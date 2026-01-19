@@ -1,0 +1,91 @@
+package restudio.resync.core;
+
+import org.java_websocket.WebSocket;
+
+import java.util.concurrent.atomic.AtomicLong;
+
+public class ConnectionInfo {
+    private final WebSocket webSocket;
+    private final int connectionId;
+    private final long connectionTime;
+    private final AtomicLong lastHeartbeat;
+    private final AtomicLong bytesSent;
+    private final AtomicLong bytesReceived;
+    private volatile ConnectionState state;
+    private String clientId;
+    private String clientVersion;
+
+    public ConnectionInfo(WebSocket webSocket, int connectionId) {
+        this.webSocket = webSocket;
+        this.connectionId = connectionId;
+        this.connectionTime = System.currentTimeMillis();
+        this.lastHeartbeat = new AtomicLong(System.currentTimeMillis());
+        this.bytesSent = new AtomicLong(0);
+        this.bytesReceived = new AtomicLong(0);
+        this.state = ConnectionState.CONNECTING;
+    }
+
+    public WebSocket getWebSocket() {
+        return webSocket;
+    }
+
+    public int getConnectionId() {
+        return connectionId;
+    }
+
+    public long getConnectionTime() {
+        return connectionTime;
+    }
+
+    public long getLastHeartbeat() {
+        return lastHeartbeat.get();
+    }
+
+    public void updateHeartbeat() {
+        lastHeartbeat.set(System.currentTimeMillis());
+    }
+
+    public ConnectionState getState() {
+        return state;
+    }
+
+    public void setState(ConnectionState state) {
+        this.state = state;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getClientVersion() {
+        return clientVersion;
+    }
+
+    public void setClientVersion(String clientVersion) {
+        this.clientVersion = clientVersion;
+    }
+
+    public long getBytesSent() {
+        return bytesSent.get();
+    }
+
+    public void addBytesSent(long bytes) {
+        bytesSent.addAndGet(bytes);
+    }
+
+    public long getBytesReceived() {
+        return bytesReceived.get();
+    }
+
+    public void addBytesReceived(long bytes) {
+        bytesReceived.addAndGet(bytes);
+    }
+
+    public long getConnectedDuration() {
+        return System.currentTimeMillis() - connectionTime;
+    }
+}

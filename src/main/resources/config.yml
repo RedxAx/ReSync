@@ -1,0 +1,21 @@
+enabled: true
+port: 8080
+api-key: ""
+maxConnections: 10
+
+compression.enabled: true
+compression.level: 6
+compression.threshold: 1024
+
+batching.enabled: true
+batching.maxBatchSize: 50
+batching.maxBatchDelay: 100
+
+queue.maxRequestsPerClient: 100
+queue.maxGlobalRequests: 500
+queue.tpsThreshold: 18.0
+
+memory.maxCacheSize: 4096
+memory.maxMemoryPerSession: 52428800
+memory.cacheTtlMinutes: 10
+memory.sessionMemoryRatio: 0.3

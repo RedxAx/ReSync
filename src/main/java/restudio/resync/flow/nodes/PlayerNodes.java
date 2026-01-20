@@ -1,10 +1,12 @@
 package restudio.resync.flow.nodes;
 
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowNode;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 
@@ -41,7 +43,18 @@ public class PlayerNodes {
             Player target = ctx.getInputValue(node, "target", Player.class);
             String reason = ctx.getInputValue(node, "reason", String.class, "Kicked by Flow");
             if (target != null) {
-                target.kick(Component.text(reason));
+                if (Bukkit.isPrimaryThread()) {
+                    target.kick(Component.text(reason));
+                } else {
+                    try {
+                        Bukkit.getScheduler().callSyncMethod(ReSync.getInstance(), () -> {
+                            target.kick(Component.text(reason));
+                            return null;
+                        }).get();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
             ctx.triggerOutput("flow");
         });

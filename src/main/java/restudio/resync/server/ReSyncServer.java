@@ -6,7 +6,11 @@ import org.java_websocket.handshake.ClientHandshake;
 import restudio.resync.compression.CompressionPool;
 import restudio.resync.core.*;
 import restudio.resync.memory.MemoryMonitor;
+import restudio.resync.flow.FlowRegistry;
+import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.GuiManager;
 import restudio.resync.modules.ChunkModule;
+import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleRegistry;
 import restudio.resync.protocol.Codec;
@@ -37,6 +41,16 @@ public class ReSyncServer {
     private final Codec codec;
     private final ScheduledExecutorService scheduler;
     private final MemoryMonitor memoryMonitor;
+    private restudio.resync.flow.GuiManager guiManager;
+    private FlowModule flowModule;
+    
+    public FlowModule getFlowModule() {
+        return flowModule;
+    }
+
+    public restudio.resync.flow.GuiManager getGuiManager() {
+        return guiManager;
+    }
 
     public ReSyncServer(ReSyncConfig config) {
         this.config = config;
@@ -66,12 +80,15 @@ public class ReSyncServer {
         );
         this.scheduler = Executors.newScheduledThreadPool(2);
 
-        registerModules();
         setupChannels();
+        registerModules();
         startScheduler();
     }
 
     private void registerModules() {
+        restudio.resync.core.ChannelMuxer.Channel chunksChannel = channelMuxer.getChannel("chunks");
+        int chunksId = (chunksChannel != null) ? chunksChannel.getNumericId() : 1000;
+
         ChunkModule chunkModule = new ChunkModule(
             codec,
             config.getMemory().getMaxCacheSize(),
@@ -79,11 +96,29 @@ public class ReSyncServer {
         );
         moduleRegistry.registerModule(chunkModule);
 
+        restudio.resync.core.ChannelMuxer.Channel flowChannel = channelMuxer.getChannel("flow");
+        int flowId = (flowChannel != null) ? flowChannel.getNumericId() : 1001;
 
+        FlowStorage flowStorage = new FlowStorage(restudio.resync.ReSync.getInstance());
+        restudio.resync.flow.TypeAdapterRegistry typeAdapter = new restudio.resync.flow.TypeAdapterRegistry();
+        FlowRegistry flowRegistry = new FlowRegistry();
+        restudio.resync.flow.StandardNodes.registerAll(flowRegistry);
+        java.util.Map<String, Object> globalVariables = new java.util.HashMap<>();
+        restudio.resync.flow.FlowExecutor flowExecutor = new restudio.resync.flow.FlowExecutor(flowRegistry, typeAdapter, globalVariables);
+        restudio.resync.flow.triggers.TriggerRegistry triggerRegistry = new restudio.resync.flow.triggers.TriggerRegistry(restudio.resync.ReSync.getInstance());
+        restudio.resync.flow.GlobalTriggers globalTriggers = new restudio.resync.flow.GlobalTriggers(flowStorage, flowExecutor, triggerRegistry);
+        Bukkit.getPluginManager().registerEvents(globalTriggers, restudio.resync.ReSync.getInstance());
+        
+        FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers);
+        moduleRegistry.registerModule(flowModule);
+
+        restudio.resync.flow.GuiManager guiManager = new restudio.resync.flow.GuiManager(this, flowStorage, flowExecutor, flowModule);
+        Bukkit.getPluginManager().registerEvents(guiManager, restudio.resync.ReSync.getInstance());
     }
 
     private void setupChannels() {
         channelMuxer.createChannel("chunks");
+        channelMuxer.createChannel("flow");
     }
 
     private void startScheduler() {
@@ -233,7 +268,14 @@ public class ReSyncServer {
             return;
         }
 
-        String channelId = "chunks";
+        int numericChannelId = req.getChannel();
+        ChannelMuxer.Channel channel = channelMuxer.getChannelByNumericId(numericChannelId);
+        
+        if (channel == null) {
+            return;
+        }
+        
+        String channelId = channel.getId();
         Module module = moduleRegistry.getModule(channelId);
         if (module == null) {
             return;

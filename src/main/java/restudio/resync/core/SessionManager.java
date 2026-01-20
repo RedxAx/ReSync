@@ -1,5 +1,7 @@
 package restudio.resync.core;
 
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.java_websocket.WebSocket;
 import restudio.resync.memory.MemoryMonitor;
 
@@ -14,6 +16,7 @@ public class SessionManager {
     private final ConcurrentHashMap<WebSocket, Session> sessionsByConnection;
     private final ConcurrentHashMap<String, Session> sessionsById;
     private final ConcurrentHashMap<ConnectionInfo, Session> sessionsByConnectionInfo;
+    private final ConcurrentHashMap<UUID, Session> sessionsByPlayer;
     private final MemoryMonitor memoryMonitor;
     private final ScheduledExecutorService cleanupExecutor;
     private final long sessionTimeoutMs;
@@ -24,8 +27,9 @@ public class SessionManager {
         this.sessionsByConnection = new ConcurrentHashMap<>();
         this.sessionsById = new ConcurrentHashMap<>();
         this.sessionsByConnectionInfo = new ConcurrentHashMap<>();
+        this.sessionsByPlayer = new ConcurrentHashMap<>();
         this.memoryMonitor = memoryMonitor;
-        this.sessionTimeoutMs = sessionTimeoutSec * 1000;
+        this.sessionTimeoutMs = sessionTimeoutSec *1000;
         this.maxMemoryPerSession = maxMemoryPerSessionBytes;
         this.sessionCounter = new AtomicInteger(0);
         this.cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -61,6 +65,18 @@ public class SessionManager {
         return sessionsByConnectionInfo.get(connection);
     }
 
+    public Session getSessionByPlayer(UUID playerUuid) {
+        return sessionsByPlayer.get(playerUuid);
+    }
+
+    public void linkPlayerToSession(UUID playerUuid, Session session) {
+        sessionsByPlayer.put(playerUuid, session);
+    }
+
+    public void unlinkPlayer(UUID playerUuid) {
+        sessionsByPlayer.remove(playerUuid);
+    }
+
     public Session getSessionById(String sessionId) {
         return sessionsById.get(sessionId);
     }
@@ -70,6 +86,7 @@ public class SessionManager {
         if (session != null) {
             sessionsById.remove(session.getSessionId());
             sessionsByConnectionInfo.remove(session.getConnection());
+            sessionsByPlayer.entrySet().removeIf(entry -> entry.getValue() == session);
             memoryMonitor.untrackSession(session);
         }
     }
@@ -114,5 +131,9 @@ public class SessionManager {
         } catch (InterruptedException e) {
             cleanupExecutor.shutdownNow();
         }
+    }
+
+    public java.util.Collection<Session> getSessions() {
+        return sessionsById.values();
     }
 }

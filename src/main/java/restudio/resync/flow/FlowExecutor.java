@@ -141,6 +141,9 @@ public class FlowExecutor {
             if (!conn.getTargetNodeId().equals(nodeId)) {
                 continue;
             }
+            if ("flow".equals(conn.getTargetPin())) {
+                continue;
+            }
             if (!runtime.hasNodeOutput(conn.getSourceNodeId(), conn.getSourcePin())) {
                 executeDataNode(runtime, conn.getSourceNodeId(), player, event);
             }

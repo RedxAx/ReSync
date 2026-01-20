@@ -141,7 +141,7 @@ public class GlobalTriggers implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onAsyncChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
 
@@ -190,7 +190,7 @@ public class GlobalTriggers implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
 
@@ -207,7 +207,7 @@ public class GlobalTriggers implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBlockPlace(BlockPlaceEvent event) {
         Player player = event.getPlayer();
 

@@ -10,14 +10,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 
 public class FlowStorage {
     private final File flowDir;
     private final File guiDir;
-    private final Map<UUID, FlowGraph> graphCache = new ConcurrentHashMap<>();
+    private final Map<String, FlowGraph> graphCache = new ConcurrentHashMap<>();
     private final Map<String, GuiDefinition> guiCache = new ConcurrentHashMap<>();
 
     public FlowStorage(JavaPlugin plugin) {
@@ -32,29 +30,25 @@ public class FlowStorage {
     }
 
     public FlowGraph getGraph(String id) {
-        try {
-            UUID uuid = UUID.fromString(id);
-            if (graphCache.containsKey(uuid)) return graphCache.get(uuid);
-            
-            File file = new File(flowDir, uuid.toString() + ".json");
-            if (file.exists()) {
-                try {
-                    String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-                    FlowGraph graph = FlowSerializer.deserialize(json);
-                    graphCache.put(uuid, graph);
-                    return graph;
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        if (graphCache.containsKey(id)) return graphCache.get(id);
+        
+        File file = new File(flowDir, id + ".json");
+        if (file.exists()) {
+            try {
+                String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                FlowGraph graph = FlowSerializer.deserialize(json);
+                graphCache.put(id, graph);
+                return graph;
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IllegalArgumentException e) {
         }
         return null;
     }
 
     public void saveGraph(FlowGraph graph) {
         graphCache.put(graph.getId(), graph);
-        File file = new File(flowDir, graph.getId().toString() + ".json");
+        File file = new File(flowDir, graph.getId() + ".json");
         try {
             String json = FlowSerializer.serialize(graph);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
@@ -68,13 +62,12 @@ public class FlowStorage {
             return;
         }
         try {
-            UUID uuid = UUID.fromString(id);
-            graphCache.remove(uuid);
-            File file = new File(flowDir, uuid.toString() + ".json");
+            graphCache.remove(id);
+            File file = new File(flowDir, id + ".json");
             if (file.exists()) {
                 Files.delete(file.toPath());
             }
-        } catch (IllegalArgumentException | IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -107,7 +100,7 @@ public class FlowStorage {
         }
     }
 
-    public Map<UUID, FlowGraph> getGraphCache() {
+    public Map<String, FlowGraph> getGraphCache() {
         return graphCache;
     }
 

@@ -138,13 +138,13 @@ public class FlowModule implements Module {
             }
 
             if (graph.getId() == null) {
-                graph.setId(java.util.UUID.randomUUID());
+                graph.setId(java.util.UUID.randomUUID().toString());
             }
 
             storage.saveGraph(graph);
             Bukkit.getLogger().info("[ReSync] Saved flow " + graph.getId() + " from client " + session.getClientId());
             updateEventBindings(graph);
-            sendFlowSaveAck(session, graph.getId().toString());
+            sendFlowSaveAck(session, graph.getId());
         } catch (Exception e) {
             sendError(session, "SAVE_FAILED", "Failed to save flow: " + e.getMessage());
             Bukkit.getLogger().severe("[ReSync] Save error: " + e.getMessage());

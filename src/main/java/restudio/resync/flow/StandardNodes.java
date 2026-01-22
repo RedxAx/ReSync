@@ -10,6 +10,7 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.flow.util.TextFormatter;
 
 public class StandardNodes {
     public static void registerAll(FlowRegistry registry) {
@@ -17,9 +18,46 @@ public class StandardNodes {
         registerUtilityNodes(registry);
         restudio.resync.flow.nodes.PlayerNodes.registerAll(registry);
         restudio.resync.flow.nodes.WorldNodes.registerAll(registry);
-        restudio.resync.flow.nodes.LogicNodes.registerAll(registry);
+        new restudio.resync.flow.nodes.LogicNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.MathNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.FlowControlNodes().registerNodes(registry);
         registerVariableNodes(registry);
         registerInventoryNodes(registry);
+        new restudio.resync.flow.nodes.StringNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.TextFormattingNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ListNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ListTransformNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PlayerActionNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PlayerInventoryNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PlayerMessagingNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EntitySpawnNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EntityControlNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.BlockNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.RegionNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.WorldStateNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.InventoryNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ItemCreationNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.MenuNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PlayerEventNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EntityEventNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.WorldEventNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.VariableNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.FileNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.JsonNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.TimeNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.RandomNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ConversionNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.DebugNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.SystemNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ScoreboardNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.TeamNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.SoundNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ParticleNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.TitleNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.SystemEventNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.CustomEventNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EconomyNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PermissionNodes().registerNodes(registry);
     }
 
     private static void registerEventNodes(FlowRegistry registry) {
@@ -145,7 +183,7 @@ public class StandardNodes {
         registry.register("player_message", (ctx, node) -> {
             Object text = ctx.getInputValue(node, "text", String.class, "");
             if (ctx.getPlayer() != null) {
-                ctx.getPlayer().sendMessage(Component.text((String)text));
+                ctx.getPlayer().sendMessage(TextFormatter.parse(String.valueOf(text)));
             }
             ctx.triggerOutput("flow");
         });

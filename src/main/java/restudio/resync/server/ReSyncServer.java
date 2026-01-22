@@ -43,6 +43,7 @@ public class ReSyncServer {
     private final MemoryMonitor memoryMonitor;
     private restudio.resync.flow.GuiManager guiManager;
     private FlowModule flowModule;
+    private restudio.resync.flow.SystemEventListener systemEventListener;
     
     public FlowModule getFlowModule() {
         return flowModule;
@@ -107,7 +108,16 @@ public class ReSyncServer {
         restudio.resync.flow.FlowExecutor flowExecutor = new restudio.resync.flow.FlowExecutor(flowRegistry, typeAdapter, globalVariables);
         restudio.resync.flow.triggers.TriggerRegistry triggerRegistry = new restudio.resync.flow.triggers.TriggerRegistry(restudio.resync.ReSync.getInstance());
         restudio.resync.flow.GlobalTriggers globalTriggers = new restudio.resync.flow.GlobalTriggers(flowStorage, flowExecutor, triggerRegistry);
+        this.systemEventListener = new restudio.resync.flow.SystemEventListener(flowStorage, flowExecutor, triggerRegistry);
         Bukkit.getPluginManager().registerEvents(globalTriggers, restudio.resync.ReSync.getInstance());
+        Bukkit.getPluginManager().registerEvents(systemEventListener, restudio.resync.ReSync.getInstance());
+
+        Bukkit.getScheduler().runTaskTimer(restudio.resync.ReSync.getInstance(), () -> {
+            if (this.systemEventListener != null) {
+                this.systemEventListener.tick();
+            }
+            restudio.resync.flow.CustomEventManager.getInstance().tick();
+        }, 1L, 1L);
         
         FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers);
         moduleRegistry.registerModule(flowModule);
@@ -297,6 +307,9 @@ public class ReSyncServer {
     }
 
     public void shutdown() {
+        if (this.systemEventListener != null) {
+            this.systemEventListener.onServerStop();
+        }
         scheduler.shutdown();
         connectionManager.shutdown();
         sessionManager.shutdown();

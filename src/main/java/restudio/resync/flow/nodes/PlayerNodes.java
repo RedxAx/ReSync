@@ -9,6 +9,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
+import restudio.resync.flow.util.TextFormatter;
 
 public class PlayerNodes {
     public static void registerAll(FlowRegistry registry) {
@@ -34,7 +35,7 @@ public class PlayerNodes {
             Player target = ctx.getInputValue(node, "target", Player.class);
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (target != null) {
-                target.sendMessage(Component.text(text));
+                target.sendMessage(TextFormatter.parse(text));
             }
             ctx.triggerOutput("flow");
         });
@@ -44,11 +45,11 @@ public class PlayerNodes {
             String reason = ctx.getInputValue(node, "reason", String.class, "Kicked by Flow");
             if (target != null) {
                 if (Bukkit.isPrimaryThread()) {
-                    target.kick(Component.text(reason));
+                    target.kick(TextFormatter.parse(reason));
                 } else {
                     try {
                         Bukkit.getScheduler().callSyncMethod(ReSync.getInstance(), () -> {
-                            target.kick(Component.text(reason));
+                            target.kick(TextFormatter.parse(reason));
                             return null;
                         }).get();
                     } catch (Exception e) {

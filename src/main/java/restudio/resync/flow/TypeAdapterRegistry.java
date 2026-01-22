@@ -1,5 +1,8 @@
 package restudio.resync.flow;
 
+import net.kyori.adventure.text.Component;
+import restudio.resync.flow.util.TextFormatter;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,6 +39,9 @@ public class TypeAdapterRegistry {
     }
 
     private void registerDefaultAdapters() {
+        register(String.class, Component.class, TextFormatter::parse);
+        register(Component.class, String.class, TextFormatter::formatLegacy);
+
         register(String.class, Integer.class, s -> {
             try {
                 return Integer.parseInt(s.toString());

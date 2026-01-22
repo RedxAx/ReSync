@@ -12,15 +12,6 @@ public class FlowControlNodes implements NodeCategory {
     
     @Override
     public void registerNodes(FlowRegistry registry) {
-        registry.register("if_else", (ctx, node) -> {
-            Boolean condition = ctx.getInputValue(node, "condition", Boolean.class, false);
-            if (condition) {
-                ctx.triggerOutput("true");
-            } else {
-                ctx.triggerOutput("false");
-            }
-        });
-        
         registry.register("switch_case", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", null);
             List<String> cases = ctx.getInputValue(node, "cases", List.class, List.of());
@@ -41,7 +32,7 @@ public class FlowControlNodes implements NodeCategory {
         });
         
         registry.register("branch_random", (ctx, node) -> {
-            int branches = ctx.getInputValue(node, "branches", Integer.class, 2);
+            int branches = ctx.getInputValue(node, "branches", Integer.class,2);
             int selected = (int) (Math.random() * branches);
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "selected", selected);
@@ -56,19 +47,25 @@ public class FlowControlNodes implements NodeCategory {
         });
         
         registry.register("loop_count", (ctx, node) -> {
-            int count = ctx.getInputValue(node, "count", Integer.class, 1);
+            int count = ctx.getInputValue(node, "count", Integer.class,1);
             String nodeId = findNodeId(ctx, node);
+            ctx.getRuntime().resetLoopControl();
             
             CompletableFuture<Void> loopFuture = CompletableFuture.completedFuture(null);
             for (int i = 0; i < count; i++) {
                 final int index = i;
                 loopFuture = loopFuture.thenCompose(v -> {
+                    if (ctx.getRuntime().isBreakLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
                     ctx.setNodeOutput(nodeId, "index", index);
+                    ctx.getRuntime().resetLoopControl();
                     return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
                 });
             }
             
             loopFuture.thenRun(() -> {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
             });
@@ -77,8 +74,10 @@ public class FlowControlNodes implements NodeCategory {
         registry.register("loop_for_each", (ctx, node) -> {
             List<?> list = ctx.getInputValue(node, "list", List.class, List.of());
             String nodeId = findNodeId(ctx, node);
+            ctx.getRuntime().resetLoopControl();
             
             if (list.isEmpty()) {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
                 return;
@@ -89,13 +88,21 @@ public class FlowControlNodes implements NodeCategory {
                 final int index = i;
                 final Object element = list.get(i);
                 loopFuture = loopFuture.thenCompose(v -> {
+                    if (ctx.getRuntime().isBreakLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    if (ctx.getRuntime().isContinueLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
                     ctx.setNodeOutput(nodeId, "index", index);
                     ctx.setNodeOutput(nodeId, "element", element);
+                    ctx.getRuntime().resetLoopControl();
                     return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
                 });
             }
             
             loopFuture.thenRun(() -> {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
             });
@@ -104,8 +111,10 @@ public class FlowControlNodes implements NodeCategory {
         registry.register("loop_for_each_player", (ctx, node) -> {
             List<org.bukkit.entity.Player> players = new java.util.ArrayList<>(org.bukkit.Bukkit.getOnlinePlayers());
             String nodeId = findNodeId(ctx, node);
+            ctx.getRuntime().resetLoopControl();
             
             if (players.isEmpty()) {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
                 return;
@@ -116,13 +125,21 @@ public class FlowControlNodes implements NodeCategory {
                 final int index = i;
                 final org.bukkit.entity.Player player = players.get(i);
                 loopFuture = loopFuture.thenCompose(v -> {
+                    if (ctx.getRuntime().isBreakLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    if (ctx.getRuntime().isContinueLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
                     ctx.setNodeOutput(nodeId, "index", index);
                     ctx.setNodeOutput(nodeId, "player", player);
+                    ctx.getRuntime().resetLoopControl();
                     return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
                 });
             }
             
             loopFuture.thenRun(() -> {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
             });
@@ -141,8 +158,10 @@ public class FlowControlNodes implements NodeCategory {
             List<org.bukkit.entity.Entity> entities = new java.util.ArrayList<>(
                 center.getWorld().getNearbyEntities(center, radius, radius, radius));
             String nodeId = findNodeId(ctx, node);
+            ctx.getRuntime().resetLoopControl();
             
             if (entities.isEmpty()) {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
                 return;
@@ -153,16 +172,34 @@ public class FlowControlNodes implements NodeCategory {
                 final int index = i;
                 final org.bukkit.entity.Entity entity = entities.get(i);
                 loopFuture = loopFuture.thenCompose(v -> {
+                    if (ctx.getRuntime().isBreakLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    if (ctx.getRuntime().isContinueLoopRequested()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
                     ctx.setNodeOutput(nodeId, "index", index);
                     ctx.setNodeOutput(nodeId, "entity", entity);
+                    ctx.getRuntime().resetLoopControl();
                     return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
                 });
             }
             
             loopFuture.thenRun(() -> {
+                ctx.getRuntime().resetLoopControl();
                 ctx.setNodeOutput(nodeId, "completed", true);
                 ctx.triggerOutput("completed");
             });
+        });
+        
+        registry.register("break_loop", (ctx, node) -> {
+            ctx.getRuntime().setBreakLoopRequested(true);
+            ctx.triggerOutput("flow");
+        });
+        
+        registry.register("continue_loop", (ctx, node) -> {
+            ctx.getRuntime().setContinueLoopRequested(true);
+            ctx.triggerOutput("flow");
         });
     }
     

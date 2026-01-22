@@ -9,13 +9,17 @@ public class EntitySpawnNodes implements NodeDefinitionCategory {
     @Override
     public void registerNodes(NodeDefinitionRegistry registry) {
         registry.register(new NodeDefinition.Builder("entity_spawn", "Spawn Entity", NodeDefinition.NodeCategory.ENTITY)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("entity_type", NodeDefinition.PinType.DATA, FlowType.STRING)
             .input("location", NodeDefinition.PinType.DATA, FlowType.LOCATION)
             .output("entity", NodeDefinition.PinType.DATA, FlowType.ENTITY)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
         
         registry.register(new NodeDefinition.Builder("entity_despawn", "Despawn Entity", NodeDefinition.NodeCategory.ENTITY)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("entity", NodeDefinition.PinType.DATA, FlowType.ENTITY)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
         
         registry.register(new NodeDefinition.Builder("entity_get_nearby", "Get Nearby Entities", NodeDefinition.NodeCategory.ENTITY)
@@ -32,12 +36,16 @@ public class EntitySpawnNodes implements NodeDefinitionCategory {
             .build());
         
         registry.register(new NodeDefinition.Builder("entity_teleport", "Teleport Entity", NodeDefinition.NodeCategory.ENTITY)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("entity", NodeDefinition.PinType.DATA, FlowType.ENTITY)
             .input("location", NodeDefinition.PinType.DATA, FlowType.LOCATION)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
         
         registry.register(new NodeDefinition.Builder("entity_remove", "Remove Entity", NodeDefinition.NodeCategory.ENTITY)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("entity", NodeDefinition.PinType.DATA, FlowType.ENTITY)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
         
         registry.register(new NodeDefinition.Builder("entity_get_player_nearby", "Get Nearby Players", NodeDefinition.NodeCategory.ENTITY)

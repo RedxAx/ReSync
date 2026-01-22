@@ -24,7 +24,6 @@ public class ConversionNodes implements NodeCategory {
             String string = value != null ? value.toString() : "";
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "string", string);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_number", (ctx, node) -> {
@@ -41,7 +40,6 @@ public class ConversionNodes implements NodeCategory {
             }
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "number", number);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_boolean", (ctx, node) -> {
@@ -57,7 +55,6 @@ public class ConversionNodes implements NodeCategory {
             }
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "boolean", bool);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_player", (ctx, node) -> {
@@ -78,7 +75,6 @@ public class ConversionNodes implements NodeCategory {
             
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "player", player);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_location", (ctx, node) -> {
@@ -99,7 +95,6 @@ public class ConversionNodes implements NodeCategory {
             
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "location", location);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_item", (ctx, node) -> {
@@ -116,7 +111,6 @@ public class ConversionNodes implements NodeCategory {
             
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "item", item);
-            ctx.triggerOutput("flow");
         });
         
         registry.register("to_list", (ctx, node) -> {
@@ -136,7 +130,6 @@ public class ConversionNodes implements NodeCategory {
             
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "list", list);
-            ctx.triggerOutput("flow");
         });
     }
     

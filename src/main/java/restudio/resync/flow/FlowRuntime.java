@@ -19,10 +19,11 @@ public class FlowRuntime {
     private final Map<String, Object> eventVariables;
     private final TypeAdapterRegistry typeAdapter;
     private String triggeredOutputPin;
-    private static final Map<String, Object> GLOBAL_CACHE = new HashMap<>();
     private final Set<String> evaluatingNodes = new HashSet<>();
     
     private final Stack<Frame> callStack = new Stack<>();
+    private boolean breakLoopRequested = false;
+    private boolean continueLoopRequested = false;
     
     private static class Frame {
         final FlowGraph graph;
@@ -123,9 +124,7 @@ public class FlowRuntime {
 
     public void setVariable(String name, Object value) {
         if (name.startsWith("server.")) {
-            if (name.startsWith("server.")) {
-                globalVariables.put(name, value);
-            }
+            globalVariables.put(name, value);
         } else {
             localVariables.put(name, value);
         }
@@ -219,5 +218,26 @@ public class FlowRuntime {
 
     public int getCallDepth() {
         return callStack.size();
+    }
+    
+    public void setBreakLoopRequested(boolean requested) {
+        this.breakLoopRequested = requested;
+    }
+    
+    public boolean isBreakLoopRequested() {
+        return breakLoopRequested;
+    }
+    
+    public void setContinueLoopRequested(boolean requested) {
+        this.continueLoopRequested = requested;
+    }
+    
+    public boolean isContinueLoopRequested() {
+        return continueLoopRequested;
+    }
+    
+    public void resetLoopControl() {
+        this.breakLoopRequested = false;
+        this.continueLoopRequested = false;
     }
 }

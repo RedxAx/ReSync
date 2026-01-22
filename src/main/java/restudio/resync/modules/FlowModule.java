@@ -219,16 +219,11 @@ public class FlowModule implements Module {
         if (nodeType == null) {
             return null;
         }
-        return switch (nodeType) {
-            case "event:join" -> "join";
-            case "event:quit" -> "quit";
-            case "event:chat" -> "chat";
-            case "event:sneak" -> "sneak";
-            case "event:death" -> "death";
-            case "event:block_break" -> "block_break";
-            case "event:block_place" -> "block_place";
-            default -> null;
-        };
+        if (nodeType.startsWith("event:")) {
+            String eventType = nodeType.substring(6);
+            return eventType;
+        }
+        return null;
     }
 
     private void sendFlowSaveAck(Session session, String flowId) {

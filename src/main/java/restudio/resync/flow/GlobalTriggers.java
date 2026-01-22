@@ -610,6 +610,11 @@ public class GlobalTriggers implements Listener {
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
+        double distance = event.getFrom().distance(event.getTo());
+        
+        if (distance < 0.1) {
+            return;
+        }
         
         for (Map.Entry<String, String> entry : playerMoveTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
@@ -619,7 +624,7 @@ public class GlobalTriggers implements Listener {
                 setEventVariables(player, eventVars);
                 eventVars.put("event.from_location", event.getFrom());
                 eventVars.put("event.to_location", event.getTo());
-                eventVars.put("event.distance", event.getFrom().distance(event.getTo()));
+                eventVars.put("event.distance", distance);
                 executor.execute(graph, entry.getValue(), player, event);
             }
         }

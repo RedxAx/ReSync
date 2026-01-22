@@ -9,6 +9,8 @@ import restudio.resync.memory.MemoryMonitor;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
+import restudio.resync.flow.plugins.FlowNodePluginRegistry;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.modules.ChunkModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.Module;
@@ -44,6 +46,7 @@ public class ReSyncServer {
     private restudio.resync.flow.GuiManager guiManager;
     private FlowModule flowModule;
     private restudio.resync.flow.SystemEventListener systemEventListener;
+    private FlowNodePluginRegistry nodePluginRegistry;
     
     public FlowModule getFlowModule() {
         return flowModule;
@@ -104,6 +107,14 @@ public class ReSyncServer {
         restudio.resync.flow.TypeAdapterRegistry typeAdapter = new restudio.resync.flow.TypeAdapterRegistry();
         FlowRegistry flowRegistry = new FlowRegistry();
         restudio.resync.flow.StandardNodes.registerAll(flowRegistry);
+        NodeDefinitionRegistry nodeDefinitionRegistry = new NodeDefinitionRegistry();
+        FlowNodePluginRegistry nodePluginRegistry = new FlowNodePluginRegistry(
+            flowRegistry,
+            nodeDefinitionRegistry,
+            restudio.resync.ReSync.getInstance().getDataFolder().toPath().resolve("flow-plugins")
+        );
+        nodePluginRegistry.loadInitialPlugins();
+        this.nodePluginRegistry = nodePluginRegistry;
         java.util.Map<String, Object> globalVariables = new java.util.HashMap<>();
         restudio.resync.flow.FlowExecutor flowExecutor = new restudio.resync.flow.FlowExecutor(flowRegistry, typeAdapter, globalVariables);
         restudio.resync.flow.triggers.TriggerRegistry triggerRegistry = new restudio.resync.flow.triggers.TriggerRegistry(restudio.resync.ReSync.getInstance());
@@ -119,7 +130,7 @@ public class ReSyncServer {
             restudio.resync.flow.CustomEventManager.getInstance().tick();
         }, 1L, 1L);
         
-        FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers);
+        FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers, flowRegistry, nodePluginRegistry);
         moduleRegistry.registerModule(flowModule);
 
         restudio.resync.flow.GuiManager guiManager = new restudio.resync.flow.GuiManager(this, flowStorage, flowExecutor, flowModule);
@@ -134,6 +145,9 @@ public class ReSyncServer {
     private void startScheduler() {
         scheduler.scheduleWithFixedDelay(() -> {
             moduleRegistry.tickAll();
+            if (nodePluginRegistry != null) {
+                nodePluginRegistry.tick();
+            }
         }, 100, 100, TimeUnit.MILLISECONDS);
     }
 
@@ -309,6 +323,9 @@ public class ReSyncServer {
     public void shutdown() {
         if (this.systemEventListener != null) {
             this.systemEventListener.onServerStop();
+        }
+        if (this.nodePluginRegistry != null) {
+            this.nodePluginRegistry.shutdown();
         }
         scheduler.shutdown();
         connectionManager.shutdown();

@@ -8,6 +8,11 @@ import restudio.resync.flow.FlowStorage;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.flow.GlobalTriggers;
+import restudio.resync.flow.FlowRegistry;
+import restudio.resync.flow.plugins.FlowNodePluginRegistry;
+import restudio.resync.flow.sync.NodePluginPayload;
+import restudio.resync.flow.sync.NodeRegistryRequest;
+import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
@@ -17,6 +22,11 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class FlowModule implements Module {
     private final FlowStorage storage;
@@ -24,16 +34,38 @@ public class FlowModule implements Module {
     private final int channelId;
     private final TriggerRegistry triggerRegistry;
     private final GlobalTriggers globalTriggers;
+    private final FlowRegistry flowRegistry;
+    private final FlowNodePluginRegistry pluginRegistry;
+    private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final Gson gson = new Gson();
     private static final int MAX_PACKET_SIZE = 1024 * 1024; // 1MB
     private static final int MAX_STRING_LENGTH = 65536; // 64KB
 
-    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers) {
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, FlowNodePluginRegistry pluginRegistry) {
         this.storage = storage;
         this.codec = codec;
         this.channelId = channelId;
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
+        this.flowRegistry = flowRegistry;
+        this.pluginRegistry = pluginRegistry;
+
+        if (this.pluginRegistry != null) {
+            this.pluginRegistry.addListener(new FlowNodePluginRegistry.PluginChangeListener() {
+                @Override
+                public void onPluginLoaded(NodePluginPayload payload) {
+                    NodeRegistrySnapshot snapshot = buildDeltaSnapshot(List.of(payload), List.of());
+                    broadcastNodeRegistry(snapshot);
+                }
+
+                @Override
+                public void onPluginUnloaded(String pluginId) {
+                    NodeRegistrySnapshot snapshot = buildDeltaSnapshot(List.of(), List.of(pluginId));
+                    broadcastNodeRegistry(snapshot);
+                }
+            });
+        }
     }
 
     @Override
@@ -44,6 +76,12 @@ public class FlowModule implements Module {
     @Override
     public void onSubscribe(Session session, SubscribeRequest req) {
         Bukkit.getLogger().info("[ReSync] " + session.getClientId() + " subscribed to flow channel.");
+        subscribedSessions.add(session);
+    }
+
+    @Override
+    public void cleanup(Session session) {
+        subscribedSessions.remove(session);
     }
 
     @Override
@@ -79,6 +117,9 @@ public class FlowModule implements Module {
                     break;
                 case 0x09:
                     handleListRequest(session);
+                    break;
+                case 0x0C:
+                    handleNodeRegistryRequest(session, buffer);
                     break;
                 case 0x06:
                     handleTriggerUpdate(buffer);
@@ -227,6 +268,23 @@ public class FlowModule implements Module {
         }
     }
 
+    private void handleNodeRegistryRequest(Session session, ByteBuffer buffer) {
+        byte[] jsonBytes = new byte[buffer.remaining()];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        NodeRegistryRequest request = null;
+        try {
+            if (!json.isBlank()) {
+                request = gson.fromJson(json, NodeRegistryRequest.class);
+            }
+        } catch (Exception e) {
+            Bukkit.getLogger().warning("[ReSync] Failed to parse node registry request: " + e.getMessage());
+        }
+
+        NodeRegistrySnapshot snapshot = buildSnapshot(request);
+        sendNodeRegistrySnapshot(session, snapshot);
+    }
+
     private void handleDelete(Session session, ByteBuffer buffer) {
         if (!buffer.hasRemaining()) {
             return;
@@ -268,6 +326,80 @@ public class FlowModule implements Module {
         msg.setChannel(channelId);
         msg.setPayload(buffer.array());
         codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private NodeRegistrySnapshot buildSnapshot(NodeRegistryRequest request) {
+        NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
+        Map<String, String> clientChecksums = request != null ? request.getPluginChecksums() : Map.of();
+        boolean fullSync = clientChecksums == null || clientChecksums.isEmpty();
+        snapshot.setFullSync(fullSync);
+
+        List<String> nodeIds = new ArrayList<>(flowRegistry.getRegisteredTypes());
+        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
+        snapshot.setNodeIds(nodeIds);
+
+        List<NodePluginPayload> pluginPayloads = new ArrayList<>();
+        if (pluginRegistry != null) {
+            for (String pluginId : pluginRegistry.getPluginIds()) {
+                String checksum = pluginRegistry.getChecksum(pluginId);
+                String clientChecksum = clientChecksums != null ? clientChecksums.get(pluginId) : null;
+                if (fullSync || checksum == null || !checksum.equals(clientChecksum)) {
+                    NodePluginPayload payload = pluginRegistry.buildPayload(pluginId);
+                    if (payload != null) {
+                        pluginPayloads.add(payload);
+                    }
+                }
+            }
+        }
+        snapshot.setPlugins(pluginPayloads);
+
+        List<String> removed = new ArrayList<>();
+        if (clientChecksums != null && pluginRegistry != null) {
+            for (String pluginId : clientChecksums.keySet()) {
+                if (!pluginRegistry.getPluginIds().contains(pluginId)) {
+                    removed.add(pluginId);
+                }
+            }
+        }
+        snapshot.setRemovedPlugins(removed);
+        return snapshot;
+    }
+
+    private NodeRegistrySnapshot buildDeltaSnapshot(List<NodePluginPayload> plugins, List<String> removedPlugins) {
+        NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
+        snapshot.setFullSync(false);
+        List<String> nodeIds = new ArrayList<>(flowRegistry.getRegisteredTypes());
+        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
+        snapshot.setNodeIds(nodeIds);
+        snapshot.setPlugins(plugins);
+        snapshot.setRemovedPlugins(removedPlugins);
+        return snapshot;
+    }
+
+    private void sendNodeRegistrySnapshot(Session session, NodeRegistrySnapshot snapshot) {
+        if (session == null || snapshot == null) {
+            return;
+        }
+        String json = gson.toJson(snapshot);
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+        byte packetId = snapshot.isFullSync() ? (byte) 0x0B : (byte) 0x0D;
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put(packetId);
+        buffer.put(jsonBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, true);
+    }
+
+    private void broadcastNodeRegistry(NodeRegistrySnapshot snapshot) {
+        if (snapshot == null) {
+            return;
+        }
+        for (Session session : subscribedSessions) {
+            sendNodeRegistrySnapshot(session, snapshot);
+        }
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {

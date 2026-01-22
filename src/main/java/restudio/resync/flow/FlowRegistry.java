@@ -17,7 +17,15 @@ public class FlowRegistry {
         executors.put(type, executor);
     }
 
+    public void unregister(String type) {
+        executors.remove(type);
+    }
+
     public BiConsumer<FlowContext, FlowNode> getExecutor(String type) {
         return executors.get(type);
+    }
+
+    public java.util.Set<String> getRegisteredTypes() {
+        return java.util.Collections.unmodifiableSet(executors.keySet());
     }
 }

@@ -130,7 +130,7 @@ public class ReSyncServer {
             restudio.resync.flow.CustomEventManager.getInstance().tick();
         }, 1L, 1L);
         
-        FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers, flowRegistry, nodePluginRegistry);
+        FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry);
         moduleRegistry.registerModule(flowModule);
 
         restudio.resync.flow.GuiManager guiManager = new restudio.resync.flow.GuiManager(this, flowStorage, flowExecutor, flowModule);

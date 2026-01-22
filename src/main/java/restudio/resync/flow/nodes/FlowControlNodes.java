@@ -12,6 +12,15 @@ public class FlowControlNodes implements NodeCategory {
     
     @Override
     public void registerNodes(FlowRegistry registry) {
+        registry.register("if", (ctx, node) -> {
+            Boolean condition = ctx.getInputValue(node, "condition", Boolean.class, false);
+            if (Boolean.TRUE.equals(condition)) {
+                ctx.triggerOutput("true");
+            } else {
+                ctx.triggerOutput("false");
+            }
+        });
+
         registry.register("switch_case", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", null);
             List<String> cases = ctx.getInputValue(node, "cases", List.class, List.of());

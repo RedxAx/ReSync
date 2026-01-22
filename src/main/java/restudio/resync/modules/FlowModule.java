@@ -10,6 +10,7 @@ import com.google.gson.reflect.TypeToken;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.plugins.FlowNodePluginRegistry;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistryRequest;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
@@ -35,6 +36,7 @@ public class FlowModule implements Module {
     private final TriggerRegistry triggerRegistry;
     private final GlobalTriggers globalTriggers;
     private final FlowRegistry flowRegistry;
+    private final NodeDefinitionRegistry definitionRegistry;
     private final FlowNodePluginRegistry pluginRegistry;
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final Gson gson = new Gson();
@@ -42,13 +44,14 @@ public class FlowModule implements Module {
     private static final int MAX_STRING_LENGTH = 65536; // 64KB
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
-                      FlowRegistry flowRegistry, FlowNodePluginRegistry pluginRegistry) {
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry) {
         this.storage = storage;
         this.codec = codec;
         this.channelId = channelId;
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
         this.flowRegistry = flowRegistry;
+        this.definitionRegistry = definitionRegistry;
         this.pluginRegistry = pluginRegistry;
 
         if (this.pluginRegistry != null) {
@@ -329,7 +332,7 @@ public class FlowModule implements Module {
         boolean fullSync = clientChecksums == null || clientChecksums.isEmpty();
         snapshot.setFullSync(fullSync);
 
-        List<String> nodeIds = new ArrayList<>(flowRegistry.getRegisteredTypes());
+        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
         nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
         snapshot.setNodeIds(nodeIds);
 
@@ -363,7 +366,7 @@ public class FlowModule implements Module {
     private NodeRegistrySnapshot buildDeltaSnapshot(List<NodePluginPayload> plugins, List<String> removedPlugins) {
         NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
         snapshot.setFullSync(false);
-        List<String> nodeIds = new ArrayList<>(flowRegistry.getRegisteredTypes());
+        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
         nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
         snapshot.setNodeIds(nodeIds);
         snapshot.setPlugins(plugins);

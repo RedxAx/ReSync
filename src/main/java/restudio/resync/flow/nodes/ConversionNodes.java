@@ -20,14 +20,14 @@ public class ConversionNodes implements NodeCategory {
     @Override
     public void registerNodes(FlowRegistry registry) {
         registry.register("to_string", (ctx, node) -> {
-            Object value = ctx.getInputValue(node, "value", null);
+            Object value = ctx.getInputValue(node, "value");
             String string = value != null ? value.toString() : "";
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "string", string);
         });
         
         registry.register("to_number", (ctx, node) -> {
-            Object value = ctx.getInputValue(node, "value", null);
+            Object value = ctx.getInputValue(node, "value");
             Double number = 0.0;
             if (value instanceof Number) {
                 number = ((Number) value).doubleValue();
@@ -43,7 +43,7 @@ public class ConversionNodes implements NodeCategory {
         });
         
         registry.register("to_boolean", (ctx, node) -> {
-            Object value = ctx.getInputValue(node, "value", null);
+            Object value = ctx.getInputValue(node, "value");
             Boolean bool = false;
             if (value instanceof Boolean) {
                 bool = (Boolean) value;
@@ -58,7 +58,7 @@ public class ConversionNodes implements NodeCategory {
         });
         
         registry.register("to_player", (ctx, node) -> {
-            Object uuidOrName = ctx.getInputValue(node, "uuid_or_name", null);
+            Object uuidOrName = ctx.getInputValue(node, "uuid_or_name");
             Player player = null;
             
             if (uuidOrName instanceof Player) {
@@ -114,7 +114,7 @@ public class ConversionNodes implements NodeCategory {
         });
         
         registry.register("to_list", (ctx, node) -> {
-            Object valueOrSeparator = ctx.getInputValue(node, "value_or_separator", null);
+            Object valueOrSeparator = ctx.getInputValue(node, "value_or_separator");
             List<Object> list = new ArrayList<>();
             
             if (valueOrSeparator instanceof List) {

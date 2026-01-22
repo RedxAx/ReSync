@@ -665,18 +665,24 @@ public class GlobalTriggers implements Listener {
     }
 
     @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
+    public void onEntityDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
-        
+
+        Entity damager = null;
+        if (event instanceof EntityDamageByEntityEvent byEntityEvent) {
+            damager = byEntityEvent.getDamager();
+        }
+
         for (Map.Entry<String, String> entry : playerEntityDamageTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
                 executor.clearEventVariables();
                 Map<String, Object> eventVars = executor.getEventVariables();
                 setEventVariables(player, eventVars);
-                eventVars.put("event.damager", event.getDamager());
+                eventVars.put("event.damager", damager);
                 eventVars.put("event.victim", event.getEntity());
                 eventVars.put("event.damage", event.getDamage());
+                eventVars.put("event.cause", event.getCause().name());
                 executor.execute(graph, entry.getValue(), player, event);
             }
         }
@@ -1113,6 +1119,85 @@ public class GlobalTriggers implements Listener {
                 Map<String, Object> eventVars = executor.getEventVariables();
                 eventVars.put("event.entity", entity);
                 eventVars.put("event.killer", event.getEntity().getKiller());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onEntityDamaged(EntityDamageEvent event) {
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : entityDamagedTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.damager", event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent ? ((org.bukkit.event.entity.EntityDamageByEntityEvent) event).getDamager() : null);
+                eventVars.put("event.damage", event.getDamage());
+                eventVars.put("event.cause", event.getCause().name());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onEntityRegainHealth(EntityRegainHealthEvent event) {
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : entityRegainHealthTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.amount", event.getAmount());
+                eventVars.put("event.reason", event.getRegainReason().name());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+        
+        for (Map.Entry<String, String> entry : entityHealTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.amount", event.getAmount());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onEntityPickup(EntityPickupItemEvent event) {
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : entityPickupTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.item", event.getItem());
+                eventVars.put("event.remaining", event.getRemaining());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onEntityDrop(EntityDropItemEvent event) {
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : entityDropTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.dropped", event.getItemDrop());
                 executor.execute(graph, entry.getValue(), null, event);
             }
         }
@@ -1584,5 +1669,90 @@ public class GlobalTriggers implements Listener {
             case "piston_retract" -> "event:piston_retract";
             default -> null;
         };
+    }
+    
+    @EventHandler
+    public void onPlayerVanishToggle(PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        
+        for (Map.Entry<String, String> entry : playerVanishToggleTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                setEventVariables(player, eventVars);
+                eventVars.put("event.is_vanished", event.isFlying());
+                executor.execute(graph, entry.getValue(), player, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onPlayerShear(PlayerShearEntityEvent event) {
+        Player player = event.getPlayer();
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : playerShearTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                setEventVariables(player, eventVars);
+                eventVars.put("event.entity", entity);
+                executor.execute(graph, entry.getValue(), player, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onEntityCombust(EntityCombustEvent event) {
+        Entity entity = event.getEntity();
+        
+        for (Map.Entry<String, String> entry : entityCombustTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.entity", entity);
+                eventVars.put("event.duration", event.getDuration());
+                eventVars.put("event.cancelled", event.isCancelled());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onPlayerTabComplete(PlayerChatTabCompleteEvent event) {
+        Player player = event.getPlayer();
+        
+        for (Map.Entry<String, String> entry : playerTabCompleteTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                setEventVariables(player, eventVars);
+                eventVars.put("event.completions", event.getTabCompletions());
+                eventVars.put("event.chat_message", event.getChatMessage());
+                executor.execute(graph, entry.getValue(), player, event);
+            }
+        }
+    }
+    
+    @EventHandler
+    public void onStructureSpawn(BlockGrowEvent event) {
+        if (event.isCancelled()) return;
+        Block block = event.getBlock();
+        
+        for (Map.Entry<String, String> entry : structureSpawnTriggers.entrySet()) {
+            FlowGraph graph = storage.getGraph(entry.getKey());
+            if (graph != null) {
+                executor.clearEventVariables();
+                Map<String, Object> eventVars = executor.getEventVariables();
+                eventVars.put("event.block", block);
+                eventVars.put("event.location", block.getLocation());
+                eventVars.put("event.new_state", event.getBlock().getType().name());
+                executor.execute(graph, entry.getValue(), null, event);
+            }
+        }
     }
 }

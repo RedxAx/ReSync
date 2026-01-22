@@ -8,6 +8,7 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -57,8 +58,10 @@ public class FlowExecutor {
         }
         FlowContext context = new FlowContext(runtime, player, event);
 
-        if ("loop".equals(node.getType())) {
-            return executeLoop(runtime, node, player, event, steps);
+        String type = node.getType();
+        if (isLoopNode(type)) {
+            ensureInputNodesReady(runtime, node, player, event);
+            return executeLoopNode(runtime, node, player, event, steps);
         }
 
         ensureInputNodesReady(runtime, node, player, event);
@@ -98,12 +101,30 @@ public class FlowExecutor {
         return execute(runtime, nextNodeId, player, event, steps + 1);
     }
 
-    private CompletableFuture<Void> executeLoop(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
+    private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
+        String type = loopNode.getType();
+        if ("loop".equals(type) || "loop_count".equals(type)) {
+            return executeLoopCount(runtime, loopNode, player, event, steps);
+        }
+        if ("loop_for_each".equals(type)) {
+            return executeLoopForEach(runtime, loopNode, player, event, steps);
+        }
+        if ("loop_for_each_player".equals(type)) {
+            return executeLoopForEachPlayer(runtime, loopNode, player, event, steps);
+        }
+        if ("loop_for_each_entity".equals(type)) {
+            return executeLoopForEachEntity(runtime, loopNode, player, event, steps);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private CompletableFuture<Void> executeLoopCount(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
         FlowGraph graph = runtime.getGraph();
         String nodeId = findNodeId(graph, loopNode);
         if (nodeId == null) {
             return CompletableFuture.completedFuture(null);
         }
+        runtime.resetLoopControl();
         Integer count = (Integer) runtime.resolveInput(loopNode, "count", Integer.class);
         int iterations = count != null ? Math.max(0, count) : 0;
 
@@ -114,6 +135,9 @@ public class FlowExecutor {
         for (int i = 0; i < iterations; i++) {
             int index = i;
             future = future.thenCompose(v -> {
+                if (runtime.isBreakLoopRequested()) {
+                    return CompletableFuture.completedFuture(null);
+                }
                 runtime.setNodeOutput(nodeId, "index", index);
                 if (loopTarget == null) {
                     return CompletableFuture.completedFuture(null);
@@ -128,6 +152,143 @@ public class FlowExecutor {
             }
             return execute(runtime, completedTarget, player, event, steps + 1);
         });
+    }
+
+    private CompletableFuture<Void> executeLoopForEach(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
+        FlowGraph graph = runtime.getGraph();
+        String nodeId = findNodeId(graph, loopNode);
+        if (nodeId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        runtime.resetLoopControl();
+        List<?> list = (List<?>) runtime.resolveInput(loopNode, "list", List.class);
+        if (list == null) {
+            list = List.of();
+        }
+
+        String loopTarget = findTargetNode(graph, nodeId, "loop");
+        String completedTarget = findTargetNode(graph, nodeId, "completed");
+
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        for (int i = 0; i < list.size(); i++) {
+            int index = i;
+            Object element = list.get(i);
+            future = future.thenCompose(v -> {
+                if (runtime.isBreakLoopRequested()) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                runtime.setNodeOutput(nodeId, "index", index);
+                runtime.setNodeOutput(nodeId, "element", element);
+                if (loopTarget == null) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                return execute(runtime, loopTarget, player, event, steps + 1);
+            });
+        }
+
+        return future.thenCompose(v -> {
+            if (completedTarget == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return execute(runtime, completedTarget, player, event, steps + 1);
+        });
+    }
+
+    private CompletableFuture<Void> executeLoopForEachPlayer(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
+        FlowGraph graph = runtime.getGraph();
+        String nodeId = findNodeId(graph, loopNode);
+        if (nodeId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        runtime.resetLoopControl();
+        List<Player> players = new java.util.ArrayList<>(org.bukkit.Bukkit.getOnlinePlayers());
+
+        String loopTarget = findTargetNode(graph, nodeId, "loop");
+        String completedTarget = findTargetNode(graph, nodeId, "completed");
+
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        for (int i = 0; i < players.size(); i++) {
+            int index = i;
+            Player loopPlayer = players.get(i);
+            future = future.thenCompose(v -> {
+                if (runtime.isBreakLoopRequested()) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                runtime.setNodeOutput(nodeId, "index", index);
+                runtime.setNodeOutput(nodeId, "player", loopPlayer);
+                if (loopTarget == null) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                return execute(runtime, loopTarget, player, event, steps + 1);
+            });
+        }
+
+        return future.thenCompose(v -> {
+            if (completedTarget == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return execute(runtime, completedTarget, player, event, steps + 1);
+        });
+    }
+
+    private CompletableFuture<Void> executeLoopForEachEntity(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
+        FlowGraph graph = runtime.getGraph();
+        String nodeId = findNodeId(graph, loopNode);
+        if (nodeId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        runtime.resetLoopControl();
+        Double radius = (Double) runtime.resolveInput(loopNode, "radius", Double.class);
+        if (radius == null) {
+            radius = 10.0;
+        }
+        org.bukkit.Location center = (org.bukkit.Location) runtime.resolveInput(loopNode, "center", org.bukkit.Location.class);
+        if (center == null && player != null) {
+            center = player.getLocation();
+        }
+        if (center == null || center.getWorld() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        List<org.bukkit.entity.Entity> entities = new java.util.ArrayList<>(
+            center.getWorld().getNearbyEntities(center, radius, radius, radius));
+        String loopTarget = findTargetNode(graph, nodeId, "loop");
+        String completedTarget = findTargetNode(graph, nodeId, "completed");
+
+        CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+        for (int i = 0; i < entities.size(); i++) {
+            int index = i;
+            org.bukkit.entity.Entity entity = entities.get(i);
+            future = future.thenCompose(v -> {
+                if (runtime.isBreakLoopRequested()) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                runtime.setNodeOutput(nodeId, "index", index);
+                runtime.setNodeOutput(nodeId, "entity", entity);
+                if (loopTarget == null) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                return execute(runtime, loopTarget, player, event, steps + 1);
+            });
+        }
+
+        return future.thenCompose(v -> {
+            if (completedTarget == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return execute(runtime, completedTarget, player, event, steps + 1);
+        });
+    }
+
+    private boolean isLoopNode(String type) {
+        if (type == null) {
+            return false;
+        }
+        return "loop".equals(type)
+            || "loop_count".equals(type)
+            || "loop_for_each".equals(type)
+            || "loop_for_each_player".equals(type)
+            || "loop_for_each_entity".equals(type);
     }
 
     private void ensureInputNodesReady(FlowRuntime runtime, FlowNode node, Player player, Event event) {
@@ -159,9 +320,6 @@ public class FlowExecutor {
             return;
         }
         String type = sourceNode.getType();
-        if (type != null && type.startsWith("event:")) {
-            return;
-        }
 
         var executor = registry.getExecutor(type);
         if (executor == null) {

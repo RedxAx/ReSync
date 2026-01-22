@@ -339,10 +339,17 @@ public class PermissionNodes implements NodeCategory {
                 ctx.setNodeOutput(nodeId, "permissions", new ArrayList<>());
                 return;
             }
-            
+
+            QueryOptions queryOptions = getQueryOptions(lp, user);
             List<String> permissions = new ArrayList<>();
-            user.getNodes().forEach(n -> permissions.add(n.getKey()));
-            
+            user.getCachedData().getPermissionData(queryOptions)
+                .getPermissionMap()
+                .forEach((key, value) -> {
+                    if (Boolean.TRUE.equals(value)) {
+                        permissions.add(key);
+                    }
+                });
+
             ctx.setNodeOutput(nodeId, "success", true);
             ctx.setNodeOutput(nodeId, "permissions", permissions);
         });

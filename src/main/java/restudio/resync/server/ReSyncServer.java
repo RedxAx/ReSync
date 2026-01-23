@@ -133,8 +133,8 @@ public class ReSyncServer {
         FlowModule flowModule = new FlowModule(flowStorage, codec, flowId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry);
         moduleRegistry.registerModule(flowModule);
 
-        restudio.resync.flow.GuiManager guiManager = new restudio.resync.flow.GuiManager(this, flowStorage, flowExecutor, flowModule);
-        Bukkit.getPluginManager().registerEvents(guiManager, restudio.resync.ReSync.getInstance());
+        this.guiManager = new restudio.resync.flow.GuiManager(this, flowStorage, flowExecutor, flowModule);
+        Bukkit.getPluginManager().registerEvents(this.guiManager, restudio.resync.ReSync.getInstance());
     }
 
     private void setupChannels() {

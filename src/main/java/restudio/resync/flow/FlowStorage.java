@@ -80,6 +80,9 @@ public class FlowStorage {
             try {
                 String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
                 GuiDefinition gui = FlowSerializer.deserializeGui(json);
+                if (gui != null && (gui.getId() == null || gui.getId().isBlank())) {
+                    gui.setId(id);
+                }
                 guiCache.put(id, gui);
                 return gui;
             } catch (IOException e) {
@@ -95,6 +98,21 @@ public class FlowStorage {
         try {
             String json = FlowSerializer.serializeGui(gui);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteGui(String id) {
+        if (id == null) {
+            return;
+        }
+        try {
+            guiCache.remove(id);
+            File file = new File(guiDir, id + ".json");
+            if (file.exists()) {
+                Files.delete(file.toPath());
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -117,6 +135,21 @@ public class FlowStorage {
             }
         }
         return flowIds;
+    }
+
+    public java.util.List<String> listGuiIds() {
+        java.util.List<String> guiIds = new java.util.ArrayList<>();
+        File[] files = guiDir.listFiles((dir, name) -> name.endsWith(".json"));
+        if (files == null) {
+            return guiIds;
+        }
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".json")) {
+                guiIds.add(name.substring(0, name.length() - 5));
+            }
+        }
+        return guiIds;
     }
 
     public Map<String, GuiDefinition> getGuiCache() {

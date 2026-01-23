@@ -3,6 +3,7 @@ package restudio.resync.modules;
 import org.bukkit.Bukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
+import restudio.flow.data.GuiDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
 import com.google.gson.Gson;
@@ -120,6 +121,18 @@ public class FlowModule implements Module {
                     break;
                 case 0x09:
                     handleListRequest(session);
+                    break;
+                case 0x11:
+                    handleGuiRequest(session, buffer);
+                    break;
+                case 0x13:
+                    handleGuiSave(session, buffer);
+                    break;
+                case 0x14:
+                    handleGuiListRequest(session);
+                    break;
+                case 0x16:
+                    handleGuiDelete(session, buffer);
                     break;
                 case 0x0C:
                     handleNodeRegistryRequest(session, buffer);
@@ -302,6 +315,87 @@ public class FlowModule implements Module {
         Bukkit.getLogger().info("[ReSync] Deleted flow " + flowId + " from client " + session.getClientId());
     }
 
+    private void handleGuiRequest(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_REQUEST", "GUI ID not provided");
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String guiId = new String(idBytes, StandardCharsets.UTF_8);
+        if (guiId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_GUI_ID", "GUI ID too long");
+            return;
+        }
+        GuiDefinition gui = storage.getGui(guiId);
+        if (gui != null) {
+            sendGuiData(session, gui);
+        } else {
+            sendError(session, "GUI_NOT_FOUND", "GUI not found: " + guiId);
+        }
+    }
+
+    private void handleGuiSave(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_SAVE", "No data provided");
+            return;
+        }
+        if (buffer.remaining() > MAX_PACKET_SIZE) {
+            sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
+            return;
+        }
+        byte[] jsonBytes = new byte[buffer.remaining()];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        try {
+            GuiDefinition gui = FlowSerializer.deserializeGui(json);
+            if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
+                sendError(session, "INVALID_GUI", "GUI ID is missing");
+                return;
+            }
+            storage.saveGui(gui);
+            Bukkit.getLogger().info("[ReSync] Saved GUI " + gui.getId() + " from client " + session.getClientId());
+            sendGuiSaveAck(session, gui.getId());
+        } catch (Exception e) {
+            sendError(session, "SAVE_FAILED", "Failed to save GUI: " + e.getMessage());
+        }
+    }
+
+    private void handleGuiDelete(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String guiId = new String(idBytes, StandardCharsets.UTF_8);
+        storage.deleteGui(guiId);
+        Bukkit.getLogger().info("[ReSync] Deleted GUI " + guiId + " from client " + session.getClientId());
+    }
+
+    private void handleGuiListRequest(Session session) {
+        if (storage == null) {
+            return;
+        }
+        java.util.List<String> guiIds = storage.listGuiIds();
+        int totalBytes = 1 + 4;
+        for (String id : guiIds) {
+            totalBytes += 4 + id.getBytes(StandardCharsets.UTF_8).length;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(totalBytes);
+        buffer.put((byte) 0x15);
+        buffer.putInt(guiIds.size());
+        for (String id : guiIds) {
+            byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
+            buffer.putInt(bytes.length);
+            buffer.put(bytes);
+        }
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
     private void handleListRequest(Session session) {
         if (storage == null) {
             return;
@@ -420,18 +514,61 @@ public class FlowModule implements Module {
         codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
     }
 
-    public void sendGuiState(Session session, boolean editable, String flowId) {
+    public void sendGuiData(Session session, GuiDefinition gui) {
+        String json = FlowSerializer.serializeGui(gui);
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+
+        if (jsonBytes.length > MAX_PACKET_SIZE) {
+            sendError(session, "GUI_TOO_LARGE", "GUI data exceeds maximum size");
+            return;
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put((byte) 0x12);
+        buffer.put(jsonBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private void sendGuiSaveAck(Session session, String guiId) {
+        if (guiId == null) {
+            return;
+        }
+        byte[] idBytes = guiId.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length);
+        buffer.put((byte) 0x17);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    public void sendGuiState(Session session, boolean editable, String guiId, String flowId) {
+        if (guiId != null && guiId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_GUI_ID", "GUI ID too long");
+            return;
+        }
         if (flowId != null && flowId.length() > MAX_STRING_LENGTH) {
             sendError(session, "INVALID_FLOW_ID", "Flow ID too long");
             return;
         }
 
-        byte[] idBytes = flowId != null ? flowId.getBytes(StandardCharsets.UTF_8) : new byte[0];
-        ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 4 + idBytes.length);
+        byte[] guiBytes = guiId != null ? guiId.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        byte[] flowBytes = flowId != null ? flowId.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 4 + guiBytes.length + 4 + flowBytes.length);
         buffer.put((byte) 0x04);
         buffer.put((byte) (editable ? 1 : 0));
-        buffer.putInt(idBytes.length);
-        buffer.put(idBytes);
+        buffer.putInt(guiBytes.length);
+        buffer.put(guiBytes);
+        buffer.putInt(flowBytes.length);
+        buffer.put(flowBytes);
 
         DataMessage msg = new DataMessage();
         msg.setChannel(channelId);

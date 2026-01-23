@@ -9,6 +9,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.ReSync;
+import restudio.resync.flow.GuiManager;
+import restudio.resync.server.ReSyncServer;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.NodeCategory;
 import restudio.resync.flow.util.TextFormatter;
@@ -155,6 +158,16 @@ public class MenuNodes implements NodeCategory {
                         player.openInventory(inv);
                         openMenus.put(player, menuId);
                     });
+                }
+            } else if (player != null && !menuId.isEmpty()) {
+                ReSyncServer server = ReSync.getInstance() != null ? ReSync.getInstance().getV2Server() : null;
+                GuiManager guiManager = server != null ? server.getGuiManager() : null;
+                if (guiManager != null) {
+                    if (Bukkit.isPrimaryThread()) {
+                        guiManager.openGui(player, menuId);
+                    } else {
+                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> guiManager.openGui(player, menuId));
+                    }
                 }
             }
             ctx.triggerOutput("flow");

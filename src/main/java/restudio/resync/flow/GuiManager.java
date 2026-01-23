@@ -1,7 +1,6 @@
 package restudio.resync.flow;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -20,19 +19,22 @@ import restudio.flow.data.GuiElement;
 import restudio.flow.data.Visual;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.server.ReSyncServer;
+import restudio.resync.flow.util.TextFormatter;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GuiManager implements Listener {
+    private static final int PLAYER_INVENTORY_SLOTS = 36;
     private final ReSyncServer server;
     private final FlowStorage storage;
     private final FlowExecutor executor;
     private final FlowModule flowModule;
     private final Map<UUID, GuiDefinition> openGuis = new ConcurrentHashMap<>();
-    private final MiniMessage miniMessage = MiniMessage.miniMessage();
+    private final Map<UUID, ItemStack[]> savedPlayerInventories = new ConcurrentHashMap<>();
 
     public GuiManager(ReSyncServer server, FlowStorage storage, FlowExecutor executor, FlowModule flowModule) {
         this.server = server;
@@ -44,35 +46,60 @@ public class GuiManager implements Listener {
     public void openGui(Player player, String guiId) {
         GuiDefinition def = storage.getGui(guiId);
         if (def != null) {
+            if (def.getId() == null || def.getId().isBlank()) {
+                def.setId(guiId);
+            }
             openGui(player, def);
         }
     }
 
     public void openGui(Player player, GuiDefinition def) {
         RemotelyHolder holder = new RemotelyHolder(def, player);
-        Inventory inv = Bukkit.createInventory(holder, def.getRows() * 9, miniMessage.deserialize(def.getTitle()));
+        String title = def.getTitle() != null && !def.getTitle().isBlank() ? def.getTitle() : def.getId();
+        int topSize = def.getRows() * 9;
+        boolean extendInventory = def.isExtendToPlayerInventory();
+        Inventory inv = Bukkit.createInventory(holder, topSize, TextFormatter.parse(title));
+
+        if (extendInventory) {
+            savePlayerInventory(player);
+            clearPlayerInventory(player);
+        } else {
+            restorePlayerInventory(player);
+        }
 
         for (GuiElement el : def.getElements()) {
             ItemStack item = createItemStack(el.getVisual());
             if (item != null) {
                 for (int slot : el.getSlots()) {
-                    if (slot >= 0 && slot < inv.getSize()) {
+                    if (slot < 0) {
+                        continue;
+                    }
+                    if (slot < topSize) {
                         inv.setItem(slot, item);
+                    } else if (extendInventory) {
+                        setPlayerInventorySlot(player, slot, topSize, item);
                     }
                 }
             }
         }
 
-        player.openInventory(inv);
         openGuis.put(player.getUniqueId(), def);
+        player.openInventory(inv);
 
         String flowId = findFlowIdForGui(def);
-        if (flowId != null) {
-            var session = server.getSessionManager().getSessionByPlayer(player.getUniqueId());
-            if (session != null) {
-                flowModule.sendGuiState(session, true, flowId);
-            }
+        var session = server.getSessionManager().getSessionByPlayer(player.getUniqueId());
+        if (session == null) {
+            linkPlayerToSession(player);
+            session = server.getSessionManager().getSessionByPlayer(player.getUniqueId());
         }
+        if (session != null) {
+            flowModule.sendGuiState(session, true, def.getId(), flowId);
+        }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        linkPlayerToSession(event.getPlayer());
     }
 
     private ItemStack createItemStack(Visual visual) {
@@ -90,13 +117,14 @@ public class GuiManager implements Listener {
 
         if (meta != null) {
             if (visual.getName() != null) {
-                meta.displayName(miniMessage.deserialize(visual.getName()));
+                meta.displayName(TextFormatter.parseItemName(visual.getName()));
             }
 
             if (visual.getLore() != null && !visual.getLore().isEmpty()) {
-                List<Component> loreLines = visual.getLore().stream()
-                    .map(miniMessage::deserialize)
-                    .toList();
+                List<Component> loreLines = new java.util.ArrayList<>();
+                for (String line : visual.getLore()) {
+                    loreLines.add(TextFormatter.parseItemLore(line));
+                }
                 meta.lore(loreLines);
             }
 
@@ -120,10 +148,24 @@ public class GuiManager implements Listener {
         GuiDefinition def = holder.getGuiDefinition();
 
         event.setCancelled(true);
-        int slot = event.getSlot();
+        int slot = event.getRawSlot();
+        int topSize = def.getRows() * 9;
+        int maxSlot = topSize + (def.isExtendToPlayerInventory() ? PLAYER_INVENTORY_SLOTS : 0);
+        if (slot < 0 || slot >= maxSlot) {
+            return;
+        }
 
         for (GuiElement el : def.getElements()) {
             if (el.getSlots().contains(slot)) {
+                String openGuiId = el.getOpenGuiId();
+                if (openGuiId != null && !openGuiId.isBlank()) {
+                    if (storage.getGui(openGuiId) != null) {
+                        openGui(player, openGuiId);
+                    } else {
+                        player.sendMessage("GUI not found: " + openGuiId);
+                    }
+                    break;
+                }
                 String flowId = el.getFlowId();
                 if (flowId != null) {
                     FlowGraph graph = storage.getGraph(flowId);
@@ -140,12 +182,24 @@ public class GuiManager implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        openGuis.remove(event.getPlayer().getUniqueId());
+        if (!(event.getInventory().getHolder() instanceof RemotelyHolder holder)) {
+            return;
+        }
+        GuiDefinition def = holder.getGuiDefinition();
+        boolean removed = openGuis.remove(event.getPlayer().getUniqueId(), def);
+        if (removed && def != null && def.isExtendToPlayerInventory() && event.getPlayer() instanceof Player player) {
+            restorePlayerInventory(player);
+        }
+        var session = server.getSessionManager().getSessionByPlayer(event.getPlayer().getUniqueId());
+        if (session != null) {
+            flowModule.sendGuiState(session, false, def != null ? def.getId() : null, null);
+        }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         openGuis.remove(event.getPlayer().getUniqueId());
+        restorePlayerInventory(event.getPlayer());
         server.getSessionManager().unlinkPlayer(event.getPlayer().getUniqueId());
     }
 
@@ -172,5 +226,44 @@ public class GuiManager implements Listener {
             var firstSession = server.getSessionManager().getSessions().iterator().next();
             server.getSessionManager().linkPlayerToSession(player.getUniqueId(), firstSession);
         }
+    }
+
+    private void savePlayerInventory(Player player) {
+        savedPlayerInventories.computeIfAbsent(player.getUniqueId(), id -> cloneInventory(player.getInventory().getStorageContents()));
+    }
+
+    private void clearPlayerInventory(Player player) {
+        player.getInventory().setStorageContents(new ItemStack[PLAYER_INVENTORY_SLOTS]);
+        player.updateInventory();
+    }
+
+    private void restorePlayerInventory(Player player) {
+        ItemStack[] saved = savedPlayerInventories.remove(player.getUniqueId());
+        if (saved != null) {
+            player.getInventory().setStorageContents(saved);
+            player.updateInventory();
+        }
+    }
+
+    private ItemStack[] cloneInventory(ItemStack[] contents) {
+        if (contents == null) {
+            return new ItemStack[PLAYER_INVENTORY_SLOTS];
+        }
+        ItemStack[] copy = Arrays.copyOf(contents, PLAYER_INVENTORY_SLOTS);
+        for (int i = 0; i < copy.length; i++) {
+            if (copy[i] != null) {
+                copy[i] = copy[i].clone();
+            }
+        }
+        return copy;
+    }
+
+    private void setPlayerInventorySlot(Player player, int rawSlot, int topSize, ItemStack item) {
+        int offset = rawSlot - topSize;
+        if (offset < 0 || offset >= PLAYER_INVENTORY_SLOTS) {
+            return;
+        }
+        int targetSlot = offset >= 27 ? offset - 27 : offset + 9;
+        player.getInventory().setItem(targetSlot, item);
     }
 }

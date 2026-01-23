@@ -5,6 +5,8 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -61,6 +63,42 @@ public class StandardNodes {
     }
 
     private static void registerEventNodes(FlowRegistry registry) {
+        registry.register("event:click", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            Player player = ctx.getPlayer();
+
+            ctx.setNodeOutput(nodeId, "player", player);
+            if (ctx.getEvent() instanceof InventoryClickEvent clickEvent) {
+                ctx.setNodeOutput(nodeId, "slot", clickEvent.getSlot());
+                ctx.setNodeOutput(nodeId, "raw_slot", clickEvent.getRawSlot());
+                ctx.setNodeOutput(nodeId, "button", clickEvent.getHotbarButton());
+                ctx.setNodeOutput(nodeId, "action", clickEvent.getAction().name());
+                ctx.setNodeOutput(nodeId, "item", clickEvent.getCurrentItem());
+                ctx.setNodeOutput(nodeId, "cursor_item", clickEvent.getCursor());
+
+                ClickType clickType = clickEvent.getClick();
+                String outputPin = switch (clickType) {
+                    case LEFT -> "left";
+                    case RIGHT -> "right";
+                    case SHIFT_LEFT -> "shift_left";
+                    case SHIFT_RIGHT -> "shift_right";
+                    case MIDDLE -> "middle";
+                    case DOUBLE_CLICK -> "double_click";
+                    case DROP -> "drop";
+                    case CONTROL_DROP -> "control_drop";
+                    case NUMBER_KEY -> "number_key";
+                    case CREATIVE -> "creative";
+                    case SWAP_OFFHAND -> "swap_offhand";
+                    case WINDOW_BORDER_LEFT -> "window_border_left";
+                    case WINDOW_BORDER_RIGHT -> "window_border_right";
+                    case UNKNOWN -> "unknown";
+                };
+                ctx.triggerOutput(outputPin);
+                return;
+            }
+            ctx.triggerOutput("next");
+        });
+
         registry.register("event:chat", (ctx, node) -> {
             String nodeId = findNodeId(ctx, node);
 

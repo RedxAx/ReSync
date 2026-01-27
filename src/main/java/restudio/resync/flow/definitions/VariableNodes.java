@@ -12,6 +12,7 @@ public class VariableNodes implements NodeDefinitionCategory {
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("mode", NodeDefinition.PinType.DATA, FlowType.STRING)
             .input("scope", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("persist", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
             .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
             .input("name", NodeDefinition.PinType.DATA, FlowType.STRING)
             .input("value", NodeDefinition.PinType.DATA, FlowType.ANY)

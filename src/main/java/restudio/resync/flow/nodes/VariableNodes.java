@@ -5,6 +5,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.PersistentVariableStore;
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,7 @@ public class VariableNodes implements NodeCategory {
         registry.register("variable_access", (ctx, node) -> {
             String mode = ctx.getInputValue(node, "mode", String.class, "get");
             String scope = ctx.getInputValue(node, "scope", String.class, "local");
+            Boolean persist = ctx.getInputValue(node, "persist", Boolean.class, false);
             String name = ctx.getInputValue(node, "name", String.class, "");
             Object value = ctx.getInputValue(node, "value", null);
             Double amount = ctx.getInputValue(node, "amount", Double.class, 1.0);
@@ -28,6 +30,7 @@ public class VariableNodes implements NodeCategory {
 
             String normalizedMode = mode == null ? "get" : mode.trim().toLowerCase();
             String normalizedScope = scope == null ? "local" : scope.trim().toLowerCase();
+            boolean persistent = Boolean.TRUE.equals(persist);
 
             if (nodeId == null) {
                 ctx.triggerOutput("flow");
@@ -40,24 +43,46 @@ public class VariableNodes implements NodeCategory {
 
             switch (normalizedMode) {
                 case "get" -> {
-                    Object resolved = resolveVariable(ctx, normalizedScope, name, player);
+                    Object resolved = persistent
+                        ? resolvePersistentVariable(ctx, normalizedScope, name, player)
+                        : resolveVariable(ctx, normalizedScope, name, player);
                     ctx.setNodeOutput(nodeId, "value", resolved);
                 }
-                case "set" -> setVariable(ctx, normalizedScope, name, value, player);
+                case "set" -> {
+                    setVariable(ctx, normalizedScope, name, value, player);
+                    if (persistent) {
+                        persistVariable(ctx, normalizedScope, name, value, player);
+                    }
+                }
                 case "exists" -> {
-                    Object resolved = resolveVariable(ctx, normalizedScope, name, player);
-                    boolean exists = resolved != null || variableExists(ctx, normalizedScope, name, player);
+                    Object resolved = persistent
+                        ? resolvePersistentVariable(ctx, normalizedScope, name, player)
+                        : resolveVariable(ctx, normalizedScope, name, player);
+                    boolean exists = persistent
+                        ? persistentVariableExists(ctx, normalizedScope, name, player)
+                        : resolved != null || variableExists(ctx, normalizedScope, name, player);
                     ctx.setNodeOutput(nodeId, "exists", exists);
                     ctx.setNodeOutput(nodeId, "value", resolved);
                 }
-                case "delete" -> deleteVariable(ctx, normalizedScope, name, player);
+                case "delete" -> {
+                    deleteVariable(ctx, normalizedScope, name, player);
+                    if (persistent) {
+                        deletePersistentVariable(ctx, normalizedScope, name, player);
+                    }
+                }
                 case "list" -> {
-                    List<String> variables = listVariables(ctx, normalizedScope, player);
+                    List<String> variables = persistent
+                        ? listPersistentVariables(ctx, normalizedScope, player)
+                        : listVariables(ctx, normalizedScope, player);
                     ctx.setNodeOutput(nodeId, "variables", variables);
                 }
                 case "increment", "decrement", "multiply", "divide" -> {
                     double delta = amount != null ? amount : 1.0;
-                    updateNumericVariable(ctx, normalizedMode, normalizedScope, name, delta, player);
+                    if (persistent) {
+                        updateNumericPersistent(ctx, normalizedMode, normalizedScope, name, delta, player);
+                    } else {
+                        updateNumericVariable(ctx, normalizedMode, normalizedScope, name, delta, player);
+                    }
                 }
                 default -> {
                 }
@@ -368,6 +393,105 @@ public class VariableNodes implements NodeCategory {
             default -> base + amount;
         };
         target.put(key, result);
+    }
+
+    private static Object resolvePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
+        String key = buildPersistentKey(ctx, scope, name, player);
+        if (key == null) {
+            return null;
+        }
+        PersistentVariableStore store = PersistentVariableStore.getInstance();
+        if (!store.contains(key)) {
+            return null;
+        }
+        Object value = store.get(key);
+        setVariable(ctx, scope, name, value, player);
+        return value;
+    }
+
+    private static boolean persistentVariableExists(FlowContext ctx, String scope, String name, Player player) {
+        String key = buildPersistentKey(ctx, scope, name, player);
+        if (key == null) {
+            return false;
+        }
+        return PersistentVariableStore.getInstance().contains(key);
+    }
+
+    private static void persistVariable(FlowContext ctx, String scope, String name, Object value, Player player) {
+        String key = buildPersistentKey(ctx, scope, name, player);
+        if (key == null) {
+            return;
+        }
+        PersistentVariableStore.getInstance().set(key, value);
+    }
+
+    private static void deletePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
+        String key = buildPersistentKey(ctx, scope, name, player);
+        if (key == null) {
+            return;
+        }
+        PersistentVariableStore.getInstance().remove(key);
+    }
+
+    private static List<String> listPersistentVariables(FlowContext ctx, String scope, Player player) {
+        String prefix = buildPersistentPrefix(ctx, scope, player);
+        if (prefix == null) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (String key : PersistentVariableStore.getInstance().getAll().keySet()) {
+            if (key.startsWith(prefix)) {
+                names.add(key.substring(prefix.length()));
+            }
+        }
+        return names;
+    }
+
+    private static void updateNumericPersistent(FlowContext ctx, String mode, String scope, String name, double amount, Player player) {
+        String key = buildPersistentKey(ctx, scope, name, player);
+        if (key == null) {
+            return;
+        }
+        PersistentVariableStore store = PersistentVariableStore.getInstance();
+        Object current = store.get(key);
+        double base = current instanceof Number ? ((Number) current).doubleValue() : 0.0;
+        double result = switch (mode) {
+            case "decrement" -> base - amount;
+            case "multiply" -> base * amount;
+            case "divide" -> amount == 0 ? base : base / amount;
+            default -> base + amount;
+        };
+        setVariable(ctx, scope, name, result, player);
+        store.set(key, result);
+    }
+
+    private static String buildPersistentKey(FlowContext ctx, String scope, String name, Player player) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        String prefix = buildPersistentPrefix(ctx, scope, player);
+        if (prefix == null) {
+            return null;
+        }
+        return prefix + name;
+    }
+
+    private static String buildPersistentPrefix(FlowContext ctx, String scope, Player player) {
+        String normalizedScope = scope == null ? "local" : scope;
+        if ("global".equals(normalizedScope)) {
+            return "global.";
+        }
+        if ("player".equals(normalizedScope)) {
+            if (player == null) {
+                return null;
+            }
+            return "player." + player.getUniqueId() + ".";
+        }
+        String graphId = ctx.getRuntime().getGraph() != null ? ctx.getRuntime().getGraph().getId() : "local";
+        if (graphId == null || graphId.isBlank()) {
+            graphId = "local";
+        }
+        return "local." + graphId + ".";
     }
 
     private static Map<String, Object> getPlayerVars(FlowContext ctx, Player player, boolean create) {

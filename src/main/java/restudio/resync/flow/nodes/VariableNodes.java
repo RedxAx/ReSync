@@ -41,28 +41,16 @@ public class VariableNodes implements NodeCategory {
                 return;
             }
 
+            Object valueOutput = null;
+            boolean existsOutput = false;
+            List<String> variablesOutput = List.of();
+
             switch (normalizedMode) {
-                case "get" -> {
-                    Object resolved = persistent
-                        ? resolvePersistentVariable(ctx, normalizedScope, name, player)
-                        : resolveVariable(ctx, normalizedScope, name, player);
-                    ctx.setNodeOutput(nodeId, "value", resolved);
-                }
                 case "set" -> {
                     setVariable(ctx, normalizedScope, name, value, player);
                     if (persistent) {
                         persistVariable(ctx, normalizedScope, name, value, player);
                     }
-                }
-                case "exists" -> {
-                    Object resolved = persistent
-                        ? resolvePersistentVariable(ctx, normalizedScope, name, player)
-                        : resolveVariable(ctx, normalizedScope, name, player);
-                    boolean exists = persistent
-                        ? persistentVariableExists(ctx, normalizedScope, name, player)
-                        : resolved != null || variableExists(ctx, normalizedScope, name, player);
-                    ctx.setNodeOutput(nodeId, "exists", exists);
-                    ctx.setNodeOutput(nodeId, "value", resolved);
                 }
                 case "delete" -> {
                     deleteVariable(ctx, normalizedScope, name, player);
@@ -71,10 +59,11 @@ public class VariableNodes implements NodeCategory {
                     }
                 }
                 case "list" -> {
-                    List<String> variables = persistent
+                    variablesOutput = persistent
                         ? listPersistentVariables(ctx, normalizedScope, player)
                         : listVariables(ctx, normalizedScope, player);
-                    ctx.setNodeOutput(nodeId, "variables", variables);
+                    valueOutput = variablesOutput;
+                    existsOutput = !variablesOutput.isEmpty();
                 }
                 case "increment", "decrement", "multiply", "divide" -> {
                     double delta = amount != null ? amount : 1.0;
@@ -84,10 +73,24 @@ public class VariableNodes implements NodeCategory {
                         updateNumericVariable(ctx, normalizedMode, normalizedScope, name, delta, player);
                     }
                 }
+                case "get", "exists" -> {
+                }
                 default -> {
                 }
             }
 
+            if (!"list".equals(normalizedMode)) {
+                valueOutput = persistent
+                    ? resolvePersistentVariable(ctx, normalizedScope, name, player)
+                    : resolveVariable(ctx, normalizedScope, name, player);
+                existsOutput = persistent
+                    ? persistentVariableExists(ctx, normalizedScope, name, player)
+                    : valueOutput != null || variableExists(ctx, normalizedScope, name, player);
+            }
+
+            ctx.setNodeOutput(nodeId, "value", valueOutput);
+            ctx.setNodeOutput(nodeId, "exists", existsOutput);
+            ctx.setNodeOutput(nodeId, "variables", variablesOutput);
             ctx.triggerOutput("flow");
         });
 

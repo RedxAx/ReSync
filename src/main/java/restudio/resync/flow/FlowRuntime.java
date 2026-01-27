@@ -18,7 +18,7 @@ public class FlowRuntime {
     private final Map<String, Object> globalVariables;
     private final Map<String, Object> eventVariables;
     private final TypeAdapterRegistry typeAdapter;
-    private String triggeredOutputPin;
+    private final ThreadLocal<String> triggeredOutputPin = ThreadLocal.withInitial(() -> null);
     private final Set<String> evaluatingNodes = new HashSet<>();
     
     private final Stack<Frame> callStack = new Stack<>();
@@ -66,21 +66,21 @@ public class FlowRuntime {
     }
 
     public void triggerOutput(String pinName) {
-        this.triggeredOutputPin = pinName;
+        triggeredOutputPin.set(pinName);
     }
 
     public String consumeTriggeredOutput() {
-        String pin = triggeredOutputPin;
-        triggeredOutputPin = null;
+        String pin = triggeredOutputPin.get();
+        triggeredOutputPin.set(null);
         return pin;
     }
 
     public String getTriggeredOutputPin() {
-        return triggeredOutputPin;
+        return triggeredOutputPin.get();
     }
 
     public void setTriggeredOutputPin(String pin) {
-        this.triggeredOutputPin = pin;
+        triggeredOutputPin.set(pin);
     }
 
     public Object resolveInput(FlowNode node, String pinName, Class<?> expectedType) {
@@ -152,6 +152,14 @@ public class FlowRuntime {
 
     public void setNodeOutput(String nodeId, String pinName, Object value) {
         nodeOutputs.put(nodeId + ":" + pinName, value);
+    }
+
+    public void clearNodeOutputs(String nodeId) {
+        if (nodeId == null) {
+            return;
+        }
+        String prefix = nodeId + ":";
+        nodeOutputs.keySet().removeIf(key -> key.startsWith(prefix));
     }
 
     public boolean hasNodeOutput(String nodeId, String pinName) {

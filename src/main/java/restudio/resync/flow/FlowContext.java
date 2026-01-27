@@ -61,6 +61,9 @@ public class FlowContext {
     }
 
     public <T> T getInputValue(FlowNode node, String pinName, Class<T> type) {
+        if (type == null) {
+            return (T) runtime.resolveInput(node, pinName);
+        }
         Object value = runtime.resolveInput(node, pinName, type);
         if (value == null && type == Player.class && player != null) {
             return type.cast(player);
@@ -69,6 +72,10 @@ public class FlowContext {
     }
 
     public <T> T getInputValue(FlowNode node, String pinName, Class<T> type, T defaultValue) {
+        if (type == null) {
+            Object raw = runtime.resolveInput(node, pinName);
+            return (T) (raw != null ? raw : defaultValue);
+        }
         Object value = runtime.resolveInput(node, pinName, type);
         if (value == null && type == Player.class && player != null) {
             return type.cast(player);

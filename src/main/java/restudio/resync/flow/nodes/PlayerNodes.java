@@ -81,7 +81,7 @@ public class PlayerNodes {
         registry.register("give_item", (ctx, node) -> {
             Player target = ctx.getInputValue(node, "target", Player.class);
             String materialName = ctx.getInputValue(node, "material", String.class, "STONE");
-            Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
+            Integer amount = ctx.getInputValue(node, "amount", Integer.class,1);
             if (target == null) {
                 ctx.triggerOutput("flow");
                 return;
@@ -90,6 +90,96 @@ public class PlayerNodes {
             Material material = Material.getMaterial(materialName.toUpperCase());
             if (material != null) {
                 target.getInventory().addItem(new ItemStack(material, Math.max(1, amount)));
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_set_walking_speed", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class, null);
+            Double speed = ctx.getInputValue(node, "speed", Double.class, 0.2);
+            if (target != null) {
+                target.setWalkSpeed(speed.floatValue());
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_set_flying_speed", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class, null);
+            Double speed = ctx.getInputValue(node, "speed", Double.class, 0.05);
+            if (target != null) {
+                target.setFlySpeed(speed.floatValue());
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_execute_command", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class);
+            String command = ctx.getInputValue(node, "command", String.class, "");
+            Boolean asOp = ctx.getInputValue(node, "as_op", Boolean.class, false);
+            if (target == null || command.isEmpty()) {
+                String nodeId = findNodeId(ctx, node);
+                ctx.setNodeOutput(nodeId, "success", false);
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            boolean success;
+            if (Bukkit.isPrimaryThread()) {
+                boolean wasOp = target.isOp();
+                if (asOp) {
+                    target.setOp(true);
+                }
+                success = Bukkit.dispatchCommand(target, command);
+                if (asOp && !wasOp) {
+                    target.setOp(false);
+                }
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                    boolean wasOp = target.isOp();
+                    if (asOp) {
+                        target.setOp(true);
+                    }
+                    Bukkit.dispatchCommand(target, command);
+                    if (asOp && !wasOp) {
+                        target.setOp(false);
+                    }
+                });
+                success = true;
+            }
+
+            String nodeId = findNodeId(ctx, node);
+            ctx.setNodeOutput(nodeId, "success", success);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_chat", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class);
+            String message = ctx.getInputValue(node, "message", String.class, "");
+            if (target == null || message.isEmpty()) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            if (Bukkit.isPrimaryThread()) {
+                target.chat(message);
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.chat(message));
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_say", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class);
+            String message = ctx.getInputValue(node, "message", String.class, "");
+            if (target == null || message.isEmpty()) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            if (Bukkit.isPrimaryThread()) {
+                target.chat("/say " + message);
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.chat("/say " + message));
             }
             ctx.triggerOutput("flow");
         });

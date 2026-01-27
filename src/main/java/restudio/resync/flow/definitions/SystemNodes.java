@@ -26,7 +26,7 @@ public class SystemNodes implements NodeDefinitionCategory {
             .output("max", NodeDefinition.PinType.DATA, FlowType.NUMBER)
             .build());
         
-        registry.register(new NodeDefinition.Builder("server_execute_command", "Execute Command", NodeDefinition.NodeCategory.UTILITY)
+        registry.register(new NodeDefinition.Builder("server_execute_command", "Execute Console Command", NodeDefinition.NodeCategory.UTILITY)
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("command", NodeDefinition.PinType.DATA, FlowType.STRING)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)

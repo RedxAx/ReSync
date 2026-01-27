@@ -73,7 +73,26 @@ public class FlowControlNodes implements NodeDefinitionCategory {
             .output("loop", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .output("completed", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
-        
+
+        registry.register(new NodeDefinition.Builder("loop_interval", "Loop Interval", NodeDefinition.NodeCategory.LOGIC)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("interval_ticks", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("max_iterations", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("index", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("loop", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .output("completed", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("loop_while", "Loop While", NodeDefinition.NodeCategory.LOGIC)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("condition", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
+            .input("interval_ticks", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("max_iterations", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("index", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("loop", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .output("completed", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
         registry.register(new NodeDefinition.Builder("break_loop", "Break Loop", NodeDefinition.NodeCategory.LOGIC)
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)

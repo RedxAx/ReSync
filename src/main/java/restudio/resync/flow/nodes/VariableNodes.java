@@ -45,8 +45,10 @@ public class VariableNodes implements NodeCategory {
                 }
                 case "set" -> setVariable(ctx, normalizedScope, name, value, player);
                 case "exists" -> {
-                    boolean exists = variableExists(ctx, normalizedScope, name, player);
+                    Object resolved = resolveVariable(ctx, normalizedScope, name, player);
+                    boolean exists = resolved != null || variableExists(ctx, normalizedScope, name, player);
                     ctx.setNodeOutput(nodeId, "exists", exists);
+                    ctx.setNodeOutput(nodeId, "value", resolved);
                 }
                 case "delete" -> deleteVariable(ctx, normalizedScope, name, player);
                 case "list" -> {

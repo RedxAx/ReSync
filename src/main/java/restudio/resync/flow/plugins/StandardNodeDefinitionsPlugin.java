@@ -46,6 +46,7 @@ public class StandardNodeDefinitionsPlugin implements FlowNodePlugin {
         new PlayerMessagingNodes().registerNodes(registry);
         new EntitySpawnNodes().registerNodes(registry);
         new EntityControlNodes().registerNodes(registry);
+        new EntityQueryNodes().registerNodes(registry);
         new InventoryNodes().registerNodes(registry);
         new ItemCreationNodes().registerNodes(registry);
         new MenuNodes().registerNodes(registry);
@@ -66,7 +67,19 @@ public class StandardNodeDefinitionsPlugin implements FlowNodePlugin {
         new PermissionNodes().registerNodes(registry);
         new ListNodes().registerNodes(registry);
         new ListTransformNodes().registerNodes(registry);
+        new ListAdvancedNodes().registerNodes(registry);
         new ScoreboardNodes().registerNodes(registry);
         new TeamNodes().registerNodes(registry);
+        new LocationNodes().registerNodes(registry);
+        new MathAdvancedNodes().registerNodes(registry);
+        new UtilityNodes().registerNodes(registry);
+        new EntityAdvancedNodes().registerNodes(registry);
+        new ItemNodes().registerNodes(registry);
+        new PlayerQueryNodes().registerNodes(registry);
+        new StringAdvancedNodes().registerNodes(registry);
+        new DataStructureNodes().registerNodes(registry);
+        new RegionAdvancedNodes().registerNodes(registry);
+        new BlockNodes().registerNodes(registry);
+        new WorldNodes().registerNodes(registry);
     }
 }

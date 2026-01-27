@@ -1134,7 +1134,9 @@ public class GlobalTriggers implements Listener {
                 executor.clearEventVariables();
                 Map<String, Object> eventVars = executor.getEventVariables();
                 eventVars.put("event.entity", entity);
-                eventVars.put("event.damager", event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent ? ((org.bukkit.event.entity.EntityDamageByEntityEvent) event).getDamager() : null);
+                if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent damageByEntityEvent) {
+                    eventVars.put("event.damager", damageByEntityEvent.getDamager());
+                }
                 eventVars.put("event.damage", event.getDamage());
                 eventVars.put("event.cause", event.getCause().name());
                 executor.execute(graph, entry.getValue(), null, event);

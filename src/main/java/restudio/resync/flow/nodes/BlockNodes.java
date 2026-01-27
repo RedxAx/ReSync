@@ -15,8 +15,13 @@ import org.bukkit.block.data.type.Sapling;
 import org.bukkit.block.data.type.Slab;
 import org.bukkit.block.data.type.Stairs;
 import org.bukkit.block.data.type.TrapDoor;
+import org.bukkit.block.Container;
+import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.FallingBlock;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
@@ -675,6 +680,392 @@ public class BlockNodes implements NodeCategory {
                     Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), soundTask);
                 }
             } catch (IllegalArgumentException ignored) {}
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_physics", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            Runnable physicsTask = () -> {
+                block.getState().update(true, false);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                physicsTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), physicsTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_explode", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            World world = location.getWorld();
+            if (world == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Float power = ctx.getInputValue(node, "power", Float.class, 4.0f);
+            Boolean fire = ctx.getInputValue(node, "fire", Boolean.class, false);
+            Boolean breakBlocks = ctx.getInputValue(node, "break_blocks", Boolean.class, true);
+
+            Runnable explodeTask = () -> {
+                world.createExplosion(location, power, fire, breakBlocks);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                explodeTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), explodeTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_raytrace", (ctx, node) -> {
+            Location startLocation = ctx.getInputValue(node, "start_location", Location.class, null);
+            Vector direction = ctx.getInputValue(node, "direction_vector", Vector.class, null);
+            Double maxDistance = ctx.getInputValue(node, "max_distance", Double.class, 50.0);
+
+            if (startLocation == null || direction == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            World world = startLocation.getWorld();
+            if (world == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            var result = world.rayTraceBlocks(startLocation, direction.normalize(), maxDistance);
+            String nodeId = findNodeId(ctx, node);
+
+            if (result != null) {
+                Block hitBlock = result.getHitBlock();
+                Location hitLocation = result.getHitPosition().toLocation(world);
+                double distance = startLocation.distance(hitLocation);
+
+                if (hitBlock != null) {
+                    ctx.setNodeOutput(nodeId, "hit_block", hitBlock);
+                }
+                ctx.setNodeOutput(nodeId, "hit_location", hitLocation);
+                ctx.setNodeOutput(nodeId, "distance", distance);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_offset", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Integer offsetX = ctx.getInputValue(node, "offset_x", Integer.class, 0);
+            Integer offsetY = ctx.getInputValue(node, "offset_y", Integer.class, 0);
+            Integer offsetZ = ctx.getInputValue(node, "offset_z", Integer.class, 0);
+
+            Block block = location.getBlock().getRelative(offsetX, offsetY, offsetZ);
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "block", block);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_sign_text", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockState state = block.getState();
+
+            if (!(state instanceof Sign)) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Sign sign = (Sign) state;
+            String line1 = ctx.getInputValue(node, "line1", String.class, "");
+            String line2 = ctx.getInputValue(node, "line2", String.class, "");
+            String line3 = ctx.getInputValue(node, "line3", String.class, "");
+            String line4 = ctx.getInputValue(node, "line4", String.class, "");
+
+            Runnable signTask = () -> {
+                sign.setLine(0, line1);
+                sign.setLine(1, line2);
+                sign.setLine(2, line3);
+                sign.setLine(3, line4);
+                sign.update(true, true);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                signTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), signTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_container_get", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockState state = block.getState();
+
+            if (!(state instanceof Container container)) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Inventory inventory = container.getInventory();
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "items_list", inventory.getContents());
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_container_set", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockState state = block.getState();
+
+            if (!(state instanceof Container container)) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            java.util.List<ItemStack> itemsList = ctx.getInputValue(node, "items_list", java.util.List.class, null);
+            if (itemsList == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Inventory inventory = container.getInventory();
+            Runnable containerTask = () -> {
+                inventory.setContents(itemsList.toArray(new ItemStack[0]));
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                containerTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), containerTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_container_add", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockState state = block.getState();
+
+            if (!(state instanceof Container container)) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
+            if (item == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Inventory inventory = container.getInventory();
+            Runnable containerTask = () -> {
+                inventory.addItem(item);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                containerTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), containerTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_spawn_falling", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            World world = location.getWorld();
+            if (world == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            String materialName = ctx.getInputValue(node, "material_type", String.class, "STONE");
+            Material material = Material.matchMaterial(materialName.toUpperCase());
+            if (material == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            FallingBlock fallingBlock = world.spawnFallingBlock(location, material.createBlockData());
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "falling_block_entity", fallingBlock);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_break_naturally_drops", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            ItemStack tool = ctx.getInputValue(node, "tool_item", ItemStack.class, null);
+
+            java.util.Collection<ItemStack> drops;
+            if (Bukkit.isPrimaryThread()) {
+                drops = block.getDrops(tool);
+            } else {
+                drops = new java.util.concurrent.CopyOnWriteArrayList<>();
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                    drops.addAll(block.getDrops(tool));
+                });
+            }
+
+            block.setType(org.bukkit.Material.AIR);
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "dropped_items_list", drops.toArray(new ItemStack[0]));
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_break_instantly", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            Runnable breakTask = () -> {
+                block.setType(org.bukkit.Material.AIR);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                breakTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), breakTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_get_drops", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            ItemStack tool = ctx.getInputValue(node, "tool_item", ItemStack.class, null);
+
+            java.util.Collection<ItemStack> drops;
+            if (Bukkit.isPrimaryThread()) {
+                drops = block.getDrops(tool);
+            } else {
+                drops = new java.util.concurrent.CopyOnWriteArrayList<>();
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                    drops.addAll(block.getDrops(tool));
+                });
+            }
+
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "dropped_items_list", drops.toArray(new ItemStack[0]));
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_get_state", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockState state = block.getState();
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "state_data", state.getBlockData().getAsString());
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_set_state", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            String stateData = ctx.getInputValue(node, "state_data", String.class, "");
+            if (stateData.isEmpty()) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            BlockData blockData = Bukkit.createBlockData(stateData);
+
+            Runnable stateTask = () -> {
+                block.setBlockData(blockData);
+            };
+
+            if (Bukkit.isPrimaryThread()) {
+                stateTask.run();
+            } else {
+                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), stateTask);
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("block_is_solid", (ctx, node) -> {
+            Location location = ctx.getInputValue(node, "block_location", Location.class, null);
+            if (location == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+
+            Block block = location.getBlock();
+            boolean isSolid = block.getType().isSolid();
+            String nodeId = findNodeId(ctx, node);
+
+            ctx.setNodeOutput(nodeId, "is_solid", isSolid);
             ctx.triggerOutput("flow");
         });
     }

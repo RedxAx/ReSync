@@ -34,6 +34,7 @@ public class StandardNodes {
         new restudio.resync.flow.nodes.PlayerMessagingNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.EntitySpawnNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.EntityControlNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EntityQueryNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.BlockNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.RegionNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.WorldStateNodes().registerNodes(registry);
@@ -60,6 +61,16 @@ public class StandardNodes {
         new restudio.resync.flow.nodes.CustomEventNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.EconomyNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.PermissionNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.LocationNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.EntityAdvancedNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ItemNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.PlayerQueryNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.MathAdvancedNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.StringAdvancedNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.ListAdvancedNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.UtilityNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.RegionAdvancedNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.DataStructureNodes().registerNodes(registry);
     }
 
     private static void registerEventNodes(FlowRegistry registry) {

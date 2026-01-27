@@ -12,6 +12,10 @@ public enum FlowType {
     ENTITY(0x8B4513, "Entity"),
     ITEMSTACK(0x32CD32, "ItemStack"),
     JSON_OBJECT(0x4B0082, "JSONObject"),
+    MAP(0x9932CC, "Map"),
+    SET(0xFF4500, "Set"),
+    QUEUE(0x2E8B57, "Queue"),
+    STACK(0x4682B4, "Stack"),
     ANY(0x808080, "Any");
 
     private final int color;
@@ -48,10 +52,15 @@ public enum FlowType {
 
     public static FlowType fromClassName(String className) {
         String lower = className.toLowerCase();
-        if (lower.contains("list") || lower.contains("collection") || lower.contains("array")) return LIST;
+        if (lower.contains("list") || lower.contains("array")) return LIST;
+        if (lower.contains("map")) return MAP;
+        if (lower.contains("set")) return SET;
+        if (lower.contains("queue")) return QUEUE;
+        if (lower.contains("stack")) return STACK;
+        if (lower.contains("collection")) return LIST;
         if (lower.contains("entity")) return ENTITY;
         if (lower.contains("itemstack")) return ITEMSTACK;
-        if (lower.contains("json") || lower.contains("map")) return JSON_OBJECT;
+        if (lower.contains("json")) return JSON_OBJECT;
         if (lower.contains("string")) return STRING;
         if (lower.contains("int") || lower.contains("double") || lower.contains("float") || lower.contains("long")) return NUMBER;
         if (lower.contains("bool")) return BOOLEAN;

@@ -110,6 +110,21 @@ public class TypeAdapterRegistry {
             return (T) adapter.apply(source);
         }
 
+        if (source instanceof Number number) {
+            if (target == Integer.class) {
+                return (T) Integer.valueOf(number.intValue());
+            }
+            if (target == Long.class) {
+                return (T) Long.valueOf(number.longValue());
+            }
+            if (target == Double.class) {
+                return (T) Double.valueOf(number.doubleValue());
+            }
+            if (target == Float.class) {
+                return (T) Float.valueOf(number.floatValue());
+            }
+        }
+
         if (source instanceof String) {
             Function<String, ?> parser = stringParsers.get(target);
             if (parser != null) {

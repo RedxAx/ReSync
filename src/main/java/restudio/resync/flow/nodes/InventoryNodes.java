@@ -11,7 +11,11 @@ import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.NodeCategory;
 import restudio.resync.flow.util.TextFormatter;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class InventoryNodes implements NodeCategory {
@@ -316,6 +320,166 @@ public class InventoryNodes implements NodeCategory {
             }
             ctx.triggerOutput("flow");
         });
+
+        registry.register("inventory_has_space", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
+            String nodeId = findNodeId(ctx, node);
+
+            boolean hasSpace = inventory != null && item != null && inventory.firstEmpty() != -1;
+            ctx.setNodeOutput(nodeId, "has_space", hasSpace);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_count_material", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            Material material = resolveMaterial(ctx, node, "material");
+            String nodeId = findNodeId(ctx, node);
+
+            int count = 0;
+            if (inventory != null && material != null) {
+                for (ItemStack item : inventory.getContents()) {
+                    if (item != null && item.getType() == material) {
+                        count += item.getAmount();
+                    }
+                }
+            }
+            ctx.setNodeOutput(nodeId, "count", count);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_get_first_empty", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            String nodeId = findNodeId(ctx, node);
+
+            int slot = inventory != null ? inventory.firstEmpty() : -1;
+            ctx.setNodeOutput(nodeId, "slot_index", slot);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_sort", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            if (inventory != null) {
+                if (Bukkit.isPrimaryThread()) {
+                    sortInventory(inventory);
+                } else {
+                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> sortInventory(inventory));
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_get_all", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            String nodeId = findNodeId(ctx, node);
+
+            List<ItemStack> items = inventory != null ? Arrays.stream(inventory.getContents()).filter(item -> item != null && item.getType() != Material.AIR).toList() : List.of();
+            ctx.setNodeOutput(nodeId, "items_list", new ArrayList<>(items));
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_clear_all", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            if (inventory != null) {
+                if (Bukkit.isPrimaryThread()) {
+                    inventory.clear();
+                } else {
+                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> inventory.clear());
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_size", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            String nodeId = findNodeId(ctx, node);
+
+            int size = inventory != null ? inventory.getSize() : 0;
+            ctx.setNodeOutput(nodeId, "size", size);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_get_storage_contents", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            String nodeId = findNodeId(ctx, node);
+
+            ItemStack[] storageContents = inventory != null ? inventory.getStorageContents() : new ItemStack[0];
+            ctx.setNodeOutput(nodeId, "items_list", storageContents);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_get_max_stack_size", (ctx, node) -> {
+            Material material = resolveMaterial(ctx, node, "material");
+            String nodeId = findNodeId(ctx, node);
+
+            int maxStackSize = material != null ? material.getMaxStackSize() : 0;
+            ctx.setNodeOutput(nodeId, "max_size", maxStackSize);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_contains_at_least", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            Material material = resolveMaterial(ctx, node, "material");
+            Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
+            String nodeId = findNodeId(ctx, node);
+
+            boolean contains = false;
+            if (inventory != null && material != null && amount > 0) {
+                int total = 0;
+                for (ItemStack item : inventory.getContents()) {
+                    if (item != null && item.getType() == material) {
+                        total += item.getAmount();
+                        if (total >= amount) {
+                            contains = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            ctx.setNodeOutput(nodeId, "contains", contains);
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_remove_any", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            Material material = resolveMaterial(ctx, node, "material");
+            Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
+            if (inventory != null && material != null && amount > 0) {
+                if (Bukkit.isPrimaryThread()) {
+                    removeAny(inventory, material, amount);
+                } else {
+                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> removeAny(inventory, material, amount));
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_set_all_contents", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            ItemStack[] contents = ctx.getInputValue(node, "items_list", ItemStack[].class, new ItemStack[0]);
+            if (inventory != null) {
+                if (Bukkit.isPrimaryThread()) {
+                    inventory.setContents(contents);
+                } else {
+                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> inventory.setContents(contents));
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("inventory_add_to_slot", (ctx, node) -> {
+            Inventory inventory = resolveInventory(ctx, node, "inventory");
+            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
+            ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
+            if (inventory != null && item != null && slot >= 0 && slot < inventory.getSize()) {
+                if (Bukkit.isPrimaryThread()) {
+                    inventory.setItem(slot, item.clone());
+                } else {
+                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> inventory.setItem(slot, item.clone()));
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {
@@ -325,5 +489,61 @@ public class InventoryNodes implements NodeCategory {
             }
         }
         return null;
+    }
+
+    private static Inventory resolveInventory(FlowContext ctx, FlowNode node, String inputName) {
+        Object input = ctx.getInputValue(node, inputName, Object.class, null);
+        if (input == null) {
+            return null;
+        }
+        return switch (input) {
+            case Inventory inv -> inv;
+            case Player p -> p.getOpenInventory().getTopInventory();
+            default -> null;
+        };
+    }
+
+    private static Material resolveMaterial(FlowContext ctx, FlowNode node, String inputName) {
+        Object input = ctx.getInputValue(node, inputName, Object.class, null);
+        if (input == null) {
+            return null;
+        }
+        return switch (input) {
+            case Material m -> m;
+            case ItemStack i -> i.getType();
+            case String s -> Material.getMaterial(s.toUpperCase());
+            default -> null;
+        };
+    }
+
+    private static void sortInventory(Inventory inventory) {
+        List<ItemStack> items = new ArrayList<>();
+        for (ItemStack item : inventory.getContents()) {
+            if (item != null && item.getType() != Material.AIR) {
+                items.add(item.clone());
+            }
+        }
+        items.sort(Comparator.comparing((ItemStack i) -> i.getType().name()).thenComparing(i -> i.getAmount(), Comparator.reverseOrder()));
+        inventory.clear();
+        for (ItemStack item : items) {
+            inventory.addItem(item);
+        }
+    }
+
+    private static void removeAny(Inventory inventory, Material material, int amount) {
+        int remaining = amount;
+        for (int i = 0; i < inventory.getSize() && remaining > 0; i++) {
+            ItemStack item = inventory.getItem(i);
+            if (item != null && item.getType() == material) {
+                int stackAmount = item.getAmount();
+                if (stackAmount <= remaining) {
+                    inventory.setItem(i, null);
+                    remaining -= stackAmount;
+                } else {
+                    item.setAmount(stackAmount - remaining);
+                    remaining = 0;
+                }
+            }
+        }
     }
 }

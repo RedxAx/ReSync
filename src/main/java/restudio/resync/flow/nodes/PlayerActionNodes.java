@@ -11,6 +11,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.NodeCategory;
@@ -35,7 +36,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setSprinting(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setSprinting(enabled));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setSprinting(enabled));
             }
             ctx.triggerOutput("flow");
         });
@@ -50,7 +51,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setSneaking(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setSneaking(enabled));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setSneaking(enabled));
             }
             ctx.triggerOutput("flow");
         });
@@ -66,7 +67,7 @@ public class PlayerActionNodes implements NodeCategory {
                 target.setAllowFlight(enabled);
                 target.setFlying(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     target.setAllowFlight(enabled);
                     target.setFlying(enabled);
                 });
@@ -86,7 +87,7 @@ public class PlayerActionNodes implements NodeCategory {
                 if (Bukkit.isPrimaryThread()) {
                     target.setGameMode(mode);
                 } else {
-                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setGameMode(mode));
+                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setGameMode(mode));
                 }
             } catch (IllegalArgumentException e) {
             }
@@ -103,7 +104,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setInvisible(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setInvisible(enabled));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setInvisible(enabled));
             }
             ctx.triggerOutput("flow");
         });
@@ -118,7 +119,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setGlowing(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setGlowing(enabled));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setGlowing(enabled));
             }
             ctx.triggerOutput("flow");
         });
@@ -133,7 +134,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setInvulnerable(enabled);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setInvulnerable(enabled));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setInvulnerable(enabled));
             }
             ctx.triggerOutput("flow");
         });
@@ -148,7 +149,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setFoodLevel(Math.max(0, Math.min(20, level)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
             }
             ctx.triggerOutput("flow");
         });
@@ -163,7 +164,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setSaturation(Math.max(0, Math.min(20, saturation)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
             }
             ctx.triggerOutput("flow");
         });
@@ -178,7 +179,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setExhaustion(Math.max(0, exhaustion));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setExhaustion(Math.max(0, exhaustion)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setExhaustion(Math.max(0, exhaustion)));
             }
             ctx.triggerOutput("flow");
         });
@@ -193,7 +194,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
             }
             ctx.triggerOutput("flow");
         });
@@ -208,7 +209,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setMaxHealth(Math.max(1, maxHealth));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setMaxHealth(Math.max(1, maxHealth)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setMaxHealth(Math.max(1, maxHealth)));
             }
             ctx.triggerOutput("flow");
         });
@@ -223,7 +224,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setAbsorptionAmount(Math.max(0, absorption));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setAbsorptionAmount(Math.max(0, absorption)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setAbsorptionAmount(Math.max(0, absorption)));
             }
             ctx.triggerOutput("flow");
         });
@@ -240,7 +241,7 @@ public class PlayerActionNodes implements NodeCategory {
                 target.setLevel(Math.max(0, level));
                 target.setExp(Math.max(0, Math.min(1, points)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     target.setLevel(Math.max(0, level));
                     target.setExp(Math.max(0, Math.min(1, points)));
                 });
@@ -269,7 +270,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.teleport(location);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.teleport(location));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.teleport(location));
             }
             ctx.triggerOutput("flow");
         });
@@ -286,7 +287,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setVelocity(new Vector(vx, vy, vz));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setVelocity(new Vector(vx, vy, vz)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setVelocity(new Vector(vx, vy, vz)));
             }
             ctx.triggerOutput("flow");
         });
@@ -302,7 +303,7 @@ public class PlayerActionNodes implements NodeCategory {
                 Vector direction = target.getLocation().getDirection();
                 target.setVelocity(direction.multiply(strength));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     Vector direction = target.getLocation().getDirection();
                     target.setVelocity(direction.multiply(strength));
                 });
@@ -324,10 +325,34 @@ public class PlayerActionNodes implements NodeCategory {
                 loc.setPitch(loc.getPitch() + pitch);
                 target.teleport(loc);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     Location loc = target.getLocation();
                     loc.setYaw(loc.getYaw() + yaw);
                     loc.setPitch(loc.getPitch() + pitch);
+                    target.teleport(loc);
+                });
+            }
+            ctx.triggerOutput("flow");
+        });
+
+        registry.register("player_set_rotation", (ctx, node) -> {
+            Player target = ctx.getInputValue(node, "target", Player.class, null);
+            if (target == null) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+            Float yaw = ctx.getInputValue(node, "yaw", Float.class, target.getLocation().getYaw());
+            Float pitch = ctx.getInputValue(node, "pitch", Float.class, target.getLocation().getPitch());
+            if (Bukkit.isPrimaryThread()) {
+                Location loc = target.getLocation();
+                loc.setYaw(yaw);
+                loc.setPitch(pitch);
+                target.teleport(loc);
+            } else {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
+                    Location loc = target.getLocation();
+                    loc.setYaw(yaw);
+                    loc.setPitch(pitch);
                     target.teleport(loc);
                 });
             }
@@ -344,7 +369,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setAllowFlight(allowed);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setAllowFlight(allowed));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setAllowFlight(allowed));
             }
             ctx.triggerOutput("flow");
         });
@@ -359,7 +384,7 @@ public class PlayerActionNodes implements NodeCategory {
                 target.setAllowFlight(false);
                 target.setFlying(false);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     target.setAllowFlight(false);
                     target.setFlying(false);
                 });
@@ -377,7 +402,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setWalkSpeed(Math.max(-1, Math.min(1, speed)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
             }
             ctx.triggerOutput("flow");
         });
@@ -392,7 +417,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setFlySpeed(Math.max(-1, Math.min(1, speed)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
             }
             ctx.triggerOutput("flow");
         });
@@ -407,7 +432,7 @@ public class PlayerActionNodes implements NodeCategory {
                 target.setWalkSpeed(0);
                 target.setFlySpeed(0);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     target.setWalkSpeed(0);
                     target.setFlySpeed(0);
                 });
@@ -425,7 +450,7 @@ public class PlayerActionNodes implements NodeCategory {
                 target.setWalkSpeed(0.2f);
                 target.setFlySpeed(0.1f);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     target.setWalkSpeed(0.2f);
                     target.setFlySpeed(0.1f);
                 });
@@ -443,7 +468,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setFireTicks(ticks);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setFireTicks(ticks));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setFireTicks(ticks));
             }
             ctx.triggerOutput("flow");
         });
@@ -458,7 +483,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setRemainingAir(Math.max(-20, ticks));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setRemainingAir(Math.max(-20, ticks)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setRemainingAir(Math.max(-20, ticks)));
             }
             ctx.triggerOutput("flow");
         });
@@ -473,7 +498,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 target.setNoDamageTicks(ticks);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> target.setNoDamageTicks(ticks));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.setNoDamageTicks(ticks));
             }
             ctx.triggerOutput("flow");
         });
@@ -493,7 +518,7 @@ public class PlayerActionNodes implements NodeCategory {
                 if (Bukkit.isPrimaryThread()) {
                     player.addPotionEffect(effect);
                 } else {
-                    Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.addPotionEffect(effect));
+                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.addPotionEffect(effect));
                 }
             }
             ctx.triggerOutput("flow");
@@ -508,7 +533,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType())));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType())));
             }
             ctx.triggerOutput("flow");
         });
@@ -535,7 +560,7 @@ public class PlayerActionNodes implements NodeCategory {
                 ctx.setNodeOutput(nodeId, "has_effect", hasEffect);
                 ctx.setNodeOutput(nodeId, "amplifier", hasEffect ? player.getPotionEffect(type).getAmplifier() : 0);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     boolean hasEffect = player.hasPotionEffect(type);
                     ctx.setNodeOutput(nodeId, "has_effect", hasEffect);
                     ctx.setNodeOutput(nodeId, "amplifier", hasEffect ? player.getPotionEffect(type).getAmplifier() : 0);
@@ -555,7 +580,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setResourcePack(url);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setResourcePack(url));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setResourcePack(url));
             }
             ctx.triggerOutput("flow");
         });
@@ -574,7 +599,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setCompassTarget(location);
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setCompassTarget(location));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setCompassTarget(location));
             }
             ctx.triggerOutput("flow");
         });
@@ -588,7 +613,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setCompassTarget(player.getWorld().getSpawnLocation());
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setCompassTarget(player.getWorld().getSpawnLocation()));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setCompassTarget(player.getWorld().getSpawnLocation()));
             }
             ctx.triggerOutput("flow");
         });
@@ -604,7 +629,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 ctx.setNodeOutput(nodeId, "level", player.getLevel());
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "level", player.getLevel()));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "level", player.getLevel()));
             }
             ctx.triggerOutput("flow");
         });
@@ -620,7 +645,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 ctx.setNodeOutput(nodeId, "exp_needed", player.getExpToLevel());
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "exp_needed", player.getExpToLevel()));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "exp_needed", player.getExpToLevel()));
             }
             ctx.triggerOutput("flow");
         });
@@ -636,7 +661,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 ctx.setNodeOutput(nodeId, "total_exp", player.getTotalExperience());
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "total_exp", player.getTotalExperience()));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> ctx.setNodeOutput(nodeId, "total_exp", player.getTotalExperience()));
             }
             ctx.triggerOutput("flow");
         });
@@ -651,7 +676,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setTotalExperience(Math.max(0, exp));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setTotalExperience(Math.max(0, exp)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setTotalExperience(Math.max(0, exp)));
             }
             ctx.triggerOutput("flow");
         });
@@ -666,7 +691,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.giveExp(Math.max(0, exp));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.giveExp(Math.max(0, exp)));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.giveExp(Math.max(0, exp)));
             }
             ctx.triggerOutput("flow");
         });
@@ -707,7 +732,7 @@ public class PlayerActionNodes implements NodeCategory {
                     bossBar.removeAll();
                 }
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     BossBar bossBar = bossBars.remove(bossbarId);
                     if (bossBar != null) {
                         bossBar.removePlayer(player);
@@ -738,7 +763,7 @@ public class PlayerActionNodes implements NodeCategory {
                     }
                 }
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> {
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                     BossBar bossBar = bossBars.get(bossbarId);
                     if (bossBar != null) {
                         if (newTitle != null) {
@@ -763,7 +788,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setWalkSpeed(Math.max(-1, Math.min(1, speed)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
             }
             ctx.triggerOutput("flow");
         });
@@ -778,7 +803,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setFlySpeed(Math.max(-1, Math.min(1, speed)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setFlySpeed(Math.max(-1, Math.min(1, speed))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setFlySpeed(Math.max(-1, Math.min(1, speed))));
             }
             ctx.triggerOutput("flow");
         });
@@ -793,7 +818,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setSaturation(Math.max(0, Math.min(20, saturation)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setSaturation(Math.max(0, Math.min(20, saturation))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setSaturation(Math.max(0, Math.min(20, saturation))));
             }
             ctx.triggerOutput("flow");
         });
@@ -808,7 +833,7 @@ public class PlayerActionNodes implements NodeCategory {
             if (Bukkit.isPrimaryThread()) {
                 player.setFoodLevel(Math.max(0, Math.min(20, level)));
             } else {
-                Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> player.setFoodLevel(Math.max(0, Math.min(20, level))));
+                Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.setFoodLevel(Math.max(0, Math.min(20, level))));
             }
             ctx.triggerOutput("flow");
         });

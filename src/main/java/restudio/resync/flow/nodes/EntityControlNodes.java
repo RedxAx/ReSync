@@ -59,6 +59,22 @@ public class EntityControlNodes implements NodeCategory {
             
             ctx.triggerOutput("flow");
         });
+
+        registry.register("entity_set_rotation", (ctx, node) -> {
+            Object entityObj = ctx.getInputValue(node, "entity", Entity.class, null);
+
+            if (entityObj != null) {
+                Entity entity = (Entity) entityObj;
+                Location location = entity.getLocation();
+                Float yaw = ctx.getInputValue(node, "yaw", Float.class, location.getYaw());
+                Float pitch = ctx.getInputValue(node, "pitch", Float.class, location.getPitch());
+                location.setYaw(yaw);
+                location.setPitch(pitch);
+                entity.teleport(location);
+            }
+
+            ctx.triggerOutput("flow");
+        });
         
         registry.register("entity_set_health", (ctx, node) -> {
             Object entityObj = ctx.getInputValue(node, "entity", Entity.class, null);

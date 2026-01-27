@@ -143,6 +143,14 @@ public class PlayerActionNodes implements NodeDefinitionCategory {
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
 
+        registry.register(new NodeDefinition.Builder("player_set_rotation", "Set Rotation", NodeDefinition.NodeCategory.ACTION)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("target", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .input("yaw", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("pitch", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
         registry.register(new NodeDefinition.Builder("player_allow_flight", "Allow Flight", NodeDefinition.NodeCategory.ACTION)
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("target", NodeDefinition.PinType.DATA, FlowType.PLAYER)

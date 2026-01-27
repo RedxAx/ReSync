@@ -28,6 +28,14 @@ public class EntityControlNodes implements NodeDefinitionCategory {
             .input("visible", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
+
+        registry.register(new NodeDefinition.Builder("entity_set_rotation", "Set Rotation", NodeDefinition.NodeCategory.ENTITY)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("entity", NodeDefinition.PinType.DATA, FlowType.ENTITY)
+            .input("yaw", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("pitch", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
         
         registry.register(new NodeDefinition.Builder("entity_set_health", "Set Health", NodeDefinition.NodeCategory.ENTITY)
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)

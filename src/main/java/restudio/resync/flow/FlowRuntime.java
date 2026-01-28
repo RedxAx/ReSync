@@ -20,6 +20,7 @@ public class FlowRuntime {
     private final TypeAdapterRegistry typeAdapter;
     private final ThreadLocal<String> triggeredOutputPin = ThreadLocal.withInitial(() -> null);
     private final Set<String> evaluatingNodes = new HashSet<>();
+    private final ThreadLocal<Set<String>> executingFlowNodes = ThreadLocal.withInitial(HashSet::new);
     
     private final Stack<Frame> callStack = new Stack<>();
     private boolean breakLoopRequested = false;
@@ -176,6 +177,14 @@ public class FlowRuntime {
 
     public void endEvaluating(String nodeId) {
         evaluatingNodes.remove(nodeId);
+    }
+
+    public boolean beginFlowExecution(String nodeId) {
+        return executingFlowNodes.get().add(nodeId);
+    }
+
+    public void endFlowExecution(String nodeId) {
+        executingFlowNodes.get().remove(nodeId);
     }
 
     public Map<String, Object> getLocalVariables() {

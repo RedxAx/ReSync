@@ -51,12 +51,17 @@ public class FlowExecutor {
             ));
         }
 
+        if (startNodeId == null || !runtime.beginFlowExecution(startNodeId)) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         FlowGraph graph = runtime.getGraph();
         FlowNode node = graph.getNodes().get(startNodeId);
         if (node == null) {
             if (enableDebug) {
                 System.err.println("[Flow] Node not found: " + startNodeId);
             }
+            runtime.endFlowExecution(startNodeId);
             return CompletableFuture.completedFuture(null);
         }
         FlowContext context = new FlowContext(runtime, player, event);
@@ -64,7 +69,9 @@ public class FlowExecutor {
         String type = node.getType();
         if (isLoopNode(type)) {
             ensureInputNodesReady(runtime, node, player, event);
-            return executeLoopNode(runtime, node, player, event, steps);
+            CompletableFuture<Void> result = executeLoopNode(runtime, node, player, event, steps);
+            runtime.endFlowExecution(startNodeId);
+            return result;
         }
 
         ensureInputNodesReady(runtime, node, player, event);
@@ -74,7 +81,9 @@ public class FlowExecutor {
             if (enableDebug) {
                 System.err.println("[Flow] No executor for node type: " + node.getType());
             }
-            return findNextAndExecute(runtime, node, "flow", player, event, steps);
+            CompletableFuture<Void> result = findNextAndExecute(runtime, node, "flow", player, event, steps);
+            runtime.endFlowExecution(startNodeId);
+            return result;
         }
 
         try {
@@ -82,8 +91,11 @@ public class FlowExecutor {
             
             String outputPin = runtime.consumeTriggeredOutput();
             String pin = outputPin != null ? outputPin : "flow";
-            return findNextAndExecute(runtime, node, pin, player, event, steps);
+            CompletableFuture<Void> result = findNextAndExecute(runtime, node, pin, player, event, steps);
+            runtime.endFlowExecution(startNodeId);
+            return result;
         } catch (Exception e) {
+            runtime.endFlowExecution(startNodeId);
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "Error executing node '" + node.getType() + "' (ID: " + startNodeId + ")", 
                 e, 

@@ -132,6 +132,7 @@ public class PlayerActionNodes implements NodeDefinitionCategory {
             .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .input("target", NodeDefinition.PinType.DATA, FlowType.PLAYER)
             .input("strength", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("direction_vector", NodeDefinition.PinType.DATA, FlowType.LOCATION)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
 

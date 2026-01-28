@@ -299,12 +299,19 @@ public class PlayerActionNodes implements NodeCategory {
                 return;
             }
             Double strength = ctx.getInputValue(node, "strength", Double.class, 1.0);
+            Vector inputDirection = ctx.getInputValue(node, "direction_vector", Vector.class, null);
             if (Bukkit.isPrimaryThread()) {
-                Vector direction = target.getLocation().getDirection();
+                Vector direction = inputDirection != null ? inputDirection.clone() : target.getLocation().getDirection();
+                if (direction.lengthSquared() > 0) {
+                    direction.normalize();
+                }
                 target.setVelocity(direction.multiply(strength));
             } else {
                 Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                    Vector direction = target.getLocation().getDirection();
+                    Vector direction = inputDirection != null ? inputDirection.clone() : target.getLocation().getDirection();
+                    if (direction.lengthSquared() > 0) {
+                        direction.normalize();
+                    }
                     target.setVelocity(direction.multiply(strength));
                 });
             }

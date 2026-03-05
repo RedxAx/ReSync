@@ -218,15 +218,43 @@ public class PlayerEventNodes implements NodeCategory {
             ctx.triggerOutput("next");
         });
 
+        registry.register("event:resync_command", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            Player player = (Player) ctx.getVariable("event.player");
+            String boundCommand = (String) ctx.getVariable("event.bound_command");
+            String commandLabel = (String) ctx.getVariable("event.command_label");
+            String args = (String) ctx.getVariable("event.args");
+            Object argsList = ctx.getVariable("event.args_list");
+            Integer argsCount = (Integer) ctx.getVariable("event.args_count");
+            Boolean isConsole = (Boolean) ctx.getVariable("event.is_console");
+
+            ctx.setNodeOutput(nodeId, "player", player);
+            ctx.setNodeOutput(nodeId, "bound_command", boundCommand);
+            ctx.setNodeOutput(nodeId, "command_label", commandLabel);
+            ctx.setNodeOutput(nodeId, "args", args);
+            ctx.setNodeOutput(nodeId, "args_list", argsList);
+            ctx.setNodeOutput(nodeId, "args_count", argsCount);
+            ctx.setNodeOutput(nodeId, "is_console", isConsole != null && isConsole);
+            ctx.triggerOutput("next");
+        });
+
         registry.register("event:command", (ctx, node) -> {
             String nodeId = findNodeId(ctx, node);
             Player player = (Player) ctx.getVariable("event.player");
+            String boundCommand = (String) ctx.getVariable("event.bound_command");
             String commandLabel = (String) ctx.getVariable("event.command_label");
             String args = (String) ctx.getVariable("event.args");
+            Object argsList = ctx.getVariable("event.args_list");
+            Integer argsCount = (Integer) ctx.getVariable("event.args_count");
+            Boolean isConsole = (Boolean) ctx.getVariable("event.is_console");
 
             ctx.setNodeOutput(nodeId, "player", player);
+            ctx.setNodeOutput(nodeId, "bound_command", boundCommand);
             ctx.setNodeOutput(nodeId, "command_label", commandLabel);
             ctx.setNodeOutput(nodeId, "args", args);
+            ctx.setNodeOutput(nodeId, "args_list", argsList);
+            ctx.setNodeOutput(nodeId, "args_count", argsCount);
+            ctx.setNodeOutput(nodeId, "is_console", isConsole != null && isConsole);
             ctx.triggerOutput("next");
         });
 

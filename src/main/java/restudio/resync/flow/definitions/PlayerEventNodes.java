@@ -115,11 +115,26 @@ public class PlayerEventNodes implements NodeDefinitionCategory {
             .output("new_level", NodeDefinition.PinType.DATA, FlowType.NUMBER)
             .build());
 
+        registry.register(new NodeDefinition.Builder("event:resync_command", "On ReSync Command Execute", NodeDefinition.NodeCategory.EVENT)
+            .output("next", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .output("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .output("bound_command", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("command_label", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("args", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("args_list", NodeDefinition.PinType.DATA, FlowType.LIST)
+            .output("args_count", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("is_console", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
+            .build());
+
         registry.register(new NodeDefinition.Builder("event:command", "On Player Command", NodeDefinition.NodeCategory.EVENT)
             .output("next", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .output("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .output("bound_command", NodeDefinition.PinType.DATA, FlowType.STRING)
             .output("command_label", NodeDefinition.PinType.DATA, FlowType.STRING)
             .output("args", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("args_list", NodeDefinition.PinType.DATA, FlowType.LIST)
+            .output("args_count", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("is_console", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
             .build());
 
         registry.register(new NodeDefinition.Builder("event:tab_complete", "On Tab Complete", NodeDefinition.NodeCategory.EVENT)

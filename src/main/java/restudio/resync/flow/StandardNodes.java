@@ -71,6 +71,8 @@ public class StandardNodes {
         new restudio.resync.flow.nodes.UtilityNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.RegionAdvancedNodes().registerNodes(registry);
         new restudio.resync.flow.nodes.DataStructureNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.HttpNodes().registerNodes(registry);
+        new restudio.resync.flow.nodes.DiscordNodes().registerNodes(registry);
     }
 
     private static void registerEventNodes(FlowRegistry registry) {

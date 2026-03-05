@@ -1,15 +1,22 @@
 package restudio.resync.flow;
 
+import com.google.gson.Gson;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
 import org.bukkit.event.block.*;
@@ -29,26 +36,37 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.*;
+import org.bukkit.event.server.ServerCommandEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.event.weather.WeatherChangeEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.TimeSkipEvent;
 import org.bukkit.event.world.WorldSaveEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.SimplePluginManager;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.ReSync;
 
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.lang.reflect.Field;
 
 public class GlobalTriggers implements Listener {
     private final FlowStorage storage;
     private final FlowExecutor executor;
     private final TriggerRegistry triggerRegistry;
     private SystemEventListener systemEventListener;
+    private final Gson gson = new Gson();
     
     private final Map<String, String> playerJoinTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> playerQuitTriggers = new ConcurrentHashMap<>();
@@ -120,6 +138,84 @@ public class GlobalTriggers implements Listener {
     private final Map<String, String> notePlayTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> pistonExtendTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> pistonRetractTriggers = new ConcurrentHashMap<>();
+    private final Map<String, CommandTrigger> commandTriggers = new ConcurrentHashMap<>();
+    private final Map<String, RuntimeFlowCommand> runtimeCommands = new ConcurrentHashMap<>();
+
+    private static class CommandTrigger {
+        private final String flowId;
+        private final String startNode;
+        private final String command;
+        private final List<String> subcommands;
+        private final List<List<String>> commandPaths;
+        private final boolean structured;
+
+        private CommandTrigger(String flowId, String startNode, String command, List<String> subcommands, List<List<String>> commandPaths, boolean structured) {
+            this.flowId = flowId;
+            this.startNode = startNode;
+            this.command = command;
+            this.subcommands = subcommands;
+            this.commandPaths = commandPaths;
+            this.structured = structured;
+        }
+    }
+
+    private static class CommandContextPayload {
+        private String command;
+        private List<String> subcommands;
+        private Boolean structured;
+    }
+
+    private class RuntimeFlowCommand extends Command {
+        private final String baseLabel;
+
+        private RuntimeFlowCommand(String label) {
+            super(label);
+            this.baseLabel = label;
+            setDescription("ReSync flow command");
+            setUsage("/" + label);
+        }
+
+        @Override
+        public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+            String normalizedLabel = normalizeCommandLabel(commandLabel);
+            String joinedArgs = String.join(" ", args);
+            Player player = sender instanceof Player p ? p : null;
+            boolean isConsole = !(sender instanceof Player);
+            boolean handled = false;
+            for (CommandTrigger trigger : commandTriggers.values()) {
+                if (trigger.command.equals(normalizedLabel) && executeCommandTrigger(trigger, normalizedLabel, joinedArgs, player, null, isConsole)) {
+                    handled = true;
+                }
+            }
+            return handled;
+        }
+
+        @Override
+        public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+            List<String> completions = new ArrayList<>();
+            String normalizedLabel = normalizeCommandLabel(alias != null ? alias : baseLabel);
+            if (normalizedLabel == null) {
+                return completions;
+            }
+            List<String> argsTokens = new ArrayList<>();
+            String currentArg = "";
+            if (args.length > 0) {
+                currentArg = args[args.length - 1];
+                for (int i = 0; i < args.length - 1; i++) {
+                    if (!args[i].isBlank()) {
+                        argsTokens.add(args[i]);
+                    }
+                }
+            }
+            for (CommandTrigger trigger : commandTriggers.values()) {
+                if (!trigger.command.equals(normalizedLabel) || trigger.commandPaths.isEmpty()) {
+                    continue;
+                }
+                completions.addAll(collectPathSuggestions(trigger, argsTokens, currentArg));
+            }
+            return completions;
+        }
+    }
     
     public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry) {
         this.storage = storage;
@@ -403,6 +499,313 @@ public class GlobalTriggers implements Listener {
         }
     }
 
+    private void registerCommandTrigger(TriggerBinding binding) {
+        if (binding == null || binding.getFlowId() == null) {
+            return;
+        }
+        FlowGraph graph = storage.getGraph(binding.getFlowId());
+        if (graph == null) {
+            return;
+        }
+        String startNode = null;
+        for (var entry : graph.getNodes().entrySet()) {
+            if ("event:resync_command".equals(entry.getValue().getType())) {
+                startNode = entry.getKey();
+                break;
+            }
+        }
+        if (startNode == null) {
+            startNode = findStartNodeForEvent(graph, "command");
+        }
+        if (startNode == null) {
+            startNode = findStartNode(graph);
+        }
+        if (startNode == null) {
+            return;
+        }
+        String context = binding.getContext();
+        if (context == null || context.isBlank()) {
+            return;
+        }
+        String command = null;
+        List<String> subcommands = new ArrayList<>();
+        boolean structured = false;
+        String trimmed = context.trim();
+        if (trimmed.startsWith("{")) {
+            try {
+                CommandContextPayload payload = gson.fromJson(trimmed, CommandContextPayload.class);
+                if (payload != null) {
+                    command = payload.command;
+                    if (payload.subcommands != null) {
+                        for (String subcommand : payload.subcommands) {
+                            if (subcommand != null && !subcommand.isBlank()) {
+                                subcommands.add(subcommand.trim());
+                            }
+                        }
+                    }
+                    structured = payload.structured != null && payload.structured;
+                }
+            } catch (Exception ignored) {
+            }
+        } else {
+            command = trimmed;
+        }
+        String normalizedCommand = normalizeCommandLabel(command);
+        if (normalizedCommand == null) {
+            return;
+        }
+        List<List<String>> commandPaths = parseCommandPaths(subcommands);
+        String key = binding.getId() != null ? binding.getId() : binding.getFlowId() + ":" + normalizedCommand;
+        commandTriggers.put(key, new CommandTrigger(binding.getFlowId(), startNode, normalizedCommand, subcommands, commandPaths, structured));
+    }
+
+    private String normalizeCommandLabel(String label) {
+        if (label == null) {
+            return null;
+        }
+        String normalized = label.trim().toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private List<String> parseArgsList(String args) {
+        List<String> parsed = new ArrayList<>();
+        if (args == null || args.isBlank()) {
+            return parsed;
+        }
+        for (String part : args.split(" ")) {
+            if (!part.isBlank()) {
+                parsed.add(part);
+            }
+        }
+        return parsed;
+    }
+
+    private List<List<String>> parseCommandPaths(List<String> entries) {
+        List<List<String>> paths = new ArrayList<>();
+        if (entries == null) {
+            return paths;
+        }
+        for (String entry : entries) {
+            if (entry == null || entry.isBlank()) {
+                continue;
+            }
+            List<String> tokens = new ArrayList<>();
+            for (String token : entry.trim().split("\\s+")) {
+                if (!token.isBlank()) {
+                    tokens.add(token.trim());
+                }
+            }
+            if (!tokens.isEmpty()) {
+                paths.add(tokens);
+            }
+        }
+        return paths;
+    }
+
+    private List<String> resolveDynamicTokenValues(String token) {
+        List<String> values = new ArrayList<>();
+        if (token == null || token.isBlank()) {
+            return values;
+        }
+        if ("<online_player>".equalsIgnoreCase(token)) {
+            for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                values.add(onlinePlayer.getName());
+            }
+            return values;
+        }
+        if ("<offline_player>".equalsIgnoreCase(token)) {
+            for (OfflinePlayer offlinePlayer : Bukkit.getOfflinePlayers()) {
+                if (offlinePlayer.getName() != null && !offlinePlayer.getName().isBlank()) {
+                    values.add(offlinePlayer.getName());
+                }
+            }
+            return values;
+        }
+        String lower = token.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("<player_with_perm:") && lower.endsWith(">")) {
+            String permission = token.substring("<player_with_perm:".length(), token.length() - 1).trim();
+            if (!permission.isBlank()) {
+                for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                    if (onlinePlayer.hasPermission(permission)) {
+                        values.add(onlinePlayer.getName());
+                    }
+                }
+            }
+            return values;
+        }
+        return values;
+    }
+
+    private boolean tokenMatches(String token, String arg) {
+        if (token == null) {
+            return false;
+        }
+        if ("<any>".equalsIgnoreCase(token)) {
+            return true;
+        }
+        List<String> dynamicValues = resolveDynamicTokenValues(token);
+        if (!dynamicValues.isEmpty()) {
+            return dynamicValues.stream().anyMatch(value -> value.equalsIgnoreCase(arg));
+        }
+        if (token.startsWith("<") && token.endsWith(">")) {
+            return true;
+        }
+        return token.equalsIgnoreCase(arg);
+    }
+
+    private List<String> collectPathSuggestions(CommandTrigger trigger, List<String> argsTokens, String currentArg) {
+        List<String> suggestions = new ArrayList<>();
+        int index = argsTokens.size();
+        for (List<String> path : trigger.commandPaths) {
+            if (path.size() <= index) {
+                continue;
+            }
+            boolean prefixMatches = true;
+            for (int i = 0; i < index; i++) {
+                if (path.size() <= i || !tokenMatches(path.get(i), argsTokens.get(i))) {
+                    prefixMatches = false;
+                    break;
+                }
+            }
+            if (!prefixMatches) {
+                continue;
+            }
+            String token = path.get(index);
+            List<String> tokenValues = resolveDynamicTokenValues(token);
+            if (tokenValues.isEmpty()) {
+                tokenValues = List.of(token);
+            }
+            for (String value : tokenValues) {
+                if (value.toLowerCase(Locale.ROOT).startsWith(currentArg.toLowerCase(Locale.ROOT))) {
+                    suggestions.add(value);
+                }
+            }
+        }
+        return suggestions;
+    }
+
+    private boolean executeCommandTrigger(CommandTrigger trigger, String commandLabel, String args, Player player, Event event, boolean isConsole) {
+        if (trigger == null || commandLabel == null) {
+            return false;
+        }
+        List<String> argsList = parseArgsList(args);
+        String firstArg = argsList.isEmpty() ? "" : argsList.getFirst();
+        if (trigger.structured && !trigger.commandPaths.isEmpty()) {
+            boolean matchedPath = false;
+            for (List<String> path : trigger.commandPaths) {
+                if (argsList.size() < path.size()) {
+                    continue;
+                }
+                boolean allMatch = true;
+                for (int i = 0; i < path.size(); i++) {
+                    if (!tokenMatches(path.get(i), argsList.get(i))) {
+                        allMatch = false;
+                        break;
+                    }
+                }
+                if (allMatch) {
+                    matchedPath = true;
+                    break;
+                }
+            }
+            if (!matchedPath) {
+                return false;
+            }
+        }
+        FlowGraph graph = storage.getGraph(trigger.flowId);
+        if (graph == null) {
+            return false;
+        }
+        executor.clearEventVariables();
+        Map<String, Object> eventVars = executor.getEventVariables();
+        setEventVariables(player, eventVars);
+        eventVars.put("event.command_label", commandLabel);
+        eventVars.put("event.args", args);
+        eventVars.put("event.args_list", new ArrayList<>(argsList));
+        eventVars.put("event.args_count", argsList.size());
+        eventVars.put("event.command_subcommand", firstArg);
+        eventVars.put("event.command_structured", trigger.structured);
+        eventVars.put("event.command_allowed_subcommands", new ArrayList<>(trigger.subcommands));
+        eventVars.put("event.is_console", isConsole);
+        eventVars.put("event.bound_command", trigger.command);
+        executor.execute(graph, trigger.startNode, player, event);
+        return true;
+    }
+
+    private CommandMap resolveCommandMap() {
+        try {
+            if (!(Bukkit.getPluginManager() instanceof SimplePluginManager pluginManager)) {
+                return null;
+            }
+            Field commandMapField = SimplePluginManager.class.getDeclaredField("commandMap");
+            commandMapField.setAccessible(true);
+            Object value = commandMapField.get(pluginManager);
+            if (value instanceof CommandMap commandMap) {
+                return commandMap;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Command> resolveKnownCommands(CommandMap commandMap) {
+        try {
+            Field knownCommandsField = commandMap.getClass().getDeclaredField("knownCommands");
+            knownCommandsField.setAccessible(true);
+            Object value = knownCommandsField.get(commandMap);
+            if (value instanceof Map<?, ?> map) {
+                return (Map<String, Command>) map;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private void refreshRuntimeCommands() {
+        CommandMap commandMap = resolveCommandMap();
+        if (commandMap == null) {
+            return;
+        }
+        Map<String, Command> knownCommands = resolveKnownCommands(commandMap);
+        Set<String> desired = new HashSet<>();
+        for (CommandTrigger trigger : commandTriggers.values()) {
+            desired.add(trigger.command);
+        }
+        String pluginPrefix = ReSync.getInstance().getName().toLowerCase(Locale.ROOT) + ":";
+
+        for (Map.Entry<String, RuntimeFlowCommand> entry : new ArrayList<>(runtimeCommands.entrySet())) {
+            if (desired.contains(entry.getKey())) {
+                continue;
+            }
+            RuntimeFlowCommand command = entry.getValue();
+            command.unregister(commandMap);
+            runtimeCommands.remove(entry.getKey());
+            if (knownCommands != null) {
+                knownCommands.remove(entry.getKey());
+                knownCommands.remove(pluginPrefix + entry.getKey());
+            }
+        }
+
+        for (String commandLabel : desired) {
+            if (runtimeCommands.containsKey(commandLabel)) {
+                continue;
+            }
+            RuntimeFlowCommand command = new RuntimeFlowCommand(commandLabel);
+            commandMap.register(ReSync.getInstance().getName().toLowerCase(Locale.ROOT), command);
+            runtimeCommands.put(commandLabel, command);
+        }
+        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+            onlinePlayer.updateCommands();
+        }
+    }
+
     public void refreshBindings() {
         playerJoinTriggers.clear();
         playerQuitTriggers.clear();
@@ -474,6 +877,7 @@ public class GlobalTriggers implements Listener {
         notePlayTriggers.clear();
         pistonExtendTriggers.clear();
         pistonRetractTriggers.clear();
+        commandTriggers.clear();
 
         if (triggerRegistry == null) {
             return;
@@ -482,6 +886,10 @@ public class GlobalTriggers implements Listener {
         for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.EVENT)) {
             registerTrigger(binding.getContext(), binding.getFlowId());
         }
+        for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.COMMAND)) {
+            registerCommandTrigger(binding);
+        }
+        refreshRuntimeCommands();
         
         if (systemEventListener != null) {
             systemEventListener.refreshBindings();
@@ -870,8 +1278,12 @@ public class GlobalTriggers implements Listener {
     public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
         String[] parts = event.getMessage().split(" ", 2);
-        String commandLabel = parts[0].replaceFirst("/", "");
+        String commandLabel = normalizeCommandLabel(parts[0]);
+        if (commandLabel != null && runtimeCommands.containsKey(commandLabel)) {
+            return;
+        }
         String args = parts.length > 1 ? parts[1] : "";
+        boolean commandHandled = false;
         
         for (Map.Entry<String, String> entry : playerCommandTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
@@ -883,6 +1295,34 @@ public class GlobalTriggers implements Listener {
                 eventVars.put("event.args", args);
                 executor.execute(graph, entry.getValue(), player, event);
             }
+        }
+
+        for (CommandTrigger trigger : commandTriggers.values()) {
+            if (trigger.command.equals(commandLabel) && executeCommandTrigger(trigger, commandLabel, args, player, event, false)) {
+                commandHandled = true;
+            }
+        }
+        if (commandHandled) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onServerCommand(ServerCommandEvent event) {
+        String[] parts = event.getCommand().split(" ", 2);
+        String commandLabel = normalizeCommandLabel(parts[0]);
+        if (commandLabel != null && runtimeCommands.containsKey(commandLabel)) {
+            return;
+        }
+        String args = parts.length > 1 ? parts[1] : "";
+        boolean commandHandled = false;
+        for (CommandTrigger trigger : commandTriggers.values()) {
+            if (trigger.command.equals(commandLabel) && executeCommandTrigger(trigger, commandLabel, args, null, event, true)) {
+                commandHandled = true;
+            }
+        }
+        if (commandHandled) {
+            event.setCommand("");
         }
     }
 
@@ -1726,6 +2166,31 @@ public class GlobalTriggers implements Listener {
     @EventHandler
     public void onPlayerTabComplete(PlayerChatTabCompleteEvent event) {
         Player player = event.getPlayer();
+        String chatMessage = event.getChatMessage();
+        if (chatMessage != null && chatMessage.startsWith("/")) {
+            String raw = chatMessage.substring(1);
+            String[] parts = raw.split(" ", -1);
+            String commandLabel = normalizeCommandLabel(parts.length > 0 ? parts[0] : "");
+            List<String> argsTokens = new ArrayList<>();
+            String currentArg = parts.length > 1 ? parts[parts.length - 1] : "";
+            for (int i = 1; i < Math.max(1, parts.length - 1); i++) {
+                if (!parts[i].isBlank()) {
+                    argsTokens.add(parts[i]);
+                }
+            }
+            if (commandLabel != null && !commandLabel.isBlank()) {
+                for (CommandTrigger trigger : commandTriggers.values()) {
+                    if (!trigger.command.equals(commandLabel) || trigger.commandPaths.isEmpty()) {
+                        continue;
+                    }
+                    for (String suggestion : collectPathSuggestions(trigger, argsTokens, currentArg)) {
+                        if (!event.getTabCompletions().contains(suggestion)) {
+                            event.getTabCompletions().add(suggestion);
+                        }
+                    }
+                }
+            }
+        }
         
         for (Map.Entry<String, String> entry : playerTabCompleteTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
@@ -1733,10 +2198,49 @@ public class GlobalTriggers implements Listener {
                 executor.clearEventVariables();
                 Map<String, Object> eventVars = executor.getEventVariables();
                 setEventVariables(player, eventVars);
-                eventVars.put("event.completions", event.getTabCompletions());
-                eventVars.put("event.chat_message", event.getChatMessage());
+                eventVars.put("event.completions", String.join(",", event.getTabCompletions()));
+                eventVars.put("event.completion_list", new ArrayList<>(event.getTabCompletions()));
+                eventVars.put("event.command", event.getChatMessage());
                 executor.execute(graph, entry.getValue(), player, event);
             }
+        }
+    }
+
+    @EventHandler
+    public void onServerTabComplete(TabCompleteEvent event) {
+        String buffer = event.getBuffer();
+        if (buffer == null || !buffer.startsWith("/")) {
+            return;
+        }
+        String raw = buffer.substring(1);
+        String[] parts = raw.split(" ", -1);
+        String commandLabel = normalizeCommandLabel(parts.length > 0 ? parts[0] : "");
+        List<String> argsTokens = new ArrayList<>();
+        String currentArg = parts.length > 1 ? parts[parts.length - 1] : "";
+        for (int i = 1; i < Math.max(1, parts.length - 1); i++) {
+            if (!parts[i].isBlank()) {
+                argsTokens.add(parts[i]);
+            }
+        }
+        if (commandLabel == null || commandLabel.isBlank()) {
+            return;
+        }
+        for (CommandTrigger trigger : commandTriggers.values()) {
+            if (!trigger.command.equals(commandLabel) || trigger.commandPaths.isEmpty()) {
+                continue;
+            }
+            for (String suggestion : collectPathSuggestions(trigger, argsTokens, currentArg)) {
+                if (!event.getCompletions().contains(suggestion)) {
+                    event.getCompletions().add(suggestion);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerCommandSend(PlayerCommandSendEvent event) {
+        for (CommandTrigger trigger : commandTriggers.values()) {
+            event.getCommands().add(trigger.command);
         }
     }
     

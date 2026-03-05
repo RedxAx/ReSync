@@ -79,7 +79,7 @@ public class StandardNodeDefinitionsPlugin implements FlowNodePlugin {
         new StringAdvancedNodes().registerNodes(registry);
         new DataStructureNodes().registerNodes(registry);
         new RegionAdvancedNodes().registerNodes(registry);
-        new BlockNodes().registerNodes(registry);
-        new WorldNodes().registerNodes(registry);
+        new HttpNodes().registerNodes(registry);
+        new DiscordNodes().registerNodes(registry);
     }
 }

@@ -4,12 +4,16 @@ import org.bukkit.Bukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
+import restudio.flow.data.ScoreboardDefinition;
+import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
+import restudio.resync.flow.TabListService;
+import restudio.resync.flow.nodes.ScoreboardNodes;
 import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodePluginPayload;
@@ -18,9 +22,11 @@ import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
+import org.bukkit.entity.Player;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -75,6 +81,10 @@ public class FlowModule implements Module {
     @Override
     public String getChannelId() {
         return "flow";
+    }
+
+    public FlowStorage getStorage() {
+        return storage;
     }
 
     @Override
@@ -133,6 +143,33 @@ public class FlowModule implements Module {
                     break;
                 case 0x16:
                     handleGuiDelete(session, buffer);
+                    break;
+                case 0x18:
+                    handleScoreboardRequest(session, buffer);
+                    break;
+                case 0x19:
+                    handleScoreboardSave(session, buffer);
+                    break;
+                case 0x1A:
+                    handleScoreboardListRequest(session);
+                    break;
+                case 0x1B:
+                    handleScoreboardDelete(session, buffer);
+                    break;
+                case 0x20:
+                    handleTabRequest(session, buffer);
+                    break;
+                case 0x21:
+                    handleTabSave(session, buffer);
+                    break;
+                case 0x22:
+                    handleTabListRequest(session);
+                    break;
+                case 0x23:
+                    handleTabDelete(session, buffer);
+                    break;
+                case 0x27:
+                    handlePlaceholderPreviewRequest(session, buffer);
                     break;
                 case 0x0C:
                     handleNodeRegistryRequest(session, buffer);
@@ -396,6 +433,207 @@ public class FlowModule implements Module {
         codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
     }
 
+    private void handleScoreboardRequest(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_REQUEST", "Scoreboard ID not provided");
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String scoreboardId = new String(idBytes, StandardCharsets.UTF_8);
+        if (scoreboardId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_SCOREBOARD_ID", "Scoreboard ID too long");
+            return;
+        }
+        ScoreboardDefinition scoreboard = storage.getScoreboard(scoreboardId);
+        if (scoreboard != null) {
+            sendScoreboardData(session, scoreboard);
+        } else {
+            sendError(session, "SCOREBOARD_NOT_FOUND", "Scoreboard not found: " + scoreboardId);
+        }
+    }
+
+    private void handleScoreboardSave(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_SAVE", "No data provided");
+            return;
+        }
+        if (buffer.remaining() > MAX_PACKET_SIZE) {
+            sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
+            return;
+        }
+        byte[] jsonBytes = new byte[buffer.remaining()];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        try {
+            ScoreboardDefinition scoreboard = FlowSerializer.deserializeScoreboard(json);
+            if (scoreboard == null || scoreboard.getId() == null || scoreboard.getId().isBlank()) {
+                sendError(session, "INVALID_SCOREBOARD", "Scoreboard ID is missing");
+                return;
+            }
+            storage.saveScoreboard(scoreboard);
+            ScoreboardNodes.refreshActiveTemplates(storage, scoreboard.getId());
+            Bukkit.getLogger().info("[ReSync] Saved scoreboard " + scoreboard.getId() + " from client " + session.getClientId());
+            sendScoreboardSaveAck(session, scoreboard.getId());
+        } catch (Exception e) {
+            sendError(session, "SAVE_FAILED", "Failed to save scoreboard: " + e.getMessage());
+        }
+    }
+
+    private void handleScoreboardDelete(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String scoreboardId = new String(idBytes, StandardCharsets.UTF_8);
+        storage.deleteScoreboard(scoreboardId);
+        ScoreboardNodes.clearActiveTemplateReferences(scoreboardId, true);
+        String defaultId = storage.getDefaultScoreboardId();
+        if (defaultId != null && defaultId.equalsIgnoreCase(scoreboardId)) {
+            storage.clearDefaultScoreboard();
+        }
+        Bukkit.getLogger().info("[ReSync] Deleted scoreboard " + scoreboardId + " from client " + session.getClientId());
+    }
+
+    private void handleScoreboardListRequest(Session session) {
+        if (storage == null) {
+            return;
+        }
+        java.util.List<String> scoreboardIds = storage.listScoreboardIds();
+        int totalBytes = 1 + 4;
+        for (String id : scoreboardIds) {
+            totalBytes += 4 + id.getBytes(StandardCharsets.UTF_8).length;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(totalBytes);
+        buffer.put((byte) 0x1D);
+        buffer.putInt(scoreboardIds.size());
+        for (String id : scoreboardIds) {
+            byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
+            buffer.putInt(bytes.length);
+            buffer.put(bytes);
+        }
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private void handleTabRequest(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_REQUEST", "Tab ID not provided");
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String tabId = new String(idBytes, StandardCharsets.UTF_8);
+        if (tabId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_TAB_ID", "Tab ID too long");
+            return;
+        }
+        TabDefinition tab = storage.getTab(tabId);
+        if (tab != null) {
+            sendTabData(session, tab);
+        } else {
+            sendError(session, "TAB_NOT_FOUND", "Tab not found: " + tabId);
+        }
+    }
+
+    private void handleTabSave(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sendError(session, "INVALID_SAVE", "No data provided");
+            return;
+        }
+        if (buffer.remaining() > MAX_PACKET_SIZE) {
+            sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
+            return;
+        }
+        byte[] jsonBytes = new byte[buffer.remaining()];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        try {
+            TabDefinition tab = FlowSerializer.deserializeTab(json);
+            if (tab == null || tab.getId() == null || tab.getId().isBlank()) {
+                sendError(session, "INVALID_TAB", "Tab ID is missing");
+                return;
+            }
+            storage.saveTab(tab);
+            TabListService.refreshActiveTabs(storage, tab.getId());
+            Bukkit.getLogger().info("[ReSync] Saved tab " + tab.getId() + " from client " + session.getClientId());
+            sendTabSaveAck(session, tab.getId());
+        } catch (Exception e) {
+            sendError(session, "SAVE_FAILED", "Failed to save tab: " + e.getMessage());
+        }
+    }
+
+    private void handleTabDelete(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String tabId = new String(idBytes, StandardCharsets.UTF_8);
+        storage.deleteTab(tabId);
+        TabListService.clearActiveTabReferences(tabId, true);
+        String defaultId = storage.getDefaultTabId();
+        if (defaultId != null && defaultId.equalsIgnoreCase(tabId)) {
+            storage.clearDefaultTab();
+        }
+        Bukkit.getLogger().info("[ReSync] Deleted tab " + tabId + " from client " + session.getClientId());
+    }
+
+    private void handleTabListRequest(Session session) {
+        if (storage == null) {
+            return;
+        }
+        java.util.List<String> tabIds = storage.listTabIds();
+        int totalBytes = 1 + 4;
+        for (String id : tabIds) {
+            totalBytes += 4 + id.getBytes(StandardCharsets.UTF_8).length;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(totalBytes);
+        buffer.put((byte) 0x25);
+        buffer.putInt(tabIds.size());
+        for (String id : tabIds) {
+            byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
+            buffer.putInt(bytes.length);
+            buffer.put(bytes);
+        }
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private void handlePlaceholderPreviewRequest(Session session, ByteBuffer buffer) {
+        if (buffer.remaining() < 9) {
+            return;
+        }
+        int requestId = buffer.getInt();
+        boolean usePapi = buffer.get() == 1;
+        int textLength = buffer.getInt();
+        if (textLength < 0 || textLength > MAX_STRING_LENGTH || textLength > buffer.remaining()) {
+            return;
+        }
+        byte[] textBytes = new byte[textLength];
+        buffer.get(textBytes);
+        String text = new String(textBytes, StandardCharsets.UTF_8);
+        Player player = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+        String rendered = ReSyncPlaceholderUtil.apply(player, text, usePapi);
+        byte[] renderedBytes = rendered.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer out = ByteBuffer.allocate(1 + 4 + 4 + renderedBytes.length);
+        out.put((byte) 0x28);
+        out.putInt(requestId);
+        out.putInt(renderedBytes.length);
+        out.put(renderedBytes);
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(out.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
     private void handleListRequest(Session session) {
         if (storage == null) {
             return;
@@ -534,6 +772,46 @@ public class FlowModule implements Module {
         codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
     }
 
+    public void sendScoreboardData(Session session, ScoreboardDefinition scoreboard) {
+        String json = FlowSerializer.serializeScoreboard(scoreboard);
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+
+        if (jsonBytes.length > MAX_PACKET_SIZE) {
+            sendError(session, "SCOREBOARD_TOO_LARGE", "Scoreboard data exceeds maximum size");
+            return;
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put((byte) 0x1C);
+        buffer.put(jsonBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    public void sendTabData(Session session, TabDefinition tab) {
+        String json = FlowSerializer.serializeTab(tab);
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+
+        if (jsonBytes.length > MAX_PACKET_SIZE) {
+            sendError(session, "TAB_TOO_LARGE", "Tab data exceeds maximum size");
+            return;
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put((byte) 0x24);
+        buffer.put(jsonBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
     private void sendGuiSaveAck(Session session, String guiId) {
         if (guiId == null) {
             return;
@@ -541,6 +819,38 @@ public class FlowModule implements Module {
         byte[] idBytes = guiId.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length);
         buffer.put((byte) 0x17);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private void sendScoreboardSaveAck(Session session, String scoreboardId) {
+        if (scoreboardId == null) {
+            return;
+        }
+        byte[] idBytes = scoreboardId.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length);
+        buffer.put((byte) 0x1E);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+
+        DataMessage msg = new DataMessage();
+        msg.setChannel(channelId);
+        msg.setPayload(buffer.array());
+        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, false);
+    }
+
+    private void sendTabSaveAck(Session session, String tabId) {
+        if (tabId == null) {
+            return;
+        }
+        byte[] idBytes = tabId.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length);
+        buffer.put((byte) 0x26);
         buffer.putInt(idBytes.length);
         buffer.put(idBytes);
 

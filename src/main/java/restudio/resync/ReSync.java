@@ -1,17 +1,24 @@
 package restudio.resync;
 
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
+import restudio.resync.commands.ReSyncCommand;
+import restudio.resync.placeholder.ReSyncPlaceholderExpansion;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
 import restudio.resync.server.ReSyncConfig;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 
 public class ReSync extends JavaPlugin {
     private static ReSync instance;
     private WebSocketServer wsServer;
     private ReSyncServer v2Server;
+    private ReSyncPlaceholderExpansion placeholderExpansion;
 
     @Override
     public void onEnable() {
@@ -28,27 +35,27 @@ public class ReSync extends JavaPlugin {
 
         wsServer = new WebSocketServer(new InetSocketAddress(config.getPort())) {
             @Override
-            public void onOpen(org.java_websocket.WebSocket conn, org.java_websocket.handshake.ClientHandshake handshake) {
+            public void onOpen(WebSocket conn, ClientHandshake handshake) {
                 v2Server.onOpen(conn, handshake);
             }
 
             @Override
-            public void onClose(org.java_websocket.WebSocket conn, int code, String reason, boolean remote) {
+            public void onClose(WebSocket conn, int code, String reason, boolean remote) {
                 v2Server.onClose(conn, code, reason, remote);
             }
 
             @Override
-            public void onMessage(org.java_websocket.WebSocket conn, String message) {
-                v2Server.onMessage(conn, java.nio.ByteBuffer.wrap(message.getBytes()));
+            public void onMessage(WebSocket conn, String message) {
+                v2Server.onMessage(conn, ByteBuffer.wrap(message.getBytes()));
             }
 
             @Override
-            public void onMessage(org.java_websocket.WebSocket conn, java.nio.ByteBuffer message) {
+            public void onMessage(WebSocket conn, ByteBuffer message) {
                 v2Server.onMessage(conn, message);
             }
 
             @Override
-            public void onError(org.java_websocket.WebSocket conn, Exception ex) {
+            public void onError(WebSocket conn, Exception ex) {
                 getLogger().severe("[ReSync] WebSocket error: " + ex.getMessage());
                 ex.printStackTrace();
             }
@@ -66,12 +73,26 @@ public class ReSync extends JavaPlugin {
             getLogger().severe("[ReSync v2] Failed to start WebSocket server: " + e.getMessage());
             e.printStackTrace();
         }
+
+        if (getCommand("resync") != null) {
+            ReSyncCommand command = new ReSyncCommand(this);
+            getCommand("resync").setExecutor(command);
+            getCommand("resync").setTabCompleter(command);
+        } else {
+            getLogger().warning("[ReSync v2] Command '/resync' not found in plugin.yml");
+        }
+
+        registerPlaceholderExpansion();
     }
 
     @Override
     public void onDisable() {
         if (v2Server != null) {
             v2Server.shutdown();
+        }
+        if (placeholderExpansion != null) {
+            placeholderExpansion.unregister();
+            placeholderExpansion = null;
         }
 
         if (wsServer != null) {
@@ -92,5 +113,18 @@ public class ReSync extends JavaPlugin {
 
     public ReSyncServer getV2Server() {
         return v2Server;
+    }
+
+    private void registerPlaceholderExpansion() {
+        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            getLogger().info("[ReSync v2] PlaceholderAPI not found, skipping PAPI hook registration.");
+            return;
+        }
+        placeholderExpansion = new ReSyncPlaceholderExpansion(this);
+        if (placeholderExpansion.register()) {
+            getLogger().info("[ReSync v2] Registered PlaceholderAPI hook: %resync_*%");
+            return;
+        }
+        getLogger().warning("[ReSync v2] Failed to register PlaceholderAPI hook.");
     }
 }

@@ -91,5 +91,37 @@ public class ScoreboardNodes implements NodeDefinitionCategory {
             .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
+
+        registry.register(new NodeDefinition.Builder("scoreboard_show_template", "Show Scoreboard", NodeDefinition.NodeCategory.SCOREBOARD)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .input("scoreboard_id", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("use_papi", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("scoreboard_hide_active", "Hide Scoreboard", NodeDefinition.NodeCategory.SCOREBOARD)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("scoreboard_set_sidebar_line", "Set Sidebar Line", NodeDefinition.NodeCategory.SCOREBOARD)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .input("objective_id", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("title", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("line", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("score", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("use_papi", NodeDefinition.PinType.DATA, FlowType.BOOLEAN)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("scoreboard_clear_sidebar", "Clear Sidebar", NodeDefinition.NodeCategory.SCOREBOARD)
+            .input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .input("player", NodeDefinition.PinType.DATA, FlowType.PLAYER)
+            .input("objective_id", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
+            .build());
     }
 }

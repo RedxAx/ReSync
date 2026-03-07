@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkModule implements Module {
     private static final String CHANNEL_ID = "chunks";
+    private static final ModuleMetadata METADATA = ModuleMetadata.of("chunksLegacyHandler", "ChunksLegacyHandler", CHANNEL_ID);
     private final Codec codec;
     private final LRUCache<ChunkKey, byte[]> chunkCache;
     private final ConcurrentHashMap<String, Session> subscribers;
@@ -33,6 +34,11 @@ public class ChunkModule implements Module {
         this.subscribers = new ConcurrentHashMap<>();
         this.pendingLoads = new ConcurrentHashMap<>();
         this.batches = new ConcurrentHashMap<>();
+    }
+
+    @Override
+    public ModuleMetadata getMetadata() {
+        return METADATA;
     }
 
     @Override

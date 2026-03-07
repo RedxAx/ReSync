@@ -3,7 +3,7 @@ package restudio.resync.flow.util;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import restudio.resync.ReSync;
+import restudio.resync.flow.FlowRuntimeAccess;
 
 import java.util.Locale;
 import java.util.Map;
@@ -106,10 +106,7 @@ public final class ReSyncPlaceholderUtil {
     }
 
     private static Map<String, Object> getGlobalVariables() {
-        if (ReSync.getInstance() == null || ReSync.getInstance().getV2Server() == null || ReSync.getInstance().getV2Server().getFlowExecutor() == null) {
-            return null;
-        }
-        return ReSync.getInstance().getV2Server().getFlowExecutor().getGlobalVariables();
+        return FlowRuntimeAccess.getGlobalVariables();
     }
 
     private static String stringify(Object value) {

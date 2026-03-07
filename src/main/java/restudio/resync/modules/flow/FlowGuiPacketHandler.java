@@ -1,0 +1,81 @@
+package restudio.resync.modules.flow;
+
+import org.bukkit.Bukkit;
+import restudio.flow.data.FlowSerializer;
+import restudio.flow.data.GuiDefinition;
+import restudio.resync.core.Session;
+import restudio.resync.flow.FlowStorage;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
+public class FlowGuiPacketHandler {
+    private final FlowStorage storage;
+    private final FlowPacketSender sender;
+
+    public FlowGuiPacketHandler(FlowStorage storage, FlowPacketSender sender) {
+        this.storage = storage;
+        this.sender = sender;
+    }
+
+    public void handleRequest(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sender.sendError(session, "INVALID_REQUEST", "GUI ID not provided");
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String guiId = new String(idBytes, StandardCharsets.UTF_8);
+        if (guiId.length() > FlowPacketSender.MAX_STRING_LENGTH) {
+            sender.sendError(session, "INVALID_GUI_ID", "GUI ID too long");
+            return;
+        }
+        GuiDefinition gui = storage.getGui(guiId);
+        if (gui != null) {
+            sender.sendGuiData(session, gui);
+        } else {
+            sender.sendError(session, "GUI_NOT_FOUND", "GUI not found: " + guiId);
+        }
+    }
+
+    public void handleSave(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            sender.sendError(session, "INVALID_SAVE", "No data provided");
+            return;
+        }
+        if (buffer.remaining() > FlowPacketSender.MAX_PACKET_SIZE) {
+            sender.sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
+            return;
+        }
+        byte[] jsonBytes = new byte[buffer.remaining()];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        try {
+            GuiDefinition gui = FlowSerializer.deserializeGui(json);
+            if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
+                sender.sendError(session, "INVALID_GUI", "GUI ID is missing");
+                return;
+            }
+            storage.saveGui(gui);
+            Bukkit.getLogger().info("[ReSync] Saved GUI " + gui.getId() + " from client " + session.getClientId());
+            sender.sendGuiSaveAck(session, gui.getId());
+        } catch (Exception e) {
+            sender.sendError(session, "SAVE_FAILED", "Failed to save GUI: " + e.getMessage());
+        }
+    }
+
+    public void handleDelete(Session session, ByteBuffer buffer) {
+        if (!buffer.hasRemaining()) {
+            return;
+        }
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        String guiId = new String(idBytes, StandardCharsets.UTF_8);
+        storage.deleteGui(guiId);
+        Bukkit.getLogger().info("[ReSync] Deleted GUI " + guiId + " from client " + session.getClientId());
+    }
+
+    public void handleListRequest(Session session) {
+        sender.sendGuiList(session, storage.listGuiIds());
+    }
+}

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class FlowExecutor {
     private final FlowRegistry registry;
@@ -23,6 +24,7 @@ public class FlowExecutor {
     private final boolean enableDebug;
     private final Map<String, Object> eventVariables = new java.util.concurrent.ConcurrentHashMap<>();
     private Map<String, BukkitTask> pendingTasks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
 
     public FlowExecutor(FlowRegistry registry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
         this(registry, typeAdapter, globalVariables, 10000, false);
@@ -38,8 +40,19 @@ public class FlowExecutor {
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event) {
+        notifyExecutionListeners(graph, startNodeId, player, event);
         FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables);
         return execute(runtime, startNodeId, player, event, 0);
+    }
+
+    public void addExecutionListener(FlowExecutionListener listener) {
+        if (listener != null) {
+            executionListeners.add(listener);
+        }
+    }
+
+    public void removeExecutionListener(FlowExecutionListener listener) {
+        executionListeners.remove(listener);
     }
 
     private CompletableFuture<Void> execute(FlowRuntime runtime, String startNodeId, Player player, Event event, int steps) {
@@ -564,6 +577,18 @@ public class FlowExecutor {
             }
         }
         pendingTasks.clear();
+    }
+
+    private void notifyExecutionListeners(FlowGraph graph, String startNodeId, Player player, Event event) {
+        for (FlowExecutionListener listener : executionListeners) {
+            try {
+                listener.onFlowExecution(graph, startNodeId, player, event);
+            } catch (Exception e) {
+                if (enableDebug) {
+                    System.err.println("[Flow] Execution listener failed: " + e.getMessage());
+                }
+            }
+        }
     }
 
     public static class FlowExecutionException extends Exception {

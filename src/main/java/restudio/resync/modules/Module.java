@@ -5,8 +5,35 @@ import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
+import java.util.Set;
+
 public interface Module {
-    String getChannelId();
+    ModuleMetadata getMetadata();
+
+    default String getModuleId() {
+        return getMetadata().id();
+    }
+
+    default String getChannelId() {
+        return getMetadata().primaryChannel();
+    }
+
+    default Set<String> getChannels() {
+        return getMetadata().channels();
+    }
+
+    default boolean isEnabledByDefault() {
+        return true;
+    }
+
+    default void initialize(ModuleContext context) {
+    }
+
+    default void start(ModuleContext context) {
+    }
+
+    default void stop(ModuleContext context) {
+    }
 
     default void onSubscribe(Session session, SubscribeRequest req) {
     }

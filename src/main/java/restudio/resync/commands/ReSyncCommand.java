@@ -323,10 +323,10 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private FlowStorage getStorage() {
-        if (plugin.getV2Server() == null || plugin.getV2Server().getFlowModule() == null) {
+        if (plugin.getV2Server() == null) {
             return null;
         }
-        return plugin.getV2Server().getFlowModule().getStorage();
+        return plugin.getV2Server().getFlowStorage();
     }
 
     private List<String> onlinePlayers() {

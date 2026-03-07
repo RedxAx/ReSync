@@ -11,7 +11,7 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.FlowNode;
-import restudio.resync.ReSync;
+import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.FlowStorage;
@@ -703,11 +703,7 @@ public class ScoreboardNodes implements NodeCategory {
     }
 
     private static FlowStorage getFlowStorage() {
-        if (ReSync.getInstance() == null || ReSync.getInstance().getV2Server() == null
-            || ReSync.getInstance().getV2Server().getFlowModule() == null || ReSync.getInstance().getV2Server().getFlowModule().getStorage() == null) {
-            return null;
-        }
-        return ReSync.getInstance().getV2Server().getFlowModule().getStorage();
+        return FlowRuntimeAccess.getStorage();
     }
 
     private static DisplaySlot parseDisplaySlot(String displaySlot) {
@@ -799,7 +795,7 @@ public class ScoreboardNodes implements NodeCategory {
             runnable.run();
             return;
         }
-        ReSync plugin = ReSync.getInstance();
+        var plugin = FlowRuntimeAccess.getPlugin();
         if (plugin == null) {
             return;
         }

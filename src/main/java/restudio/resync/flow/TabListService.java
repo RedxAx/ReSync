@@ -4,7 +4,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.TabDefinition;
-import restudio.resync.ReSync;
 import restudio.resync.flow.nodes.ScoreboardNodes;
 import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.flow.util.TextFormatter;
@@ -25,11 +24,11 @@ public final class TabListService {
     public static synchronized void startUpdater() {
         stopUpdater();
         FlowStorage storage = getFlowStorage();
-        if (storage == null || ReSync.getInstance() == null) {
+        if (storage == null || FlowRuntimeAccess.getPlugin() == null) {
             return;
         }
         int interval = Math.max(1, storage.getTabRefreshIntervalTicks());
-        updaterTask = Bukkit.getScheduler().runTaskTimer(ReSync.getInstance(), TabListService::refreshActive, interval, interval);
+        updaterTask = Bukkit.getScheduler().runTaskTimer(FlowRuntimeAccess.getPlugin(), TabListService::refreshActive, interval, interval);
     }
 
     public static synchronized void stopUpdater() {
@@ -229,11 +228,7 @@ public final class TabListService {
     }
 
     private static FlowStorage getFlowStorage() {
-        if (ReSync.getInstance() == null || ReSync.getInstance().getV2Server() == null
-            || ReSync.getInstance().getV2Server().getFlowModule() == null || ReSync.getInstance().getV2Server().getFlowModule().getStorage() == null) {
-            return null;
-        }
-        return ReSync.getInstance().getV2Server().getFlowModule().getStorage();
+        return FlowRuntimeAccess.getStorage();
     }
 
     private static void applyViewerHeaderFooter(Player viewer, TabDefinition definition, boolean usePapi) {

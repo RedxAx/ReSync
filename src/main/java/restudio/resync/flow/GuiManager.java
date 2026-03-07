@@ -17,7 +17,9 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.GuiElement;
 import restudio.flow.data.Visual;
+import restudio.resync.core.Session;
 import restudio.resync.modules.FlowModule;
+import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.flow.util.TextFormatter;
 
@@ -33,6 +35,7 @@ public class GuiManager implements Listener {
     private final FlowStorage storage;
     private final FlowExecutor executor;
     private final FlowModule flowModule;
+    private final PlayerSessionLinkService sessionLinkService;
     private final Map<UUID, GuiDefinition> openGuis = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack[]> savedPlayerInventories = new ConcurrentHashMap<>();
 
@@ -41,6 +44,7 @@ public class GuiManager implements Listener {
         this.storage = storage;
         this.executor = executor;
         this.flowModule = flowModule;
+        this.sessionLinkService = server.getPlayerSessionLinkService();
     }
 
     public void openGui(Player player, String guiId) {
@@ -87,10 +91,10 @@ public class GuiManager implements Listener {
         player.openInventory(inv);
 
         String flowId = findFlowIdForGui(def);
-        var session = server.getSessionManager().getSessionByPlayer(player.getUniqueId());
+        Session session = sessionLinkService.getLinkedSession(player.getUniqueId());
         if (session == null) {
             linkPlayerToSession(player);
-            session = server.getSessionManager().getSessionByPlayer(player.getUniqueId());
+            session = sessionLinkService.getLinkedSession(player.getUniqueId());
         }
         if (session != null) {
             flowModule.sendGuiState(session, true, def.getId(), flowId);
@@ -190,7 +194,7 @@ public class GuiManager implements Listener {
         if (removed && def != null && def.isExtendToPlayerInventory() && event.getPlayer() instanceof Player player) {
             restorePlayerInventory(player);
         }
-        var session = server.getSessionManager().getSessionByPlayer(event.getPlayer().getUniqueId());
+        Session session = sessionLinkService.getLinkedSession(event.getPlayer().getUniqueId());
         if (session != null) {
             flowModule.sendGuiState(session, false, def != null ? def.getId() : null, null);
         }
@@ -200,7 +204,7 @@ public class GuiManager implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         openGuis.remove(event.getPlayer().getUniqueId());
         restorePlayerInventory(event.getPlayer());
-        server.getSessionManager().unlinkPlayer(event.getPlayer().getUniqueId());
+        sessionLinkService.unlinkPlayer(event.getPlayer().getUniqueId());
     }
 
     private String findStartNode(FlowGraph graph) {
@@ -223,8 +227,8 @@ public class GuiManager implements Listener {
 
     public void linkPlayerToSession(Player player) {
         if (server.getSessionManager().getSessionCount() > 0) {
-            var firstSession = server.getSessionManager().getSessions().iterator().next();
-            server.getSessionManager().linkPlayerToSession(player.getUniqueId(), firstSession);
+            Session firstSession = server.getSessionManager().getSessions().iterator().next();
+            sessionLinkService.link(player.getUniqueId(), firstSession);
         }
     }
 

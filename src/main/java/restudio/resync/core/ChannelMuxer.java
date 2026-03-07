@@ -13,6 +13,10 @@ public class ChannelMuxer {
     }
 
     public Channel createChannel(String channelId) {
+        Channel existing = channels.get(channelId);
+        if (existing != null) {
+            return existing;
+        }
         int numericId = channelIdCounter.getAndIncrement();
         Channel channel = new Channel(channelId, numericId);
         channels.put(channelId, channel);

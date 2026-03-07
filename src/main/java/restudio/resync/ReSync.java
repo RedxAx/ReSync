@@ -31,7 +31,7 @@ public class ReSync extends JavaPlugin {
             return;
         }
 
-        v2Server = new ReSyncServer(config);
+        v2Server = new ReSyncServer(this, config);
 
         wsServer = new WebSocketServer(new InetSocketAddress(config.getPort())) {
             @Override

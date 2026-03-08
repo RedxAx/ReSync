@@ -235,34 +235,44 @@ public class ReSyncCommand implements TabExecutor {
         if ("list".equals(action)) {
             FlowStorage storage = getStorage();
             if (storage == null) {
-                sender.sendMessage("Flow storage unavailable.");
+                sendError(sender, "Flow Storage Unavailable");
                 return true;
             }
             List<String> ids = storage.listScoreboardIds();
-            sender.sendMessage(ids.isEmpty() ? "No scoreboards found." : "Scoreboards: " + String.join(", ", ids));
+            if (ids.isEmpty()) {
+                sendInfo(sender, "No Scoreboards Found");
+            } else {
+                sendInfo(sender, "Scoreboards", String.join(", ", ids));
+            }
             return true;
         }
         if ("default".equals(action)) {
             if (args.length == 2) {
                 String defaultId = ScoreboardNodes.getDefaultScoreboardId();
                 if (defaultId == null || defaultId.isBlank()) {
-                    sender.sendMessage("Default scoreboard: none");
+                    sendInfo(sender, "Default Scoreboard", "None");
                 } else {
-                    sender.sendMessage("Default scoreboard: " + defaultId + " (usePapi=" + ScoreboardNodes.isDefaultScoreboardUsePapi() + ")");
+                    sendInfo(sender, "Default Scoreboard", defaultId + " · Papi " + ScoreboardNodes.isDefaultScoreboardUsePapi());
                 }
                 return true;
             }
             String id = args[2];
             if ("none".equalsIgnoreCase(id)) {
                 boolean cleared = ScoreboardNodes.clearDefaultScoreboard();
-                sender.sendMessage(cleared ? "Default scoreboard cleared." : "Failed to clear default scoreboard.");
+                if (cleared) {
+                    sendSuccess(sender, "Default Scoreboard Cleared");
+                } else {
+                    sendError(sender, "Default Scoreboard Clear Failed");
+                }
                 return true;
             }
             boolean usePapi = args.length < 4 || Boolean.parseBoolean(args[3]);
             boolean changed = ScoreboardNodes.setDefaultScoreboard(id, usePapi);
-            sender.sendMessage(changed
-                ? "Default scoreboard set to '" + id + "' (usePapi=" + usePapi + ")"
-                : "Failed to set default scoreboard. Check ID.");
+            if (changed) {
+                sendSuccess(sender, "Default Scoreboard", id + " · Papi " + usePapi);
+            } else {
+                sendError(sender, "Default Scoreboard Set Failed", id);
+            }
             return true;
         }
         if (args.length < 3) {
@@ -271,12 +281,12 @@ public class ReSyncCommand implements TabExecutor {
         }
         Player target = findPlayer(args[2]);
         if (target == null) {
-            sender.sendMessage("Player not found: " + args[2]);
+            sendError(sender, "Player Not Found", args[2]);
             return true;
         }
         if ("hide".equals(action)) {
             ScoreboardNodes.hideActive(target);
-            sender.sendMessage("Hid scoreboard for " + target.getName());
+            sendSuccess(sender, "Scoreboard Hidden", target.getName());
             return true;
         }
         if (!"show".equals(action) || args.length < 4) {
@@ -285,20 +295,22 @@ public class ReSyncCommand implements TabExecutor {
         }
         FlowStorage storage = getStorage();
         if (storage == null) {
-            sender.sendMessage("Flow storage unavailable.");
+            sendError(sender, "Flow Storage Unavailable");
             return true;
         }
         String scoreboardId = args[3];
         ScoreboardDefinition definition = storage.getScoreboard(scoreboardId);
         if (definition == null) {
-            sender.sendMessage("Scoreboard not found: " + scoreboardId);
+            sendError(sender, "Scoreboard Not Found", scoreboardId);
             return true;
         }
         boolean usePapi = args.length < 5 || Boolean.parseBoolean(args[4]);
         boolean applied = ScoreboardNodes.showTemplate(target, definition, usePapi);
-        sender.sendMessage(applied
-            ? "Applied scoreboard '" + scoreboardId + "' to " + target.getName()
-            : "Failed to apply scoreboard '" + scoreboardId + "'.");
+        if (applied) {
+            sendSuccess(sender, "Scoreboard Applied", scoreboardId + " -> " + target.getName());
+        } else {
+            sendError(sender, "Scoreboard Apply Failed", scoreboardId);
+        }
         return true;
     }
 
@@ -310,53 +322,63 @@ public class ReSyncCommand implements TabExecutor {
         String action = args[1].toLowerCase(Locale.ROOT);
         FlowStorage storage = getStorage();
         if (storage == null) {
-            sender.sendMessage("Flow storage unavailable.");
+            sendError(sender, "Flow Storage Unavailable");
             return true;
         }
         if ("list".equals(action)) {
             List<String> ids = storage.listTabIds();
-            sender.sendMessage(ids.isEmpty() ? "No tabs found." : "Tabs: " + String.join(", ", ids));
+            if (ids.isEmpty()) {
+                sendInfo(sender, "No Tabs Found");
+            } else {
+                sendInfo(sender, "Tabs", String.join(", ", ids));
+            }
             return true;
         }
         if ("default".equals(action)) {
             if (args.length == 2) {
                 String defaultId = TabListService.getDefaultTabId();
                 if (defaultId == null || defaultId.isBlank()) {
-                    sender.sendMessage("Default tab: none");
+                    sendInfo(sender, "Default Tab", "None");
                 } else {
-                    sender.sendMessage("Default tab: " + defaultId + " (usePapi=" + TabListService.isDefaultTabUsePapi() + ")");
+                    sendInfo(sender, "Default Tab", defaultId + " · Papi " + TabListService.isDefaultTabUsePapi());
                 }
                 return true;
             }
             String id = args[2];
             if ("none".equalsIgnoreCase(id)) {
                 boolean cleared = TabListService.clearDefaultTab();
-                sender.sendMessage(cleared ? "Default tab cleared." : "Failed to clear default tab.");
+                if (cleared) {
+                    sendSuccess(sender, "Default Tab Cleared");
+                } else {
+                    sendError(sender, "Default Tab Clear Failed");
+                }
                 return true;
             }
             boolean usePapi = args.length < 4 || Boolean.parseBoolean(args[3]);
             boolean changed = TabListService.setDefaultTab(id, usePapi);
-            sender.sendMessage(changed
-                ? "Default tab set to '" + id + "' (usePapi=" + usePapi + ")"
-                : "Failed to set default tab. Check ID.");
+            if (changed) {
+                sendSuccess(sender, "Default Tab", id + " · Papi " + usePapi);
+            } else {
+                sendError(sender, "Default Tab Set Failed", id);
+            }
             return true;
         }
         if ("clear".equals(action)) {
             if (args.length >= 3) {
                 Player target = findPlayer(args[2]);
                 if (target == null) {
-                    sender.sendMessage("Player not found: " + args[2]);
+                    sendError(sender, "Player Not Found", args[2]);
                     return true;
                 }
                 TabListService.clearForPlayer(target);
-                sender.sendMessage("Cleared tab for " + target.getName());
+                sendSuccess(sender, "Tab Cleared", target.getName());
                 return true;
             }
             for (Player player : Bukkit.getOnlinePlayers()) {
                 TabListService.clearForPlayer(player);
             }
             TabListService.resetEntryNames();
-            sender.sendMessage("Cleared tab for all players.");
+            sendSuccess(sender, "Tab Cleared", "All Players");
             return true;
         }
         if ("apply".equals(action)) {
@@ -367,7 +389,7 @@ public class ReSyncCommand implements TabExecutor {
             String tabId = args[2];
             TabDefinition tab = storage.getTab(tabId);
             if (tab == null) {
-                sender.sendMessage("Tab not found: " + tabId);
+                sendError(sender, "Tab Not Found", tabId);
                 return true;
             }
             Player target = null;
@@ -385,31 +407,37 @@ public class ReSyncCommand implements TabExecutor {
             }
             if (target != null) {
                 boolean applied = TabListService.applyTemplate(target, tab, usePapi);
-                sender.sendMessage(applied
-                    ? "Applied tab '" + tabId + "' to " + target.getName()
-                    : "Failed to apply tab '" + tabId + "'.");
+                if (applied) {
+                    sendSuccess(sender, "Tab Applied", tabId + " -> " + target.getName());
+                } else {
+                    sendError(sender, "Tab Apply Failed", tabId);
+                }
             } else {
                 TabListService.applyTemplateToAll(tab, usePapi);
-                sender.sendMessage("Applied tab '" + tabId + "' to all players.");
+                sendSuccess(sender, "Tab Applied", tabId + " -> All Players");
             }
             return true;
         }
         if ("interval".equals(action)) {
             if (args.length == 2) {
-                sender.sendMessage("Hud refresh interval: " + TabListService.getRefreshIntervalTicks() + " ticks");
+                sendInfo(sender, "Hud Refresh Interval", TabListService.getRefreshIntervalTicks() + " Ticks");
                 return true;
             }
             Integer ticks = parseInt(args[2]);
             if (ticks == null) {
-                sender.sendMessage("Invalid interval: " + args[2]);
+                sendError(sender, "Invalid Interval", args[2]);
                 return true;
             }
             if (ticks < 1) {
-                sender.sendMessage("Interval must be >= 1 tick.");
+                sendError(sender, "Interval Must Be At Least 1 Tick");
                 return true;
             }
             boolean changed = TabListService.setRefreshIntervalTicks(ticks);
-            sender.sendMessage(changed ? "Hud refresh interval set to " + ticks + " ticks." : "Failed to set interval.");
+            if (changed) {
+                sendSuccess(sender, "Hud Refresh Interval", ticks + " Ticks");
+            } else {
+                sendError(sender, "Hud Refresh Interval Set Failed");
+            }
             return true;
         }
         sendUsage(sender);
@@ -419,7 +447,7 @@ public class ReSyncCommand implements TabExecutor {
     private boolean handleWorld(CommandSender sender, String[] args) {
         WorldManagementService service = getWorldService();
         if (service == null) {
-            sender.sendMessage("World management unavailable.");
+            sendError(sender, "World Management Unavailable");
             return true;
         }
         if (args.length < 2) {
@@ -831,7 +859,7 @@ public class ReSyncCommand implements TabExecutor {
             sendInfo(sender, "No Generator Hints Found");
             return;
         }
-        sendInfo(sender, "Generator Hints");
+        sendInfo(sender, "Generator Hints", "Use Exact Value");
         for (String hint : hints) {
             sendInfo(sender, "- " + hint);
         }
@@ -1210,42 +1238,45 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void sendUsage(CommandSender sender) {
-        sender.sendMessage(Component.text("/resync portal create <target> <name>", NamedTextColor.WHITE));
-        sender.sendMessage(Component.text("/resync portal cancel", NamedTextColor.WHITE));
-        sender.sendMessage("/resync scoreboard list");
-        sender.sendMessage("/resync scoreboard show <player> <scoreboardId> [usePapi]");
-        sender.sendMessage("/resync scoreboard hide <player>");
-        sender.sendMessage("/resync scoreboard default [<scoreboardId|none> [usePapi]]");
-        sender.sendMessage("/resync tab list");
-        sender.sendMessage("/resync tab apply <tabId> [player] [usePapi]");
-        sender.sendMessage("/resync tab clear [player]");
-        sender.sendMessage("/resync tab default [<tabId|none> [usePapi]]");
-        sender.sendMessage("/resync tab interval [ticks]");
-        sender.sendMessage("/resync world list");
-        sender.sendMessage("/resync world info <world>");
-        sender.sendMessage("/resync world create <world> [seed] [environment] [generator]");
-        sender.sendMessage("/resync world clone <source> <target> [loadAfterClone]");
-        sender.sendMessage("/resync world load <world>");
-        sender.sendMessage("/resync world unload <world> [fallbackWorld]");
-        sender.sendMessage("/resync world delete <world> <deleteFiles> [fallbackWorld]");
-        sender.sendMessage("/resync world difficulty <world> [difficulty]");
-        sender.sendMessage("/resync world rules <world>");
-        sender.sendMessage("/resync world rule <world> <rule> [value]");
-        sender.sendMessage("/resync world isolated <world> [enabled]");
-        sender.sendMessage("/resync world timelock <world> [enabled] [lockedTime]");
-        sender.sendMessage("/resync world weatherlock <world> [enabled] [storm] [thundering]");
-        sender.sendMessage("/resync world tp <player> <world> [x] [y] [z] [yaw] [pitch]");
-        sender.sendMessage("/resync world tpspawn <player> <world>");
-        sender.sendMessage("/resync world generators");
-        sender.sendMessage("/resync portal create <target> <name>");
-        sender.sendMessage("/resync portal cancel");
-        sender.sendMessage("/resync portal list [world]");
-        sender.sendMessage("/resync portal info <portal>");
-        sender.sendMessage("/resync portal enable <portal> <enabled>");
-        sender.sendMessage("/resync portal rename <portal> <newName>");
-        sender.sendMessage("/resync portal bounds <portal> [sourceWorld minX minY minZ maxX maxY maxZ]");
-        sender.sendMessage("/resync portal dest <portal> [world x y z yaw pitch]");
-        sender.sendMessage("/resync portal tp <player> <portal>");
-        sender.sendMessage("/resync portal delete <portal>");
+        sendInfo(sender, "Commands");
+        sendUsageLine(sender, "/resync portal create <target> <name>");
+        sendUsageLine(sender, "/resync portal cancel");
+        sendUsageLine(sender, "/resync scoreboard list");
+        sendUsageLine(sender, "/resync scoreboard show <player> <scoreboardId> [usePapi]");
+        sendUsageLine(sender, "/resync scoreboard hide <player>");
+        sendUsageLine(sender, "/resync scoreboard default [<scoreboardId|none> [usePapi]]");
+        sendUsageLine(sender, "/resync tab list");
+        sendUsageLine(sender, "/resync tab apply <tabId> [player] [usePapi]");
+        sendUsageLine(sender, "/resync tab clear [player]");
+        sendUsageLine(sender, "/resync tab default [<tabId|none> [usePapi]]");
+        sendUsageLine(sender, "/resync tab interval [ticks]");
+        sendUsageLine(sender, "/resync world list");
+        sendUsageLine(sender, "/resync world info <world>");
+        sendUsageLine(sender, "/resync world create <world> [seed] [environment] [generator]");
+        sendUsageLine(sender, "/resync world clone <source> <target> [loadAfterClone]");
+        sendUsageLine(sender, "/resync world load <world>");
+        sendUsageLine(sender, "/resync world unload <world> [fallbackWorld]");
+        sendUsageLine(sender, "/resync world delete <world> <deleteFiles> [fallbackWorld]");
+        sendUsageLine(sender, "/resync world difficulty <world> [difficulty]");
+        sendUsageLine(sender, "/resync world rules <world>");
+        sendUsageLine(sender, "/resync world rule <world> <rule> [value]");
+        sendUsageLine(sender, "/resync world isolated <world> [enabled]");
+        sendUsageLine(sender, "/resync world timelock <world> [enabled] [lockedTime]");
+        sendUsageLine(sender, "/resync world weatherlock <world> [enabled] [storm] [thundering]");
+        sendUsageLine(sender, "/resync world tp <player> <world> [x] [y] [z] [yaw] [pitch]");
+        sendUsageLine(sender, "/resync world tpspawn <player> <world>");
+        sendUsageLine(sender, "/resync world generators");
+        sendUsageLine(sender, "/resync portal list [world]");
+        sendUsageLine(sender, "/resync portal info <portal>");
+        sendUsageLine(sender, "/resync portal enable <portal> <enabled>");
+        sendUsageLine(sender, "/resync portal rename <portal> <newName>");
+        sendUsageLine(sender, "/resync portal bounds <portal> [sourceWorld minX minY minZ maxX maxY maxZ]");
+        sendUsageLine(sender, "/resync portal dest <portal> [world x y z yaw pitch]");
+        sendUsageLine(sender, "/resync portal tp <player> <portal>");
+        sendUsageLine(sender, "/resync portal delete <portal>");
+    }
+
+    private void sendUsageLine(CommandSender sender, String usage) {
+        sender.sendMessage(Component.text("  " + usage, NamedTextColor.WHITE));
     }
 }

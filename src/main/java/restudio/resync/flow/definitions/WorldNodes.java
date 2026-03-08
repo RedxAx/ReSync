@@ -123,5 +123,45 @@ public class WorldNodes implements NodeDefinitionCategory {
             .input("water_underground", NodeDefinition.PinType.DATA, FlowType.NUMBER)
             .output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION)
             .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_snapshot", "World Snapshot", NodeDefinition.NodeCategory.DATA)
+            .output("snapshot", NodeDefinition.PinType.DATA, FlowType.ANY)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_worlds", "World Entries", NodeDefinition.NodeCategory.DATA)
+            .output("worlds", NodeDefinition.PinType.DATA, FlowType.LIST)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_world", "World Entry", NodeDefinition.NodeCategory.DATA)
+            .input("world_name", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("world", NodeDefinition.PinType.DATA, FlowType.ANY)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_portals", "World Portals", NodeDefinition.NodeCategory.DATA)
+            .input("world_name", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("portals", NodeDefinition.PinType.DATA, FlowType.LIST)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_portal", "World Portal", NodeDefinition.NodeCategory.DATA)
+            .input("portal_id", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("portal", NodeDefinition.PinType.DATA, FlowType.ANY)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_game_rules", "World Game Rules", NodeDefinition.NodeCategory.DATA)
+            .input("world_name", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .output("game_rules", NodeDefinition.PinType.DATA, FlowType.MAP)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_game_rule_descriptors", "World Game Rule Descriptors", NodeDefinition.NodeCategory.DATA)
+            .output("descriptors", NodeDefinition.PinType.DATA, FlowType.LIST)
+            .build());
+
+        registry.register(new NodeDefinition.Builder("world_management_get_map_snapshot", "World Map Snapshot", NodeDefinition.NodeCategory.DATA)
+            .input("world_name", NodeDefinition.PinType.DATA, FlowType.STRING)
+            .input("center_x", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("center_z", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .input("zoom", NodeDefinition.PinType.DATA, FlowType.NUMBER)
+            .output("snapshot", NodeDefinition.PinType.DATA, FlowType.ANY)
+            .build());
     }
 }

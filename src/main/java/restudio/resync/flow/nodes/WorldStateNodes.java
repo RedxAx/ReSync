@@ -5,10 +5,15 @@ import org.bukkit.Difficulty;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.NodeCategory;
+import restudio.resync.world.WorldManagementService;
+import restudio.resync.world.WorldOperationResult;
+import restudio.resync.world.WorldPortal;
 
 public class WorldStateNodes implements NodeCategory {
 
@@ -297,6 +302,297 @@ public class WorldStateNodes implements NodeCategory {
             }
             ctx.triggerOutput("flow");
         });
+
+        registry.register("world_management_create_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.createWorld(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "seed", String.class, ""),
+                ctx.getInputValue(node, "environment", String.class, ""),
+                ctx.getInputValue(node, "generator", String.class, "")
+            )
+                : WorldOperationResult.failure("createWorld", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_scan_worlds", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.scanUnregisteredWorlds()
+                : WorldOperationResult.failure("scanWorlds", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_import_worlds", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.importUnregisteredWorlds()
+                : WorldOperationResult.failure("importWorlds", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_clone_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.cloneWorldAsync(
+                ctx.getInputValue(node, "source_world", String.class, ""),
+                ctx.getInputValue(node, "target_world", String.class, ""),
+                ctx.getInputValue(node, "load_after_clone", Boolean.class, false)
+            )
+                : WorldOperationResult.failure("cloneWorld", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_load_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.loadWorld(ctx.getInputValue(node, "world_name", String.class, ""))
+                : WorldOperationResult.failure("loadWorld", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_unload_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.unloadWorld(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "fallback_world", String.class, "")
+            )
+                : WorldOperationResult.failure("unloadWorld", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_delete_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.deleteWorld(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "delete_files", Boolean.class, false),
+                ctx.getInputValue(node, "fallback_world", String.class, "")
+            )
+                : WorldOperationResult.failure("deleteWorld", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_rule", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setGameRule(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "rule_name", String.class, ""),
+                ctx.getInputValue(node, "value", String.class, "")
+            )
+                : WorldOperationResult.failure("setWorldRule", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_difficulty", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setDifficulty(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "difficulty", String.class, "")
+            )
+                : WorldOperationResult.failure("setWorldDifficulty", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_time_lock", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            Double lockedTime = ctx.getInputValue(node, "locked_time", Double.class, 0.0);
+            WorldOperationResult result = service != null
+                ? service.setTimeLock(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "enabled", Boolean.class, false),
+                lockedTime.longValue()
+            )
+                : WorldOperationResult.failure("setTimeLock", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_weather_lock", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setWeatherLock(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "enabled", Boolean.class, false),
+                ctx.getInputValue(node, "storm", Boolean.class, false),
+                ctx.getInputValue(node, "thundering", Boolean.class, false)
+            )
+                : WorldOperationResult.failure("setWeatherLock", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_isolated_state", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setIsolatedPlayerState(
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "enabled", Boolean.class, false)
+            )
+                : WorldOperationResult.failure("setIsolatedState", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_create_portal", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldPortal portal = new WorldPortal();
+            portal.setPortalName(ctx.getInputValue(node, "portal_name", String.class, ""));
+            portal.setSourceWorld(ctx.getInputValue(node, "source_world", String.class, ""));
+            portal.setMinX(ctx.getInputValue(node, "min_x", Double.class, 0.0));
+            portal.setMinY(ctx.getInputValue(node, "min_y", Double.class, 0.0));
+            portal.setMinZ(ctx.getInputValue(node, "min_z", Double.class, 0.0));
+            portal.setMaxX(ctx.getInputValue(node, "max_x", Double.class, 0.0));
+            portal.setMaxY(ctx.getInputValue(node, "max_y", Double.class, 0.0));
+            portal.setMaxZ(ctx.getInputValue(node, "max_z", Double.class, 0.0));
+            portal.setDestinationWorld(ctx.getInputValue(node, "destination_world", String.class, ""));
+            portal.setDestinationX(ctx.getInputValue(node, "destination_x", Double.class, 0.0));
+            portal.setDestinationY(ctx.getInputValue(node, "destination_y", Double.class, 80.0));
+            portal.setDestinationZ(ctx.getInputValue(node, "destination_z", Double.class, 0.0));
+            portal.setDestinationYaw(ctx.getInputValue(node, "destination_yaw", Float.class, 0f));
+            portal.setDestinationPitch(ctx.getInputValue(node, "destination_pitch", Float.class, 0f));
+            portal.setEnabled(ctx.getInputValue(node, "enabled", Boolean.class, true));
+            WorldOperationResult result = service != null
+                ? service.createPortal(portal)
+                : WorldOperationResult.failure("createPortal", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, result != null ? extractPortalId(result) : null);
+        });
+
+        registry.register("world_management_delete_portal", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.deletePortal(ctx.getInputValue(node, "portal_id", String.class, ""))
+                : WorldOperationResult.failure("deletePortal", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_set_portal_enabled", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setPortalEnabled(
+                ctx.getInputValue(node, "portal_id", String.class, ""),
+                ctx.getInputValue(node, "enabled", Boolean.class, true)
+            )
+                : WorldOperationResult.failure("setPortalEnabled", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, extractPortalId(result));
+        });
+
+        registry.register("world_management_set_portal_destination", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setPortalDestination(
+                ctx.getInputValue(node, "portal_id", String.class, ""),
+                ctx.getInputValue(node, "destination_world", String.class, ""),
+                ctx.getInputValue(node, "destination_x", Double.class, 0.0),
+                ctx.getInputValue(node, "destination_y", Double.class, 80.0),
+                ctx.getInputValue(node, "destination_z", Double.class, 0.0),
+                ctx.getInputValue(node, "destination_yaw", Float.class, 0f),
+                ctx.getInputValue(node, "destination_pitch", Float.class, 0f)
+            )
+                : WorldOperationResult.failure("setPortalDestination", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, extractPortalId(result));
+        });
+
+        registry.register("world_management_set_portal_bounds", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            WorldOperationResult result = service != null
+                ? service.setPortalBounds(
+                ctx.getInputValue(node, "portal_id", String.class, ""),
+                ctx.getInputValue(node, "source_world", String.class, ""),
+                ctx.getInputValue(node, "min_x", Double.class, 0.0),
+                ctx.getInputValue(node, "min_y", Double.class, 0.0),
+                ctx.getInputValue(node, "min_z", Double.class, 0.0),
+                ctx.getInputValue(node, "max_x", Double.class, 0.0),
+                ctx.getInputValue(node, "max_y", Double.class, 0.0),
+                ctx.getInputValue(node, "max_z", Double.class, 0.0)
+            )
+                : WorldOperationResult.failure("setPortalBounds", null, "WorldManagementUnavailable");
+            applyResult(ctx, node, result, extractPortalId(result));
+        });
+
+        registry.register("world_management_teleport_player_to_world", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            Player player = ctx.getInputValue(node, "target", Player.class, null);
+            WorldOperationResult result = service == null
+                ? WorldOperationResult.failure("teleportPlayerToWorld", null, "WorldManagementUnavailable")
+                : player == null
+                ? WorldOperationResult.failure("teleportPlayerToWorld", null, "PlayerUnavailable")
+                : service.teleportPlayerToWorld(
+                player.getName(),
+                ctx.getInputValue(node, "world_name", String.class, ""),
+                ctx.getInputValue(node, "x", Double.class, 0.0),
+                ctx.getInputValue(node, "y", Double.class, 80.0),
+                ctx.getInputValue(node, "z", Double.class, 0.0),
+                ctx.getInputValue(node, "yaw", Float.class, 0f),
+                ctx.getInputValue(node, "pitch", Float.class, 0f)
+            );
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_teleport_player_to_world_spawn", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            Player player = ctx.getInputValue(node, "target", Player.class, null);
+            WorldOperationResult result = service == null
+                ? WorldOperationResult.failure("teleportPlayerToWorldSpawn", null, "WorldManagementUnavailable")
+                : player == null
+                ? WorldOperationResult.failure("teleportPlayerToWorldSpawn", null, "PlayerUnavailable")
+                : service.teleportPlayerToWorldSpawn(
+                player.getName(),
+                ctx.getInputValue(node, "world_name", String.class, "")
+            );
+            applyResult(ctx, node, result, null);
+        });
+
+        registry.register("world_management_teleport_player_to_portal", (ctx, node) -> {
+            WorldManagementService service = getWorldManagementService();
+            Player player = ctx.getInputValue(node, "target", Player.class, null);
+            WorldOperationResult result = service == null
+                ? WorldOperationResult.failure("teleportPlayerToPortal", null, "WorldManagementUnavailable")
+                : player == null
+                ? WorldOperationResult.failure("teleportPlayerToPortal", null, "PlayerUnavailable")
+                : service.teleportPlayerToPortal(
+                player.getName(),
+                ctx.getInputValue(node, "portal_id", String.class, "")
+            );
+            applyResult(ctx, node, result, null);
+        });
+    }
+
+    private static WorldManagementService getWorldManagementService() {
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getV2Server() == null) {
+            return null;
+        }
+        return plugin.getV2Server().getWorldManagementService();
+    }
+
+    private static void applyResult(FlowContext ctx, FlowNode node, WorldOperationResult result, String portalId) {
+        String nodeId = findNodeId(ctx, node);
+        if (nodeId != null) {
+            boolean success = result != null && result.isSuccess();
+            ctx.setNodeOutput(nodeId, "success", success);
+            ctx.setNodeOutput(nodeId, "message", result != null ? result.getMessage() : "WorldManagementUnavailable");
+            if (result != null && result.getData().containsKey("count")) {
+                ctx.setNodeOutput(nodeId, "count", result.getData().get("count"));
+            }
+            if (portalId != null) {
+                ctx.setNodeOutput(nodeId, "portal_id", portalId);
+            }
+        }
+        ctx.triggerOutput("flow");
+    }
+
+    private static String extractPortalId(WorldOperationResult result) {
+        if (result == null) {
+            return null;
+        }
+        Object portal = result.getData().get("portal");
+        if (portal instanceof WorldPortal worldPortal) {
+            return worldPortal.getPortalId();
+        }
+        Object portalId = result.getData().get("portalId");
+        return portalId == null ? null : String.valueOf(portalId);
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

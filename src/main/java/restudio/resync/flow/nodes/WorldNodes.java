@@ -1,14 +1,23 @@
 package restudio.resync.flow.nodes;
 
-import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
+import restudio.resync.world.WorldManagementService;
+import restudio.resync.world.WorldMapQuery;
+import restudio.resync.world.WorldRegistryEntry;
+import restudio.resync.world.WorldSnapshot;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class WorldNodes {
     public static void registerAll(FlowRegistry registry) {
@@ -289,6 +298,122 @@ public class WorldNodes {
             }
             ctx.setNodeOutput(nodeId, "flow", true);
         });
+
+        registry.register("world_management_get_snapshot", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            WorldManagementService service = getWorldManagementService();
+            if (service != null) {
+                ctx.setNodeOutput(nodeId, "snapshot", service.createSnapshot());
+            }
+        });
+
+        registry.register("world_management_get_worlds", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            WorldManagementService service = getWorldManagementService();
+            WorldSnapshot snapshot = service != null ? service.createSnapshot() : null;
+            ctx.setNodeOutput(nodeId, "worlds", snapshot != null ? snapshot.getWorlds() : Collections.emptyList());
+        });
+
+        registry.register("world_management_get_world", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            String worldName = ctx.getInputValue(node, "world_name", String.class, "");
+            WorldManagementService service = getWorldManagementService();
+            WorldRegistryEntry match = null;
+            if (service != null) {
+                for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
+                    if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
+                        match = entry;
+                        break;
+                    }
+                }
+            }
+            ctx.setNodeOutput(nodeId, "world", match);
+        });
+
+        registry.register("world_management_get_portals", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            String worldName = ctx.getInputValue(node, "world_name", String.class, "");
+            WorldManagementService service = getWorldManagementService();
+            if (service == null) {
+                ctx.setNodeOutput(nodeId, "portals", Collections.emptyList());
+                return;
+            }
+            ctx.setNodeOutput(nodeId, "portals", worldName == null || worldName.isBlank() ? service.getPortals() : service.getPortalsByWorld(worldName));
+        });
+
+        registry.register("world_management_get_portal", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            WorldManagementService service = getWorldManagementService();
+            ctx.setNodeOutput(nodeId, "portal", service == null ? null : service.getPortal(ctx.getInputValue(node, "portal_id", String.class, "")));
+        });
+
+        registry.register("world_management_get_game_rules", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            String worldName = ctx.getInputValue(node, "world_name", String.class, "");
+            WorldManagementService service = getWorldManagementService();
+            Map<String, String> gameRules = new LinkedHashMap<>();
+            if (service != null) {
+                for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
+                    if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
+                        gameRules.putAll(entry.getGameRules());
+                        break;
+                    }
+                }
+            }
+            ctx.setNodeOutput(nodeId, "game_rules", gameRules);
+        });
+
+        registry.register("world_management_get_game_rule_descriptors", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            WorldManagementService service = getWorldManagementService();
+            ctx.setNodeOutput(nodeId, "descriptors", service == null ? Collections.emptyList() : service.getGameRuleDescriptors());
+        });
+
+        registry.register("world_management_get_map_snapshot", (ctx, node) -> {
+            String nodeId = findNodeId(ctx, node);
+            if (nodeId == null) {
+                return;
+            }
+            WorldManagementService service = getWorldManagementService();
+            if (service == null) {
+                return;
+            }
+            WorldMapQuery query = new WorldMapQuery();
+            query.setWorldName(ctx.getInputValue(node, "world_name", String.class, ""));
+            query.setCenterX(ctx.getInputValue(node, "center_x", Double.class, 0.0));
+            query.setCenterZ(ctx.getInputValue(node, "center_z", Double.class, 0.0));
+            query.setZoom(ctx.getInputValue(node, "zoom", Integer.class, 1));
+            ctx.setNodeOutput(nodeId, "snapshot", service.getMapService().createSnapshot(query));
+        });
+    }
+
+    private static WorldManagementService getWorldManagementService() {
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getV2Server() == null) {
+            return null;
+        }
+        return plugin.getV2Server().getWorldManagementService();
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

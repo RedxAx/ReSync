@@ -16,6 +16,6 @@ permissions:
     default: op
 commands:
   resync:
-    description: Manage ReSync scoreboard outputs
-    usage: /resync <scoreboard|tab> ...
+    description: Manage ReSync systems
+    usage: /resync <scoreboard|tab|world|portal> ...
     permission: resync.command

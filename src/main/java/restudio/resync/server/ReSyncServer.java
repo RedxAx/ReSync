@@ -22,10 +22,12 @@ import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleRegistry;
 import restudio.resync.modules.PlayerTrackingModule;
+import restudio.resync.modules.WorldManagementModule;
 import restudio.resync.player.DefaultPlayerSessionLinkService;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.player.PlayerTrackingManager;
 import restudio.resync.player.PlayerTrackingService;
+import restudio.resync.world.WorldManagementService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameHeader;
 import restudio.resync.protocol.messages.DataMessage;
@@ -111,6 +113,7 @@ public class ReSyncServer {
         moduleRegistry.registerModule(new ChunkTransportModule());
         moduleRegistry.registerModule(new FlowRuntimeModule());
         moduleRegistry.registerModule(new PlayerTrackingModule());
+        moduleRegistry.registerModule(new WorldManagementModule());
     }
 
     private void startScheduler() {
@@ -324,5 +327,9 @@ public class ReSyncServer {
 
     public PlayerSessionLinkService getPlayerSessionLinkService() {
         return moduleContext.getService(PlayerSessionLinkService.class);
+    }
+
+    public WorldManagementService getWorldManagementService() {
+        return moduleContext.getService(WorldManagementService.class);
     }
 }

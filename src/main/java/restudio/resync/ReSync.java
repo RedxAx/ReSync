@@ -7,6 +7,7 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
 import restudio.resync.placeholder.ReSyncPlaceholderExpansion;
+import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
 import restudio.resync.server.ReSyncConfig;
@@ -19,6 +20,7 @@ public class ReSync extends JavaPlugin {
     private WebSocketServer wsServer;
     private ReSyncServer v2Server;
     private ReSyncPlaceholderExpansion placeholderExpansion;
+    private InteractiveSelectionManager interactiveSelectionManager;
 
     @Override
     public void onEnable() {
@@ -32,6 +34,8 @@ public class ReSync extends JavaPlugin {
         }
 
         v2Server = new ReSyncServer(this, config);
+        interactiveSelectionManager = new InteractiveSelectionManager(this);
+        interactiveSelectionManager.start();
 
         wsServer = new WebSocketServer(new InetSocketAddress(config.getPort())) {
             @Override
@@ -90,6 +94,10 @@ public class ReSync extends JavaPlugin {
         if (v2Server != null) {
             v2Server.shutdown();
         }
+        if (interactiveSelectionManager != null) {
+            interactiveSelectionManager.shutdown();
+            interactiveSelectionManager = null;
+        }
         if (placeholderExpansion != null) {
             placeholderExpansion.unregister();
             placeholderExpansion = null;
@@ -113,6 +121,10 @@ public class ReSync extends JavaPlugin {
 
     public ReSyncServer getV2Server() {
         return v2Server;
+    }
+
+    public InteractiveSelectionManager getInteractiveSelectionManager() {
+        return interactiveSelectionManager;
     }
 
     private void registerPlaceholderExpansion() {

@@ -14,13 +14,21 @@ public interface WorldManagementService {
 
     List<WorldGameRuleDescriptor> getGameRuleDescriptors();
 
+    List<WorldGeneratorDescriptor> getGeneratorDescriptors();
+
     List<WorldPortal> getPortals();
 
     List<WorldPortal> getPortalsByWorld(String worldName);
 
+    List<WorldInventoryGroup> getInventoryGroups();
+
+    List<WorldSignPortal> getSignPortals();
+
     WorldPortal getPortal(String portalIdOrName);
 
     WorldOperationResult createWorld(String worldName, String seed, String environment, String generator);
+
+    WorldOperationResult createWorld(String worldName, String seed, String environment, String generator, String generatorConfig);
 
     WorldOperationResult importUnregisteredWorlds();
 
@@ -46,6 +54,8 @@ public interface WorldManagementService {
 
     WorldOperationResult setIsolatedPlayerState(String worldName, boolean enabled);
 
+    WorldOperationResult setWorldProfile(String worldName, WorldProfileSettings profileSettings);
+
     WorldOperationResult createPortal(WorldPortal portal);
 
     WorldOperationResult resizePortal(WorldPortal portal);
@@ -64,6 +74,20 @@ public interface WorldManagementService {
     WorldOperationResult teleportPlayerToWorldSpawn(String playerName, String worldName);
 
     WorldOperationResult teleportPlayerToPortal(String playerName, String portalIdOrName);
+
+    WorldOperationResult createInventoryGroup(WorldInventoryGroup group);
+
+    WorldOperationResult updateInventoryGroup(WorldInventoryGroup group);
+
+    WorldOperationResult deleteInventoryGroup(String groupId);
+
+    WorldOperationResult createSignPortal(WorldSignPortal signPortal);
+
+    WorldOperationResult deleteSignPortal(String signId);
+
+    WorldOperationResult whoWorld(String worldName);
+
+    WorldOperationResult purgeWorld(String worldName, boolean monsters, boolean animals, boolean ambient, boolean misc, boolean vehicles, boolean items);
 
     void start();
 

@@ -22,6 +22,10 @@ public class WorldStateStorage {
     }.getType();
     private static final Type PORTAL_LIST_TYPE = new TypeToken<List<WorldPortal>>() {
     }.getType();
+    private static final Type INVENTORY_GROUP_LIST_TYPE = new TypeToken<List<WorldInventoryGroup>>() {
+    }.getType();
+    private static final Type SIGN_PORTAL_LIST_TYPE = new TypeToken<List<WorldSignPortal>>() {
+    }.getType();
     private static final Type PLAYER_STATES_TYPE = new TypeToken<Map<String, Map<String, WorldPlayerState>>>() {
     }.getType();
     private final ReSync plugin;
@@ -29,6 +33,8 @@ public class WorldStateStorage {
     private final Path rootDirectory;
     private final Path worldsFile;
     private final Path portalsFile;
+    private final Path inventoryGroupsFile;
+    private final Path signPortalsFile;
     private final Path playerStatesFile;
 
     public WorldStateStorage(ReSync plugin) {
@@ -36,6 +42,8 @@ public class WorldStateStorage {
         this.rootDirectory = plugin.getDataFolder().toPath().resolve("world-management");
         this.worldsFile = rootDirectory.resolve("worlds.json");
         this.portalsFile = rootDirectory.resolve("portals.json");
+        this.inventoryGroupsFile = rootDirectory.resolve("inventory-groups.json");
+        this.signPortalsFile = rootDirectory.resolve("sign-portals.json");
         this.playerStatesFile = rootDirectory.resolve("player-states.json");
         ensureDirectory();
     }
@@ -89,6 +97,58 @@ public class WorldStateStorage {
             Files.writeString(portalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             plugin.getLogger().warning("Failed to save portals: " + exception.getMessage());
+        }
+    }
+
+    public synchronized List<WorldInventoryGroup> loadInventoryGroups() {
+        if (!Files.exists(inventoryGroupsFile)) {
+            return new ArrayList<>();
+        }
+        try {
+            String raw = Files.readString(inventoryGroupsFile, StandardCharsets.UTF_8);
+            List<WorldInventoryGroup> groups = gson.fromJson(raw, INVENTORY_GROUP_LIST_TYPE);
+            return groups == null ? new ArrayList<>() : groups;
+        } catch (Exception exception) {
+            plugin.getLogger().warning("Failed to load inventory groups: " + exception.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public synchronized void saveInventoryGroups(Collection<WorldInventoryGroup> entries) {
+        List<WorldInventoryGroup> payload = new ArrayList<>();
+        if (entries != null) {
+            payload.addAll(entries);
+        }
+        try {
+            Files.writeString(inventoryGroupsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save inventory groups: " + exception.getMessage());
+        }
+    }
+
+    public synchronized List<WorldSignPortal> loadSignPortals() {
+        if (!Files.exists(signPortalsFile)) {
+            return new ArrayList<>();
+        }
+        try {
+            String raw = Files.readString(signPortalsFile, StandardCharsets.UTF_8);
+            List<WorldSignPortal> portals = gson.fromJson(raw, SIGN_PORTAL_LIST_TYPE);
+            return portals == null ? new ArrayList<>() : portals;
+        } catch (Exception exception) {
+            plugin.getLogger().warning("Failed to load sign portals: " + exception.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public synchronized void saveSignPortals(Collection<WorldSignPortal> entries) {
+        List<WorldSignPortal> payload = new ArrayList<>();
+        if (entries != null) {
+            payload.addAll(entries);
+        }
+        try {
+            Files.writeString(signPortalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save sign portals: " + exception.getMessage());
         }
     }
 

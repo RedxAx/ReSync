@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ScoreboardDefinition {
+    public static final String SLOT_SIDEBAR = "sidebar";
+    public static final String SLOT_BELOW_NAME = "below_name";
+
     private String id;
     private String title;
     private String objectiveId;
@@ -12,14 +15,14 @@ public class ScoreboardDefinition {
 
     public ScoreboardDefinition() {
         this.lines = new ArrayList<>();
-        this.displaySlot = "sidebar";
+        this.displaySlot = SLOT_SIDEBAR;
     }
 
     public ScoreboardDefinition(String id, String title) {
         this.id = id;
         this.title = title;
         this.objectiveId = id;
-        this.displaySlot = "sidebar";
+        this.displaySlot = SLOT_SIDEBAR;
         this.lines = new ArrayList<>();
     }
 
@@ -52,7 +55,12 @@ public class ScoreboardDefinition {
     }
 
     public void setDisplaySlot(String displaySlot) {
-        this.displaySlot = displaySlot;
+        String normalized = displaySlot != null ? displaySlot.trim().toLowerCase() : "";
+        if (SLOT_BELOW_NAME.equals(normalized)) {
+            this.displaySlot = SLOT_BELOW_NAME;
+            return;
+        }
+        this.displaySlot = SLOT_SIDEBAR;
     }
 
     public List<String> getLines() {

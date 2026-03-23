@@ -7,6 +7,7 @@ public class WorldRegistryEntry {
     private String worldName;
     private String environment;
     private String generator;
+    private String generatorConfig;
     private String difficulty;
     private boolean loaded;
     private boolean isolatedPlayerState;
@@ -15,6 +16,7 @@ public class WorldRegistryEntry {
     private boolean weatherLockEnabled;
     private boolean lockedStorm;
     private boolean lockedThundering;
+    private WorldProfileSettings profileSettings = new WorldProfileSettings();
     private Map<String, String> gameRules = new LinkedHashMap<>();
     private long updatedAt;
 
@@ -23,6 +25,7 @@ public class WorldRegistryEntry {
         copy.worldName = worldName;
         copy.environment = environment;
         copy.generator = generator;
+        copy.generatorConfig = generatorConfig;
         copy.difficulty = difficulty;
         copy.loaded = loaded;
         copy.isolatedPlayerState = isolatedPlayerState;
@@ -31,6 +34,7 @@ public class WorldRegistryEntry {
         copy.weatherLockEnabled = weatherLockEnabled;
         copy.lockedStorm = lockedStorm;
         copy.lockedThundering = lockedThundering;
+        copy.profileSettings = profileSettings == null ? new WorldProfileSettings() : profileSettings.copy();
         copy.gameRules = gameRules == null ? new LinkedHashMap<>() : new LinkedHashMap<>(gameRules);
         copy.updatedAt = updatedAt;
         return copy;
@@ -58,6 +62,14 @@ public class WorldRegistryEntry {
 
     public void setGenerator(String generator) {
         this.generator = generator;
+    }
+
+    public String getGeneratorConfig() {
+        return generatorConfig;
+    }
+
+    public void setGeneratorConfig(String generatorConfig) {
+        this.generatorConfig = generatorConfig;
     }
 
     public String getDifficulty() {
@@ -122,6 +134,14 @@ public class WorldRegistryEntry {
 
     public void setLockedThundering(boolean lockedThundering) {
         this.lockedThundering = lockedThundering;
+    }
+
+    public WorldProfileSettings getProfileSettings() {
+        return profileSettings == null ? new WorldProfileSettings() : profileSettings;
+    }
+
+    public void setProfileSettings(WorldProfileSettings profileSettings) {
+        this.profileSettings = profileSettings == null ? new WorldProfileSettings() : profileSettings.copy();
     }
 
     public Map<String, String> getGameRules() {

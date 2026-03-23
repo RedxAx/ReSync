@@ -9,6 +9,7 @@ import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.world.WorldChannelMessage;
+import restudio.resync.world.WorldInventoryGroup;
 import restudio.resync.world.WorldManagementListener;
 import restudio.resync.world.WorldManagementManager;
 import restudio.resync.world.WorldManagementService;
@@ -19,6 +20,8 @@ import restudio.resync.world.WorldMapSnapshot;
 import restudio.resync.world.WorldMapService;
 import restudio.resync.world.WorldOperationResult;
 import restudio.resync.world.WorldPortal;
+import restudio.resync.world.WorldProfileSettings;
+import restudio.resync.world.WorldSignPortal;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -98,7 +101,7 @@ public class WorldManagementModule implements Module, WorldManagementListener {
                 case "scanUnregisteredWorlds" -> respondResult(session, request.action, worldManagementService.scanUnregisteredWorlds());
                 case "importUnregisteredWorlds" -> respondResult(session, request.action, worldManagementService.importUnregisteredWorlds());
                 case "createWorld" -> respondResult(session, request.action,
-                    worldManagementService.createWorld(request.worldName, request.seed, request.environment, request.generator));
+                    worldManagementService.createWorld(request.worldName, request.seed, request.environment, request.generator, request.generatorConfig));
                 case "cloneWorld" -> respondResult(session, request.action,
                     worldManagementService.cloneWorldAsync(request.sourceWorld, request.targetWorld, request.loadAfterClone));
                 case "deleteWorld" -> respondResult(session, request.action,
@@ -118,9 +121,42 @@ public class WorldManagementModule implements Module, WorldManagementListener {
                     worldManagementService.setWeatherLock(request.worldName, request.enabled, request.storm, request.thundering));
                 case "setIsolatedPlayerState" -> respondResult(session, request.action,
                     worldManagementService.setIsolatedPlayerState(request.worldName, request.enabled));
+                case "setWorldProfile" -> respondResult(session, request.action,
+                    worldManagementService.setWorldProfile(request.worldName, request.profileSettings));
                 case "createPortal" -> respondResult(session, request.action, worldManagementService.createPortal(mapPortal(request)));
                 case "resizePortal" -> respondResult(session, request.action, worldManagementService.resizePortal(mapPortal(request)));
+                case "setPortalEnabled" -> respondResult(session, request.action,
+                    worldManagementService.setPortalEnabled(portalLookupKey(request), request.enabled));
+                case "setPortalDestination" -> respondResult(session, request.action,
+                    worldManagementService.setPortalDestination(portalLookupKey(request), request.destinationWorld, request.destinationX, request.destinationY,
+                        request.destinationZ, request.destinationYaw, request.destinationPitch));
+                case "setPortalBounds" -> respondResult(session, request.action,
+                    worldManagementService.setPortalBounds(portalLookupKey(request), request.sourceWorld, request.minX, request.minY, request.minZ,
+                        request.maxX, request.maxY, request.maxZ));
                 case "deletePortal" -> respondResult(session, request.action, worldManagementService.deletePortal(request.portalId));
+                case "teleportPlayerToWorld" -> respondResult(session, request.action,
+                    worldManagementService.teleportPlayerToWorld(request.playerName, request.worldName, request.hasPosition ? request.destinationX : null,
+                        request.hasPosition ? request.destinationY : null, request.hasPosition ? request.destinationZ : null,
+                        request.hasRotation ? request.destinationYaw : null, request.hasRotation ? request.destinationPitch : null));
+                case "teleportPlayerToWorldSpawn" -> respondResult(session, request.action,
+                    worldManagementService.teleportPlayerToWorldSpawn(request.playerName, request.worldName));
+                case "teleportPlayerToPortal" -> respondResult(session, request.action,
+                    worldManagementService.teleportPlayerToPortal(request.playerName, portalLookupKey(request)));
+                case "createInventoryGroup" -> respondResult(session, request.action,
+                    worldManagementService.createInventoryGroup(request.inventoryGroup));
+                case "updateInventoryGroup" -> respondResult(session, request.action,
+                    worldManagementService.updateInventoryGroup(request.inventoryGroup));
+                case "deleteInventoryGroup" -> respondResult(session, request.action,
+                    worldManagementService.deleteInventoryGroup(request.groupId));
+                case "createSignPortal" -> respondResult(session, request.action,
+                    worldManagementService.createSignPortal(request.signPortal));
+                case "deleteSignPortal" -> respondResult(session, request.action,
+                    worldManagementService.deleteSignPortal(request.signId));
+                case "whoWorld" -> respondResult(session, request.action,
+                    worldManagementService.whoWorld(request.worldName));
+                case "purgeWorld" -> respondResult(session, request.action,
+                    worldManagementService.purgeWorld(request.worldName, request.purgeMonsters, request.purgeAnimals, request.purgeAmbient,
+                        request.purgeMisc, request.purgeVehicles, request.purgeItems));
                 case "mapSnapshot" -> {
                     WorldMapSnapshot snapshot = worldManagementService.getMapService().createSnapshot(mapQuery(request));
                     send(session, WorldChannelMessage.response(request.action, true, "MapSnapshot", snapshot));
@@ -175,6 +211,19 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         portal.setDestinationYaw(request.destinationYaw);
         portal.setDestinationPitch(request.destinationPitch);
         portal.setEnabled(request.portalEnabled == null || request.portalEnabled);
+        portal.setAccessPermission(request.accessPermission);
+        portal.setBypassPermission(request.bypassPermission);
+        portal.setUsageFeeEnabled(request.usageFeeEnabled);
+        portal.setUsageFee(request.usageFee);
+        portal.setCooldownMillis(request.cooldownMillis);
+        portal.setPriority(request.priority);
+        portal.setSafeTeleport(request.safeTeleport == null || request.safeTeleport);
+        portal.setPreserveVelocity(request.preserveVelocity != null && request.preserveVelocity);
+        portal.setEnterMessage(request.enterMessage);
+        portal.setVehiclePassthroughEnabled(request.vehiclePassthroughEnabled == null || request.vehiclePassthroughEnabled);
+        portal.setEntityPassthroughEnabled(request.entityPassthroughEnabled == null || request.entityPassthroughEnabled);
+        portal.setDestinationMode(request.destinationMode);
+        portal.setCannonPower(request.cannonPower);
         return portal;
     }
 
@@ -195,6 +244,16 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         action.setWorldName(request.worldName);
         action.setData(request.options);
         return action;
+    }
+
+    private String portalLookupKey(RequestMessage request) {
+        if (request == null) {
+            return null;
+        }
+        if (request.portalId != null && !request.portalId.isBlank()) {
+            return request.portalId;
+        }
+        return request.portalName;
     }
 
     private void broadcast(WorldChannelMessage message) {
@@ -222,9 +281,11 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         private String seed;
         private String environment;
         private String generator;
+        private String generatorConfig;
         private String ruleName;
         private String ruleValue;
         private Map<String, String> gameRules;
+        private WorldProfileSettings profileSettings;
         private String difficulty;
         private boolean enabled;
         private long lockedTime;
@@ -234,6 +295,7 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         private boolean loadAfterClone;
         private String portalId;
         private String portalName;
+        private String playerName;
         private String destinationWorld;
         private double minX;
         private double minY;
@@ -246,9 +308,34 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         private double destinationZ;
         private float destinationYaw;
         private float destinationPitch;
+        private boolean hasPosition;
+        private boolean hasRotation;
         private Boolean portalEnabled;
+        private String accessPermission;
+        private String bypassPermission;
+        private boolean usageFeeEnabled;
+        private double usageFee;
+        private long cooldownMillis;
+        private int priority;
+        private Boolean safeTeleport;
+        private Boolean preserveVelocity;
+        private String enterMessage;
         private String extensionId;
         private String extensionActionId;
+        private WorldInventoryGroup inventoryGroup;
+        private String groupId;
+        private WorldSignPortal signPortal;
+        private String signId;
+        private Boolean vehiclePassthroughEnabled;
+        private Boolean entityPassthroughEnabled;
+        private String destinationMode;
+        private double cannonPower;
+        private boolean purgeMonsters;
+        private boolean purgeAnimals;
+        private boolean purgeAmbient;
+        private boolean purgeMisc;
+        private boolean purgeVehicles;
+        private boolean purgeItems;
         private double centerX;
         private double centerZ;
         private int zoom;

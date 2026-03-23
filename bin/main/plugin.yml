@@ -5,7 +5,17 @@ api-version: '1.21'
 prefix: ReSync
 authors: [RedxAx, DumbFridge]
 description: High-performance data synchronizer for Remotely - v2
+softdepend:
+  - PlaceholderAPI
 permissions:
   resync.api.access:
     description: Allows API access to ReSync from Remotely
     default: op
+  resync.command:
+    description: Allows use of /resync command
+    default: op
+commands:
+  resync:
+    description: Manage ReSync systems
+    usage: /resync <scoreboard|tab|world|portal> ...
+    permission: resync.command

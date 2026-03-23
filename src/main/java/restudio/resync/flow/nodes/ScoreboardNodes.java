@@ -100,7 +100,6 @@ public class ScoreboardNodes implements NodeCategory {
 
             if (objective != null) {
                 DisplaySlot slot = switch (displaySlot.toLowerCase()) {
-                    case "list" -> DisplaySlot.PLAYER_LIST;
                     case "below_name" -> DisplaySlot.BELOW_NAME;
                     default -> DisplaySlot.SIDEBAR;
                 };
@@ -711,7 +710,6 @@ public class ScoreboardNodes implements NodeCategory {
             return DisplaySlot.SIDEBAR;
         }
         return switch (displaySlot.toLowerCase()) {
-            case "list", "player_list" -> DisplaySlot.PLAYER_LIST;
             case "below_name" -> DisplaySlot.BELOW_NAME;
             default -> DisplaySlot.SIDEBAR;
         };

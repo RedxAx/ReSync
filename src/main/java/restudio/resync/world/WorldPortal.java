@@ -20,6 +20,19 @@ public class WorldPortal {
     private float destinationPitch;
     private boolean enabled = true;
     private long lastUsedAt;
+    private String accessPermission;
+    private String bypassPermission;
+    private boolean usageFeeEnabled;
+    private double usageFee;
+    private long cooldownMillis;
+    private int priority;
+    private Boolean safeTeleport;
+    private Boolean preserveVelocity;
+    private String enterMessage;
+    private Boolean vehiclePassthroughEnabled;
+    private Boolean entityPassthroughEnabled;
+    private String destinationMode;
+    private double cannonPower;
 
     public WorldPortal copy() {
         WorldPortal copy = new WorldPortal();
@@ -40,6 +53,19 @@ public class WorldPortal {
         copy.destinationPitch = destinationPitch;
         copy.enabled = enabled;
         copy.lastUsedAt = lastUsedAt;
+        copy.accessPermission = accessPermission;
+        copy.bypassPermission = bypassPermission;
+        copy.usageFeeEnabled = usageFeeEnabled;
+        copy.usageFee = usageFee;
+        copy.cooldownMillis = cooldownMillis;
+        copy.priority = priority;
+        copy.safeTeleport = safeTeleport;
+        copy.preserveVelocity = preserveVelocity;
+        copy.enterMessage = enterMessage;
+        copy.vehiclePassthroughEnabled = vehiclePassthroughEnabled;
+        copy.entityPassthroughEnabled = entityPassthroughEnabled;
+        copy.destinationMode = destinationMode;
+        copy.cannonPower = cannonPower;
         return copy;
     }
 
@@ -209,5 +235,109 @@ public class WorldPortal {
 
     public void setLastUsedAt(long lastUsedAt) {
         this.lastUsedAt = lastUsedAt;
+    }
+
+    public String getAccessPermission() {
+        return accessPermission;
+    }
+
+    public void setAccessPermission(String accessPermission) {
+        this.accessPermission = accessPermission;
+    }
+
+    public String getBypassPermission() {
+        return bypassPermission;
+    }
+
+    public void setBypassPermission(String bypassPermission) {
+        this.bypassPermission = bypassPermission;
+    }
+
+    public boolean isUsageFeeEnabled() {
+        return usageFeeEnabled;
+    }
+
+    public void setUsageFeeEnabled(boolean usageFeeEnabled) {
+        this.usageFeeEnabled = usageFeeEnabled;
+    }
+
+    public double getUsageFee() {
+        return usageFee;
+    }
+
+    public void setUsageFee(double usageFee) {
+        this.usageFee = usageFee;
+    }
+
+    public long getCooldownMillis() {
+        return cooldownMillis > 0L ? cooldownMillis : 1500L;
+    }
+
+    public void setCooldownMillis(long cooldownMillis) {
+        this.cooldownMillis = cooldownMillis;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
+    }
+
+    public boolean isSafeTeleport() {
+        return safeTeleport == null || safeTeleport;
+    }
+
+    public void setSafeTeleport(boolean safeTeleport) {
+        this.safeTeleport = safeTeleport;
+    }
+
+    public boolean isPreserveVelocity() {
+        return preserveVelocity != null && preserveVelocity;
+    }
+
+    public void setPreserveVelocity(boolean preserveVelocity) {
+        this.preserveVelocity = preserveVelocity;
+    }
+
+    public String getEnterMessage() {
+        return enterMessage;
+    }
+
+    public void setEnterMessage(String enterMessage) {
+        this.enterMessage = enterMessage;
+    }
+
+    public boolean isVehiclePassthroughEnabled() {
+        return vehiclePassthroughEnabled == null || vehiclePassthroughEnabled;
+    }
+
+    public void setVehiclePassthroughEnabled(boolean vehiclePassthroughEnabled) {
+        this.vehiclePassthroughEnabled = vehiclePassthroughEnabled;
+    }
+
+    public boolean isEntityPassthroughEnabled() {
+        return entityPassthroughEnabled == null || entityPassthroughEnabled;
+    }
+
+    public void setEntityPassthroughEnabled(boolean entityPassthroughEnabled) {
+        this.entityPassthroughEnabled = entityPassthroughEnabled;
+    }
+
+    public String getDestinationMode() {
+        return destinationMode == null || destinationMode.isBlank() ? "WORLD" : destinationMode;
+    }
+
+    public void setDestinationMode(String destinationMode) {
+        this.destinationMode = destinationMode;
+    }
+
+    public double getCannonPower() {
+        return cannonPower <= 0.0 ? 1.8 : cannonPower;
+    }
+
+    public void setCannonPower(double cannonPower) {
+        this.cannonPower = cannonPower;
     }
 }

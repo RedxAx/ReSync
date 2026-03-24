@@ -5,7 +5,6 @@ import java.util.List;
 
 public class ScoreboardDefinition {
     public static final String SLOT_SIDEBAR = "sidebar";
-    public static final String SLOT_BELOW_NAME = "below_name";
 
     private String id;
     private String title;
@@ -51,15 +50,13 @@ public class ScoreboardDefinition {
     }
 
     public String getDisplaySlot() {
+        if (displaySlot == null || !SLOT_SIDEBAR.equalsIgnoreCase(displaySlot)) {
+            displaySlot = SLOT_SIDEBAR;
+        }
         return displaySlot;
     }
 
     public void setDisplaySlot(String displaySlot) {
-        String normalized = displaySlot != null ? displaySlot.trim().toLowerCase() : "";
-        if (SLOT_BELOW_NAME.equals(normalized)) {
-            this.displaySlot = SLOT_BELOW_NAME;
-            return;
-        }
         this.displaySlot = SLOT_SIDEBAR;
     }
 

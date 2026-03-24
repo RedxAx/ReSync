@@ -61,6 +61,7 @@ public class FlowStorage {
         loadDefaultScoreboard();
         loadDefaultTab();
         loadTabRefreshConfig();
+        cleanupBelowNameData();
     }
 
     public FlowGraph getGraph(String id) {
@@ -519,6 +520,33 @@ public class FlowStorage {
     private void storeConfigProperties(Properties properties) {
         try (FileOutputStream fos = new FileOutputStream(configFile)) {
             properties.store(fos, "ReSync v2 Configuration");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void cleanupBelowNameData() {
+        try {
+            File legacyBelowNamesDir = new File(configFile.getParentFile(), "below-names");
+            if (legacyBelowNamesDir.exists() && legacyBelowNamesDir.isDirectory()) {
+                File[] files = legacyBelowNamesDir.listFiles();
+                if (files != null) {
+                    for (File file : files) {
+                        if (file != null && file.isFile()) {
+                            Files.deleteIfExists(file.toPath());
+                        }
+                    }
+                }
+                Files.deleteIfExists(legacyBelowNamesDir.toPath());
+            }
+            File legacyDefault = new File(configFile.getParentFile(), "default-below-name.cfg");
+            if (legacyDefault.exists()) {
+                Files.deleteIfExists(legacyDefault.toPath());
+            }
+            Properties properties = loadConfigProperties();
+            properties.remove("flow.default-below-name.id");
+            properties.remove("flow.default-below-name.usePapi");
+            storeConfigProperties(properties);
         } catch (IOException e) {
             e.printStackTrace();
         }

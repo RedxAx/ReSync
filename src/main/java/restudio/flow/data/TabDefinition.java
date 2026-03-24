@@ -46,4 +46,5 @@ public class TabDefinition {
     public void setFooter(String footer) {
         this.footer = footer;
     }
+
 }

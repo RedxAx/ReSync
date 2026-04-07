@@ -1,20 +1,28 @@
 package restudio.resync.flow.nodes;
 
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
 import restudio.resync.ReSync;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class FileNodes implements NodeCategory {
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+
+public class FileNodes {
+
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
     
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("file_write", (ctx, node) -> {
             String path = ctx.getInputValue(node, "path", String.class, "");
             String content = ctx.getInputValue(node, "content", String.class, "");
@@ -205,7 +213,167 @@ public class FileNodes implements NodeCategory {
         });
     }
     
-    private File resolveSafeFile(String path) {
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (FileNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "file_write", displayName = "Write File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING),
+                    @FlowPin(name = "content", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileWrite(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_write", ctx, node);
+    }
+
+    @DefineNode(id = "file_append", displayName = "Append File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING),
+                    @FlowPin(name = "content", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileAppend(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_append", ctx, node);
+    }
+
+    @DefineNode(id = "file_read", displayName = "Read File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "content", dataType = FlowType.STRING)
+            })
+    public void fileRead(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_read", ctx, node);
+    }
+
+    @DefineNode(id = "file_read_lines", displayName = "Read File Lines", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "lines", dataType = FlowType.LIST)
+            })
+    public void fileReadLines(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_read_lines", ctx, node);
+    }
+
+    @DefineNode(id = "file_delete", displayName = "Delete File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileDelete(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_delete", ctx, node);
+    }
+
+    @DefineNode(id = "file_exists", displayName = "File Exists", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "exists", dataType = FlowType.BOOLEAN)
+            })
+    public void fileExists(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_exists", ctx, node);
+    }
+
+    @DefineNode(id = "file_copy", displayName = "Copy File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "source_path", dataType = FlowType.STRING),
+                    @FlowPin(name = "dest_path", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileCopy(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_copy", ctx, node);
+    }
+
+    @DefineNode(id = "file_move", displayName = "Move File", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "source_path", dataType = FlowType.STRING),
+                    @FlowPin(name = "dest_path", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileMove(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_move", ctx, node);
+    }
+
+    @DefineNode(id = "file_list_dir", displayName = "List Directory", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "files", dataType = FlowType.LIST)
+            })
+    public void fileListDir(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_list_dir", ctx, node);
+    }
+
+    @DefineNode(id = "file_create_dir", displayName = "Create Directory", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void fileCreateDir(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_create_dir", ctx, node);
+    }
+
+    @DefineNode(id = "file_get_size", displayName = "Get File Size", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "size", dataType = FlowType.NUMBER)
+            })
+    public void fileGetSize(FlowContext ctx, FlowNode node) {
+        executeLegacy("file_get_size", ctx, node);
+    }
+
+    private static File resolveSafeFile(String path) {
         if (path == null || path.isEmpty()) return null;
         File dataFolder = ReSync.getInstance().getDataFolder();
         File targetFile = new File(dataFolder, path);

@@ -6,26 +6,34 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class ConversionNodes implements NodeCategory {
-    
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+public class ConversionNodes {
+
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("to_string", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value");
             String string = value != null ? value.toString() : "";
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "string", string);
         });
-        
+
         registry.register("to_number", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value");
             Double number = 0.0;
@@ -41,7 +49,7 @@ public class ConversionNodes implements NodeCategory {
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "number", number);
         });
-        
+
         registry.register("to_boolean", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value");
             Boolean bool = false;
@@ -56,11 +64,10 @@ public class ConversionNodes implements NodeCategory {
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "boolean", bool);
         });
-        
+
         registry.register("to_player", (ctx, node) -> {
             Object uuidOrName = ctx.getInputValue(node, "uuid_or_name");
             Player player = null;
-            
             if (uuidOrName instanceof Player) {
                 player = (Player) uuidOrName;
             } else if (uuidOrName instanceof String) {
@@ -72,17 +79,15 @@ public class ConversionNodes implements NodeCategory {
                     player = Bukkit.getPlayerExact(str);
                 }
             }
-            
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "player", player);
         });
-        
+
         registry.register("to_location", (ctx, node) -> {
             Double x = ctx.getInputValue(node, "x", Double.class, 0.0);
             Double y = ctx.getInputValue(node, "y", Double.class, 0.0);
             Double z = ctx.getInputValue(node, "z", Double.class, 0.0);
             String world = ctx.getInputValue(node, "world", String.class, "");
-            
             Location location = null;
             if (!world.isEmpty()) {
                 org.bukkit.World worldObj = Bukkit.getWorld(world);
@@ -90,33 +95,29 @@ public class ConversionNodes implements NodeCategory {
                     location = new Location(worldObj, x, y, z);
                 }
             } else if (!Bukkit.getWorlds().isEmpty()) {
-                location = new Location(Bukkit.getWorlds().get(0), x, y, z);
+                location = new Location(Bukkit.getWorlds().getFirst(), x, y, z);
             }
-            
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "location", location);
         });
-        
+
         registry.register("to_item", (ctx, node) -> {
             String material = ctx.getInputValue(node, "material", String.class, "STONE");
             Integer amount = ctx.getInputValue(node, "amount", Integer.class, 1);
-            
-            ItemStack item = null;
+            ItemStack item;
             try {
                 Material mat = Material.valueOf(material.toUpperCase());
                 item = new ItemStack(mat, amount);
             } catch (IllegalArgumentException e) {
                 item = new ItemStack(Material.STONE, amount);
             }
-            
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "item", item);
         });
-        
+
         registry.register("to_list", (ctx, node) -> {
             Object valueOrSeparator = ctx.getInputValue(node, "value_or_separator");
             List<Object> list = new ArrayList<>();
-            
             if (valueOrSeparator instanceof List) {
                 list = (List<Object>) valueOrSeparator;
             } else if (valueOrSeparator instanceof String) {
@@ -127,12 +128,98 @@ public class ConversionNodes implements NodeCategory {
             } else if (valueOrSeparator != null) {
                 list.add(valueOrSeparator);
             }
-            
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "list", list);
         });
     }
-    
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (ConversionNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "to_string", displayName = "To String", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "value", dataType = FlowType.ANY)},
+            outputs = {@FlowPin(name = "string", dataType = FlowType.STRING)})
+    public void toStringNode(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_string", ctx, node);
+    }
+
+    @DefineNode(id = "to_number", displayName = "To Number", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "value", dataType = FlowType.ANY)},
+            outputs = {@FlowPin(name = "number", dataType = FlowType.NUMBER)})
+    public void toNumber(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_number", ctx, node);
+    }
+
+    @DefineNode(id = "to_boolean", displayName = "To Boolean", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "value", dataType = FlowType.ANY)},
+            outputs = {@FlowPin(name = "boolean", dataType = FlowType.BOOLEAN)})
+    public void toBoolean(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_boolean", ctx, node);
+    }
+
+    @DefineNode(id = "to_player", displayName = "To Player", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "uuid_or_name", dataType = FlowType.STRING)},
+            outputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER)})
+    public void toPlayer(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_player", ctx, node);
+    }
+
+    @DefineNode(id = "to_location", displayName = "To Location", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "y", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "z", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "world", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "location", dataType = FlowType.LOCATION)})
+    public void toLocation(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_location", ctx, node);
+    }
+
+    @DefineNode(id = "to_item", displayName = "To Item", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "material", dataType = FlowType.STRING),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK)})
+    public void toItem(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_item", ctx, node);
+    }
+
+    @DefineNode(id = "to_list", displayName = "To List", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "value_or_separator", dataType = FlowType.ANY)},
+            outputs = {@FlowPin(name = "list", dataType = FlowType.LIST)})
+    public void toList(FlowContext ctx, FlowNode node) {
+        executeLegacy("to_list", ctx, node);
+    }
+
     private static String findNodeId(FlowContext ctx, FlowNode node) {
         for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {
             if (entry.getValue() == node) {

@@ -7,16 +7,24 @@ import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
-public class ParticleNodes implements NodeCategory {
+public class ParticleNodes {
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("particle_spawn", (ctx, node) -> {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
@@ -673,6 +681,211 @@ public class ParticleNodes implements NodeCategory {
             ctx.triggerOutput("flow");
         });
     }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (ParticleNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "particle_spawn", displayName = "Spawn Particle", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_y", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_z", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "speed", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleSpawn(FlowContext ctx, FlowNode node) { executeLegacy("particle_spawn", ctx, node); }
+
+    @DefineNode(id = "particle_area", displayName = "Particle Area", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "density", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleArea(FlowContext ctx, FlowNode node) { executeLegacy("particle_area", ctx, node); }
+
+    @DefineNode(id = "particle_player_spawn", displayName = "Particle Player Spawn", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_y", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_z", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "speed", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "data", dataType = FlowType.ANY)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particlePlayerSpawn(FlowContext ctx, FlowNode node) { executeLegacy("particle_player_spawn", ctx, node); }
+
+    @DefineNode(id = "particle_line", displayName = "Particle Line", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "start_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "end_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "density", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleLine(FlowContext ctx, FlowNode node) { executeLegacy("particle_line", ctx, node); }
+
+    @DefineNode(id = "particle_circle", displayName = "Particle Circle", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "radius", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "is_filled", dataType = FlowType.BOOLEAN)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleCircle(FlowContext ctx, FlowNode node) { executeLegacy("particle_circle", ctx, node); }
+
+    @DefineNode(id = "particle_sphere", displayName = "Particle Sphere", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "radius", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "is_filled", dataType = FlowType.BOOLEAN)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleSphere(FlowContext ctx, FlowNode node) { executeLegacy("particle_sphere", ctx, node); }
+
+    @DefineNode(id = "particle_ellipse", displayName = "Particle Ellipse", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "radius_x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "radius_z", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleEllipse(FlowContext ctx, FlowNode node) { executeLegacy("particle_ellipse", ctx, node); }
+
+    @DefineNode(id = "particle_spiral", displayName = "Particle Spiral", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "radius", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "height", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "rotations", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleSpiral(FlowContext ctx, FlowNode node) { executeLegacy("particle_spiral", ctx, node); }
+
+    @DefineNode(id = "particle_cone", displayName = "Particle Cone", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "height", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "radius", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleCone(FlowContext ctx, FlowNode node) { executeLegacy("particle_cone", ctx, node); }
+
+    @DefineNode(id = "particle_ring", displayName = "Particle Ring", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "center_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "radius", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "axis", dataType = FlowType.STRING)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleRing(FlowContext ctx, FlowNode node) { executeLegacy("particle_ring", ctx, node); }
+
+    @DefineNode(id = "particle_cube", displayName = "Particle Cube", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "is_filled", dataType = FlowType.BOOLEAN)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleCube(FlowContext ctx, FlowNode node) { executeLegacy("particle_cube", ctx, node); }
+
+    @DefineNode(id = "particle_wave", displayName = "Particle Wave", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "start_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "direction", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "amplitude", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "frequency", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "length", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleWave(FlowContext ctx, FlowNode node) { executeLegacy("particle_wave", ctx, node); }
+
+    @DefineNode(id = "particle_text", displayName = "Particle Text", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "text", dataType = FlowType.STRING),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "size", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleText(FlowContext ctx, FlowNode node) { executeLegacy("particle_text", ctx, node); }
+
+    @DefineNode(id = "particle_block_dust", displayName = "Block Dust Particle", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "block_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "count", dataType = FlowType.NUMBER)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleBlockDust(FlowContext ctx, FlowNode node) { executeLegacy("particle_block_dust", ctx, node); }
+
+    @DefineNode(id = "particle_item_break", displayName = "Item Break Particle", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "item_type", dataType = FlowType.STRING)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleItemBreak(FlowContext ctx, FlowNode node) { executeLegacy("particle_item_break", ctx, node); }
+
+    @DefineNode(id = "particle_explosion", displayName = "Explosion Particle", category = NodeDefinition.NodeCategory.VISUAL,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "particle_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "large", dataType = FlowType.BOOLEAN)
+            }, outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void particleExplosion(FlowContext ctx, FlowNode node) { executeLegacy("particle_explosion", ctx, node); }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {
         for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {

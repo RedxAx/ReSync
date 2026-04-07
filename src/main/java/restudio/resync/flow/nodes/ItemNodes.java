@@ -8,18 +8,26 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.*;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class ItemNodes implements NodeCategory {
+public class ItemNodes {
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("item_add_attribute", (ctx, node) -> {
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
             String attributeName = ctx.getInputValue(node, "attribute_name", String.class, "generic.max_health");
@@ -603,5 +611,9 @@ public class ItemNodes implements NodeCategory {
             }
         }
         return null;
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
     }
 }

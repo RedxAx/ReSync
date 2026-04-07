@@ -21,6 +21,7 @@ public class NodeDefinition {
         ACTION,
         LOGIC,
         DATA,
+        PLAYER,
         VARIABLE,
         FUNCTION,
         ENTITY,
@@ -155,6 +156,7 @@ public class NodeDefinition {
                 case ACTION: this.color = 0xFF5555FF; break;
                 case LOGIC: this.color = 0xFFFF55FF; break;
                 case DATA: this.color = 0xFF55FFFF; break;
+                case PLAYER: this.color = 0xFF4CAF50; break;
                 case VARIABLE: this.color = 0xFFFFFF55; break;
                 case FUNCTION: this.color = 0xFFFFAA55; break;
                 case ENTITY: this.color = 0xFF8B4513; break;

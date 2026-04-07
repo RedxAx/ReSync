@@ -4,9 +4,11 @@ main: restudio.resync.ReSync
 api-version: '1.21'
 prefix: ReSync
 authors: [RedxAx, DumbFridge]
-description: High-performance data synchronizer for Remotely - v2
+description: High-performance data synchronizer for Remotely
 softdepend:
   - PlaceholderAPI
+  - Vault
+  - LuckPerms
 permissions:
   resync.api.access:
     description: Allows API access to ReSync from Remotely

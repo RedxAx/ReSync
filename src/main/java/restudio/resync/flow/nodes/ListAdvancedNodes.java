@@ -1,18 +1,25 @@
 package restudio.resync.flow.nodes;
 
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
-public class ListAdvancedNodes implements NodeCategory {
+public class ListAdvancedNodes {
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("list_sort", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             String sortOrder = ctx.getInputValue(node, "sort_order", String.class, "asc");
@@ -591,6 +598,437 @@ public class ListAdvancedNodes implements NodeCategory {
                 result.add(item);
             }
         }
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) return;
+        synchronized (ListAdvancedNodes.class) {
+            if (initialized) return;
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) return;
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "list_sort", displayName = "List Sort", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "sort_order", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "sorted_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_sort(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_sort", ctx, node);
+    }
+
+    @DefineNode(id = "list_sort_by_property", displayName = "List Sort By Property", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "property_name", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "sort_order", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "sorted_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_sort_by_property(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_sort_by_property", ctx, node);
+    }
+
+    @DefineNode(id = "list_filter", displayName = "List Filter", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "property_name", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "operator", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "compare_value", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "filtered_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_filter(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_filter", ctx, node);
+    }
+
+    @DefineNode(id = "list_map", displayName = "List Map", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "transformation_type", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "transformed_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_map(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_map", ctx, node);
+    }
+
+    @DefineNode(id = "list_reduce", displayName = "List Reduce", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "operation", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "separator", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "result", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            })
+    public void nlist_reduce(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_reduce", ctx, node);
+    }
+
+    @DefineNode(id = "list_shuffle", displayName = "List Shuffle", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "shuffled_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_shuffle(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_shuffle", ctx, node);
+    }
+
+    @DefineNode(id = "list_unique", displayName = "List Unique", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "unique_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_unique(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_unique", ctx, node);
+    }
+
+    @DefineNode(id = "list_slice", displayName = "List Slice", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "start_index", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "end_index", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "slice_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_slice(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_slice", ctx, node);
+    }
+
+    @DefineNode(id = "list_reverse", displayName = "List Reverse", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "reversed_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_reverse(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_reverse", ctx, node);
+    }
+
+    @DefineNode(id = "list_find_first", displayName = "List Find First", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "property_name", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "operator", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "compare_value", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "found_element", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            })
+    public void nlist_find_first(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_find_first", ctx, node);
+    }
+
+    @DefineNode(id = "list_find_all", displayName = "List Find All", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "property_name", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "operator", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "compare_value", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "found_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_find_all(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_find_all", ctx, node);
+    }
+
+    @DefineNode(id = "list_find_index", displayName = "List Find Index", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "element", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "index", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_find_index(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_find_index", ctx, node);
+    }
+
+    @DefineNode(id = "list_contains_any", displayName = "List Contains Any", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "elements_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "contains_any", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nlist_contains_any(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_contains_any", ctx, node);
+    }
+
+    @DefineNode(id = "list_contains_all", displayName = "List Contains All", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "elements_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "contains_all", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nlist_contains_all(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_contains_all", ctx, node);
+    }
+
+    @DefineNode(id = "list_sum", displayName = "List Sum", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "sum", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_sum(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_sum", ctx, node);
+    }
+
+    @DefineNode(id = "list_average", displayName = "List Average", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "average", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_average(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_average", ctx, node);
+    }
+
+    @DefineNode(id = "list_min_value", displayName = "List Min Value", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "min", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_min_value(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_min_value", ctx, node);
+    }
+
+    @DefineNode(id = "list_max_value", displayName = "List Max Value", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "max", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_max_value(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_max_value", ctx, node);
+    }
+
+    @DefineNode(id = "list_median", displayName = "List Median", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "median", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_median(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_median", ctx, node);
+    }
+
+    @DefineNode(id = "list_mode", displayName = "List Mode", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "modes_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_mode(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_mode", ctx, node);
+    }
+
+    @DefineNode(id = "list_range", displayName = "List Range", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "range", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_range(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_range", ctx, node);
+    }
+
+    @DefineNode(id = "list_variance", displayName = "List Variance", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "variance", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_variance(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_variance", ctx, node);
+    }
+
+    @DefineNode(id = "list_stddev", displayName = "List Standard Deviation", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "stddev", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nlist_stddev(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_stddev", ctx, node);
+    }
+
+    @DefineNode(id = "list_flatten", displayName = "List Flatten", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "flattened_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_flatten(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_flatten", ctx, node);
+    }
+
+    @DefineNode(id = "list_chunk", displayName = "List Chunk", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "chunk_size", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "chunks_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_chunk(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_chunk", ctx, node);
+    }
+
+    @DefineNode(id = "list_partition", displayName = "List Partition", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "property_name", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "operator", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "compare_value", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "true_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "false_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_partition(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_partition", ctx, node);
+    }
+
+    @DefineNode(id = "list_intersect", displayName = "List Intersect", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "list2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "intersection_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_intersect(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_intersect", ctx, node);
+    }
+
+    @DefineNode(id = "list_union", displayName = "List Union", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "list2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "union_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_union(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_union", ctx, node);
+    }
+
+    @DefineNode(id = "list_difference", displayName = "List Difference", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "list2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "difference_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_difference(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_difference", ctx, node);
+    }
+
+    @DefineNode(id = "list_zip", displayName = "List Zip", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "list2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "pairs_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_zip(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_zip", ctx, node);
+    }
+
+    @DefineNode(id = "list_take_first", displayName = "List Take First", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "count", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "taken_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_take_first(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_take_first", ctx, node);
+    }
+
+    @DefineNode(id = "list_take_last", displayName = "List Take Last", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "count", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "taken_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_take_last(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_take_last", ctx, node);
+    }
+
+    @DefineNode(id = "list_drop_first", displayName = "List Drop First", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "count", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "remaining_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_drop_first(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_drop_first", ctx, node);
+    }
+
+    @DefineNode(id = "list_drop_last", displayName = "List Drop Last", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "count", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "remaining_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nlist_drop_last(FlowContext ctx, FlowNode node) {
+        executeLegacy("list_drop_last", ctx, node);
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

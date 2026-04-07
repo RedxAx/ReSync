@@ -12,16 +12,24 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class PermissionNodes implements NodeCategory {
+public class PermissionNodes {
     
     private static LuckPerms luckPerms;
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
     
     static LuckPerms getLuckPerms() {
         if (luckPerms == null) {
@@ -40,8 +48,7 @@ public class PermissionNodes implements NodeCategory {
         return lp.getContextManager().getStaticQueryOptions();
     }
     
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("perm_check", (ctx, node) -> {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String permission = ctx.getInputValue(node, "permission", String.class, "");
@@ -666,6 +673,130 @@ public class PermissionNodes implements NodeCategory {
             ctx.setNodeOutput(nodeId, "suffix", suffix != null ? suffix : "");
         });
     }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (PermissionNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry tempRegistry = new FlowRegistry();
+            registerLegacyNodes(tempRegistry);
+            for (String type : tempRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, tempRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private static void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor != null) {
+            executor.accept(ctx, node);
+        }
+    }
+
+    @DefineNode(id = "perm_check", displayName = "Check Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "has", dataType = FlowType.BOOLEAN), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permCheck(FlowContext ctx, FlowNode node) { executeLegacy("perm_check", ctx, node); }
+
+    @DefineNode(id = "perm_grant", displayName = "Grant Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGrant(FlowContext ctx, FlowNode node) { executeLegacy("perm_grant", ctx, node); }
+
+    @DefineNode(id = "perm_revoke", displayName = "Revoke Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permRevoke(FlowContext ctx, FlowNode node) { executeLegacy("perm_revoke", ctx, node); }
+
+    @DefineNode(id = "perm_add_group", displayName = "Add Group", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "group", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permAddGroup(FlowContext ctx, FlowNode node) { executeLegacy("perm_add_group", ctx, node); }
+
+    @DefineNode(id = "perm_remove_group", displayName = "Remove Group", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "group", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permRemoveGroup(FlowContext ctx, FlowNode node) { executeLegacy("perm_remove_group", ctx, node); }
+
+    @DefineNode(id = "perm_set_group", displayName = "Set Primary Group", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "group", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permSetGroup(FlowContext ctx, FlowNode node) { executeLegacy("perm_set_group", ctx, node); }
+
+    @DefineNode(id = "perm_has_group", displayName = "Has Group", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "group", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "has", dataType = FlowType.BOOLEAN), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permHasGroup(FlowContext ctx, FlowNode node) { executeLegacy("perm_has_group", ctx, node); }
+
+    @DefineNode(id = "perm_get_groups", displayName = "Get Groups", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "groups", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetGroups(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_groups", ctx, node); }
+
+    @DefineNode(id = "perm_get_permissions", displayName = "Get Permissions", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "permissions", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetPermissions(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_permissions", ctx, node); }
+
+    @DefineNode(id = "perm_group_has_permission", displayName = "Group Has Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "group", dataType = FlowType.STRING), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "has", dataType = FlowType.BOOLEAN), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGroupHasPermission(FlowContext ctx, FlowNode node) { executeLegacy("perm_group_has_permission", ctx, node); }
+
+    @DefineNode(id = "perm_group_add_permission", displayName = "Add Group Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "group", dataType = FlowType.STRING), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGroupAddPermission(FlowContext ctx, FlowNode node) { executeLegacy("perm_group_add_permission", ctx, node); }
+
+    @DefineNode(id = "perm_group_remove_permission", displayName = "Remove Group Permission", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "group", dataType = FlowType.STRING), @FlowPin(name = "permission", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGroupRemovePermission(FlowContext ctx, FlowNode node) { executeLegacy("perm_group_remove_permission", ctx, node); }
+
+    @DefineNode(id = "perm_get_group_permissions", displayName = "Get Group Permissions", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "group", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "permissions", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetGroupPermissions(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_group_permissions", ctx, node); }
+
+    @DefineNode(id = "perm_get_all_groups", displayName = "Get All Groups", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "groups", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetAllGroups(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_all_groups", ctx, node); }
+
+    @DefineNode(id = "perm_get_primary_group", displayName = "Get Primary Group", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "group", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetPrimaryGroup(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_primary_group", ctx, node); }
+
+    @DefineNode(id = "perm_set_prefix", displayName = "Set Prefix", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "prefix", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permSetPrefix(FlowContext ctx, FlowNode node) { executeLegacy("perm_set_prefix", ctx, node); }
+
+    @DefineNode(id = "perm_set_suffix", displayName = "Set Suffix", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "suffix", dataType = FlowType.STRING) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permSetSuffix(FlowContext ctx, FlowNode node) { executeLegacy("perm_set_suffix", ctx, node); }
+
+    @DefineNode(id = "perm_get_prefix", displayName = "Get Prefix", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "prefix", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetPrefix(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_prefix", ctx, node); }
+
+    @DefineNode(id = "perm_get_suffix", displayName = "Get Suffix", category = NodeDefinition.NodeCategory.PERMISSION,
+        inputs = { @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION), @FlowPin(name = "player", dataType = FlowType.PLAYER) },
+        outputs = { @FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "error", dataType = FlowType.STRING), @FlowPin(name = "suffix", dataType = FlowType.STRING), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION) })
+    public void permGetSuffix(FlowContext ctx, FlowNode node) { executeLegacy("perm_get_suffix", ctx, node); }
     
     private static String findNodeId(FlowContext ctx, FlowNode node) {
         for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {

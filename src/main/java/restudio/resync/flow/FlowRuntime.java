@@ -142,7 +142,7 @@ public class FlowRuntime {
         return value != null ? value : defaultValue;
     }
 
-    private String findNodeId(FlowNode node) {
+    public String findNodeId(FlowNode node) {
         for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
             if (entry.getValue() == node) {
                 return entry.getKey();

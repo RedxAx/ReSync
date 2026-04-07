@@ -4,23 +4,28 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class JsonNodes implements NodeCategory {
+public class JsonNodes {
     
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
     
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("json_parse", (ctx, node) -> {
             String jsonString = ctx.getInputValue(node, "json_string", String.class, "{}");
             try {
@@ -198,6 +203,164 @@ public class JsonNodes implements NodeCategory {
             ctx.setNodeOutput(nodeId, "array", values);
             ctx.triggerOutput("flow");
         });
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (JsonNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "json_parse", displayName = "Parse JSON", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "json_string", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
+            })
+    public void jsonParse(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_parse", ctx, node);
+    }
+
+    @DefineNode(id = "json_to_string", displayName = "JSON to String", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "string", dataType = FlowType.STRING)
+            })
+    public void jsonToString(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_to_string", ctx, node);
+    }
+
+    @DefineNode(id = "json_get", displayName = "Get JSON Value", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            })
+    public void jsonGet(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_get", ctx, node);
+    }
+
+    @DefineNode(id = "json_set", displayName = "Set JSON Value", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
+                    @FlowPin(name = "path", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void jsonSet(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_set", ctx, node);
+    }
+
+    @DefineNode(id = "json_delete", displayName = "Delete JSON Key", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void jsonDelete(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_delete", ctx, node);
+    }
+
+    @DefineNode(id = "json_has", displayName = "JSON Has Key", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
+                    @FlowPin(name = "path", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "has", dataType = FlowType.BOOLEAN)
+            })
+    public void jsonHas(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_has", ctx, node);
+    }
+
+    @DefineNode(id = "json_keys", displayName = "Get JSON Keys", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "keys", dataType = FlowType.LIST)
+            })
+    public void jsonKeys(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_keys", ctx, node);
+    }
+
+    @DefineNode(id = "json_merge", displayName = "Merge JSON", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object1", dataType = FlowType.JSON_OBJECT),
+                    @FlowPin(name = "object2", dataType = FlowType.JSON_OBJECT)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "merged", dataType = FlowType.JSON_OBJECT)
+            })
+    public void jsonMerge(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_merge", ctx, node);
+    }
+
+    @DefineNode(id = "json_create", displayName = "Create JSON Object", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
+            })
+    public void jsonCreate(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_create", ctx, node);
+    }
+
+    @DefineNode(id = "json_set_array", displayName = "Create JSON Array", category = NodeDefinition.NodeCategory.DATABASE,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "values", dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "array", dataType = FlowType.LIST)
+            })
+    public void jsonSetArray(FlowContext ctx, FlowNode node) {
+        executeLegacy("json_set_array", ctx, node);
     }
     
     private static String findNodeId(FlowContext ctx, FlowNode node) {

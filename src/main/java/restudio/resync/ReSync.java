@@ -18,7 +18,7 @@ import java.nio.ByteBuffer;
 public class ReSync extends JavaPlugin {
     private static ReSync instance;
     private WebSocketServer wsServer;
-    private ReSyncServer v2Server;
+    private ReSyncServer server;
     private ReSyncPlaceholderExpansion placeholderExpansion;
     private InteractiveSelectionManager interactiveSelectionManager;
 
@@ -29,33 +29,33 @@ public class ReSync extends JavaPlugin {
         ReSyncConfig config = ConfigLoader.load(getDataFolder().toPath().resolve("config.properties").toString());
 
         if (!config.isEnabled()) {
-            getLogger().info("ReSync v2 is disabled in config.");
+            getLogger().info("ReSync is disabled in config.");
             return;
         }
 
-        v2Server = new ReSyncServer(this, config);
+        server = new ReSyncServer(this, config);
         interactiveSelectionManager = new InteractiveSelectionManager(this);
         interactiveSelectionManager.start();
 
         wsServer = new WebSocketServer(new InetSocketAddress(config.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
-                v2Server.onOpen(conn, handshake);
+                server.onOpen(conn, handshake);
             }
 
             @Override
             public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-                v2Server.onClose(conn, code, reason, remote);
+                server.onClose(conn, code, reason, remote);
             }
 
             @Override
             public void onMessage(WebSocket conn, String message) {
-                v2Server.onMessage(conn, ByteBuffer.wrap(message.getBytes()));
+                server.onMessage(conn, ByteBuffer.wrap(message.getBytes()));
             }
 
             @Override
             public void onMessage(WebSocket conn, ByteBuffer message) {
-                v2Server.onMessage(conn, message);
+                server.onMessage(conn, message);
             }
 
             @Override
@@ -66,15 +66,15 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onStart() {
-                getLogger().info("[ReSync v2] Server started on port " + getPort());
+                getLogger().info("[ReSync] Server started on port " + getPort());
             }
         };
 
         try {
             wsServer.start();
-            getLogger().info("[ReSync v2] Server enabled on port " + config.getPort());
+            getLogger().info("[ReSync] Server enabled on port " + config.getPort());
         } catch (Exception e) {
-            getLogger().severe("[ReSync v2] Failed to start WebSocket server: " + e.getMessage());
+            getLogger().severe("[ReSync] Failed to start WebSocket server: " + e.getMessage());
             e.printStackTrace();
         }
 
@@ -83,7 +83,7 @@ public class ReSync extends JavaPlugin {
             getCommand("resync").setExecutor(command);
             getCommand("resync").setTabCompleter(command);
         } else {
-            getLogger().warning("[ReSync v2] Command '/resync' not found in plugin.yml");
+            getLogger().warning("[ReSync] Command '/resync' not found in plugin.yml");
         }
 
         registerPlaceholderExpansion();
@@ -91,8 +91,8 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (v2Server != null) {
-            v2Server.shutdown();
+        if (server != null) {
+            server.shutdown();
         }
         if (interactiveSelectionManager != null) {
             interactiveSelectionManager.shutdown();
@@ -106,21 +106,21 @@ public class ReSync extends JavaPlugin {
         if (wsServer != null) {
             try {
                 wsServer.stop();
-                getLogger().info("[ReSync v2] WebSocket server stopped.");
+                getLogger().info("[ReSync] WebSocket server stopped.");
             } catch (Exception e) {
-                getLogger().severe("[ReSync v2] Error stopping WebSocket server: " + e.getMessage());
+                getLogger().severe("[ReSync] Error stopping WebSocket server: " + e.getMessage());
             }
         }
 
-        getLogger().info("[ReSync v2] Plugin disabled.");
+        getLogger().info("[ReSync] Plugin disabled.");
     }
 
     public static ReSync getInstance() {
         return instance;
     }
 
-    public ReSyncServer getV2Server() {
-        return v2Server;
+    public ReSyncServer getReSyncServer() {
+        return server;
     }
 
     public InteractiveSelectionManager getInteractiveSelectionManager() {
@@ -129,14 +129,14 @@ public class ReSync extends JavaPlugin {
 
     private void registerPlaceholderExpansion() {
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            getLogger().info("[ReSync v2] PlaceholderAPI not found, skipping PAPI hook registration.");
+            getLogger().info("[ReSync] PlaceholderAPI not found, skipping PAPI hook registration.");
             return;
         }
         placeholderExpansion = new ReSyncPlaceholderExpansion(this);
         if (placeholderExpansion.register()) {
-            getLogger().info("[ReSync v2] Registered PlaceholderAPI hook: %resync_*%");
+            getLogger().info("[ReSync] Registered PlaceholderAPI hook: %resync_*%");
             return;
         }
-        getLogger().warning("[ReSync v2] Failed to register PlaceholderAPI hook.");
+        getLogger().warning("[ReSync] Failed to register PlaceholderAPI hook.");
     }
 }

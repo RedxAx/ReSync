@@ -23,16 +23,23 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class BlockNodes implements NodeCategory {
+public class BlockNodes {
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("block_set", (ctx, node) -> {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             if (location == null) {
@@ -1068,6 +1075,446 @@ public class BlockNodes implements NodeCategory {
             ctx.setNodeOutput(nodeId, "is_solid", isSolid);
             ctx.triggerOutput("flow");
         });
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (BlockNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "block_set", displayName = "Set Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "material", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSet(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set", ctx, node);
+    }
+
+    @DefineNode(id = "block_get", displayName = "Get Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "type", dataType = FlowType.STRING),
+                    @FlowPin(name = "data", dataType = FlowType.STRING)
+            })
+    public void blockGet(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_get", ctx, node);
+    }
+
+    @DefineNode(id = "block_replace", displayName = "Replace Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "old_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "new_type", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockReplace(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_replace", ctx, node);
+    }
+
+    @DefineNode(id = "block_fill", displayName = "Fill Area", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "material", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockFill(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_fill", ctx, node);
+    }
+
+    @DefineNode(id = "block_replace_area", displayName = "Replace Area", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "old_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "new_type", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockReplaceArea(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_replace_area", ctx, node);
+    }
+
+    @DefineNode(id = "block_break_naturally", displayName = "Break Naturally", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "cause", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockBreakNaturally(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_break_naturally", ctx, node);
+    }
+
+    @DefineNode(id = "block_drop_item", displayName = "Drop Item", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "item", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockDropItem(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_drop_item", ctx, node);
+    }
+
+    @DefineNode(id = "block_update", displayName = "Update Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockUpdate(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_update", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_biome", displayName = "Set Biome", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "biome", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetBiome(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_biome", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_type", displayName = "Set Block Type", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "material", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetType(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_type", ctx, node);
+    }
+
+    @DefineNode(id = "block_get_type", displayName = "Get Block Type", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "type", dataType = FlowType.STRING)
+            })
+    public void blockGetType(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_get_type", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_data", displayName = "Set Block Data", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "data", dataType = FlowType.JSON_OBJECT)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetData(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_data", ctx, node);
+    }
+
+    @DefineNode(id = "block_get_data", displayName = "Get Block Data", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "data", dataType = FlowType.STRING)
+            })
+    public void blockGetData(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_get_data", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_age", displayName = "Set Block Age", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "age", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetAge(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_age", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_level", displayName = "Set Block Level", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "level", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetLevel(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_level", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_rotation", displayName = "Set Rotation", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "rotation", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetRotation(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_rotation", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_face", displayName = "Set Face", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "face", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetFace(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_face", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_powered", displayName = "Set Powered", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "powered", dataType = FlowType.BOOLEAN)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetPowered(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_powered", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_lit", displayName = "Set Lit", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "lit", dataType = FlowType.BOOLEAN)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetLit(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_lit", ctx, node);
+    }
+
+    @DefineNode(id = "block_interact", displayName = "Interact Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockInteract(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_interact", ctx, node);
+    }
+
+    @DefineNode(id = "block_break_particles", displayName = "Break Particles", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "type", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockBreakParticles(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_break_particles", ctx, node);
+    }
+
+    @DefineNode(id = "block_play_sound", displayName = "Play Block Sound", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "type", dataType = FlowType.STRING),
+                    @FlowPin(name = "volume", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockPlaySound(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_play_sound", ctx, node);
+    }
+
+    @DefineNode(id = "block_physics", displayName = "Block Physics", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockPhysics(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_physics", ctx, node);
+    }
+
+    @DefineNode(id = "block_explode", displayName = "Block Explode", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "power", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "fire", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "break_blocks", dataType = FlowType.BOOLEAN)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockExplode(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_explode", ctx, node);
+    }
+
+    @DefineNode(id = "block_raytrace", displayName = "Block Raytrace", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "start_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "max_distance", dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "hit_block", dataType = FlowType.ANY),
+                    @FlowPin(name = "hit_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "distance", dataType = FlowType.NUMBER)
+            })
+    public void blockRaytrace(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_raytrace", ctx, node);
+    }
+
+    @DefineNode(id = "block_offset", displayName = "Block Offset", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "offset_x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_y", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "offset_z", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "block", dataType = FlowType.ANY)})
+    public void blockOffset(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_offset", ctx, node);
+    }
+
+    @DefineNode(id = "block_sign_text", displayName = "Block Sign Text", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "line1", dataType = FlowType.STRING),
+                    @FlowPin(name = "line2", dataType = FlowType.STRING),
+                    @FlowPin(name = "line3", dataType = FlowType.STRING),
+                    @FlowPin(name = "line4", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSignText(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_sign_text", ctx, node);
+    }
+
+    @DefineNode(id = "block_container_get", displayName = "Container Get", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "block_location", dataType = FlowType.LOCATION)},
+            outputs = {@FlowPin(name = "items_list", dataType = FlowType.LIST)})
+    public void blockContainerGet(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_container_get", ctx, node);
+    }
+
+    @DefineNode(id = "block_container_set", displayName = "Container Set", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "items_list", dataType = FlowType.LIST)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockContainerSet(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_container_set", ctx, node);
+    }
+
+    @DefineNode(id = "block_container_add", displayName = "Container Add", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockContainerAdd(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_container_add", ctx, node);
+    }
+
+    @DefineNode(id = "block_spawn_falling", displayName = "Spawn Falling Block", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "material_type", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "falling_block_entity", dataType = FlowType.ENTITY)})
+    public void blockSpawnFalling(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_spawn_falling", ctx, node);
+    }
+
+    @DefineNode(id = "block_break_naturally_drops", displayName = "Break Naturally", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "tool_item", dataType = FlowType.ITEMSTACK)
+            },
+            outputs = {@FlowPin(name = "dropped_items_list", dataType = FlowType.LIST)})
+    public void blockBreakNaturallyDrops(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_break_naturally_drops", ctx, node);
+    }
+
+    @DefineNode(id = "block_break_instantly", displayName = "Break Instantly", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockBreakInstantly(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_break_instantly", ctx, node);
+    }
+
+    @DefineNode(id = "block_get_drops", displayName = "Get Drops", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "tool_item", dataType = FlowType.ITEMSTACK)
+            },
+            outputs = {@FlowPin(name = "dropped_items_list", dataType = FlowType.LIST)})
+    public void blockGetDrops(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_get_drops", ctx, node);
+    }
+
+    @DefineNode(id = "block_get_state", displayName = "Get State", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "block_location", dataType = FlowType.LOCATION)},
+            outputs = {@FlowPin(name = "state_data", dataType = FlowType.STRING)})
+    public void blockGetState(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_get_state", ctx, node);
+    }
+
+    @DefineNode(id = "block_set_state", displayName = "Set State", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "block_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "state_data", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void blockSetState(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_set_state", ctx, node);
+    }
+
+    @DefineNode(id = "block_is_solid", displayName = "Is Solid", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {@FlowPin(name = "block_location", dataType = FlowType.LOCATION)},
+            outputs = {@FlowPin(name = "is_solid", dataType = FlowType.BOOLEAN)})
+    public void blockIsSolid(FlowContext ctx, FlowNode node) {
+        executeLegacy("block_is_solid", ctx, node);
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

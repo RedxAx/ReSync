@@ -1507,17 +1507,17 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private WorldManagementService getWorldService() {
-        if (plugin.getV2Server() == null) {
+        if (plugin.getReSyncServer() == null) {
             return null;
         }
-        return plugin.getV2Server().getWorldManagementService();
+        return plugin.getReSyncServer().getWorldManagementService();
     }
 
     private FlowStorage getStorage() {
-        if (plugin.getV2Server() == null) {
+        if (plugin.getReSyncServer() == null) {
             return null;
         }
-        return plugin.getV2Server().getFlowStorage();
+        return plugin.getReSyncServer().getFlowStorage();
     }
 
     private WorldRegistryEntry findWorldEntry(WorldManagementService service, String worldName) {

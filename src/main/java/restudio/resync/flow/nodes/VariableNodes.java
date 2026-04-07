@@ -2,22 +2,28 @@ package restudio.resync.flow.nodes;
 
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
 import restudio.resync.flow.PersistentVariableStore;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class VariableNodes implements NodeCategory {
+public class VariableNodes {
     
     private static final String GLOBAL_PREFIX = "server.";
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
     
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("variable_access", (ctx, node) -> {
             String mode = ctx.getInputValue(node, "mode", String.class, "get");
             String scope = ctx.getInputValue(node, "scope", String.class, "local");
@@ -292,7 +298,219 @@ public class VariableNodes implements NodeCategory {
             ctx.triggerOutput("flow");
         });
     }
-    
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (VariableNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "variable_access", displayName = "Variable", category = NodeDefinition.NodeCategory.VARIABLE, priority = -10,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING),
+                    @FlowPin(name = "persist", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "value", dataType = FlowType.ANY),
+                    @FlowPin(name = "exists", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "variables", dataType = FlowType.LIST)
+            })
+    public void variableAccess(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_access", ctx, node);
+    }
+
+    @DefineNode(id = "variable_set_global", displayName = "Set Global Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableSetGlobal(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_set_global", ctx, node);
+    }
+
+    @DefineNode(id = "variable_set_local", displayName = "Set Local Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableSetLocal(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_set_local", ctx, node);
+    }
+
+    @DefineNode(id = "variable_set_player", displayName = "Set Player Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableSetPlayer(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_set_player", ctx, node);
+    }
+
+    @DefineNode(id = "variable_get_global", displayName = "Get Global Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            })
+    public void variableGetGlobal(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_get_global", ctx, node);
+    }
+
+    @DefineNode(id = "variable_get_local", displayName = "Get Local Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            })
+    public void variableGetLocal(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_get_local", ctx, node);
+    }
+
+    @DefineNode(id = "variable_get_player", displayName = "Get Player Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "name", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            })
+    public void variableGetPlayer(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_get_player", ctx, node);
+    }
+
+    @DefineNode(id = "variable_delete", displayName = "Delete Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableDelete(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_delete", ctx, node);
+    }
+
+    @DefineNode(id = "variable_exists", displayName = "Variable Exists", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "exists", dataType = FlowType.BOOLEAN)
+            })
+    public void variableExists(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_exists", ctx, node);
+    }
+
+    @DefineNode(id = "variable_list_all", displayName = "List All Variables", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "variables", dataType = FlowType.LIST)
+            })
+    public void variableListAll(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_list_all", ctx, node);
+    }
+
+    @DefineNode(id = "variable_increment", displayName = "Increment Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableIncrement(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_increment", ctx, node);
+    }
+
+    @DefineNode(id = "variable_decrement", displayName = "Decrement Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableDecrement(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_decrement", ctx, node);
+    }
+
+    @DefineNode(id = "variable_multiply", displayName = "Multiply Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableMultiply(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_multiply", ctx, node);
+    }
+
+    @DefineNode(id = "variable_divide", displayName = "Divide Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "name", dataType = FlowType.STRING),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void variableDivide(FlowContext ctx, FlowNode node) {
+        executeLegacy("variable_divide", ctx, node);
+    }
+
     private static String findNodeId(FlowContext ctx, FlowNode node) {
         for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {
             if (entry.getValue() == node) {

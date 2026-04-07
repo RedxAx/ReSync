@@ -3,22 +3,27 @@ package restudio.resync.flow.nodes;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
 import restudio.resync.ReSync;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class TimeNodes implements NodeCategory {
+public class TimeNodes {
     
     private static final Map<String, BukkitTask> scheduledTasks = new ConcurrentHashMap<>();
     private static final long SERVER_START_TIME = System.currentTimeMillis();
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
     
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("delay_ticks", (ctx, node) -> {
             Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 20);
             ctx.runLater(() -> ctx.triggerOutput("flow"), ticks);
@@ -153,6 +158,150 @@ public class TimeNodes implements NodeCategory {
             ctx.setNodeOutput(nodeId, "uptime_ms", uptimeMs);
             ctx.triggerOutput("flow");
         });
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (TimeNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            ctx.triggerOutput("flow");
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "delay_ticks", displayName = "Delay Ticks", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void delayTicks(FlowContext ctx, FlowNode node) {
+        executeLegacy("delay_ticks", ctx, node);
+    }
+
+    @DefineNode(id = "delay_seconds", displayName = "Delay Seconds", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "seconds", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void delaySeconds(FlowContext ctx, FlowNode node) {
+        executeLegacy("delay_seconds", ctx, node);
+    }
+
+    @DefineNode(id = "delay_minutes", displayName = "Delay Minutes", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "minutes", dataType = FlowType.NUMBER)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void delayMinutes(FlowContext ctx, FlowNode node) {
+        executeLegacy("delay_minutes", ctx, node);
+    }
+
+    @DefineNode(id = "schedule_at_time", displayName = "Schedule at Time", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "time_string", dataType = FlowType.STRING),
+                    @FlowPin(name = "flow_id", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "task_id", dataType = FlowType.STRING)
+            })
+    public void scheduleAtTime(FlowContext ctx, FlowNode node) {
+        executeLegacy("schedule_at_time", ctx, node);
+    }
+
+    @DefineNode(id = "schedule_interval", displayName = "Schedule Interval", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "interval_ticks", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "flow_id", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "task_id", dataType = FlowType.STRING)
+            })
+    public void scheduleInterval(FlowContext ctx, FlowNode node) {
+        executeLegacy("schedule_interval", ctx, node);
+    }
+
+    @DefineNode(id = "schedule_cron", displayName = "Schedule Cron", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "cron_expr", dataType = FlowType.STRING),
+                    @FlowPin(name = "flow_id", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "task_id", dataType = FlowType.STRING)
+            })
+    public void scheduleCron(FlowContext ctx, FlowNode node) {
+        executeLegacy("schedule_cron", ctx, node);
+    }
+
+    @DefineNode(id = "cancel_schedule", displayName = "Cancel Schedule", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "task_id", dataType = FlowType.STRING)
+            },
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+    public void cancelSchedule(FlowContext ctx, FlowNode node) {
+        executeLegacy("cancel_schedule", ctx, node);
+    }
+
+    @DefineNode(id = "get_current_time", displayName = "Get Current Time", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "time", dataType = FlowType.NUMBER)
+            })
+    public void getCurrentTime(FlowContext ctx, FlowNode node) {
+        executeLegacy("get_current_time", ctx, node);
+    }
+
+    @DefineNode(id = "get_current_ticks", displayName = "Get Current Ticks", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
+            })
+    public void getCurrentTicks(FlowContext ctx, FlowNode node) {
+        executeLegacy("get_current_ticks", ctx, node);
+    }
+
+    @DefineNode(id = "get_server_uptime", displayName = "Get Server Uptime", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "uptime", dataType = FlowType.STRING),
+                    @FlowPin(name = "uptime_ms", dataType = FlowType.NUMBER)
+            })
+    public void getServerUptime(FlowContext ctx, FlowNode node) {
+        executeLegacy("get_server_uptime", ctx, node);
     }
     
     private static String findNodeId(FlowContext ctx, FlowNode node) {

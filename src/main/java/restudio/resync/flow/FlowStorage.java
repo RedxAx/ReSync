@@ -519,7 +519,7 @@ public class FlowStorage {
 
     private void storeConfigProperties(Properties properties) {
         try (FileOutputStream fos = new FileOutputStream(configFile)) {
-            properties.store(fos, "ReSync v2 Configuration");
+            properties.store(fos, "ReSync Configuration");
         } catch (IOException e) {
             e.printStackTrace();
         }

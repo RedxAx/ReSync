@@ -68,7 +68,7 @@ public class ConfigLoader {
 
     private static void saveConfig(Path configFile, Properties props) {
         try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
-            props.store(fos, "ReSync v2 Configuration");
+            props.store(fos, "ReSync Configuration");
         } catch (Exception e) {
             System.err.println("Failed to save config: " + e.getMessage());
         }

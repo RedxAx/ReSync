@@ -3,9 +3,12 @@ package restudio.resync.flow.nodes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -19,13 +22,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class StringAdvancedNodes implements NodeCategory {
+public class StringAdvancedNodes {
 
     private static final Gson GSON = new GsonBuilder().create();
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("string_base64_encode", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
             String nodeId = findNodeId(ctx, node);
@@ -505,6 +511,369 @@ public class StringAdvancedNodes implements NodeCategory {
             boolean isEmail = text != null && !text.isEmpty() && text.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
             ctx.setNodeOutput(nodeId, "is_email", isEmail);
         });
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) return;
+        synchronized (StringAdvancedNodes.class) {
+            if (initialized) return;
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) return;
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "string_base64_encode", displayName = "Base64 Encode", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "encoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_base64_encode(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_base64_encode", ctx, node);
+    }
+
+    @DefineNode(id = "string_base64_decode", displayName = "Base64 Decode", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "encoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "decoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_base64_decode(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_base64_decode", ctx, node);
+    }
+
+    @DefineNode(id = "string_url_encode", displayName = "URL Encode", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "encoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_url_encode(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_url_encode", ctx, node);
+    }
+
+    @DefineNode(id = "string_url_decode", displayName = "URL Decode", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "encoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "decoded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_url_decode(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_url_decode", ctx, node);
+    }
+
+    @DefineNode(id = "string_to_json", displayName = "String To JSON", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "json_string", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "json_object", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            })
+    public void nstring_to_json(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_to_json", ctx, node);
+    }
+
+    @DefineNode(id = "string_from_json", displayName = "String From JSON", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "object", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "json_string", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_from_json(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_from_json", ctx, node);
+    }
+
+    @DefineNode(id = "string_md5", displayName = "String MD5", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "hash", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_md5(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_md5", ctx, node);
+    }
+
+    @DefineNode(id = "string_sha256", displayName = "String SHA256", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "hash", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_sha256(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_sha256", ctx, node);
+    }
+
+    @DefineNode(id = "string_sha512", displayName = "String SHA512", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "hash", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_sha512(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_sha512", ctx, node);
+    }
+
+    @DefineNode(id = "string_pad_left", displayName = "Pad Left", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "length", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "pad_char", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "padded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_pad_left(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_pad_left", ctx, node);
+    }
+
+    @DefineNode(id = "string_pad_right", displayName = "Pad Right", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "length", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "pad_char", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "padded", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_pad_right(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_pad_right", ctx, node);
+    }
+
+    @DefineNode(id = "string_truncate", displayName = "Truncate", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "length", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "add_ellipsis", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            },
+            outputs = {
+                    @FlowPin(name = "truncated", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_truncate(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_truncate", ctx, node);
+    }
+
+    @DefineNode(id = "string_word_wrap", displayName = "Word Wrap", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "width", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "wrapped_lines_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            })
+    public void nstring_word_wrap(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_word_wrap", ctx, node);
+    }
+
+    @DefineNode(id = "string_levenshtein", displayName = "Levenshtein Distance", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text1", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "text2", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "distance", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nstring_levenshtein(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_levenshtein", ctx, node);
+    }
+
+    @DefineNode(id = "string_soundex", displayName = "Soundex", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "soundex", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_soundex(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_soundex", ctx, node);
+    }
+
+    @DefineNode(id = "string_metaphone", displayName = "Metaphone", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "metaphone", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_metaphone(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_metaphone", ctx, node);
+    }
+
+    @DefineNode(id = "string_slugify", displayName = "Slugify", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "slug", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_slugify(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_slugify", ctx, node);
+    }
+
+    @DefineNode(id = "string_camel_case", displayName = "Camel Case", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "camel_case", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_camel_case(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_camel_case", ctx, node);
+    }
+
+    @DefineNode(id = "string_pascal_case", displayName = "Pascal Case", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "pascal_case", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_pascal_case(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_pascal_case", ctx, node);
+    }
+
+    @DefineNode(id = "string_snake_case", displayName = "Snake Case", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "snake_case", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_snake_case(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_snake_case", ctx, node);
+    }
+
+    @DefineNode(id = "string_kebab_case", displayName = "Kebab Case", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "kebab_case", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_kebab_case(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_kebab_case", ctx, node);
+    }
+
+    @DefineNode(id = "string_reverse", displayName = "Reverse", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "reversed", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_reverse(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_reverse", ctx, node);
+    }
+
+    @DefineNode(id = "string_shuffle", displayName = "Shuffle", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "shuffled", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_shuffle(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_shuffle", ctx, node);
+    }
+
+    @DefineNode(id = "string_repeat", displayName = "Repeat", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING),
+                    @FlowPin(name = "count", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "repeated", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            })
+    public void nstring_repeat(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_repeat", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_empty", displayName = "Is Empty", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_empty", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_empty(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_empty", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_blank", displayName = "Is Blank", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_blank", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_blank(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_blank", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_numeric", displayName = "Is Numeric", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_numeric", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_numeric(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_numeric", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_alpha", displayName = "Is Alpha", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_alpha", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_alpha(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_alpha", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_alphanumeric", displayName = "Is Alphanumeric", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_alphanumeric", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_alphanumeric(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_alphanumeric", ctx, node);
+    }
+
+    @DefineNode(id = "string_is_email", displayName = "Is Email", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "text", type = NodeDefinition.PinType.DATA, dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "is_email", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nstring_is_email(FlowContext ctx, FlowNode node) {
+        executeLegacy("string_is_email", ctx, node);
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

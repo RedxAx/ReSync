@@ -47,8 +47,8 @@ public class FlowRuntimeModule implements Module {
         storage = new FlowStorage(context.getPlugin());
         TypeAdapterRegistry typeAdapterRegistry = new TypeAdapterRegistry();
         FlowRegistry flowRegistry = new FlowRegistry();
-        StandardNodes.registerAll(flowRegistry);
         NodeDefinitionRegistry nodeDefinitionRegistry = new NodeDefinitionRegistry();
+        StandardNodes.registerAll(flowRegistry, nodeDefinitionRegistry);
         nodePluginRegistry = new FlowNodePluginRegistry(
             flowRegistry,
             nodeDefinitionRegistry,

@@ -4,14 +4,23 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
-public class LocationNodes implements NodeCategory {
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+public class LocationNodes {
+
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("location_add", (ctx, node) -> {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             if (location == null) {
@@ -178,6 +187,122 @@ public class LocationNodes implements NodeCategory {
             ctx.triggerOutput("flow");
         });
     }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (LocationNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry tempRegistry = new FlowRegistry();
+            registerLegacyNodes(tempRegistry);
+            for (String type : tempRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, tempRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private static void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor != null) {
+            executor.accept(ctx, node);
+        }
+    }
+
+    @DefineNode(id = "location_add", displayName = "Location Add", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION),
+            @FlowPin(name = "offset_x", dataType = FlowType.NUMBER),
+            @FlowPin(name = "offset_y", dataType = FlowType.NUMBER),
+            @FlowPin(name = "offset_z", dataType = FlowType.NUMBER)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationAdd(FlowContext ctx, FlowNode node) { executeLegacy("location_add", ctx, node); }
+
+    @DefineNode(id = "location_multiply", displayName = "Location Multiply", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION),
+            @FlowPin(name = "factor", dataType = FlowType.NUMBER)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationMultiply(FlowContext ctx, FlowNode node) { executeLegacy("location_multiply", ctx, node); }
+
+    @DefineNode(id = "location_direction", displayName = "Location Direction", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION),
+            @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
+            @FlowPin(name = "pitch", dataType = FlowType.NUMBER),
+            @FlowPin(name = "distance", dataType = FlowType.NUMBER)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationDirection(FlowContext ctx, FlowNode node) { executeLegacy("location_direction", ctx, node); }
+
+    @DefineNode(id = "location_relative_to_entity", displayName = "Location Relative To Entity", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "entity", dataType = FlowType.ENTITY),
+            @FlowPin(name = "offset_type", dataType = FlowType.STRING),
+            @FlowPin(name = "offset_x", dataType = FlowType.NUMBER),
+            @FlowPin(name = "offset_y", dataType = FlowType.NUMBER),
+            @FlowPin(name = "offset_z", dataType = FlowType.NUMBER)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationRelativeToEntity(FlowContext ctx, FlowNode node) { executeLegacy("location_relative_to_entity", ctx, node); }
+
+    @DefineNode(id = "location_look_at", displayName = "Location Look At", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION),
+            @FlowPin(name = "target_location", dataType = FlowType.LOCATION)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationLookAt(FlowContext ctx, FlowNode node) { executeLegacy("location_look_at", ctx, node); }
+
+    @DefineNode(id = "location_get_offset", displayName = "Location Get Offset", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION),
+            @FlowPin(name = "direction", dataType = FlowType.STRING),
+            @FlowPin(name = "distance", dataType = FlowType.NUMBER)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationGetOffset(FlowContext ctx, FlowNode node) { executeLegacy("location_get_offset", ctx, node); }
+
+    @DefineNode(id = "location_center", displayName = "Location Center", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        },
+        outputs = {
+            @FlowPin(name = "location", dataType = FlowType.LOCATION)
+        })
+    public void locationCenter(FlowContext ctx, FlowNode node) { executeLegacy("location_center", ctx, node); }
+
+    @DefineNode(id = "location_distance", displayName = "Location Distance", category = NodeDefinition.NodeCategory.DATA,
+        inputs = {
+            @FlowPin(name = "location1", dataType = FlowType.LOCATION),
+            @FlowPin(name = "location2", dataType = FlowType.LOCATION)
+        },
+        outputs = {
+            @FlowPin(name = "distance", dataType = FlowType.NUMBER)
+        })
+    public void locationDistance(FlowContext ctx, FlowNode node) { executeLegacy("location_distance", ctx, node); }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {
         for (var entry : ctx.getRuntime().getGraph().getNodes().entrySet()) {

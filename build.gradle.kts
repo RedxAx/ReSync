@@ -24,7 +24,6 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-core:2.25.2")
     implementation("org.slf4j:slf4j-simple:2.0.17")
     implementation("io.javalin:javalin:6.7.0")
-    implementation("org.slf4j:slf4j-simple:2.0.13")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
 }

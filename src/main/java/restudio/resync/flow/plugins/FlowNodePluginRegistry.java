@@ -47,7 +47,6 @@ public class FlowNodePluginRegistry {
         this.definitionRegistry = definitionRegistry;
         this.pluginDirectory = pluginDirectory;
         ensureDirectory();
-        registerBuiltinPlugin(new StandardNodeDefinitionsPlugin());
     }
 
     public void loadInitialPlugins() {
@@ -91,26 +90,36 @@ public class FlowNodePluginRegistry {
     }
 
     public Set<String> getPluginIds() {
-        return new HashSet<>(plugins.keySet());
+        Set<String> ids = new HashSet<>(plugins.keySet());
+        ids.addAll(definitionRegistry.getPluginIds());
+        return ids;
     }
 
     public NodePluginPayload buildPayload(String pluginId) {
         PluginState state = plugins.get(pluginId);
-        if (state == null) {
+        List<NodeDefinition> definitions = definitionRegistry.getDefinitionsForPlugin(pluginId);
+        if ((state == null) && (definitions == null || definitions.isEmpty())) {
             return null;
         }
         NodePluginPayload payload = new NodePluginPayload();
-        payload.setPluginId(state.pluginId);
-        payload.setVersion(state.version);
-        payload.setDescription(state.description);
-        payload.setChecksum(state.checksum);
-        payload.setNodes(definitionRegistry.getDefinitionsForPlugin(pluginId));
+        payload.setPluginId(state != null ? state.pluginId : pluginId);
+        payload.setVersion(state != null ? state.version : "builtin");
+        payload.setDescription(state != null ? state.description : "BuiltInNodeDefinitions");
+        payload.setChecksum(state != null ? state.checksum : computeChecksum(definitions));
+        payload.setNodes(definitions);
         return payload;
     }
 
     public String getChecksum(String pluginId) {
         PluginState state = plugins.get(pluginId);
-        return state != null ? state.checksum : null;
+        if (state != null) {
+            return state.checksum;
+        }
+        List<NodeDefinition> definitions = definitionRegistry.getDefinitionsForPlugin(pluginId);
+        if (definitions == null || definitions.isEmpty()) {
+            return null;
+        }
+        return computeChecksum(definitions);
     }
 
     private void ensureDirectory() {

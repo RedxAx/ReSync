@@ -92,6 +92,14 @@ public class FlowContext {
         runtime.setNodeOutput(nodeId, pinName, value);
     }
 
+    public void setOutput(FlowNode node, String pinName, Object value) {
+        runtime.setNodeOutput(runtime.findNodeId(node), pinName, value);
+    }
+
+    public String resolveNodeId(FlowNode node) {
+        return runtime.findNodeId(node);
+    }
+
     public TypeAdapterRegistry getTypeAdapter() {
         return runtime.getTypeAdapter();
     }

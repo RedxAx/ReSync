@@ -1,9 +1,12 @@
 package restudio.resync.flow.nodes;
 
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -13,14 +16,18 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.Set;
 import java.util.Stack;
 import java.util.Map.Entry;
 
-public class DataStructureNodes implements NodeCategory {
+public class DataStructureNodes {
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
+
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("map_create", (ctx, node) -> {
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "map", new HashMap<>());
@@ -463,5 +470,9 @@ public class DataStructureNodes implements NodeCategory {
             case "trim" -> strValue.trim();
             default -> value;
         };
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
     }
 }

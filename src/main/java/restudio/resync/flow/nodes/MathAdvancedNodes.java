@@ -2,19 +2,26 @@ package restudio.resync.flow.nodes;
 
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.NodeCategory;
+import restudio.resync.flow.registry.DefineNode;
+import restudio.resync.flow.registry.FlowPin;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 
-public class MathAdvancedNodes implements NodeCategory {
+public class MathAdvancedNodes {
 
     private static final Random RANDOM = new Random();
+    private static final Map<String, BiConsumer<FlowContext, FlowNode>> LEGACY_EXECUTORS = new ConcurrentHashMap<>();
+    private static volatile boolean initialized;
 
-    @Override
-    public void registerNodes(FlowRegistry registry) {
+    private static void registerLegacyNodes(FlowRegistry registry) {
         registry.register("math_random_range", (ctx, node) -> {
             Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
             Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
@@ -371,6 +378,533 @@ public class MathAdvancedNodes implements NodeCategory {
             String nodeId = findNodeId(ctx, node);
             ctx.setNodeOutput(nodeId, "angle_degrees", angleDegrees);
         });
+    }
+
+    public void registerNodes(FlowRegistry registry) {
+        registerLegacyNodes(registry);
+    }
+
+    private static void ensureLegacyInitialized() {
+        if (initialized) {
+            return;
+        }
+        synchronized (MathAdvancedNodes.class) {
+            if (initialized) {
+                return;
+            }
+            FlowRegistry legacyRegistry = new FlowRegistry();
+            registerLegacyNodes(legacyRegistry);
+            for (String type : legacyRegistry.getRegisteredTypes()) {
+                LEGACY_EXECUTORS.put(type, legacyRegistry.getExecutor(type));
+            }
+            initialized = true;
+        }
+    }
+
+    private void executeLegacy(String id, FlowContext ctx, FlowNode node) {
+        ensureLegacyInitialized();
+        BiConsumer<FlowContext, FlowNode> executor = LEGACY_EXECUTORS.get(id);
+        if (executor == null) {
+            return;
+        }
+        executor.accept(ctx, node);
+    }
+
+    @DefineNode(id = "math_random_range", displayName = "Random Range", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "min", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "max", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "result", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_random_range(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_random_range", ctx, node);
+    }
+
+    @DefineNode(id = "math_random_chance", displayName = "Random Chance", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {
+                    @FlowPin(name = "chance_percent", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "success", type = NodeDefinition.PinType.DATA, dataType = FlowType.BOOLEAN)
+            })
+    public void nmath_random_chance(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_random_chance", ctx, node);
+    }
+
+    @DefineNode(id = "math_random_choice", displayName = "Random Choice", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "items_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "chosen_item", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            })
+    public void nmath_random_choice(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_random_choice", ctx, node);
+    }
+
+    @DefineNode(id = "math_random_choice_weighted", displayName = "Random Choice Weighted", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {
+                    @FlowPin(name = "items_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST),
+                    @FlowPin(name = "weights_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "chosen_item", type = NodeDefinition.PinType.DATA, dataType = FlowType.ANY)
+            })
+    public void nmath_random_choice_weighted(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_random_choice_weighted", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_create", displayName = "Vector Create", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "x", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "y", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "z", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_create(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_create", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_add", displayName = "Vector Add", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "result_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_add(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_add", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_subtract", displayName = "Vector Subtract", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "result_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_subtract(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_subtract", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_multiply", displayName = "Vector Multiply", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "scalar", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "result_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_multiply(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_multiply", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_divide", displayName = "Vector Divide", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "scalar", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "result_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_divide(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_divide", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_dot", displayName = "Vector Dot", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "result", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_vector_dot(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_dot", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_cross", displayName = "Vector Cross", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "result_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_cross(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_cross", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_distance", displayName = "Vector Distance", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "distance", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_vector_distance(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_distance", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_length", displayName = "Vector Length", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "length", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_vector_length(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_length", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_normalize", displayName = "Vector Normalize", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "normalized_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_normalize(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_normalize", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_angle_between", displayName = "Vector Angle Between", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "angle", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_vector_angle_between(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_angle_between", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_midpoint", displayName = "Vector Midpoint", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector1", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "vector2", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "midpoint_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_midpoint(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_midpoint", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_rotate_x", displayName = "Vector Rotate X", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "rotated_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_rotate_x(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_rotate_x", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_rotate_y", displayName = "Vector Rotate Y", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "rotated_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_rotate_y(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_rotate_y", ctx, node);
+    }
+
+    @DefineNode(id = "math_vector_rotate_z", displayName = "Vector Rotate Z", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION),
+                    @FlowPin(name = "degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "rotated_vector", type = NodeDefinition.PinType.DATA, dataType = FlowType.LOCATION)
+            })
+    public void nmath_vector_rotate_z(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_vector_rotate_z", ctx, node);
+    }
+
+    @DefineNode(id = "math_lerp", displayName = "Lerp", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "a", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "b", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "t", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "result", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_lerp(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_lerp", ctx, node);
+    }
+
+    @DefineNode(id = "math_clamp", displayName = "Clamp", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "min", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "max", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "clamped", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_clamp(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_clamp", ctx, node);
+    }
+
+    @DefineNode(id = "math_abs", displayName = "Absolute", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "absolute", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_abs(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_abs", ctx, node);
+    }
+
+    @DefineNode(id = "math_min", displayName = "Min", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "values_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "min", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_min(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_min", ctx, node);
+    }
+
+    @DefineNode(id = "math_max", displayName = "Max", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "values_list", type = NodeDefinition.PinType.DATA, dataType = FlowType.LIST)
+            },
+            outputs = {
+                    @FlowPin(name = "max", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_max(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_max", ctx, node);
+    }
+
+    @DefineNode(id = "math_round", displayName = "Round", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "decimal_places", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "rounded", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_round(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_round", ctx, node);
+    }
+
+    @DefineNode(id = "math_floor", displayName = "Floor", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "floored", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_floor(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_floor", ctx, node);
+    }
+
+    @DefineNode(id = "math_ceil", displayName = "Ceil", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "ceiling", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_ceil(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_ceil", ctx, node);
+    }
+
+    @DefineNode(id = "math_hypotenuse", displayName = "Hypotenuse", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "a", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "b", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "hypotenuse", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_hypotenuse(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_hypotenuse", ctx, node);
+    }
+
+    @DefineNode(id = "math_log", displayName = "Log", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "log", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_log(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_log", ctx, node);
+    }
+
+    @DefineNode(id = "math_log10", displayName = "Log10", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "log10", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_log10(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_log10", ctx, node);
+    }
+
+    @DefineNode(id = "math_sqrt", displayName = "Sqrt", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "sqrt", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_sqrt(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_sqrt", ctx, node);
+    }
+
+    @DefineNode(id = "math_cbrt", displayName = "Cube Root", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "cbrt", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_cbrt(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_cbrt", ctx, node);
+    }
+
+    @DefineNode(id = "math_pow", displayName = "Power", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "base", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "exponent", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "result", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_pow(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_pow", ctx, node);
+    }
+
+    @DefineNode(id = "math_signum", displayName = "Signum", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "sign", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_signum(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_signum", ctx, node);
+    }
+
+    @DefineNode(id = "math_to_radians", displayName = "To Radians", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "radians", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_to_radians(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_to_radians", ctx, node);
+    }
+
+    @DefineNode(id = "math_to_degrees", displayName = "To Degrees", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "radians", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_to_degrees(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_to_degrees", ctx, node);
+    }
+
+    @DefineNode(id = "math_sin", displayName = "Sin", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "sin", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_sin(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_sin", ctx, node);
+    }
+
+    @DefineNode(id = "math_cos", displayName = "Cos", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "cos", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_cos(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_cos", ctx, node);
+    }
+
+    @DefineNode(id = "math_tan", displayName = "Tan", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "tan", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_tan(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_tan", ctx, node);
+    }
+
+    @DefineNode(id = "math_asin", displayName = "Arc Sin", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_asin(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_asin", ctx, node);
+    }
+
+    @DefineNode(id = "math_acos", displayName = "Arc Cos", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_acos(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_acos", ctx, node);
+    }
+
+    @DefineNode(id = "math_atan", displayName = "Arc Tan", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "value", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_atan(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_atan", ctx, node);
+    }
+
+    @DefineNode(id = "math_atan2", displayName = "Arc Tan2", category = NodeDefinition.NodeCategory.DATA,
+            inputs = {
+                    @FlowPin(name = "y", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER),
+                    @FlowPin(name = "x", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "angle_degrees", type = NodeDefinition.PinType.DATA, dataType = FlowType.NUMBER)
+            })
+    public void nmath_atan2(FlowContext ctx, FlowNode node) {
+        executeLegacy("math_atan2", ctx, node);
     }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

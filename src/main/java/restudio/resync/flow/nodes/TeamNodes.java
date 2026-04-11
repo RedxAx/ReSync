@@ -344,109 +344,109 @@ public class TeamNodes {
 
     @DefineNode(id = "team_create", displayName = "Create Team", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamCreate(FlowContext ctx, FlowNode node) {
         executeLegacy("team_create", ctx, node);
     }
 
     @DefineNode(id = "team_delete", displayName = "Delete Team", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamDelete(FlowContext ctx, FlowNode node) {
         executeLegacy("team_delete", ctx, node);
     }
 
     @DefineNode(id = "team_set_display_name", displayName = "Set Team Display Name", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSetDisplayName(FlowContext ctx, FlowNode node) {
         executeLegacy("team_set_display_name", ctx, node);
     }
 
     @DefineNode(id = "team_set_prefix", displayName = "Set Team Prefix", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "prefix", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSetPrefix(FlowContext ctx, FlowNode node) {
         executeLegacy("team_set_prefix", ctx, node);
     }
 
     @DefineNode(id = "team_set_suffix", displayName = "Set Team Suffix", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "suffix", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSetSuffix(FlowContext ctx, FlowNode node) {
         executeLegacy("team_set_suffix", ctx, node);
     }
 
     @DefineNode(id = "team_set_color", displayName = "Set Team Color", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "color", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSetColor(FlowContext ctx, FlowNode node) {
         executeLegacy("team_set_color", ctx, node);
     }
 
     @DefineNode(id = "team_set_allow_friendly_fire", displayName = "Allow Friendly Fire", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "allow", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSetAllowFriendlyFire(FlowContext ctx, FlowNode node) {
         executeLegacy("team_set_allow_friendly_fire", ctx, node);
     }
 
     @DefineNode(id = "team_see_friendly_invisibles", displayName = "See Friendly Invisibles", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "allow", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamSeeFriendlyInvisibles(FlowContext ctx, FlowNode node) {
         executeLegacy("team_see_friendly_invisibles", ctx, node);
     }
 
     @DefineNode(id = "team_add_player", displayName = "Add Player to Team", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamAddPlayer(FlowContext ctx, FlowNode node) {
         executeLegacy("team_add_player", ctx, node);
     }
 
     @DefineNode(id = "team_remove_player", displayName = "Remove Player from Team", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "team_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teamRemovePlayer(FlowContext ctx, FlowNode node) {
         executeLegacy("team_remove_player", ctx, node);
     }

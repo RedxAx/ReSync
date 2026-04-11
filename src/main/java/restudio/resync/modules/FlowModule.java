@@ -1,6 +1,6 @@
 package restudio.resync.modules;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
@@ -67,7 +67,7 @@ public class FlowModule implements Module {
 
     @Override
     public void onSubscribe(Session session, SubscribeRequest req) {
-        Bukkit.getLogger().info("[ReSync] " + session.getClientId() + " subscribed to flow channel.");
+        Log.fine(session.getClientId() + " subscribed to flow channel");
         subscribedSessions.add(session);
     }
 
@@ -117,10 +117,10 @@ public class FlowModule implements Module {
                 case 0x22 -> tabHandler.handleListRequest(session);
                 case 0x23 -> tabHandler.handleDelete(session, buffer);
                 case 0x27 -> placeholderPreviewHandler.handle(session, buffer);
-                default -> Bukkit.getLogger().warning("[ReSync] Unknown packet type: 0x" + String.format("%02X", packetId));
+                default -> Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
             }
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[ReSync] Error handling packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
+            Log.error("Error handling flow packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
             sender.sendError(session, "PROCESSING_ERROR", e.getMessage());
         }
     }

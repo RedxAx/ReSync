@@ -1,6 +1,6 @@
 package restudio.resync.flow.nodes;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -32,7 +32,7 @@ public class EntitySpawnNodes {
         try {
             spawned = location.getWorld().spawnEntity(location, EntityType.valueOf(entityType.toUpperCase()));
         } catch (IllegalArgumentException e) {
-            Bukkit.getLogger().warning("[Flow] Invalid entity type: " + entityType);
+            Log.warn("[Flow] Invalid entity type: " + entityType);
         }
         ctx.setOutput(node, "entity", spawned);
         ctx.triggerOutput("flow");
@@ -64,7 +64,7 @@ public class EntitySpawnNodes {
                     EntityType filterType = EntityType.valueOf(typeFilter.toUpperCase());
                     entities.removeIf(entity -> entity.getType() != filterType);
                 } catch (IllegalArgumentException e) {
-                    Bukkit.getLogger().warning("[Flow] Invalid entity type filter: " + typeFilter);
+                    Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
                 }
             }
         }
@@ -91,7 +91,7 @@ public class EntitySpawnNodes {
                         }
                     }
                 } catch (IllegalArgumentException e) {
-                    Bukkit.getLogger().warning("[Flow] Invalid entity type filter: " + typeFilter);
+                    Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
                 }
             }
         }
@@ -154,7 +154,7 @@ public class EntitySpawnNodes {
                 try {
                     filterType = EntityType.valueOf(typeFilter.toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    Bukkit.getLogger().warning("[Flow] Invalid entity type filter: " + typeFilter);
+                    Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
                 }
             }
             for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {

@@ -3,6 +3,7 @@ package restudio.resync.player;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.bukkit.entity.Player;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 
 import java.io.IOException;
@@ -201,7 +202,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         try {
             Files.createDirectories(dossierDirectory);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to create dossier directory: " + e.getMessage());
+            Log.warn("Failed to create dossier directory: " + e.getMessage());
         }
     }
 
@@ -210,7 +211,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
             stream.filter(path -> path.getFileName().toString().endsWith(".json"))
                 .forEach(this::load);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to load player dossiers: " + e.getMessage());
+            Log.warn("Failed to load player dossiers: " + e.getMessage());
         }
     }
 
@@ -225,7 +226,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
             dossier.setActiveSession(null);
             dossiers.put(UUID.fromString(dossier.getPlayerId()), dossier);
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to load dossier " + path.getFileName() + ": " + e.getMessage());
+            Log.warn("Failed to load dossier " + path.getFileName() + ": " + e.getMessage());
         }
     }
 
@@ -234,7 +235,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
             Path path = dossierDirectory.resolve(dossier.getPlayerId() + ".json");
             Files.writeString(path, gson.toJson(dossier), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            plugin.getLogger().warning("Failed to save dossier " + dossier.getPlayerId() + ": " + e.getMessage());
+            Log.warn("Failed to save dossier " + dossier.getPlayerId() + ": " + e.getMessage());
         }
     }
 

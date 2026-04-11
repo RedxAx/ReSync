@@ -9,6 +9,7 @@ import org.bukkit.scoreboard.RenderType;
 import org.bukkit.scoreboard.Score;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
+import restudio.resync.Log;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
@@ -347,7 +348,7 @@ public class ScoreboardNodes {
             if (definition != null) {
                 showTemplate(player, definition, Boolean.TRUE.equals(usePapi));
             } else {
-                Bukkit.getLogger().warning("[ReSync] Scoreboard definition not found: " + scoreboardId);
+                Log.warn("Scoreboard definition not found: " + scoreboardId);
             }
 
             ctx.triggerOutput("flow");
@@ -456,81 +457,81 @@ public class ScoreboardNodes {
 
     @DefineNode(id = "scoreboard_create", displayName = "Create Objective", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "criteria", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardCreate(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_create", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_delete", displayName = "Delete Objective", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardDelete(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_delete", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_set_display", displayName = "Set Display Slot", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "display_slot", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardSetDisplay(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_set_display", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_set_score", displayName = "Set Score", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "score", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardSetScore(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_set_score", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_add_score", displayName = "Add Score", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardAddScore(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_add_score", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_remove_score", displayName = "Remove Score", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardRemoveScore(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_remove_score", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_reset_score", displayName = "Reset Score", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "score", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardResetScore(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_reset_score", ctx, node);
     }
@@ -553,62 +554,62 @@ public class ScoreboardNodes {
 
     @DefineNode(id = "scoreboard_set_name", displayName = "Set Objective Name", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardSetName(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_set_name", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_set_render_type", displayName = "Set Render Type", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "render_type", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardSetRenderType(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_set_render_type", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_clear", displayName = "Clear Score", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardClear(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_clear", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_show_template", displayName = "Show Scoreboard", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "scoreboard_id", dataType = FlowType.STRING),
                     @FlowPin(name = "use_papi", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardShowTemplate(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_show_template", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_hide_active", displayName = "Hide Scoreboard", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardHideActive(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_hide_active", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_set_sidebar_line", displayName = "Set Sidebar Line", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING),
                     @FlowPin(name = "title", dataType = FlowType.STRING),
@@ -616,18 +617,18 @@ public class ScoreboardNodes {
                     @FlowPin(name = "score", dataType = FlowType.NUMBER),
                     @FlowPin(name = "use_papi", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardSetSidebarLine(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_set_sidebar_line", ctx, node);
     }
 
     @DefineNode(id = "scoreboard_clear_sidebar", displayName = "Clear Sidebar", category = NodeDefinition.NodeCategory.SCOREBOARD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "objective_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void scoreboardClearSidebar(FlowContext ctx, FlowNode node) {
         executeLegacy("scoreboard_clear_sidebar", ctx, node);
     }
@@ -1015,10 +1016,10 @@ public class ScoreboardNodes {
             }).get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            Bukkit.getLogger().warning("[ReSync] Scoreboard task interrupted: " + e.getMessage());
+            Log.warn("Scoreboard task interrupted: " + e.getMessage());
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            Bukkit.getLogger().warning("[ReSync] Scoreboard task failed: " + cause.getMessage());
+            Log.warn("Scoreboard task failed: " + cause.getMessage());
         }
     }
 

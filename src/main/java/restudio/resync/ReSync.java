@@ -6,7 +6,6 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
-import restudio.resync.placeholder.ReSyncPlaceholderExpansion;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
@@ -19,17 +18,19 @@ public class ReSync extends JavaPlugin {
     private static ReSync instance;
     private WebSocketServer wsServer;
     private ReSyncServer server;
-    private ReSyncPlaceholderExpansion placeholderExpansion;
+    private Object placeholderExpansion;
     private InteractiveSelectionManager interactiveSelectionManager;
 
     @Override
     public void onEnable() {
         instance = this;
+        Log.init(getLogger());
 
         ReSyncConfig config = ConfigLoader.load(getDataFolder().toPath().resolve("config.properties").toString());
+        Log.setLevel(config.getLogLevel());
 
         if (!config.isEnabled()) {
-            getLogger().info("ReSync is disabled in config.");
+            Log.info("ReSync is disabled in config");
             return;
         }
 
@@ -99,7 +100,10 @@ public class ReSync extends JavaPlugin {
             interactiveSelectionManager = null;
         }
         if (placeholderExpansion != null) {
-            placeholderExpansion.unregister();
+            try {
+                placeholderExpansion.getClass().getMethod("unregister").invoke(placeholderExpansion);
+            } catch (Exception ignored) {
+            }
             placeholderExpansion = null;
         }
 
@@ -129,14 +133,22 @@ public class ReSync extends JavaPlugin {
 
     private void registerPlaceholderExpansion() {
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            getLogger().info("[ReSync] PlaceholderAPI not found, skipping PAPI hook registration.");
+            Log.fine("PlaceholderAPI not found, skipping PAPI hook");
             return;
         }
-        placeholderExpansion = new ReSyncPlaceholderExpansion(this);
-        if (placeholderExpansion.register()) {
-            getLogger().info("[ReSync] Registered PlaceholderAPI hook: %resync_*%");
-            return;
+        try {
+            Class<?> expansionClass = Class.forName("restudio.resync.placeholder.ReSyncPlaceholderExpansion");
+            placeholderExpansion = expansionClass.getConstructor(ReSync.class).newInstance(this);
+            boolean registered = (boolean) expansionClass.getMethod("register").invoke(placeholderExpansion);
+            if (registered) {
+                Log.info("PlaceholderAPI hook registered");
+            } else {
+                Log.warn("Failed to register PlaceholderAPI hook");
+            }
+        } catch (NoClassDefFoundError e) {
+            Log.fine("PlaceholderAPI classes not available, skipping PAPI hook");
+        } catch (Exception e) {
+            Log.warn("Failed to register PlaceholderAPI hook: " + e.getMessage());
         }
-        getLogger().warning("[ReSync] Failed to register PlaceholderAPI hook.");
     }
 }

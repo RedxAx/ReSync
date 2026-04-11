@@ -25,7 +25,11 @@ public class FlowControlNodes {
 
     @DefineNode(id = "switch_case", displayName = "Switch", category = NodeDefinition.NodeCategory.LOGIC,
             inputs = {@FlowPin(name = "value", dataType = FlowType.ANY), @FlowPin(name = "cases", dataType = FlowType.LIST)},
-            outputs = {@FlowPin(name = "matched", dataType = FlowType.BOOLEAN), @FlowPin(name = "index", dataType = FlowType.NUMBER)})
+            outputs = {
+                    @FlowPin(name = "default", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "matched", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "index", dataType = FlowType.NUMBER)
+            })
     public void switchCase(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Object value = ctx.getInputValue(node, "value", null);
         List<String> cases = ctx.getInputValue(node, "cases", List.class, List.of());
@@ -44,7 +48,7 @@ public class FlowControlNodes {
 
     @DefineNode(id = "branch_random", displayName = "Random Branch", category = NodeDefinition.NodeCategory.LOGIC,
             inputs = {@FlowPin(name = "branches", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "selected", dataType = FlowType.NUMBER)})
+            outputs = {@FlowPin(name = "selected", dataType = FlowType.NUMBER), @FlowPin(name = "branch", type = NodeDefinition.PinType.FLOW)})
     public void branchRandom(FlowContext ctx, restudio.flow.data.FlowNode node) {
         int branches = ctx.getInputValue(node, "branches", Integer.class, 2);
         int selected = (int) (Math.random() * branches);
@@ -52,7 +56,13 @@ public class FlowControlNodes {
         ctx.triggerOutput("branch_" + selected);
     }
 
-    @DefineNode(id = "branch_all", displayName = "Branch All", category = NodeDefinition.NodeCategory.LOGIC)
+    @DefineNode(id = "branch_all", displayName = "Branch All", category = NodeDefinition.NodeCategory.LOGIC,
+            outputs = {
+                    @FlowPin(name = "branch_0", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "branch_1", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "branch_2", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "branch_3", type = NodeDefinition.PinType.FLOW)
+            })
     public void branchAll(FlowContext ctx, restudio.flow.data.FlowNode node) {
         ctx.triggerOutput("branch_0");
         ctx.triggerOutput("branch_1");
@@ -62,7 +72,11 @@ public class FlowControlNodes {
 
     @DefineNode(id = "loop_count", displayName = "Loop Count", category = NodeDefinition.NodeCategory.LOGIC,
             inputs = {@FlowPin(name = "count", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "index", dataType = FlowType.NUMBER), @FlowPin(name = "completed", dataType = FlowType.BOOLEAN)})
+            outputs = {
+                    @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "index", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "completed", type = NodeDefinition.PinType.FLOW, dataType = FlowType.BOOLEAN)
+            })
     public void loopCount(FlowContext ctx, restudio.flow.data.FlowNode node) {
         int count = ctx.getInputValue(node, "count", Integer.class, 1);
         ctx.getRuntime().resetLoopControl();
@@ -85,7 +99,12 @@ public class FlowControlNodes {
 
     @DefineNode(id = "loop_for_each", displayName = "For Each", category = NodeDefinition.NodeCategory.LOGIC,
             inputs = {@FlowPin(name = "list", dataType = FlowType.LIST)},
-            outputs = {@FlowPin(name = "index", dataType = FlowType.NUMBER), @FlowPin(name = "element", dataType = FlowType.ANY), @FlowPin(name = "completed", dataType = FlowType.BOOLEAN)})
+            outputs = {
+                    @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "index", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "element", dataType = FlowType.ANY),
+                    @FlowPin(name = "completed", type = NodeDefinition.PinType.FLOW, dataType = FlowType.BOOLEAN)
+            })
     public void loopForEach(FlowContext ctx, restudio.flow.data.FlowNode node) {
         List<?> list = ctx.getInputValue(node, "list", List.class, List.of());
         ctx.getRuntime().resetLoopControl();
@@ -116,7 +135,12 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "loop_for_each_player", displayName = "For Each Player", category = NodeDefinition.NodeCategory.LOGIC,
-            outputs = {@FlowPin(name = "index", dataType = FlowType.NUMBER), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "completed", dataType = FlowType.BOOLEAN)})
+            outputs = {
+                    @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "index", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "completed", type = NodeDefinition.PinType.FLOW, dataType = FlowType.BOOLEAN)
+            })
     public void loopForEachPlayer(FlowContext ctx, restudio.flow.data.FlowNode node) {
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
         ctx.getRuntime().resetLoopControl();
@@ -148,7 +172,12 @@ public class FlowControlNodes {
 
     @DefineNode(id = "loop_for_each_entity", displayName = "For Each Entity", category = NodeDefinition.NodeCategory.LOGIC,
             inputs = {@FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "center", dataType = FlowType.LOCATION)},
-            outputs = {@FlowPin(name = "index", dataType = FlowType.NUMBER), @FlowPin(name = "entity", dataType = FlowType.ENTITY), @FlowPin(name = "completed", dataType = FlowType.BOOLEAN)})
+            outputs = {
+                    @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "index", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
+                    @FlowPin(name = "completed", type = NodeDefinition.PinType.FLOW, dataType = FlowType.BOOLEAN)
+            })
     public void loopForEachEntity(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
         org.bukkit.Location center = ctx.getInputValue(node, "center", org.bukkit.Location.class,

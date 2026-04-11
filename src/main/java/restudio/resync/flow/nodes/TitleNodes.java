@@ -158,7 +158,7 @@ public class TitleNodes {
         displayName = "Send Title",
         category = NodeDefinition.NodeCategory.VISUAL,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "title", dataType = FlowType.STRING),
             @FlowPin(name = "subtitle", dataType = FlowType.STRING),
@@ -167,7 +167,7 @@ public class TitleNodes {
             @FlowPin(name = "fade_out", dataType = FlowType.NUMBER)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void titleSend(FlowContext ctx, FlowNode node) {
@@ -179,11 +179,11 @@ public class TitleNodes {
         displayName = "Clear Title",
         category = NodeDefinition.NodeCategory.VISUAL,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void titleClear(FlowContext ctx, FlowNode node) {
@@ -195,13 +195,13 @@ public class TitleNodes {
         displayName = "Show Action Bar",
         category = NodeDefinition.NodeCategory.VISUAL,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "text", dataType = FlowType.STRING),
             @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void titleActionBar(FlowContext ctx, FlowNode node) {
@@ -213,14 +213,14 @@ public class TitleNodes {
         displayName = "Set Title Times",
         category = NodeDefinition.NodeCategory.VISUAL,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "fade_in", dataType = FlowType.NUMBER),
             @FlowPin(name = "stay", dataType = FlowType.NUMBER),
             @FlowPin(name = "fade_out", dataType = FlowType.NUMBER)
         },
         outputs = {
             @FlowPin(name = "times", dataType = FlowType.ANY),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void titleTimes(FlowContext ctx, FlowNode node) {
@@ -232,7 +232,7 @@ public class TitleNodes {
         displayName = "Send Subtitle",
         category = NodeDefinition.NodeCategory.VISUAL,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "subtitle", dataType = FlowType.STRING),
             @FlowPin(name = "fade_in", dataType = FlowType.NUMBER),
@@ -240,7 +240,7 @@ public class TitleNodes {
             @FlowPin(name = "fade_out", dataType = FlowType.NUMBER)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void titleSubtitle(FlowContext ctx, FlowNode node) {

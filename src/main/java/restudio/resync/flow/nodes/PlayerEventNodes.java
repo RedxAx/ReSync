@@ -413,7 +413,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:move", displayName = "On Player Move", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "from_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "to_location", dataType = FlowType.LOCATION),
@@ -425,7 +425,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:interact", displayName = "On Player Interact", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "clicked_block", dataType = FlowType.ANY),
                     @FlowPin(name = "clicked_entity", dataType = FlowType.ENTITY),
@@ -437,7 +437,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:entity_interact", displayName = "On Entity Interact", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             })
@@ -447,7 +447,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:entity_damage", displayName = "On Entity Damage", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "damager", dataType = FlowType.ENTITY),
                     @FlowPin(name = "victim", dataType = FlowType.ENTITY),
@@ -459,7 +459,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:shoot", displayName = "On Projectile Shoot", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "projectile", dataType = FlowType.ENTITY)
             })
@@ -469,7 +469,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:projectile_hit", displayName = "On Projectile Hit", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "projectile", dataType = FlowType.ENTITY),
                     @FlowPin(name = "hit_entity", dataType = FlowType.ENTITY)
@@ -480,7 +480,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:pickup", displayName = "On Item Pickup", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             })
@@ -490,7 +490,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:drop", displayName = "On Item Drop", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             })
@@ -500,7 +500,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:consume", displayName = "On Item Consume", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             })
@@ -510,7 +510,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:craft", displayName = "On Item Craft", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "result", dataType = FlowType.ITEMSTACK)
             })
@@ -520,7 +520,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:smelt", displayName = "On Item Smelt", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "result", dataType = FlowType.ITEMSTACK)
             })
@@ -530,7 +530,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:enchant", displayName = "On Item Enchant", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "enchantment", dataType = FlowType.STRING),
@@ -542,7 +542,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:bed_enter", displayName = "On Bed Enter", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "bed_location", dataType = FlowType.LOCATION)
             })
@@ -552,7 +552,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:bed_leave", displayName = "On Bed Leave", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "bed_location", dataType = FlowType.LOCATION)
             })
@@ -562,7 +562,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:respawn", displayName = "On Player Respawn", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "respawn_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "death_location", dataType = FlowType.LOCATION)
@@ -573,7 +573,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:level_up", displayName = "On Level Up", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "old_level", dataType = FlowType.NUMBER),
                     @FlowPin(name = "new_level", dataType = FlowType.NUMBER)
@@ -584,7 +584,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:resync_command", displayName = "On ReSync Command Execute", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "bound_command", dataType = FlowType.STRING),
                     @FlowPin(name = "command_label", dataType = FlowType.STRING),
@@ -599,7 +599,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:command", displayName = "On Player Command", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "bound_command", dataType = FlowType.STRING),
                     @FlowPin(name = "command_label", dataType = FlowType.STRING),
@@ -614,7 +614,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:tab_complete", displayName = "On Tab Complete", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "command", dataType = FlowType.STRING),
                     @FlowPin(name = "completions", dataType = FlowType.STRING)
@@ -625,7 +625,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:teleport", displayName = "On Player Teleport", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "from_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "to_location", dataType = FlowType.LOCATION),
@@ -637,7 +637,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:gamemode_change", displayName = "On Gamemode Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "old_gamemode", dataType = FlowType.STRING),
                     @FlowPin(name = "new_gamemode", dataType = FlowType.STRING)
@@ -648,7 +648,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:flight_toggle", displayName = "On Flight Toggle", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "is_flying", dataType = FlowType.BOOLEAN)
             })
@@ -658,7 +658,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:vanish_toggle", displayName = "On Vanish Toggle", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "is_vanished", dataType = FlowType.BOOLEAN)
             })
@@ -668,7 +668,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:fish", displayName = "On Player Fish", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "state", dataType = FlowType.STRING),
                     @FlowPin(name = "caught", dataType = FlowType.ENTITY)
@@ -679,7 +679,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:shear", displayName = "On Entity Shear", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             })
@@ -689,7 +689,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:item_damage", displayName = "On Item Damage", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "damage", dataType = FlowType.NUMBER)
@@ -700,7 +700,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:item_break", displayName = "On Item Break", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "broken_item", dataType = FlowType.ITEMSTACK)
             })
@@ -710,7 +710,7 @@ public class PlayerEventNodes {
 
     @DefineNode(id = "event:exp_change", displayName = "On Experience Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             })

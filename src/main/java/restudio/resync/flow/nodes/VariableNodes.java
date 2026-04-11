@@ -332,7 +332,7 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_access", displayName = "Variable", category = NodeDefinition.NodeCategory.VARIABLE, priority = -10,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "mode", dataType = FlowType.STRING),
                     @FlowPin(name = "scope", dataType = FlowType.STRING),
                     @FlowPin(name = "persist", dataType = FlowType.BOOLEAN),
@@ -342,7 +342,7 @@ public class VariableNodes {
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "value", dataType = FlowType.ANY),
                     @FlowPin(name = "exists", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "variables", dataType = FlowType.LIST)
@@ -353,45 +353,45 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_set_global", displayName = "Set Global Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableSetGlobal(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_set_global", ctx, node);
     }
 
     @DefineNode(id = "variable_set_local", displayName = "Set Local Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableSetLocal(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_set_local", ctx, node);
     }
 
     @DefineNode(id = "variable_set_player", displayName = "Set Player Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableSetPlayer(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_set_player", ctx, node);
     }
 
     @DefineNode(id = "variable_get_global", displayName = "Get Global Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             })
     public void variableGetGlobal(FlowContext ctx, FlowNode node) {
@@ -400,11 +400,11 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_get_local", displayName = "Get Local Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             })
     public void variableGetLocal(FlowContext ctx, FlowNode node) {
@@ -413,12 +413,12 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_get_player", displayName = "Get Player Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             })
     public void variableGetPlayer(FlowContext ctx, FlowNode node) {
@@ -427,23 +427,23 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_delete", displayName = "Delete Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableDelete(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_delete", ctx, node);
     }
 
     @DefineNode(id = "variable_exists", displayName = "Variable Exists", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "exists", dataType = FlowType.BOOLEAN)
             })
     public void variableExists(FlowContext ctx, FlowNode node) {
@@ -452,11 +452,11 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_list_all", displayName = "List All Variables", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "variables", dataType = FlowType.LIST)
             })
     public void variableListAll(FlowContext ctx, FlowNode node) {
@@ -465,48 +465,48 @@ public class VariableNodes {
 
     @DefineNode(id = "variable_increment", displayName = "Increment Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableIncrement(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_increment", ctx, node);
     }
 
     @DefineNode(id = "variable_decrement", displayName = "Decrement Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableDecrement(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_decrement", ctx, node);
     }
 
     @DefineNode(id = "variable_multiply", displayName = "Multiply Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableMultiply(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_multiply", ctx, node);
     }
 
     @DefineNode(id = "variable_divide", displayName = "Divide Variable", category = NodeDefinition.NodeCategory.VARIABLE, hidden = true,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER),
                     @FlowPin(name = "scope", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void variableDivide(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_divide", ctx, node);
     }

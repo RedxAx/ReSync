@@ -1,7 +1,7 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
@@ -140,7 +140,7 @@ public class FlowPacketSender {
         buffer.putInt(errorBytes.length);
         buffer.put(errorBytes);
         sendRaw(session, buffer.array(), false);
-        Bukkit.getLogger().warning("[ReSync] Sending error to client " + session.getClientId() + ": " + errorCode + " - " + message);
+        Log.warn("Error sent to " + session.getClientId() + ": " + errorCode + " - " + message);
     }
 
     private void sendJsonPacket(Session session, byte packetId, String json, String errorCode, String errorMessage) {

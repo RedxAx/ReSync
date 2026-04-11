@@ -1,6 +1,7 @@
 package restudio.resync.queue;
 
 import org.bukkit.Bukkit;
+import restudio.resync.Log;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -129,7 +130,7 @@ public class RequestQueue {
             activeRequests.incrementAndGet();
             request.getTask().run();
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.warn("Request execution failed: " + e.getMessage());
         } finally {
             long duration = System.currentTimeMillis() - startTime;
             request.setExecutionTime(duration);

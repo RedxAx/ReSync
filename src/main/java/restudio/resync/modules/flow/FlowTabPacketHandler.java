@@ -1,6 +1,6 @@
 package restudio.resync.modules.flow;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
@@ -59,7 +59,7 @@ public class FlowTabPacketHandler {
             }
             storage.saveTab(tab);
             TabListService.refreshActiveTabs(storage, tab.getId());
-            Bukkit.getLogger().info("[ReSync] Saved tab " + tab.getId() + " from client " + session.getClientId());
+            Log.fine("Tab saved: " + tab.getId());
             sender.sendTabSaveAck(session, tab.getId());
         } catch (Exception e) {
             sender.sendError(session, "SAVE_FAILED", "Failed to save tab: " + e.getMessage());
@@ -79,7 +79,7 @@ public class FlowTabPacketHandler {
         if (defaultId != null && defaultId.equalsIgnoreCase(tabId)) {
             storage.clearDefaultTab();
         }
-        Bukkit.getLogger().info("[ReSync] Deleted tab " + tabId + " from client " + session.getClientId());
+        Log.fine("Tab deleted: " + tabId);
     }
 
     public void handleListRequest(Session session) {

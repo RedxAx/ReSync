@@ -41,11 +41,10 @@ import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.generator.ChunkGenerator;
-import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
-import net.milkbowl.vault.economy.Economy;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.player.PlayerTrackingService;
 
@@ -87,7 +86,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private final Map<UUID, Long> facetUpdates = new ConcurrentHashMap<>();
     private volatile Map<String, List<WorldPortal>> portalIndex = Map.of();
     private volatile BukkitTask lockTask;
-    private volatile Economy economy;
+    private volatile Object economy;
 
     public WorldManagementManager(ReSync plugin, PlayerTrackingService trackingService) {
         this.plugin = plugin;
@@ -2052,24 +2051,47 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null || profile == null || !profile.isEntryFeeEnabled() || profile.getEntryFee() <= 0.0) {
             return true;
         }
-        Economy resolvedEconomy = getEconomy();
+        Object resolvedEconomy = getEconomy();
         if (resolvedEconomy == null) {
             return true;
         }
-        if (resolvedEconomy.getBalance(player) < profile.getEntryFee()) {
+        if (getBalance(resolvedEconomy, player) < profile.getEntryFee()) {
             publishMessage(WorldChannelMessage.error("worldEntryFee", "InsufficientFunds:" + worldName));
             sendPlayerMessage(player, profile.getDenyMessage(), worldName, "Insufficient Funds");
             return false;
         }
-        return resolvedEconomy.withdrawPlayer(player, profile.getEntryFee()).transactionSuccess();
+        return withdrawPlayer(resolvedEconomy, player, profile.getEntryFee());
     }
 
-    private Economy getEconomy() {
+    private Object getEconomy() {
         if (economy == null) {
-            RegisteredServiceProvider<Economy> registration = Bukkit.getServicesManager().getRegistration(Economy.class);
-            economy = registration == null ? null : registration.getProvider();
+            try {
+                Class<?> economyClass = Class.forName("net.milkbowl.vault.economy.Economy");
+                var registration = Bukkit.getServicesManager().getRegistration(economyClass);
+                economy = registration == null ? null : registration.getProvider();
+            } catch (ClassNotFoundException e) {
+                economy = null;
+            }
         }
         return economy;
+    }
+
+    private double getBalance(Object eco, Player player) {
+        try {
+            return (double) eco.getClass().getMethod("getBalance", Player.class).invoke(eco, player);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private boolean withdrawPlayer(Object eco, Player player, double amount) {
+        try {
+            Object response = eco.getClass().getMethod("withdrawPlayer", Player.class, double.class).invoke(eco, player, amount);
+            return (boolean) response.getClass().getMethod("transactionSuccess").invoke(response);
+        } catch (Exception e) {
+            Log.warn("[World] Economy withdraw failed: " + e.getMessage());
+            return false;
+        }
     }
 
     private Location resolveProfileSpawn(World world, WorldProfileSettings profile) {
@@ -2508,16 +2530,16 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null || portal == null || !portal.isUsageFeeEnabled() || portal.getUsageFee() <= 0.0) {
             return true;
         }
-        Economy resolvedEconomy = getEconomy();
+        Object resolvedEconomy = getEconomy();
         if (resolvedEconomy == null) {
             return true;
         }
-        if (resolvedEconomy.getBalance(player) < portal.getUsageFee()) {
+        if (getBalance(resolvedEconomy, player) < portal.getUsageFee()) {
             publishMessage(WorldChannelMessage.error("portalFee", "InsufficientFunds:" + portal.getPortalId()));
             sendPlayerMessage(player, null, portal.getDestinationWorld(), "Insufficient Funds");
             return false;
         }
-        boolean success = resolvedEconomy.withdrawPlayer(player, portal.getUsageFee()).transactionSuccess();
+        boolean success = withdrawPlayer(resolvedEconomy, player, portal.getUsageFee());
         if (!success) {
             publishMessage(WorldChannelMessage.error("portalFee", "WithdrawFailed:" + portal.getPortalId()));
             sendPlayerMessage(player, null, portal.getDestinationWorld(), "Portal Fee Failed");

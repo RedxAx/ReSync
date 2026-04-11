@@ -3,6 +3,7 @@ package restudio.resync.flow;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 
 import java.io.IOException;
@@ -102,7 +103,7 @@ public class PersistentVariableStore {
                         variables.putAll(data);
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.warn("Failed to load persistent variables: " + e.getMessage());
                 }
             }
             loaded = true;
@@ -117,7 +118,7 @@ public class PersistentVariableStore {
             String json = GSON.toJson(variables);
             Files.writeString(filePath, json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save persistent variables: " + e.getMessage());
         }
     }
 

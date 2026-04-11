@@ -3,6 +3,7 @@ package restudio.resync.flow.nodes;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import restudio.resync.Log;
 import org.bukkit.Bukkit;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
@@ -49,7 +50,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP GET error: " + e.getMessage());
+                    Log.error("[Flow] HTTP GET error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -73,7 +74,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP POST error: " + e.getMessage());
+                    Log.error("[Flow] HTTP POST error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -97,7 +98,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP PUT error: " + e.getMessage());
+                    Log.error("[Flow] HTTP PUT error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -120,7 +121,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP DELETE error: " + e.getMessage());
+                    Log.error("[Flow] HTTP DELETE error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -144,7 +145,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP PATCH error: " + e.getMessage());
+                    Log.error("[Flow] HTTP PATCH error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -177,7 +178,7 @@ public class HttpNodes implements NodeCategory {
                         ctx.triggerOutput("flow");
                     });
                 } catch (Exception e) {
-                    Bukkit.getLogger().severe("[Flow] HTTP REQUEST error: " + e.getMessage());
+                    Log.error("[Flow] HTTP REQUEST error: " + e.getMessage());
                     String nodeId = findNodeId(ctx, node);
                     ctx.runSync(() -> {
                         ctx.setNodeOutput(nodeId, "response", createErrorResponse(e.getMessage()));
@@ -397,7 +398,7 @@ public class HttpNodes implements NodeCategory {
                 sb.append("=");
                 sb.append(URLEncoder.encode(entry.getValue() != null ? entry.getValue().toString() : "", StandardCharsets.UTF_8));
             } catch (Exception e) {
-                Bukkit.getLogger().warning("[Flow] Failed to encode query parameter: " + e.getMessage());
+                Log.warn("[Flow] Failed to encode query parameter: " + e.getMessage());
             }
             first = false;
         }

@@ -3,6 +3,7 @@ package restudio.resync.server;
 import org.bukkit.Bukkit;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.compression.CompressionPool;
 import restudio.resync.core.ChannelMuxer;
@@ -122,7 +123,7 @@ public class ReSyncServer {
 
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         connectionManager.createConnection(conn);
-        Bukkit.getLogger().info("[ReSync] Client connected: " + conn.getRemoteSocketAddress());
+        Log.fine("Client connected: " + conn.getRemoteSocketAddress());
     }
 
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
@@ -132,7 +133,7 @@ public class ReSyncServer {
         }
         sessionManager.removeSession(conn);
         connectionManager.removeConnection(conn);
-        Bukkit.getLogger().info("[ReSync] Client disconnected: " + conn.getRemoteSocketAddress());
+        Log.fine("Client disconnected: " + conn.getRemoteSocketAddress());
     }
 
     public void onMessage(WebSocket conn, ByteBuffer message) {
@@ -150,8 +151,7 @@ public class ReSyncServer {
             Message payload = codec.decodePayload(frame);
             handlePayload(conn, info, payload, frame.header);
         } catch (Exception e) {
-            Bukkit.getLogger().warning("[ReSync] Error handling message: " + e.getMessage());
-            e.printStackTrace();
+            Log.warn("Error handling message: " + e.getMessage());
         }
     }
 
@@ -162,7 +162,7 @@ public class ReSyncServer {
             case UNSUBSCRIBE -> handleUnsubscribe(info, (UnsubscribeRequest) payload);
             case DATA -> handleData(info, (DataMessage) payload);
             case HEARTBEAT -> handleHeartbeat(info, (Heartbeat) payload);
-            default -> Bukkit.getLogger().warning("[ReSync] Unhandled message type: " + payload.getType());
+            default -> Log.warn("Unhandled message type: " + payload.getType());
         }
     }
 
@@ -196,7 +196,7 @@ public class ReSyncServer {
         response.setSupportedTileSizes(new int[]{32, 64, 128, 256});
 
         codec.sendMessage(conn, response, 0, false);
-        Bukkit.getLogger().info("[ReSync] Client authenticated: " + req.getClientId());
+        Log.info("Client authenticated: " + req.getClientId());
     }
 
     private void handleSubscribe(WebSocket conn, ConnectionInfo info, SubscribeRequest req) {
@@ -220,7 +220,7 @@ public class ReSyncServer {
         if (channel != null) {
             channel.incrementSubscribers();
         }
-        Bukkit.getLogger().info("[ReSync] Client " + session.getClientId() + " subscribed to " + req.getChannelId());
+        Log.fine(session.getClientId() + " subscribed to " + req.getChannelId());
     }
 
     private void handleUnsubscribe(ConnectionInfo info, UnsubscribeRequest req) {

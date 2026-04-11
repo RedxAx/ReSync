@@ -348,7 +348,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_redstone", displayName = "On Redstone Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "old_power", dataType = FlowType.NUMBER),
@@ -360,7 +360,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:physics", displayName = "On Block Physics", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             })
@@ -370,7 +370,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:explosion", displayName = "On Explosion", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "power", dataType = FlowType.NUMBER),
                     @FlowPin(name = "break_blocks", dataType = FlowType.BOOLEAN),
@@ -384,7 +384,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:grow", displayName = "On Block Grow", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "new_state", dataType = FlowType.ANY)
@@ -395,7 +395,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_from_to", displayName = "On Block From To", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "from_block", dataType = FlowType.ANY),
                     @FlowPin(name = "to_block", dataType = FlowType.ANY),
                     @FlowPin(name = "from_location", dataType = FlowType.LOCATION),
@@ -407,7 +407,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:structure_spawn", displayName = "On Structure Spawn", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "structure_type", dataType = FlowType.STRING),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING)
@@ -418,7 +418,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:world_save", displayName = "On World Save", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING)
             })
     public void onWorldSave(FlowContext ctx, FlowNode node) {
@@ -427,7 +427,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:weather_change", displayName = "On Weather Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "old_weather", dataType = FlowType.STRING),
                     @FlowPin(name = "new_weather", dataType = FlowType.STRING)
@@ -438,7 +438,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:time_change", displayName = "On Time Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "old_time", dataType = FlowType.NUMBER),
                     @FlowPin(name = "new_time", dataType = FlowType.NUMBER)
@@ -449,7 +449,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_break", displayName = "On Block Break", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             })
@@ -459,7 +459,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_place", displayName = "On Block Place", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "placed_against", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
@@ -471,7 +471,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_dispense", displayName = "On Block Dispense", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
@@ -482,7 +482,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_fade", displayName = "On Block Fade", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "new_state", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -493,7 +493,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_form", displayName = "On Block Form", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "new_state", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -504,7 +504,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:block_spread", displayName = "On Block Spread", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "new_block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -515,7 +515,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:lightning_strike", displayName = "On Lightning Strike", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "struck_entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING)
@@ -526,7 +526,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:leaf_decay", displayName = "On Leaf Decay", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             })
@@ -536,7 +536,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:sign_change", displayName = "On Sign Change", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "lines", dataType = FlowType.LIST)
@@ -547,7 +547,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:furnace_smelt", displayName = "On Furnace Smelt", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "furnace", dataType = FlowType.ANY),
                     @FlowPin(name = "result", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -558,7 +558,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:inventory_open", displayName = "On Inventory Open", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "inventory_title", dataType = FlowType.STRING),
                     @FlowPin(name = "inventory_type", dataType = FlowType.STRING),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -569,7 +569,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:inventory_close", displayName = "On Inventory Close", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "inventory_title", dataType = FlowType.STRING),
                     @FlowPin(name = "inventory_type", dataType = FlowType.STRING),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
@@ -580,7 +580,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:note_play", displayName = "On Note Play", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "instrument", dataType = FlowType.NUMBER),
@@ -592,7 +592,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:piston_extend", displayName = "On Piston Extend", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "length", dataType = FlowType.NUMBER)
@@ -603,7 +603,7 @@ public class WorldEventNodes {
 
     @DefineNode(id = "event:piston_retract", displayName = "On Piston Retract", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
-                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             })

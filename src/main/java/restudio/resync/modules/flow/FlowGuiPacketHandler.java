@@ -1,6 +1,6 @@
 package restudio.resync.modules.flow;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.resync.core.Session;
@@ -57,7 +57,7 @@ public class FlowGuiPacketHandler {
                 return;
             }
             storage.saveGui(gui);
-            Bukkit.getLogger().info("[ReSync] Saved GUI " + gui.getId() + " from client " + session.getClientId());
+            Log.fine("GUI saved: " + gui.getId());
             sender.sendGuiSaveAck(session, gui.getId());
         } catch (Exception e) {
             sender.sendError(session, "SAVE_FAILED", "Failed to save GUI: " + e.getMessage());
@@ -72,7 +72,7 @@ public class FlowGuiPacketHandler {
         buffer.get(idBytes);
         String guiId = new String(idBytes, StandardCharsets.UTF_8);
         storage.deleteGui(guiId);
-        Bukkit.getLogger().info("[ReSync] Deleted GUI " + guiId + " from client " + session.getClientId());
+        Log.fine("GUI deleted: " + guiId);
     }
 
     public void handleListRequest(Session session) {

@@ -1,7 +1,7 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -50,7 +50,7 @@ public class FlowNodeRegistryPacketHandler {
                 request = gson.fromJson(json, NodeRegistryRequest.class);
             }
         } catch (Exception e) {
-            Bukkit.getLogger().warning("[ReSync] Failed to parse node registry request: " + e.getMessage());
+            Log.warn("Failed to parse node registry request: " + e.getMessage());
         }
         sender.sendNodeRegistrySnapshot(session, buildSnapshot(request));
     }

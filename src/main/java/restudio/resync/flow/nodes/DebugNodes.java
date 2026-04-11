@@ -1,6 +1,6 @@
 package restudio.resync.flow.nodes;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
@@ -27,9 +27,9 @@ public class DebugNodes {
         String level = ctx.getInputValue(node, "level", String.class, "INFO");
 
         switch (level.toUpperCase()) {
-            case "WARN" -> Bukkit.getLogger().warning("[Flow Debug] " + message);
-            case "ERROR" -> Bukkit.getLogger().severe("[Flow Debug] " + message);
-            default -> Bukkit.getLogger().info("[Flow Debug] " + message);
+            case "WARN" -> Log.warn("[Flow:Debug] " + message);
+            case "ERROR" -> Log.error("[Flow:Debug] " + message);
+            default -> Log.info("[Flow:Debug] " + message);
         }
 
         ctx.triggerOutput("flow");
@@ -45,7 +45,7 @@ public class DebugNodes {
         String variableName = ctx.getInputValue(node, "variable_name", String.class, "");
         Object value = ctx.getVariable(variableName);
 
-        Bukkit.getLogger().info("[Flow Debug] Variable '" + variableName + "' = " +
+        Log.info("[Flow:Debug] Variable '" + variableName + "' = " +
                 (value != null ? value : "null") +
                 " (" + (value != null ? value.getClass().getSimpleName() : "null") + ")");
 
@@ -68,17 +68,17 @@ public class DebugNodes {
             for (Map.Entry<String, Object> entry : globals.entrySet()) {
                 variableInfo.add(entry.getKey() + " = " + (entry.getValue() != null ? entry.getValue() : "null"));
             }
-            Bukkit.getLogger().info("[Flow Debug] Global Variables (" + globals.size() + "):");
+            Log.info("[Flow:Debug] Global Variables (" + globals.size() + "):");
         } else {
             Map<String, Object> locals = ctx.getLocalVariables();
             for (Map.Entry<String, Object> entry : locals.entrySet()) {
                 variableInfo.add(entry.getKey() + " = " + (entry.getValue() != null ? entry.getValue() : "null"));
             }
-            Bukkit.getLogger().info("[Flow Debug] Local Variables (" + locals.size() + "):");
+            Log.info("[Flow:Debug] Local Variables (" + locals.size() + "):");
         }
 
         for (String info : variableInfo) {
-            Bukkit.getLogger().info("  " + info);
+            Log.info("[Flow:Debug]   " + info);
         }
 
         ctx.setOutput(node, "variables", variableInfo);
@@ -94,11 +94,11 @@ public class DebugNodes {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         List<String> stackList = new ArrayList<>();
 
-        Bukkit.getLogger().info("[Flow Debug] Execution Stack:");
+        Log.info("[Flow:Debug] Execution Stack:");
         for (int i = 1; i < Math.min(stackTrace.length, 20); i++) {
             String trace = stackTrace[i].toString();
             stackList.add(trace);
-            Bukkit.getLogger().info("  " + trace);
+            Log.info("[Flow:Debug]   " + trace);
         }
 
         ctx.setOutput(node, "stack_trace", String.join("\n", stackList));
@@ -109,7 +109,7 @@ public class DebugNodes {
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void debugBreak(FlowContext ctx, FlowNode node) {
         if (debugMode) {
-            Bukkit.getLogger().warning("[Flow Debug] BREAKPOINT HIT - Execution paused");
+            Log.warn("[Flow:Debug] BREAKPOINT HIT");
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -125,6 +125,6 @@ public class DebugNodes {
 
     public static void setDebugMode(boolean enabled) {
         debugMode = enabled;
-        Bukkit.getLogger().info("[Flow] Debug mode " + (enabled ? "enabled" : "disabled"));
+        Log.info("[Flow] Debug mode " + (enabled ? "enabled" : "disabled"));
     }
 }

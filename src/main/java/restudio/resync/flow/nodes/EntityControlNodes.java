@@ -1,6 +1,7 @@
 package restudio.resync.flow.nodes;
 
 import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import org.bukkit.DyeColor;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
@@ -52,7 +53,7 @@ public class EntityControlNodes {
                     loc.getWorld().spawnEntity(loc, newType);
                 }
             } catch (IllegalArgumentException e) {
-                Bukkit.getLogger().warning("[Flow] Invalid entity type: " + entityType);
+                Log.warn("[Flow] Invalid entity type: " + entityType);
             }
         }
         ctx.triggerOutput("flow");
@@ -489,7 +490,7 @@ public class EntityControlNodes {
                 } catch (Exception ignored) {
                 }
             } catch (IllegalArgumentException e) {
-                Bukkit.getLogger().warning("[Flow] Invalid dye color: " + colorName);
+                Log.warn("[Flow] Invalid dye color: " + colorName);
             }
         }
         ctx.triggerOutput("flow");

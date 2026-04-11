@@ -663,210 +663,210 @@ public class ItemCreationNodes {
 
     @DefineNode(id = "item_create", displayName = "Create Item", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "material", dataType = FlowType.STRING),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemCreate(FlowContext ctx, FlowNode node) { executeLegacy("item_create", ctx, node); }
 
     @DefineNode(id = "item_set_material", displayName = "Set Material", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "material", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetMaterial(FlowContext ctx, FlowNode node) { executeLegacy("item_set_material", ctx, node); }
 
     @DefineNode(id = "item_set_amount", displayName = "Set Amount", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "amount", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetAmount(FlowContext ctx, FlowNode node) { executeLegacy("item_set_amount", ctx, node); }
 
     @DefineNode(id = "item_set_damage", displayName = "Set Damage", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "damage", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetDamage(FlowContext ctx, FlowNode node) { executeLegacy("item_set_damage", ctx, node); }
 
     @DefineNode(id = "item_set_max_damage", displayName = "Set Max Damage", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "max_damage", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetMaxDamage(FlowContext ctx, FlowNode node) { executeLegacy("item_set_max_damage", ctx, node); }
 
     @DefineNode(id = "item_set_unbreakable", displayName = "Set Unbreakable", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "unbreakable", dataType = FlowType.BOOLEAN)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetUnbreakable(FlowContext ctx, FlowNode node) { executeLegacy("item_set_unbreakable", ctx, node); }
 
     @DefineNode(id = "item_set_custom_name", displayName = "Set Custom Name", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetCustomName(FlowContext ctx, FlowNode node) { executeLegacy("item_set_custom_name", ctx, node); }
 
     @DefineNode(id = "item_set_lore", displayName = "Set Lore", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "lore", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetLore(FlowContext ctx, FlowNode node) { executeLegacy("item_set_lore", ctx, node); }
 
     @DefineNode(id = "item_add_lore", displayName = "Add Lore", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "lore", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemAddLore(FlowContext ctx, FlowNode node) { executeLegacy("item_add_lore", ctx, node); }
 
     @DefineNode(id = "item_clear_lore", displayName = "Clear Lore", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemClearLore(FlowContext ctx, FlowNode node) { executeLegacy("item_clear_lore", ctx, node); }
 
     @DefineNode(id = "item_set_flags", displayName = "Set Flags", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "flags", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetFlags(FlowContext ctx, FlowNode node) { executeLegacy("item_set_flags", ctx, node); }
 
     @DefineNode(id = "item_add_flag", displayName = "Add Flag", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "flag", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemAddFlag(FlowContext ctx, FlowNode node) { executeLegacy("item_add_flag", ctx, node); }
 
     @DefineNode(id = "item_remove_flag", displayName = "Remove Flag", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "flag", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemRemoveFlag(FlowContext ctx, FlowNode node) { executeLegacy("item_remove_flag", ctx, node); }
 
     @DefineNode(id = "item_add_enchant", displayName = "Add Enchant", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "enchantment", dataType = FlowType.STRING),
                     @FlowPin(name = "level", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemAddEnchant(FlowContext ctx, FlowNode node) { executeLegacy("item_add_enchant", ctx, node); }
 
     @DefineNode(id = "item_remove_enchant", displayName = "Remove Enchant", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "enchantment", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemRemoveEnchant(FlowContext ctx, FlowNode node) { executeLegacy("item_remove_enchant", ctx, node); }
 
     @DefineNode(id = "item_clear_enchants", displayName = "Clear Enchants", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemClearEnchants(FlowContext ctx, FlowNode node) { executeLegacy("item_clear_enchants", ctx, node); }
 
     @DefineNode(id = "item_set_custom_model", displayName = "Set Custom Model", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "model_data", dataType = FlowType.NUMBER)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetCustomModel(FlowContext ctx, FlowNode node) { executeLegacy("item_set_custom_model", ctx, node); }
 
     @DefineNode(id = "item_set_color", displayName = "Set Color", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "red", dataType = FlowType.NUMBER),
                     @FlowPin(name = "green", dataType = FlowType.NUMBER),
@@ -874,25 +874,25 @@ public class ItemCreationNodes {
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetColor(FlowContext ctx, FlowNode node) { executeLegacy("item_set_color", ctx, node); }
 
     @DefineNode(id = "item_set_skull_owner", displayName = "Set Skull Owner", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "owner", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetSkullOwner(FlowContext ctx, FlowNode node) { executeLegacy("item_set_skull_owner", ctx, node); }
 
     @DefineNode(id = "item_set_book_pages", displayName = "Set Book Pages", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "title", dataType = FlowType.STRING),
                     @FlowPin(name = "author", dataType = FlowType.STRING),
@@ -900,13 +900,13 @@ public class ItemCreationNodes {
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetBookPages(FlowContext ctx, FlowNode node) { executeLegacy("item_set_book_pages", ctx, node); }
 
     @DefineNode(id = "item_set_potion_effect", displayName = "Set Potion Effect", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "effect", dataType = FlowType.STRING),
                     @FlowPin(name = "duration", dataType = FlowType.NUMBER),
@@ -914,30 +914,30 @@ public class ItemCreationNodes {
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetPotionEffect(FlowContext ctx, FlowNode node) { executeLegacy("item_set_potion_effect", ctx, node); }
 
     @DefineNode(id = "item_get_nbt", displayName = "Get Nbt", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             },
             outputs = {
                     @FlowPin(name = "nbt", dataType = FlowType.STRING),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemGetNbt(FlowContext ctx, FlowNode node) { executeLegacy("item_get_nbt", ctx, node); }
 
     @DefineNode(id = "item_set_nbt", displayName = "Set Nbt", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
                     @FlowPin(name = "nbt", dataType = FlowType.STRING)
             },
             outputs = {
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK),
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
             })
     public void itemSetNbt(FlowContext ctx, FlowNode node) { executeLegacy("item_set_nbt", ctx, node); }
 

@@ -311,86 +311,86 @@ public class SoundNodes {
 
     @DefineNode(id = "sound_play", displayName = "Play Sound", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "sound_type", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlay(FlowContext ctx, FlowNode node) { executeLegacy("sound_play", ctx, node); }
 
     @DefineNode(id = "sound_play_for_player", displayName = "Play Sound for Player", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "sound_type", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlayForPlayer(FlowContext ctx, FlowNode node) { executeLegacy("sound_play_for_player", ctx, node); }
 
     @DefineNode(id = "sound_play_for_all", displayName = "Play Sound for All", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "sound_type", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlayForAll(FlowContext ctx, FlowNode node) { executeLegacy("sound_play_for_all", ctx, node); }
 
     @DefineNode(id = "sound_stop", displayName = "Stop Sound", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "sound", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundStop(FlowContext ctx, FlowNode node) { executeLegacy("sound_stop", ctx, node); }
 
     @DefineNode(id = "sound_stop_all", displayName = "Stop All Sounds", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundStopAll(FlowContext ctx, FlowNode node) { executeLegacy("sound_stop_all", ctx, node); }
 
     @DefineNode(id = "sound_play_category", displayName = "Sound Play Category", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "sound_name", dataType = FlowType.STRING),
                     @FlowPin(name = "category", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlayCategory(FlowContext ctx, FlowNode node) { executeLegacy("sound_play_category", ctx, node); }
 
     @DefineNode(id = "sound_stop_for_player", displayName = "Sound Stop For Player", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "sound_name", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundStopForPlayer(FlowContext ctx, FlowNode node) { executeLegacy("sound_stop_for_player", ctx, node); }
 
     @DefineNode(id = "sound_stop_category", displayName = "Sound Stop Category", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "category", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundStopCategory(FlowContext ctx, FlowNode node) { executeLegacy("sound_stop_category", ctx, node); }
 
     @DefineNode(id = "sound_play_with_distance", displayName = "Sound Play With Distance", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "sound_name", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
@@ -398,12 +398,12 @@ public class SoundNodes {
                     @FlowPin(name = "min_distance", dataType = FlowType.NUMBER),
                     @FlowPin(name = "max_distance", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlayWithDistance(FlowContext ctx, FlowNode node) { executeLegacy("sound_play_with_distance", ctx, node); }
 
     @DefineNode(id = "sound_loop_for_player", displayName = "Sound Loop For Player", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "sound_name", dataType = FlowType.STRING),
@@ -411,30 +411,30 @@ public class SoundNodes {
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER),
                     @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundLoopForPlayer(FlowContext ctx, FlowNode node) { executeLegacy("sound_loop_for_player", ctx, node); }
 
     @DefineNode(id = "sound_fade", displayName = "Sound Fade", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "sound_name", dataType = FlowType.STRING),
                     @FlowPin(name = "start_volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "end_volume", dataType = FlowType.NUMBER),
                     @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundFade(FlowContext ctx, FlowNode node) { executeLegacy("sound_fade", ctx, node); }
 
     @DefineNode(id = "sound_play_sequence", displayName = "Sound Play Sequence", category = NodeDefinition.NodeCategory.VISUAL,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "sounds_list", dataType = FlowType.LIST),
                     @FlowPin(name = "delays_list", dataType = FlowType.LIST)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void soundPlaySequence(FlowContext ctx, FlowNode node) { executeLegacy("sound_play_sequence", ctx, node); }
 
     private static String findNodeId(FlowContext ctx, FlowNode node) {

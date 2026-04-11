@@ -600,17 +600,17 @@ public class MenuNodes {
 
     @DefineNode(id = "menu_create", displayName = "Create Menu", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "title", dataType = FlowType.STRING),
                     @FlowPin(name = "rows", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuCreate(FlowContext ctx, FlowNode node) { executeLegacy("menu_create", ctx, node); }
 
     @DefineNode(id = "menu_set_item", displayName = "Set Item", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "material", dataType = FlowType.STRING),
@@ -618,87 +618,87 @@ public class MenuNodes {
                     @FlowPin(name = "lore", dataType = FlowType.STRING),
                     @FlowPin(name = "flow_to_execute", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetItem(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_item", ctx, node); }
 
     @DefineNode(id = "menu_add_item", displayName = "Add Item", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "material", dataType = FlowType.STRING),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "lore", dataType = FlowType.STRING),
                     @FlowPin(name = "flow_to_execute", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuAddItem(FlowContext ctx, FlowNode node) { executeLegacy("menu_add_item", ctx, node); }
 
     @DefineNode(id = "menu_clear", displayName = "Clear Menu", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuClear(FlowContext ctx, FlowNode node) { executeLegacy("menu_clear", ctx, node); }
 
     @DefineNode(id = "menu_open", displayName = "Open Menu", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuOpen(FlowContext ctx, FlowNode node) { executeLegacy("menu_open", ctx, node); }
 
     @DefineNode(id = "menu_update", displayName = "Update Menu", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuUpdate(FlowContext ctx, FlowNode node) { executeLegacy("menu_update", ctx, node); }
 
     @DefineNode(id = "menu_close", displayName = "Close Menu", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuClose(FlowContext ctx, FlowNode node) { executeLegacy("menu_close", ctx, node); }
 
     @DefineNode(id = "menu_set_click_sound", displayName = "Set Click Sound", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "sound", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetClickSound(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_click_sound", ctx, node); }
 
     @DefineNode(id = "menu_set_title", displayName = "Set Title", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "title", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetTitle(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_title", ctx, node); }
 
     @DefineNode(id = "menu_set_click_action", displayName = "Set Click Action", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "flow_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetClickAction(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_click_action", ctx, node); }
 
     @DefineNode(id = "menu_set_item_with_action", displayName = "Set Item With Action", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "material", dataType = FlowType.STRING),
@@ -706,52 +706,52 @@ public class MenuNodes {
                     @FlowPin(name = "lore", dataType = FlowType.STRING),
                     @FlowPin(name = "flow_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetItemWithAction(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_item_with_action", ctx, node); }
 
     @DefineNode(id = "menu_set_enchant", displayName = "Set Enchant", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "enchanted", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetEnchant(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_enchant", ctx, node); }
 
     @DefineNode(id = "menu_set_flags", displayName = "Set Flags", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "flags_list", dataType = FlowType.LIST)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetFlags(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_flags", ctx, node); }
 
     @DefineNode(id = "menu_set_custom_model", displayName = "Set Custom Model", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "model_data", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetCustomModel(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_custom_model", ctx, node); }
 
     @DefineNode(id = "menu_set_head_texture", displayName = "Set Head Texture", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "player_name_or_uuid", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetHeadTexture(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_head_texture", ctx, node); }
 
     @DefineNode(id = "menu_fill_pattern", displayName = "Fill Pattern", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "start_slot", dataType = FlowType.NUMBER),
                     @FlowPin(name = "end_slot", dataType = FlowType.NUMBER),
@@ -759,16 +759,16 @@ public class MenuNodes {
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "lore", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuFillPattern(FlowContext ctx, FlowNode node) { executeLegacy("menu_fill_pattern", ctx, node); }
 
     @DefineNode(id = "menu_clear_slot", displayName = "Clear Slot", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "slot", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuClearSlot(FlowContext ctx, FlowNode node) { executeLegacy("menu_clear_slot", ctx, node); }
 
     @DefineNode(id = "menu_get_item", displayName = "Get Item", category = NodeDefinition.NodeCategory.INVENTORY,
@@ -786,39 +786,39 @@ public class MenuNodes {
 
     @DefineNode(id = "menu_duplicate", displayName = "Duplicate", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "source_menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "new_menu_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuDuplicate(FlowContext ctx, FlowNode node) { executeLegacy("menu_duplicate", ctx, node); }
 
     @DefineNode(id = "menu_set_close_action", displayName = "Set Close Action", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "flow_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetCloseAction(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_close_action", ctx, node); }
 
     @DefineNode(id = "menu_set_open_action", displayName = "Set Open Action", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "flow_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetOpenAction(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_open_action", ctx, node); }
 
     @DefineNode(id = "menu_set_update_interval", displayName = "Set Update Interval", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "menu_id", dataType = FlowType.STRING),
                     @FlowPin(name = "interval_ticks", dataType = FlowType.NUMBER),
                     @FlowPin(name = "flow_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void menuSetUpdateInterval(FlowContext ctx, FlowNode node) { executeLegacy("menu_set_update_interval", ctx, node); }
 
     @DefineNode(id = "menu_get_open_menu_id", displayName = "Get Open Menu Id", category = NodeDefinition.NodeCategory.INVENTORY,

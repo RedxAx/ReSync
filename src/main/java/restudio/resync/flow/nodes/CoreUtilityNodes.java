@@ -1,6 +1,6 @@
 package restudio.resync.flow.nodes;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import org.bukkit.event.Cancellable;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
@@ -16,7 +16,7 @@ public class CoreUtilityNodes {
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void log(FlowContext ctx, FlowNode node) {
         Object text = ctx.getInputValue(node, "text", String.class, "");
-        Bukkit.getLogger().info("[Flow] " + text);
+        Log.info("[Flow] " + text);
         ctx.triggerOutput("flow");
     }
 

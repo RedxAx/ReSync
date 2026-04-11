@@ -337,33 +337,33 @@ public class EconomyNodes {
 
     @DefineNode(id = "eco_get_balance", displayName = "Get Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "balance", dataType = FlowType.NUMBER),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoGetBalance(FlowContext ctx, FlowNode node) { executeLegacy("eco_get_balance", ctx, node); }
 
     @DefineNode(id = "eco_set_balance", displayName = "Set Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "balance", dataType = FlowType.NUMBER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoSetBalance(FlowContext ctx, FlowNode node) { executeLegacy("eco_set_balance", ctx, node); }
 
     @DefineNode(id = "eco_add_balance", displayName = "Add Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
@@ -371,13 +371,13 @@ public class EconomyNodes {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "new_balance", dataType = FlowType.NUMBER),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoAddBalance(FlowContext ctx, FlowNode node) { executeLegacy("eco_add_balance", ctx, node); }
 
     @DefineNode(id = "eco_remove_balance", displayName = "Remove Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
@@ -385,13 +385,13 @@ public class EconomyNodes {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "new_balance", dataType = FlowType.NUMBER),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoRemoveBalance(FlowContext ctx, FlowNode node) { executeLegacy("eco_remove_balance", ctx, node); }
 
     @DefineNode(id = "eco_transfer", displayName = "Transfer Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "from_player", dataType = FlowType.PLAYER),
             @FlowPin(name = "to_player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
@@ -399,13 +399,13 @@ public class EconomyNodes {
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoTransfer(FlowContext ctx, FlowNode node) { executeLegacy("eco_transfer", ctx, node); }
 
     @DefineNode(id = "eco_has_balance", displayName = "Has Balance", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
@@ -413,82 +413,82 @@ public class EconomyNodes {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "has", dataType = FlowType.BOOLEAN),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoHasBalance(FlowContext ctx, FlowNode node) { executeLegacy("eco_has_balance", ctx, node); }
 
     @DefineNode(id = "eco_format", displayName = "Format Currency", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "formatted", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoFormat(FlowContext ctx, FlowNode node) { executeLegacy("eco_format", ctx, node); }
 
     @DefineNode(id = "eco_get_currency", displayName = "Get Currency Name", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
             @FlowPin(name = "singular", dataType = FlowType.STRING),
             @FlowPin(name = "plural", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoGetCurrency(FlowContext ctx, FlowNode node) { executeLegacy("eco_get_currency", ctx, node); }
 
     @DefineNode(id = "eco_deposit", displayName = "Deposit", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoDeposit(FlowContext ctx, FlowNode node) { executeLegacy("eco_deposit", ctx, node); }
 
     @DefineNode(id = "eco_withdraw", displayName = "Withdraw", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER),
             @FlowPin(name = "amount", dataType = FlowType.NUMBER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoWithdraw(FlowContext ctx, FlowNode node) { executeLegacy("eco_withdraw", ctx, node); }
 
     @DefineNode(id = "eco_has_bank", displayName = "Has Bank Support", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "has_bank", dataType = FlowType.BOOLEAN),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoHasBank(FlowContext ctx, FlowNode node) { executeLegacy("eco_has_bank", ctx, node); }
 
     @DefineNode(id = "eco_create_bank", displayName = "Create Bank Account", category = NodeDefinition.NodeCategory.ECONOMY,
         inputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
             @FlowPin(name = "player", dataType = FlowType.PLAYER)
         },
         outputs = {
             @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
             @FlowPin(name = "error", dataType = FlowType.STRING),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         })
     public void ecoCreateBank(FlowContext ctx, FlowNode node) { executeLegacy("eco_create_bank", ctx, node); }
     

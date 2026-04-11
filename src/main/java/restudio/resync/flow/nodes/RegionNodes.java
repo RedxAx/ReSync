@@ -707,105 +707,105 @@ public class RegionNodes {
 
     @DefineNode(id = "region_copy", displayName = "Copy Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "clipboard_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionCopy(FlowContext ctx, FlowNode node) {
         executeLegacy("region_copy", ctx, node);
     }
 
     @DefineNode(id = "region_cut", displayName = "Cut Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "clipboard_id", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionCut(FlowContext ctx, FlowNode node) {
         executeLegacy("region_cut", ctx, node);
     }
 
     @DefineNode(id = "region_paste", displayName = "Paste Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "clipboard_id", dataType = FlowType.STRING),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionPaste(FlowContext ctx, FlowNode node) {
         executeLegacy("region_paste", ctx, node);
     }
 
     @DefineNode(id = "region_rotate", displayName = "Rotate Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "clipboard_id", dataType = FlowType.STRING),
                     @FlowPin(name = "rotations", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionRotate(FlowContext ctx, FlowNode node) {
         executeLegacy("region_rotate", ctx, node);
     }
 
     @DefineNode(id = "region_mirror", displayName = "Mirror Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "clipboard_id", dataType = FlowType.STRING),
                     @FlowPin(name = "axis", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionMirror(FlowContext ctx, FlowNode node) {
         executeLegacy("region_mirror", ctx, node);
     }
 
     @DefineNode(id = "region_clear", displayName = "Clear Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionClear(FlowContext ctx, FlowNode node) {
         executeLegacy("region_clear", ctx, node);
     }
 
     @DefineNode(id = "region_replace", displayName = "Replace Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "old_material", dataType = FlowType.STRING),
                     @FlowPin(name = "new_material", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionReplace(FlowContext ctx, FlowNode node) {
         executeLegacy("region_replace", ctx, node);
     }
 
     @DefineNode(id = "region_set_air", displayName = "Set Air Region", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionSetAir(FlowContext ctx, FlowNode node) {
         executeLegacy("region_set_air", ctx, node);
     }
 
     @DefineNode(id = "region_count_blocks", displayName = "Count Blocks", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "material", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "count", dataType = FlowType.NUMBER)
             })
     public void regionCountBlocks(FlowContext ctx, FlowNode node) {
@@ -814,48 +814,48 @@ public class RegionNodes {
 
     @DefineNode(id = "region_distribute", displayName = "Distribute Blocks", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "pattern_list", dataType = FlowType.LIST)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionDistribute(FlowContext ctx, FlowNode node) {
         executeLegacy("region_distribute", ctx, node);
     }
 
     @DefineNode(id = "region_outline", displayName = "Create Outline", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "material", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionOutline(FlowContext ctx, FlowNode node) {
         executeLegacy("region_outline", ctx, node);
     }
 
     @DefineNode(id = "region_walls", displayName = "Create Walls", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "material", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionWalls(FlowContext ctx, FlowNode node) {
         executeLegacy("region_walls", ctx, node);
     }
 
     @DefineNode(id = "region_hollow", displayName = "Create Hollow", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "min_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "max_location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "material", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void regionHollow(FlowContext ctx, FlowNode node) {
         executeLegacy("region_hollow", ctx, node);
     }

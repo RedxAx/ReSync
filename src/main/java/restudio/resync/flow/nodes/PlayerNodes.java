@@ -8,6 +8,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowType;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.registry.DefineNode;
@@ -58,7 +59,7 @@ public class PlayerNodes {
                         return null;
                     }).get();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Log.warn("[Flow] Failed to kick player: " + e.getMessage());
                 }
             }
         }

@@ -238,11 +238,11 @@ public class JsonNodes {
 
     @DefineNode(id = "json_parse", displayName = "Parse JSON", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "json_string", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
             })
     public void jsonParse(FlowContext ctx, FlowNode node) {
@@ -251,11 +251,11 @@ public class JsonNodes {
 
     @DefineNode(id = "json_to_string", displayName = "JSON to String", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "string", dataType = FlowType.STRING)
             })
     public void jsonToString(FlowContext ctx, FlowNode node) {
@@ -264,12 +264,12 @@ public class JsonNodes {
 
     @DefineNode(id = "json_get", displayName = "Get JSON Value", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
                     @FlowPin(name = "path", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             })
     public void jsonGet(FlowContext ctx, FlowNode node) {
@@ -278,35 +278,35 @@ public class JsonNodes {
 
     @DefineNode(id = "json_set", displayName = "Set JSON Value", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
                     @FlowPin(name = "path", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void jsonSet(FlowContext ctx, FlowNode node) {
         executeLegacy("json_set", ctx, node);
     }
 
     @DefineNode(id = "json_delete", displayName = "Delete JSON Key", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
                     @FlowPin(name = "path", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void jsonDelete(FlowContext ctx, FlowNode node) {
         executeLegacy("json_delete", ctx, node);
     }
 
     @DefineNode(id = "json_has", displayName = "JSON Has Key", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT),
                     @FlowPin(name = "path", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "has", dataType = FlowType.BOOLEAN)
             })
     public void jsonHas(FlowContext ctx, FlowNode node) {
@@ -315,11 +315,11 @@ public class JsonNodes {
 
     @DefineNode(id = "json_keys", displayName = "Get JSON Keys", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "keys", dataType = FlowType.LIST)
             })
     public void jsonKeys(FlowContext ctx, FlowNode node) {
@@ -328,12 +328,12 @@ public class JsonNodes {
 
     @DefineNode(id = "json_merge", displayName = "Merge JSON", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object1", dataType = FlowType.JSON_OBJECT),
                     @FlowPin(name = "object2", dataType = FlowType.JSON_OBJECT)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "merged", dataType = FlowType.JSON_OBJECT)
             })
     public void jsonMerge(FlowContext ctx, FlowNode node) {
@@ -341,9 +341,9 @@ public class JsonNodes {
     }
 
     @DefineNode(id = "json_create", displayName = "Create JSON Object", category = NodeDefinition.NodeCategory.DATABASE,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "object", dataType = FlowType.JSON_OBJECT)
             })
     public void jsonCreate(FlowContext ctx, FlowNode node) {
@@ -352,11 +352,11 @@ public class JsonNodes {
 
     @DefineNode(id = "json_set_array", displayName = "Create JSON Array", category = NodeDefinition.NodeCategory.DATABASE,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "values", dataType = FlowType.LIST)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "array", dataType = FlowType.LIST)
             })
     public void jsonSetArray(FlowContext ctx, FlowNode node) {

@@ -5,6 +5,7 @@ public class ReSyncConfig {
     private int port;
     private String apiKey;
     private int maxConnections;
+    private String logLevel;
 
     private CompressionConfig compression;
     private BatchingConfig batching;
@@ -170,6 +171,14 @@ public class ReSyncConfig {
 
     public void setMaxConnections(int maxConnections) {
         this.maxConnections = maxConnections;
+    }
+
+    public String getLogLevel() {
+        return logLevel;
+    }
+
+    public void setLogLevel(String logLevel) {
+        this.logLevel = logLevel;
     }
 
     public CompressionConfig getCompression() {

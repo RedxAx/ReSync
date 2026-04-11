@@ -1,6 +1,6 @@
 package restudio.resync.flow.nodes;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
@@ -107,7 +107,7 @@ public class EntityAdvancedNodes {
                     PotionEffect effect = new PotionEffect(effectType, duration, amplifier);
                     ((LivingEntity)entityObj).addPotionEffect(effect);
                 } else {
-                    Bukkit.getLogger().warning("[Flow] Invalid potion effect type: " + effectTypeObj);
+                    Log.warn("[Flow] Invalid potion effect type: " + effectTypeObj);
                 }
             }
             
@@ -308,98 +308,98 @@ public class EntityAdvancedNodes {
 
     @DefineNode(id = "entity_mount", displayName = "Entity Mount", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "mount_entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityMount(FlowContext ctx, FlowNode node) { executeLegacy("entity_mount", ctx, node); }
 
     @DefineNode(id = "entity_dismount", displayName = "Entity Dismount", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityDismount(FlowContext ctx, FlowNode node) { executeLegacy("entity_dismount", ctx, node); }
 
     @DefineNode(id = "entity_ai_disable", displayName = "Entity AI Disable", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityAiDisable(FlowContext ctx, FlowNode node) { executeLegacy("entity_ai_disable", ctx, node); }
 
     @DefineNode(id = "entity_ai_enable", displayName = "Entity AI Enable", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityAiEnable(FlowContext ctx, FlowNode node) { executeLegacy("entity_ai_enable", ctx, node); }
 
     @DefineNode(id = "entity_set_no_damage", displayName = "Entity Set No Damage", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "no_damage", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetNoDamage(FlowContext ctx, FlowNode node) { executeLegacy("entity_set_no_damage", ctx, node); }
 
     @DefineNode(id = "entity_set_silent", displayName = "Entity Set Silent", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "silent", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetSilent(FlowContext ctx, FlowNode node) { executeLegacy("entity_set_silent", ctx, node); }
 
     @DefineNode(id = "entity_add_potion", displayName = "Entity Add Potion", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "effect_type", dataType = FlowType.STRING),
                     @FlowPin(name = "duration", dataType = FlowType.NUMBER),
                     @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityAddPotion(FlowContext ctx, FlowNode node) { executeLegacy("entity_add_potion", ctx, node); }
 
     @DefineNode(id = "entity_clear_potions", displayName = "Entity Clear Potions", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityClearPotions(FlowContext ctx, FlowNode node) { executeLegacy("entity_clear_potions", ctx, node); }
 
     @DefineNode(id = "entity_leash", displayName = "Entity Leash", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "holder_entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityLeash(FlowContext ctx, FlowNode node) { executeLegacy("entity_leash", ctx, node); }
 
     @DefineNode(id = "entity_unleash", displayName = "Entity Unleash", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityUnleash(FlowContext ctx, FlowNode node) { executeLegacy("entity_unleash", ctx, node); }
 
     @DefineNode(id = "entity_set_custom_name", displayName = "Entity Set Custom Name", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetCustomName(FlowContext ctx, FlowNode node) { executeLegacy("entity_set_custom_name", ctx, node); }
 
     @DefineNode(id = "entity_get_passengers", displayName = "Entity Get Passengers", category = NodeDefinition.NodeCategory.DATA,
@@ -414,46 +414,46 @@ public class EntityAdvancedNodes {
 
     @DefineNode(id = "entity_set_fire_ticks", displayName = "Entity Set Fire Ticks", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetFireTicks(FlowContext ctx, FlowNode node) { executeLegacy("entity_set_fire_ticks", ctx, node); }
 
     @DefineNode(id = "entity_set_frozen", displayName = "Entity Set Frozen", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetFrozen(FlowContext ctx, FlowNode node) { executeLegacy("entity_set_frozen", ctx, node); }
 
     @DefineNode(id = "entity_add_tag", displayName = "Entity Add Tag", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "tag", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityAddTag(FlowContext ctx, FlowNode node) { executeLegacy("entity_add_tag", ctx, node); }
 
     @DefineNode(id = "entity_remove_tag", displayName = "Entity Remove Tag", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "tag", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityRemoveTag(FlowContext ctx, FlowNode node) { executeLegacy("entity_remove_tag", ctx, node); }
 
     @DefineNode(id = "entity_clear_tags", displayName = "Entity Clear Tags", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityClearTags(FlowContext ctx, FlowNode node) { executeLegacy("entity_clear_tags", ctx, node); }
 
     @DefineNode(id = "entity_has_tag", displayName = "Entity Has Tag", category = NodeDefinition.NodeCategory.DATA,

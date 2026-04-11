@@ -2,7 +2,7 @@ package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.core.Session;
@@ -77,11 +77,11 @@ public class FlowBlueprintPacketHandler {
             }
             storage.saveGraph(graph);
             updateEventBindings(graph);
-            Bukkit.getLogger().info("[ReSync] Saved flow " + graph.getId() + " from client " + session.getClientId());
+            Log.fine("Flow saved: " + graph.getId());
             sender.sendFlowSaveAck(session, graph.getId());
         } catch (Exception e) {
             sender.sendError(session, "SAVE_FAILED", "Failed to save flow: " + e.getMessage());
-            Bukkit.getLogger().severe("[ReSync] Save error: " + e.getMessage());
+            Log.error("Flow save error: " + e.getMessage());
         }
     }
 
@@ -99,7 +99,7 @@ public class FlowBlueprintPacketHandler {
         if (globalTriggers != null) {
             globalTriggers.refreshBindings();
         }
-        Bukkit.getLogger().info("[ReSync] Deleted flow " + flowId + " from client " + session.getClientId());
+        Log.fine("Flow deleted: " + flowId);
     }
 
     public void handleListRequest(Session session) {

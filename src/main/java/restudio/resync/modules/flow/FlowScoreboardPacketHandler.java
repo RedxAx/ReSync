@@ -1,6 +1,6 @@
 package restudio.resync.modules.flow;
 
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.resync.core.Session;
@@ -59,7 +59,7 @@ public class FlowScoreboardPacketHandler {
             }
             storage.saveScoreboard(scoreboard);
             ScoreboardNodes.refreshActiveTemplates(storage, scoreboard.getId());
-            Bukkit.getLogger().info("[ReSync] Saved scoreboard " + scoreboard.getId() + " from client " + session.getClientId());
+            Log.fine("Scoreboard saved: " + scoreboard.getId());
             sender.sendScoreboardSaveAck(session, scoreboard.getId());
         } catch (Exception e) {
             sender.sendError(session, "SAVE_FAILED", "Failed to save scoreboard: " + e.getMessage());
@@ -79,7 +79,7 @@ public class FlowScoreboardPacketHandler {
         if (defaultId != null && defaultId.equalsIgnoreCase(scoreboardId)) {
             storage.clearDefaultScoreboard();
         }
-        Bukkit.getLogger().info("[ReSync] Deleted scoreboard " + scoreboardId + " from client " + session.getClientId());
+        Log.fine("Scoreboard deleted: " + scoreboardId);
     }
 
     public void handleListRequest(Session session) {

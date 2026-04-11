@@ -29,7 +29,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_sprint", displayName = "Sprint", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSprint(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -41,7 +41,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_sneak", displayName = "Sneak", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSneak(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -53,7 +53,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_fly", displayName = "Fly", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerFly(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -68,7 +68,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_gamemode", displayName = "Gamemode", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "mode", dataType = FlowType.STRING)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerGamemode(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         String modeName = ctx.getInputValue(node, "mode", String.class, "SURVIVAL");
@@ -84,7 +84,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_vanish", displayName = "Vanish", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerVanish(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -96,7 +96,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_glowing", displayName = "Glowing", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerGlowing(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -108,7 +108,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_invulnerable", displayName = "Invulnerable", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerInvulnerable(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
@@ -120,7 +120,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_food_level", displayName = "Food Level", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerFoodLevel(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Integer level = ctx.getInputValue(node, "level", Integer.class, 20);
@@ -132,7 +132,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_saturation", displayName = "Saturation", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "saturation", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSaturation(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Float saturation = ctx.getInputValue(node, "saturation", Float.class, 20.0f);
@@ -144,7 +144,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_exhaustion", displayName = "Exhaustion", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "exhaustion", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerExhaustion(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Float exhaustion = ctx.getInputValue(node, "exhaustion", Float.class, 0.0f);
@@ -156,7 +156,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_health", displayName = "Health", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "health", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerHealth(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Double health = ctx.getInputValue(node, "health", Double.class, 20.0);
@@ -168,7 +168,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_max_health", displayName = "Max Health", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "max_health", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerMaxHealth(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Double maxHealth = ctx.getInputValue(node, "max_health", Double.class, 20.0);
@@ -180,7 +180,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_absorption", displayName = "Absorption", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "absorption", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerAbsorption(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Double absorption = ctx.getInputValue(node, "absorption", Double.class, 0.0);
@@ -196,7 +196,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "level", dataType = FlowType.NUMBER),
                     @FlowPin(name = "points", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerXp(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Integer level = ctx.getInputValue(node, "level", Integer.class, 0);
@@ -220,7 +220,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerTp(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         if (target != null) {
@@ -247,7 +247,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "vy", dataType = FlowType.NUMBER),
                     @FlowPin(name = "vz", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerLaunch(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Double vx = ctx.getInputValue(node, "vx", Double.class, 0.0);
@@ -265,7 +265,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "strength", dataType = FlowType.NUMBER),
                     @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerPush(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Double strength = ctx.getInputValue(node, "strength", Double.class, 1.0);
@@ -288,7 +288,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSpin(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Float yaw = ctx.getInputValue(node, "yaw", Float.class, 0.0f);
@@ -310,7 +310,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetRotation(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         if (target != null) {
@@ -329,7 +329,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_allow_flight", displayName = "Allow Flight", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "allowed", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerAllowFlight(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Boolean allowed = ctx.getInputValue(node, "allowed", Boolean.class, true);
@@ -341,7 +341,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_deny_flight", displayName = "Deny Flight", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerDenyFlight(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         if (target != null) {
@@ -355,7 +355,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_walk_speed", displayName = "Walk Speed", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetWalkSpeed(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Float speed = ctx.getInputValue(node, "speed", Float.class, 0.2f);
@@ -367,7 +367,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_fly_speed", displayName = "Fly Speed", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetFlySpeed(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Float speed = ctx.getInputValue(node, "speed", Float.class, 0.1f);
@@ -379,7 +379,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_freeze", displayName = "Freeze", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerFreeze(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         if (target != null) {
@@ -393,7 +393,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_unfreeze", displayName = "Unfreeze", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerUnfreeze(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         if (target != null) {
@@ -407,7 +407,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_fire_ticks", displayName = "Fire Ticks", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetFireTicks(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
@@ -419,7 +419,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_air_ticks", displayName = "Air Ticks", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetAirTicks(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 300);
@@ -431,7 +431,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_no_damage_ticks", displayName = "No Damage Ticks", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetNoDamageTicks(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
@@ -448,7 +448,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER),
                     @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerAddPotion(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         String effectType = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
@@ -466,7 +466,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_clear_potions", displayName = "Clear Potions", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerClearPotions(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         if (player != null) {
@@ -503,7 +503,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "url", dataType = FlowType.STRING),
                     @FlowPin(name = "force", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSendResourcepack(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         String url = ctx.getInputValue(node, "url", String.class, "");
@@ -515,7 +515,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_compass_target", displayName = "Set Compass Target", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetCompassTarget(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Location location = ctx.getInputValue(node, "location", Location.class, null);
@@ -527,7 +527,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_reset_compass", displayName = "Reset Compass", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerResetCompass(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         if (player != null) {
@@ -565,7 +565,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_exp", displayName = "Set Xp", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "exp", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetExp(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Integer exp = ctx.getInputValue(node, "exp", Integer.class, 0);
@@ -577,7 +577,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_give_exp", displayName = "Give Xp", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "exp", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerGiveExp(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Integer exp = ctx.getInputValue(node, "exp", Integer.class, 0);
@@ -596,7 +596,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "style", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "bossbar_id", dataType = FlowType.STRING)
             })
     public void playerShowBossbar(FlowContext ctx, FlowNode node) {
@@ -625,7 +625,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_hide_bossbar", displayName = "Hide Boss Bar", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "bossbar_id", dataType = FlowType.STRING)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerHideBossbar(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         String bossbarId = ctx.getInputValue(node, "bossbar_id", String.class, "");
@@ -648,7 +648,7 @@ public class PlayerActionNodes {
                     @FlowPin(name = "new_title", dataType = FlowType.STRING),
                     @FlowPin(name = "new_progress", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerUpdateBossbar(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         String bossbarId = ctx.getInputValue(node, "bossbar_id", String.class, "");
@@ -672,7 +672,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_walking_speed", displayName = "Set Walking Speed", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetWalkingSpeed(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Float speed = ctx.getInputValue(node, "speed", Float.class, 0.2f);
@@ -684,7 +684,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_flying_speed", displayName = "Set Flying Speed", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetFlyingSpeed(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Float speed = ctx.getInputValue(node, "speed", Float.class, 0.05f);
@@ -696,7 +696,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_saturation", displayName = "Set Saturation", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "saturation", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetSaturation(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Float saturation = ctx.getInputValue(node, "saturation", Float.class, 20.0f);
@@ -708,7 +708,7 @@ public class PlayerActionNodes {
 
     @DefineNode(id = "player_set_food_level", displayName = "Set Food Level", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerSetFoodLevel(FlowContext ctx, FlowNode node) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Integer level = ctx.getInputValue(node, "level", Integer.class, 20);

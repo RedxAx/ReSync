@@ -1,10 +1,10 @@
 package restudio.resync.flow.util;
 
-import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import restudio.resync.flow.FlowRuntimeAccess;
 
+import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 
 public final class ReSyncPlaceholderUtil {
     private static final Pattern RESYNC_PATTERN = Pattern.compile("%resync_([^%]+)%", Pattern.CASE_INSENSITIVE);
+    private static Method setPlaceholdersMethod;
 
     private ReSyncPlaceholderUtil() {
     }
@@ -102,7 +103,15 @@ public final class ReSyncPlaceholderUtil {
         if (player == null || text == null || text.isEmpty() || !Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             return text;
         }
-        return PlaceholderAPI.setPlaceholders(player, text);
+        try {
+            if (setPlaceholdersMethod == null) {
+                Class<?> papiClass = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+                setPlaceholdersMethod = papiClass.getMethod("setPlaceholders", Player.class, String.class);
+            }
+            return (String) setPlaceholdersMethod.invoke(null, player, text);
+        } catch (Exception e) {
+            return text;
+        }
     }
 
     private static Map<String, Object> getGlobalVariables() {

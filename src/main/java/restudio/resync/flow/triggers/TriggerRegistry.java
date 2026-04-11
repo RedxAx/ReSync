@@ -3,6 +3,7 @@ package restudio.resync.flow.triggers;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import restudio.resync.Log;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -96,7 +97,7 @@ public class TriggerRegistry {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to load trigger bindings: " + e.getMessage());
         }
     }
 
@@ -105,7 +106,7 @@ public class TriggerRegistry {
             String json = gson.toJson(getBindings());
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save trigger bindings: " + e.getMessage());
         }
     }
 }

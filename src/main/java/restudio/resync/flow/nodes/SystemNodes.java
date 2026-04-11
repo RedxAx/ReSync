@@ -5,6 +5,7 @@ import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
@@ -98,7 +99,7 @@ public class SystemNodes {
                 Bukkit.reload();
                 success = true;
             } catch (Exception e) {
-                Bukkit.getLogger().severe("Error during reload: " + e.getMessage());
+                Log.error("Error during reload: " + e.getMessage());
                 success = false;
             }
             String nodeId = findNodeId(ctx, node);
@@ -139,9 +140,9 @@ public class SystemNodes {
     }
 
     @DefineNode(id = "server_get_info", displayName = "Server Info", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "info", dataType = FlowType.JSON_OBJECT)
             })
     public void serverGetInfo(FlowContext ctx, FlowNode node) {
@@ -149,9 +150,9 @@ public class SystemNodes {
     }
 
     @DefineNode(id = "server_get_online_players", displayName = "Get Online Players", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "players", dataType = FlowType.LIST)
             })
     public void serverGetOnlinePlayers(FlowContext ctx, FlowNode node) {
@@ -159,9 +160,9 @@ public class SystemNodes {
     }
 
     @DefineNode(id = "server_get_max_players", displayName = "Get Max Players", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "max", dataType = FlowType.NUMBER)
             })
     public void serverGetMaxPlayers(FlowContext ctx, FlowNode node) {
@@ -170,11 +171,11 @@ public class SystemNodes {
 
     @DefineNode(id = "server_execute_command", displayName = "Execute Console Command", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "command", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
             })
     public void serverExecuteCommand(FlowContext ctx, FlowNode node) {
@@ -183,11 +184,11 @@ public class SystemNodes {
 
     @DefineNode(id = "server_broadcast", displayName = "Broadcast Message", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "sent_count", dataType = FlowType.NUMBER)
             })
     public void serverBroadcast(FlowContext ctx, FlowNode node) {
@@ -196,28 +197,28 @@ public class SystemNodes {
 
     @DefineNode(id = "server_shutdown", displayName = "Server Shutdown", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "reason", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void serverShutdown(FlowContext ctx, FlowNode node) {
         executeLegacy("server_shutdown", ctx, node);
     }
 
     @DefineNode(id = "server_restart", displayName = "Server Restart", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "reason", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void serverRestart(FlowContext ctx, FlowNode node) {
         executeLegacy("server_restart", ctx, node);
     }
 
     @DefineNode(id = "server_reload", displayName = "Server Reload", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
             })
     public void serverReload(FlowContext ctx, FlowNode node) {

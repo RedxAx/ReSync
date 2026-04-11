@@ -3,6 +3,7 @@ package restudio.resync.flow.nodes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import restudio.resync.Log;
 import org.bukkit.Bukkit;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
@@ -206,7 +207,7 @@ public class DiscordNodes implements NodeCategory {
                     color = Integer.parseInt(hex, 16);
                 }
             } catch (Exception e) {
-                Bukkit.getLogger().warning("[Flow] Invalid hex color: " + hexColor);
+                Log.warn("[Flow] Invalid hex color: " + hexColor);
             }
             
             String nodeId = findNodeId(ctx, node);
@@ -420,7 +421,7 @@ public class DiscordNodes implements NodeCategory {
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[Flow] Discord webhook error: " + e.getMessage());
+            Log.error("[Flow] Discord webhook error: " + e.getMessage());
             return false;
         }
     }
@@ -452,7 +453,7 @@ public class DiscordNodes implements NodeCategory {
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[Flow] Discord webhook edit error: " + e.getMessage());
+            Log.error("[Flow] Discord webhook edit error: " + e.getMessage());
             return false;
         }
     }
@@ -468,7 +469,7 @@ public class DiscordNodes implements NodeCategory {
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
         } catch (Exception e) {
-            Bukkit.getLogger().severe("[Flow] Discord webhook delete error: " + e.getMessage());
+            Log.error("[Flow] Discord webhook delete error: " + e.getMessage());
             return false;
         }
     }

@@ -1,6 +1,7 @@
 package restudio.resync.modules;
 
 import com.google.gson.Gson;
+import restudio.resync.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -121,7 +122,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
                 default -> sendSnapshot(session);
             }
         } catch (Exception e) {
-            Bukkit.getLogger().warning("[ReSync] PlayerTracking request failed: " + e.getMessage());
+            Log.warn("PlayerTracking request failed: " + e.getMessage());
         }
     }
 

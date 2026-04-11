@@ -130,7 +130,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "server_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void serverStart(FlowContext ctx, FlowNode node) {
@@ -143,7 +143,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "server_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void serverStop(FlowContext ctx, FlowNode node) {
@@ -156,7 +156,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "plugin_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void pluginEnable(FlowContext ctx, FlowNode node) {
@@ -169,7 +169,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "plugin_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void pluginDisable(FlowContext ctx, FlowNode node) {
@@ -182,7 +182,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "world_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void worldLoad(FlowContext ctx, FlowNode node) {
@@ -195,7 +195,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "world_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void worldUnload(FlowContext ctx, FlowNode node) {
@@ -209,7 +209,7 @@ public class SystemEventNodes {
         outputs = {
             @FlowPin(name = "chunk_x", dataType = FlowType.NUMBER),
             @FlowPin(name = "chunk_z", dataType = FlowType.NUMBER),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void chunkLoad(FlowContext ctx, FlowNode node) {
@@ -223,7 +223,7 @@ public class SystemEventNodes {
         outputs = {
             @FlowPin(name = "chunk_x", dataType = FlowType.NUMBER),
             @FlowPin(name = "chunk_z", dataType = FlowType.NUMBER),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void chunkUnload(FlowContext ctx, FlowNode node) {
@@ -236,7 +236,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "tick_number", dataType = FlowType.NUMBER),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void serverTick(FlowContext ctx, FlowNode node) {
@@ -249,7 +249,7 @@ public class SystemEventNodes {
         category = NodeDefinition.NodeCategory.EVENT,
         outputs = {
             @FlowPin(name = "world_name", dataType = FlowType.STRING),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void serverSave(FlowContext ctx, FlowNode node) {

@@ -1,6 +1,7 @@
 package restudio.resync.flow.registry;
 
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowType;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.FlowRuntime;
@@ -60,11 +61,19 @@ public class NodeRegistrar {
         );
 
         for (FlowPin pin : annotation.inputs()) {
-            builder.input(pin.name(), pin.type(), pin.dataType());
+            FlowType dataType = pin.dataType();
+            if (pin.type() == NodeDefinition.PinType.FLOW && dataType == FlowType.ANY) {
+                dataType = FlowType.EXECUTION;
+            }
+            builder.input(pin.name(), pin.type(), dataType);
         }
 
         for (FlowPin pin : annotation.outputs()) {
-            builder.output(pin.name(), pin.type(), pin.dataType());
+            FlowType dataType = pin.dataType();
+            if (pin.type() == NodeDefinition.PinType.FLOW && dataType == FlowType.ANY) {
+                dataType = FlowType.EXECUTION;
+            }
+            builder.output(pin.name(), pin.type(), dataType);
         }
 
         if (annotation.color() != -1) {

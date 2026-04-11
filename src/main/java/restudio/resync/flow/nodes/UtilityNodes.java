@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
+import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.registry.DefineNode;
@@ -303,10 +304,9 @@ public class UtilityNodes {
             String level = ctx.getInputValue(node, "level", String.class, "info");
             String message = ctx.getInputValue(node, "message", String.class, "");
             switch (level) {
-                case "warning" -> Bukkit.getLogger().warning(message);
-                case "severe" -> Bukkit.getLogger().severe(message);
-                case "fine" -> Bukkit.getLogger().fine(message);
-                default -> Bukkit.getLogger().info(message);
+                case "warning" -> Log.warn(message);
+                case "severe" -> Log.error(message);
+                default -> Log.info(message);
             }
             ctx.triggerOutput("flow");
         });
@@ -549,19 +549,19 @@ public class UtilityNodes {
 
     @DefineNode(id = "delay", displayName = "Delay", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {@FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void delay(FlowContext ctx, FlowNode node) {
         executeLegacy("delay", ctx, node);
     }
 
     @DefineNode(id = "run_async", displayName = "Run Async", category = NodeDefinition.NodeCategory.UTILITY,
-            outputs = {@FlowPin(name = "async_flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "async_flow", type = NodeDefinition.PinType.FLOW)})
     public void runAsync(FlowContext ctx, FlowNode node) {
         executeLegacy("run_async", ctx, node);
     }
 
     @DefineNode(id = "run_sync", displayName = "Run Sync", category = NodeDefinition.NodeCategory.UTILITY,
-            outputs = {@FlowPin(name = "sync_flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "sync_flow", type = NodeDefinition.PinType.FLOW)})
     public void runSync(FlowContext ctx, FlowNode node) {
         executeLegacy("run_sync", ctx, node);
     }
@@ -571,7 +571,7 @@ public class UtilityNodes {
                     @FlowPin(name = "level", dataType = FlowType.STRING),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void consoleLog(FlowContext ctx, FlowNode node) {
         executeLegacy("console_log", ctx, node);
     }

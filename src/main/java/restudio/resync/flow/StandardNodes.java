@@ -1,5 +1,7 @@
 package restudio.resync.flow;
 
+import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeRegistrar;
 
@@ -55,14 +57,27 @@ public class StandardNodes {
         registrar.scan(new restudio.resync.flow.nodes.TitleNodes());
         registrar.scan(new restudio.resync.flow.nodes.SystemEventNodes());
         registrar.scan(new restudio.resync.flow.nodes.CustomEventNodes());
-        registrar.scan(new restudio.resync.flow.nodes.EconomyNodes());
-        registrar.scan(new restudio.resync.flow.nodes.PermissionNodes());
+        scanSoftDependency(registrar, "Vault", "restudio.resync.flow.nodes.EconomyNodes");
+        scanSoftDependency(registrar, "LuckPerms", "restudio.resync.flow.nodes.PermissionNodes");
         registrar.scan(new restudio.resync.flow.nodes.LocationNodes());
         registrar.scan(new restudio.resync.flow.nodes.MathAdvancedNodes());
         registrar.scan(new restudio.resync.flow.nodes.StringAdvancedNodes());
         registrar.scan(new restudio.resync.flow.nodes.ListAdvancedNodes());
 
         registerLegacyCategories(registry);
+    }
+
+    private static void scanSoftDependency(NodeRegistrar registrar, String pluginName, String className) {
+        if (Bukkit.getPluginManager().getPlugin(pluginName) == null) {
+            Log.fine("[Flow] Skipping " + className.substring(className.lastIndexOf('.') + 1) + " — " + pluginName + " not installed");
+            return;
+        }
+        try {
+            Class<?> containerClass = Class.forName(className);
+            registrar.scan(containerClass);
+        } catch (NoClassDefFoundError | ClassNotFoundException e) {
+            Log.warn("[Flow] Failed to load " + className.substring(className.lastIndexOf('.') + 1) + ": " + e.getMessage());
+        }
     }
 
     private static void registerLegacyCategories(FlowRegistry registry) {

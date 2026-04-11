@@ -126,7 +126,7 @@ public class CustomEventNodes {
             @FlowPin(name = "data_payload", dataType = FlowType.ANY)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void customEventEmit(FlowContext ctx, FlowNode node) {
@@ -143,8 +143,8 @@ public class CustomEventNodes {
         },
         outputs = {
             @FlowPin(name = "listening", dataType = FlowType.BOOLEAN),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
-            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+            @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void customEventListen(FlowContext ctx, FlowNode node) {
@@ -159,7 +159,7 @@ public class CustomEventNodes {
             @FlowPin(name = "event_id", dataType = FlowType.STRING)
         },
         outputs = {
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void customEventClear(FlowContext ctx, FlowNode node) {
@@ -176,7 +176,7 @@ public class CustomEventNodes {
         },
         outputs = {
             @FlowPin(name = "value", dataType = FlowType.ANY),
-            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)
+            @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
         }
     )
     public void customEventGetData(FlowContext ctx, FlowNode node) {

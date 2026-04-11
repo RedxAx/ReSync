@@ -35,6 +35,7 @@ public class ConfigLoader {
         config.setApiKey(apiKey);
 
         config.setMaxConnections(Integer.parseInt(props.getProperty("maxConnections", "10")));
+        config.setLogLevel(props.getProperty("log-level", "info"));
 
         ReSyncConfig.CompressionConfig compression = new ReSyncConfig.CompressionConfig();
         compression.setEnabled(Boolean.parseBoolean(props.getProperty("compression.enabled", "true")));

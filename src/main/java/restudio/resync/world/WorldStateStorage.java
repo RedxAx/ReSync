@@ -3,6 +3,7 @@ package restudio.resync.world;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 
 import java.io.IOException;
@@ -57,7 +58,7 @@ public class WorldStateStorage {
             List<WorldRegistryEntry> worlds = gson.fromJson(raw, WORLD_LIST_TYPE);
             return worlds == null ? new ArrayList<>() : worlds;
         } catch (Exception exception) {
-            plugin.getLogger().warning("Failed to load world registry: " + exception.getMessage());
+            Log.warn("Failed to load world registry: " + exception.getMessage());
             return new ArrayList<>();
         }
     }
@@ -70,7 +71,7 @@ public class WorldStateStorage {
         try {
             Files.writeString(worldsFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save world registry: " + exception.getMessage());
+            Log.warn("Failed to save world registry: " + exception.getMessage());
         }
     }
 
@@ -83,7 +84,7 @@ public class WorldStateStorage {
             List<WorldPortal> portals = gson.fromJson(raw, PORTAL_LIST_TYPE);
             return portals == null ? new ArrayList<>() : portals;
         } catch (Exception exception) {
-            plugin.getLogger().warning("Failed to load portals: " + exception.getMessage());
+            Log.warn("Failed to load portals: " + exception.getMessage());
             return new ArrayList<>();
         }
     }
@@ -96,7 +97,7 @@ public class WorldStateStorage {
         try {
             Files.writeString(portalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save portals: " + exception.getMessage());
+            Log.warn("Failed to save portals: " + exception.getMessage());
         }
     }
 
@@ -109,7 +110,7 @@ public class WorldStateStorage {
             List<WorldInventoryGroup> groups = gson.fromJson(raw, INVENTORY_GROUP_LIST_TYPE);
             return groups == null ? new ArrayList<>() : groups;
         } catch (Exception exception) {
-            plugin.getLogger().warning("Failed to load inventory groups: " + exception.getMessage());
+            Log.warn("Failed to load inventory groups: " + exception.getMessage());
             return new ArrayList<>();
         }
     }
@@ -122,7 +123,7 @@ public class WorldStateStorage {
         try {
             Files.writeString(inventoryGroupsFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save inventory groups: " + exception.getMessage());
+            Log.warn("Failed to save inventory groups: " + exception.getMessage());
         }
     }
 
@@ -135,7 +136,7 @@ public class WorldStateStorage {
             List<WorldSignPortal> portals = gson.fromJson(raw, SIGN_PORTAL_LIST_TYPE);
             return portals == null ? new ArrayList<>() : portals;
         } catch (Exception exception) {
-            plugin.getLogger().warning("Failed to load sign portals: " + exception.getMessage());
+            Log.warn("Failed to load sign portals: " + exception.getMessage());
             return new ArrayList<>();
         }
     }
@@ -148,7 +149,7 @@ public class WorldStateStorage {
         try {
             Files.writeString(signPortalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save sign portals: " + exception.getMessage());
+            Log.warn("Failed to save sign portals: " + exception.getMessage());
         }
     }
 
@@ -173,7 +174,7 @@ public class WorldStateStorage {
             }
             return output;
         } catch (Exception exception) {
-            plugin.getLogger().warning("Failed to load player world states: " + exception.getMessage());
+            Log.warn("Failed to load player world states: " + exception.getMessage());
             return new LinkedHashMap<>();
         }
     }
@@ -188,7 +189,7 @@ public class WorldStateStorage {
         try {
             Files.writeString(playerStatesFile, gson.toJson(payload), StandardCharsets.UTF_8);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to save player world states: " + exception.getMessage());
+            Log.warn("Failed to save player world states: " + exception.getMessage());
         }
     }
 
@@ -196,7 +197,7 @@ public class WorldStateStorage {
         try {
             Files.createDirectories(rootDirectory);
         } catch (IOException exception) {
-            plugin.getLogger().warning("Failed to create world management directory: " + exception.getMessage());
+            Log.warn("Failed to create world management directory: " + exception.getMessage());
         }
     }
 }

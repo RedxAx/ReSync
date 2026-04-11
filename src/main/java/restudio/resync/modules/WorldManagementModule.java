@@ -1,7 +1,7 @@
 package restudio.resync.modules;
 
 import com.google.gson.Gson;
-import org.bukkit.Bukkit;
+import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.protocol.Codec;
@@ -149,7 +149,7 @@ public class WorldManagementModule implements Module, WorldManagementListener {
                 default -> send(session, WorldChannelMessage.error(request.action, "UnknownWorldAction"));
             }
         } catch (Exception exception) {
-            Bukkit.getLogger().warning("[ReSync] WorldManagement request failed: " + exception.getMessage());
+            Log.warn("WorldManagement request failed: " + exception.getMessage());
             send(session, WorldChannelMessage.error("worldRequest", "RequestFailed"));
         }
     }

@@ -597,147 +597,147 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_set_time", displayName = "Set Time", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "time", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetTime(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_time", ctx, node);
     }
 
     @DefineNode(id = "world_set_weather", displayName = "Set Weather", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "weather", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetWeather(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_weather", ctx, node);
     }
 
     @DefineNode(id = "world_set_thunder", displayName = "Set Thunder", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "thundering", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetThunder(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_thunder", ctx, node);
     }
 
     @DefineNode(id = "world_set_spawn", displayName = "Set Spawn", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetSpawn(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_spawn", ctx, node);
     }
 
     @DefineNode(id = "world_set_difficulty", displayName = "Set Difficulty", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "difficulty", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetDifficulty(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_difficulty", ctx, node);
     }
 
     @DefineNode(id = "world_set_pvp", displayName = "Set Pvp", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "pvp", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetPvp(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_pvp", ctx, node);
     }
 
     @DefineNode(id = "world_set_keep_spawn", displayName = "Set Keep Spawn", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "keep_spawn_time", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetKeepSpawn(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_keep_spawn", ctx, node);
     }
 
     @DefineNode(id = "world_set_auto_save", displayName = "Set Auto Save", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "auto_save", dataType = FlowType.BOOLEAN)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetAutoSave(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_auto_save", ctx, node);
     }
 
     @DefineNode(id = "world_spawn_lightning", displayName = "Spawn Lightning", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
                     @FlowPin(name = "effect", dataType = FlowType.STRING)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSpawnLightning(FlowContext ctx, FlowNode node) {
         executeLegacy("world_spawn_lightning", ctx, node);
     }
 
     @DefineNode(id = "world_set_border_size", displayName = "Set Border Size", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "size", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetBorderSize(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_border_size", ctx, node);
     }
 
     @DefineNode(id = "world_set_border_damage", displayName = "Set Border Damage", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "damage_amount", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetBorderDamage(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_border_damage", ctx, node);
     }
 
     @DefineNode(id = "world_set_border_warning", displayName = "Set Border Warning", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
                     @FlowPin(name = "warning_distance", dataType = FlowType.NUMBER)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)})
+            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void worldSetBorderWarning(FlowContext ctx, FlowNode node) {
         executeLegacy("world_set_border_warning", ctx, node);
     }
 
     @DefineNode(id = "world_management_create_world", displayName = "Create World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "seed", dataType = FlowType.STRING),
                     @FlowPin(name = "environment", dataType = FlowType.STRING),
                     @FlowPin(name = "generator", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -746,9 +746,9 @@ public class WorldStateNodes {
     }
 
     @DefineNode(id = "world_management_scan_worlds", displayName = "Scan Worlds", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "count", dataType = FlowType.NUMBER)
@@ -758,9 +758,9 @@ public class WorldStateNodes {
     }
 
     @DefineNode(id = "world_management_import_worlds", displayName = "Import Worlds", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "count", dataType = FlowType.NUMBER)
@@ -771,13 +771,13 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_clone_world", displayName = "Clone World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "source_world", dataType = FlowType.STRING),
                     @FlowPin(name = "target_world", dataType = FlowType.STRING),
                     @FlowPin(name = "load_after_clone", dataType = FlowType.BOOLEAN)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -787,11 +787,11 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_load_world", displayName = "Load World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -801,12 +801,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_unload_world", displayName = "Unload World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "fallback_world", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -816,13 +816,13 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_delete_world", displayName = "Delete World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "delete_files", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "fallback_world", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -832,13 +832,13 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_rule", displayName = "Set World Rule", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "rule_name", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -848,12 +848,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_difficulty", displayName = "Set World Difficulty", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "difficulty", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -863,13 +863,13 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_time_lock", displayName = "Set Time Lock", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "locked_time", dataType = FlowType.NUMBER)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -879,14 +879,14 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_weather_lock", displayName = "Set Weather Lock", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "storm", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "thundering", dataType = FlowType.BOOLEAN)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -896,12 +896,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_isolated_state", displayName = "Set Isolated State", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -911,7 +911,7 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_create_portal", displayName = "Create Portal", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "portal_name", dataType = FlowType.STRING),
                     @FlowPin(name = "source_world", dataType = FlowType.STRING),
                     @FlowPin(name = "min_x", dataType = FlowType.NUMBER),
@@ -929,7 +929,7 @@ public class WorldStateNodes {
                     @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
@@ -940,11 +940,11 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_delete_portal", displayName = "Delete Portal", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -954,12 +954,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_portal_enabled", displayName = "Set Portal Enabled", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING),
                     @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
@@ -970,7 +970,7 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_portal_destination", displayName = "Set Portal Destination", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING),
                     @FlowPin(name = "destination_world", dataType = FlowType.STRING),
                     @FlowPin(name = "destination_x", dataType = FlowType.NUMBER),
@@ -980,7 +980,7 @@ public class WorldStateNodes {
                     @FlowPin(name = "destination_pitch", dataType = FlowType.NUMBER)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
@@ -991,7 +991,7 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_set_portal_bounds", displayName = "Set Portal Bounds", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING),
                     @FlowPin(name = "source_world", dataType = FlowType.STRING),
                     @FlowPin(name = "min_x", dataType = FlowType.NUMBER),
@@ -1002,7 +1002,7 @@ public class WorldStateNodes {
                     @FlowPin(name = "max_z", dataType = FlowType.NUMBER)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
@@ -1013,7 +1013,7 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_teleport_player_to_world", displayName = "Teleport Player To World", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING),
                     @FlowPin(name = "x", dataType = FlowType.NUMBER),
@@ -1023,7 +1023,7 @@ public class WorldStateNodes {
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -1033,12 +1033,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_teleport_player_to_world_spawn", displayName = "Teleport Player To World Spawn", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "world_name", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })
@@ -1048,12 +1048,12 @@ public class WorldStateNodes {
 
     @DefineNode(id = "world_management_teleport_player_to_portal", displayName = "Teleport Player To Portal", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "portal_id", dataType = FlowType.STRING)
             },
             outputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW, dataType = FlowType.EXECUTION),
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             })

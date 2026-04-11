@@ -7,6 +7,7 @@ import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 
+import restudio.resync.Log;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -75,7 +76,7 @@ public class FlowStorage {
                 graphCache.put(id, graph);
                 return graph;
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.warn("Failed to load flow: " + id + " - " + e.getMessage());
             }
         }
         return null;
@@ -88,7 +89,7 @@ public class FlowStorage {
             String json = FlowSerializer.serialize(graph);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save flow: " + graph.getId() + " - " + e.getMessage());
         }
     }
 
@@ -103,7 +104,7 @@ public class FlowStorage {
                 Files.delete(file.toPath());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to delete flow: " + id + " - " + e.getMessage());
         }
     }
 
@@ -121,7 +122,7 @@ public class FlowStorage {
                 guiCache.put(id, gui);
                 return gui;
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.warn("Failed to load GUI: " + id + " - " + e.getMessage());
             }
         }
         return null;
@@ -134,7 +135,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeGui(gui);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save GUI: " + gui.getId() + " - " + e.getMessage());
         }
     }
 
@@ -149,7 +150,7 @@ public class FlowStorage {
                 Files.delete(file.toPath());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to delete GUI: " + id + " - " + e.getMessage());
         }
     }
 
@@ -167,7 +168,7 @@ public class FlowStorage {
                 scoreboardCache.put(id, scoreboard);
                 return scoreboard;
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.warn("Failed to load scoreboard: " + id + " - " + e.getMessage());
             }
         }
         return null;
@@ -180,7 +181,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeScoreboard(scoreboard);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save scoreboard: " + scoreboard.getId() + " - " + e.getMessage());
         }
     }
 
@@ -195,7 +196,7 @@ public class FlowStorage {
                 Files.delete(file.toPath());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to delete scoreboard: " + id + " - " + e.getMessage());
         }
     }
 
@@ -213,7 +214,7 @@ public class FlowStorage {
                 tabCache.put(id, tab);
                 return tab;
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.warn("Failed to load tab: " + id + " - " + e.getMessage());
             }
         }
         return null;
@@ -226,7 +227,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeTab(tab);
             Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save tab: " + tab.getId() + " - " + e.getMessage());
         }
     }
 
@@ -241,7 +242,7 @@ public class FlowStorage {
                 Files.delete(file.toPath());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to delete tab: " + id + " - " + e.getMessage());
         }
     }
 
@@ -414,7 +415,7 @@ public class FlowStorage {
             }
             persistDefaultScoreboard();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to load default scoreboard config: " + e.getMessage());
         }
     }
 
@@ -457,7 +458,7 @@ public class FlowStorage {
             }
             persistDefaultTab();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to load default tab config: " + e.getMessage());
         }
     }
 
@@ -494,7 +495,7 @@ public class FlowStorage {
                 persistTabRefreshConfig();
             }
         } catch (IOException | NumberFormatException e) {
-            e.printStackTrace();
+            Log.warn("Failed to load tab refresh config: " + e.getMessage());
         }
     }
 
@@ -512,7 +513,7 @@ public class FlowStorage {
         try (FileInputStream fis = new FileInputStream(configFile)) {
             properties.load(fis);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to load config: " + e.getMessage());
         }
         return properties;
     }
@@ -521,7 +522,7 @@ public class FlowStorage {
         try (FileOutputStream fos = new FileOutputStream(configFile)) {
             properties.store(fos, "ReSync Configuration");
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to save config: " + e.getMessage());
         }
     }
 
@@ -548,7 +549,7 @@ public class FlowStorage {
             properties.remove("flow.default-below-name.usePapi");
             storeConfigProperties(properties);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.warn("Failed to cleanup below-name data: " + e.getMessage());
         }
     }
 }

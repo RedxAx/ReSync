@@ -19,7 +19,7 @@ import java.util.List;
 public class EntitySpawnNodes {
 
     @DefineNode(id = "entity_spawn", displayName = "Spawn Entity", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity_type", dataType = FlowType.STRING), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity_type", dataType = FlowType.STRING), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
             outputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySpawn(FlowContext ctx, FlowNode node) {
         String entityType = ctx.getInputValue(node, "entity_type", String.class, "ZOMBIE");
@@ -39,7 +39,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_despawn", displayName = "Despawn Entity", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityDespawn(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
@@ -50,7 +50,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_get_nearby", displayName = "Nearby Entities", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "entities", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityGetNearby(FlowContext ctx, FlowNode node) {
         Location center = ctx.getInputValue(node, "center", Location.class, null);
@@ -73,7 +73,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_get_all", displayName = "All Entities", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "entities", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityGetAll(FlowContext ctx, FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class, null);
@@ -100,7 +100,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_teleport", displayName = "Teleport Entity", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityTeleport(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
@@ -112,7 +112,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_remove", displayName = "Remove Entity", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityRemove(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
@@ -123,7 +123,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_get_player_nearby", displayName = "Nearby Players", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "players", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityGetPlayerNearby(FlowContext ctx, FlowNode node) {
         Location center = ctx.getInputValue(node, "center", Location.class, null);
@@ -141,7 +141,7 @@ public class EntitySpawnNodes {
     }
 
     @DefineNode(id = "entity_get_mob_nearby", displayName = "Nearby Mobs", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "center", dataType = FlowType.LOCATION), @FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "entity_type", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "mobs", dataType = FlowType.LIST), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityGetMobNearby(FlowContext ctx, FlowNode node) {
         Location center = ctx.getInputValue(node, "center", Location.class, null);

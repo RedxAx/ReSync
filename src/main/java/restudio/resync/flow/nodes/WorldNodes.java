@@ -62,7 +62,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_time", displayName = "Set Time", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "time_ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "time_ticks", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setTime(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -80,7 +80,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_full_time", displayName = "Set Full Time", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "full_time_ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "full_time_ticks", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setFullTime(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -98,7 +98,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_day_time", displayName = "Set Day Time", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "time", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "time", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setDayTime(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -108,7 +108,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_weather", displayName = "Set Weather", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "weather_type", dataType = FlowType.STRING), @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "weather_type", dataType = FlowType.STRING), @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setWeather(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -141,7 +141,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_spawn_set", displayName = "Set Spawn", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setSpawn(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -159,7 +159,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_difficulty", displayName = "Set Difficulty", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "difficulty", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "difficulty", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setDifficulty(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -185,7 +185,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_pvp", displayName = "Set PVP", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "pvp_enabled", dataType = FlowType.BOOLEAN)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "pvp_enabled", dataType = FlowType.BOOLEAN)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setPvp(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -203,7 +203,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_save", displayName = "Save", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void save(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -212,7 +212,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_auto_save_set", displayName = "Set Auto Save", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "interval_ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "interval_ticks", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setAutoSave(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);
@@ -222,7 +222,7 @@ public class WorldNodes {
     }
 
     @DefineNode(id = "world_set_spawn_limits", displayName = "Set Spawn Limits", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {@FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "monsters", dataType = FlowType.NUMBER), @FlowPin(name = "animals", dataType = FlowType.NUMBER), @FlowPin(name = "water_ambient", dataType = FlowType.NUMBER), @FlowPin(name = "water_animals", dataType = FlowType.NUMBER), @FlowPin(name = "water_underground", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "world", dataType = FlowType.ANY), @FlowPin(name = "monsters", dataType = FlowType.NUMBER), @FlowPin(name = "animals", dataType = FlowType.NUMBER), @FlowPin(name = "water_ambient", dataType = FlowType.NUMBER), @FlowPin(name = "water_animals", dataType = FlowType.NUMBER), @FlowPin(name = "water_underground", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setSpawnLimits(FlowContext ctx, restudio.flow.data.FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class);

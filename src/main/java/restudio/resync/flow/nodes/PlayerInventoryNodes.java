@@ -23,7 +23,7 @@ import restudio.resync.flow.util.TextFormatter;
 public class PlayerInventoryNodes {
 
     @DefineNode(id = "player_give_item", displayName = "Give Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void giveItem(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -35,7 +35,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_take_item", displayName = "Take Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void takeItem(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -50,7 +50,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item", displayName = "Set Slot Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot", dataType = FlowType.NUMBER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot", dataType = FlowType.NUMBER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItem(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -63,7 +63,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_clear_slot", displayName = "Clear Slot", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void clearSlot(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -75,7 +75,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_swap_items", displayName = "Swap Slots", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot1", dataType = FlowType.NUMBER), @FlowPin(name = "slot2", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "slot1", dataType = FlowType.NUMBER), @FlowPin(name = "slot2", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void swapItems(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -93,7 +93,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_helmet", displayName = "Set Helmet", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setHelmet(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -105,7 +105,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_chestplate", displayName = "Set Chestplate", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setChestplate(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -117,7 +117,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_leggings", displayName = "Set Leggings", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setLeggings(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -129,7 +129,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_boots", displayName = "Set Boots", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setBoots(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -141,7 +141,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_mainhand", displayName = "Set MainHand", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setMainHand(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -153,7 +153,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_offhand", displayName = "Set OffHand", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setOffHand(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -165,7 +165,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_inventory_title", displayName = "Open Inventory", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "title", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "title", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setInventoryTitle(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -178,6 +178,7 @@ public class PlayerInventoryNodes {
 
     @DefineNode(id = "player_set_armor_color", displayName = "Set Armor Color", category = NodeDefinition.NodeCategory.INVENTORY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "slot", dataType = FlowType.ANY),
                     @FlowPin(name = "red", dataType = FlowType.NUMBER),
@@ -204,7 +205,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_repair_item", displayName = "Repair Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void repairItem(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -216,7 +217,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_enchant_item", displayName = "Enchant Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "enchantment", dataType = FlowType.STRING), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "enchantment", dataType = FlowType.STRING), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void enchantItem(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -239,7 +240,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_unenchant_item", displayName = "Unenchant Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "enchantment", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "enchantment", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void unenchantItem(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -261,7 +262,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_clear_enchants", displayName = "Clear Enchants", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void clearEnchants(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -279,7 +280,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item_name", displayName = "Set Item Name", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "name", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "name", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItemName(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -298,7 +299,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item_lore", displayName = "Set Item Lore", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "lore", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "lore", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItemLore(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -317,7 +318,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item_flags", displayName = "Set Item Flags", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flags", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flags", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItemFlags(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -338,7 +339,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item_custom_model", displayName = "Set Custom Model", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "model_data", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "model_data", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItemCustomModel(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
@@ -357,7 +358,7 @@ public class PlayerInventoryNodes {
     }
 
     @DefineNode(id = "player_set_item_unbreakable", displayName = "Set Unbreakable", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "unbreakable", dataType = FlowType.BOOLEAN)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "unbreakable", dataType = FlowType.BOOLEAN)},
             outputs = {@FlowPin(name = "item", dataType = FlowType.ITEMSTACK), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setItemUnbreakable(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);

@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 public class FlowControlNodes {
 
     @DefineNode(id = "if", displayName = "If", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "condition", dataType = FlowType.BOOLEAN)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "condition", dataType = FlowType.BOOLEAN)},
             outputs = {@FlowPin(name = "true", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "false", type = NodeDefinition.PinType.FLOW)})
     public void ifNode(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Boolean condition = ctx.getInputValue(node, "condition", Boolean.class, false);
@@ -24,7 +24,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "switch_case", displayName = "Switch", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "value", dataType = FlowType.ANY), @FlowPin(name = "cases", dataType = FlowType.LIST)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "value", dataType = FlowType.ANY), @FlowPin(name = "cases", dataType = FlowType.LIST)},
             outputs = {
                     @FlowPin(name = "default", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "matched", dataType = FlowType.BOOLEAN),
@@ -47,7 +47,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "branch_random", displayName = "Random Branch", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "branches", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "branches", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "selected", dataType = FlowType.NUMBER), @FlowPin(name = "branch", type = NodeDefinition.PinType.FLOW)})
     public void branchRandom(FlowContext ctx, restudio.flow.data.FlowNode node) {
         int branches = ctx.getInputValue(node, "branches", Integer.class, 2);
@@ -57,6 +57,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "branch_all", displayName = "Branch All", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
                     @FlowPin(name = "branch_0", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "branch_1", type = NodeDefinition.PinType.FLOW),
@@ -71,7 +72,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "loop_count", displayName = "Loop Count", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "count", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "count", dataType = FlowType.NUMBER)},
             outputs = {
                     @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "index", dataType = FlowType.NUMBER),
@@ -98,7 +99,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "loop_for_each", displayName = "For Each", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "list", dataType = FlowType.LIST)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "list", dataType = FlowType.LIST)},
             outputs = {
                     @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "index", dataType = FlowType.NUMBER),
@@ -135,6 +136,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "loop_for_each_player", displayName = "For Each Player", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
                     @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "index", dataType = FlowType.NUMBER),
@@ -171,7 +173,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "loop_for_each_entity", displayName = "For Each Entity", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "center", dataType = FlowType.LOCATION)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "radius", dataType = FlowType.NUMBER), @FlowPin(name = "center", dataType = FlowType.LOCATION)},
             outputs = {
                     @FlowPin(name = "loop", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "index", dataType = FlowType.NUMBER),
@@ -215,6 +217,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "break_loop", displayName = "Break", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void breakLoop(FlowContext ctx, restudio.flow.data.FlowNode node) {
         ctx.getRuntime().setBreakLoopRequested(true);
@@ -222,6 +225,7 @@ public class FlowControlNodes {
     }
 
     @DefineNode(id = "continue_loop", displayName = "Continue", category = NodeDefinition.NodeCategory.LOGIC,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void continueLoop(FlowContext ctx, restudio.flow.data.FlowNode node) {
         ctx.getRuntime().setContinueLoopRequested(true);

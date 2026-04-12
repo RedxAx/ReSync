@@ -37,6 +37,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_type", displayName = "Entity Set Type", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "entity_type", dataType = FlowType.STRING)
             },
@@ -61,6 +62,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_name", displayName = "Entity Set Name", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "name", dataType = FlowType.STRING)
             },
@@ -76,6 +78,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_custom_name_visible", displayName = "Entity Set Name Visible", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "visible", dataType = FlowType.BOOLEAN)
             },
@@ -91,6 +94,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_rotation", displayName = "Entity Set Rotation", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
                     @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
@@ -111,6 +115,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_health", displayName = "Entity Set Health", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "health", dataType = FlowType.NUMBER)
             },
@@ -126,6 +131,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_max_health", displayName = "Entity Set Max Health", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "max_health", dataType = FlowType.NUMBER)
             },
@@ -141,6 +147,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_speed", displayName = "Entity Set Speed", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "speed", dataType = FlowType.NUMBER)
             },
@@ -156,6 +163,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_damage", displayName = "Entity Set Damage", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "damage", dataType = FlowType.NUMBER)
             },
@@ -171,6 +179,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_armor_value", displayName = "Entity Set Armor Value", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "armor", dataType = FlowType.NUMBER)
             },
@@ -186,6 +195,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_follow_range", displayName = "Entity Set Follow Range", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "range", dataType = FlowType.NUMBER)
             },
@@ -201,6 +211,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_knockback_resistance", displayName = "Entity Set Knockback Resistance", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "resistance", dataType = FlowType.NUMBER)
             },
@@ -216,6 +227,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_target", displayName = "Entity Set Target", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "target", dataType = FlowType.ENTITY)
             },
@@ -230,7 +242,7 @@ public class EntityControlNodes {
     }
 
     @DefineNode(id = "entity_clear_target", displayName = "Entity Clear Target", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityClearTarget(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
@@ -242,6 +254,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_persistent", displayName = "Entity Set Persistent", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "persistent", dataType = FlowType.BOOLEAN)
             },
@@ -257,6 +270,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_invulnerable", displayName = "Entity Set Invulnerable", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "invulnerable", dataType = FlowType.BOOLEAN)
             },
@@ -272,6 +286,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_silent", displayName = "Entity Set Silent", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "silent", dataType = FlowType.BOOLEAN)
             },
@@ -287,6 +302,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_glowing", displayName = "Entity Set Glowing", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "glowing", dataType = FlowType.BOOLEAN)
             },
@@ -302,6 +318,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_burning", displayName = "Entity Set Burning", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
             },
@@ -317,6 +334,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_frozen", displayName = "Entity Set Frozen", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
             },
@@ -332,6 +350,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_wet", displayName = "Entity Set Wet", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "wet", dataType = FlowType.BOOLEAN)
             },
@@ -347,6 +366,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_swimming", displayName = "Entity Set Swimming", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "swimming", dataType = FlowType.BOOLEAN)
             },
@@ -362,6 +382,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_shaking", displayName = "Entity Set Shaking", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "shaking", dataType = FlowType.BOOLEAN)
             },
@@ -377,6 +398,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_baby", displayName = "Entity Set Baby", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "is_baby", dataType = FlowType.BOOLEAN)
             },
@@ -395,6 +417,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_tamed", displayName = "Entity Set Tamed", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "tamed", dataType = FlowType.BOOLEAN)
             },
@@ -410,6 +433,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_owner", displayName = "Entity Set Owner", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "owner", dataType = FlowType.ENTITY)
             },
@@ -425,6 +449,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_sitting", displayName = "Entity Set Sitting", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "sitting", dataType = FlowType.BOOLEAN)
             },
@@ -440,6 +465,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_angry", displayName = "Entity Set Angry", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "angry", dataType = FlowType.BOOLEAN)
             },
@@ -460,6 +486,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_love_mode", displayName = "Entity Set Love Mode", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
             },
@@ -475,6 +502,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_color", displayName = "Entity Set Color", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "color", dataType = FlowType.STRING)
             },
@@ -498,6 +526,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_variant", displayName = "Entity Set Variant", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "variant", dataType = FlowType.STRING)
             },
@@ -563,6 +592,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_held_item", displayName = "Entity Set Held Item", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             },
@@ -578,6 +608,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_armor", displayName = "Entity Set Armor", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "slot", dataType = FlowType.STRING),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
@@ -602,6 +633,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_set_drop_chances", displayName = "Entity Set Drop Chances", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "chance", dataType = FlowType.NUMBER)
             },
@@ -623,6 +655,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_add_drop", displayName = "Entity Add Drop", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "item", dataType = FlowType.ITEMSTACK)
             },
@@ -637,7 +670,7 @@ public class EntityControlNodes {
     }
 
     @DefineNode(id = "entity_clear_drops", displayName = "Entity Clear Drops", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "entity", dataType = FlowType.ENTITY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entityClearDrops(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
@@ -649,6 +682,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_pickup_item", displayName = "Entity Pickup Item", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "can_pickup", dataType = FlowType.BOOLEAN)
             },
@@ -664,6 +698,7 @@ public class EntityControlNodes {
 
     @DefineNode(id = "entity_kill", displayName = "Entity Kill", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
                     @FlowPin(name = "reason", dataType = FlowType.STRING)
             },

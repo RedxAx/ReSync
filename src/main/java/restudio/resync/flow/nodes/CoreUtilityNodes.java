@@ -12,7 +12,7 @@ import restudio.resync.flow.registry.NodeDefinition;
 public class CoreUtilityNodes {
 
     @DefineNode(id = "log", displayName = "Log", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "text", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "text", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void log(FlowContext ctx, FlowNode node) {
         Object text = ctx.getInputValue(node, "text", String.class, "");
@@ -21,7 +21,7 @@ public class CoreUtilityNodes {
     }
 
     @DefineNode(id = "cancel_event", displayName = "Cancel Event", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "cancel", dataType = FlowType.BOOLEAN)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "cancel", dataType = FlowType.BOOLEAN)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void cancelEvent(FlowContext ctx, FlowNode node) {
         Boolean cancel = ctx.getInputValue(node, "cancel", Boolean.class, true);
@@ -32,7 +32,7 @@ public class CoreUtilityNodes {
     }
 
     @DefineNode(id = "delay", displayName = "Delay", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
             outputs = {
                     @FlowPin(name = "done", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)

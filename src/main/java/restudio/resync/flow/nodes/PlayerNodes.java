@@ -32,7 +32,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_message", displayName = "Message", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void message(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -44,7 +44,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_kick", displayName = "Kick", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "reason", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "reason", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void kick(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -67,7 +67,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_teleport", displayName = "Teleport", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "location", dataType = FlowType.LOCATION), @FlowPin(name = "x", dataType = FlowType.NUMBER), @FlowPin(name = "y", dataType = FlowType.NUMBER), @FlowPin(name = "z", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "location", dataType = FlowType.LOCATION), @FlowPin(name = "x", dataType = FlowType.NUMBER), @FlowPin(name = "y", dataType = FlowType.NUMBER), @FlowPin(name = "z", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void teleport(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -87,7 +87,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "give_item", displayName = "Give Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void giveItem(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -105,7 +105,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_set_walking_speed", displayName = "Set Walking Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setWalkingSpeed(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -117,7 +117,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_set_flying_speed", displayName = "Set Flying Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void setFlyingSpeed(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -129,7 +129,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_execute_command", displayName = "Execute Command", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "command", dataType = FlowType.STRING), @FlowPin(name = "as_op", dataType = FlowType.BOOLEAN)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "command", dataType = FlowType.STRING), @FlowPin(name = "as_op", dataType = FlowType.BOOLEAN)},
             outputs = {@FlowPin(name = "success", dataType = FlowType.BOOLEAN), @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void executeCommand(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -160,7 +160,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_chat", displayName = "Chat", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "message", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "message", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void chat(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);
@@ -178,7 +178,7 @@ public class PlayerNodes {
     }
 
     @DefineNode(id = "player_say", displayName = "Say", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "message", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "message", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void say(FlowContext ctx, restudio.flow.data.FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class);

@@ -22,7 +22,7 @@ import restudio.resync.flow.util.TextFormatter;
 public class PlayerMessagingNodes {
 
     @DefineNode(id = "player_send_message", displayName = "Send Message", category = NodeDefinition.NodeCategory.PLAYER,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void sendMessage(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -39,7 +39,7 @@ public class PlayerMessagingNodes {
     }
 
     @DefineNode(id = "player_send_action_bar", displayName = "Send ActionBar", category = NodeDefinition.NodeCategory.PLAYER,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "text", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void sendActionBar(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -57,6 +57,7 @@ public class PlayerMessagingNodes {
 
     @DefineNode(id = "player_send_title", displayName = "Send Title", category = NodeDefinition.NodeCategory.PLAYER,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "title", dataType = FlowType.STRING),
                     @FlowPin(name = "subtitle", dataType = FlowType.STRING),
@@ -77,6 +78,7 @@ public class PlayerMessagingNodes {
 
     @DefineNode(id = "player_send_sound", displayName = "Send Sound", category = NodeDefinition.NodeCategory.PLAYER,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "sound", dataType = FlowType.STRING),
                     @FlowPin(name = "volume", dataType = FlowType.NUMBER),
@@ -107,6 +109,7 @@ public class PlayerMessagingNodes {
 
     @DefineNode(id = "player_send_particle", displayName = "Send Particle", category = NodeDefinition.NodeCategory.PLAYER,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
                     @FlowPin(name = "particle", dataType = FlowType.STRING),
                     @FlowPin(name = "count", dataType = FlowType.NUMBER),
@@ -142,7 +145,7 @@ public class PlayerMessagingNodes {
     }
 
     @DefineNode(id = "player_send_book", displayName = "Send Book", category = NodeDefinition.NodeCategory.PLAYER,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "book", dataType = FlowType.ITEMSTACK)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "book", dataType = FlowType.ITEMSTACK)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void sendBook(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -158,7 +161,7 @@ public class PlayerMessagingNodes {
     }
 
     @DefineNode(id = "player_send_sign", displayName = "Open Sign", category = NodeDefinition.NodeCategory.PLAYER,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void sendSign(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);
@@ -182,7 +185,7 @@ public class PlayerMessagingNodes {
     }
 
     @DefineNode(id = "player_send_raw_json", displayName = "Send Raw Json", category = NodeDefinition.NodeCategory.PLAYER,
-            inputs = {@FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "json", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "json", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void sendRawJson(FlowContext ctx, FlowNode node) {
         Player target = ctx.getInputValue(node, "target", Player.class, null);

@@ -17,7 +17,7 @@ import java.util.Map;
 public class CoreVariableNodes {
 
     @DefineNode(id = "get_variable", displayName = "Get Variable", category = NodeDefinition.NodeCategory.VARIABLE,
-            inputs = {@FlowPin(name = "name", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "name", dataType = FlowType.STRING)},
             outputs = {
                     @FlowPin(name = "value", dataType = FlowType.ANY),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
@@ -31,6 +31,7 @@ public class CoreVariableNodes {
 
     @DefineNode(id = "set_variable", displayName = "Set Variable", category = NodeDefinition.NodeCategory.VARIABLE,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
                     @FlowPin(name = "value", dataType = FlowType.ANY)
             },
@@ -43,7 +44,7 @@ public class CoreVariableNodes {
     }
 
     @DefineNode(id = "get_server_var", displayName = "Get Server Variable", category = NodeDefinition.NodeCategory.VARIABLE,
-            inputs = {@FlowPin(name = "name", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "name", dataType = FlowType.STRING)},
             outputs = {
                     @FlowPin(name = "value", dataType = FlowType.ANY),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
@@ -56,7 +57,7 @@ public class CoreVariableNodes {
     }
 
     @DefineNode(id = "call_function", displayName = "Call Function", category = NodeDefinition.NodeCategory.FUNCTION,
-            inputs = {@FlowPin(name = "function", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "function", dataType = FlowType.STRING)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void callFunction(FlowContext ctx, FlowNode node) {
         String functionName = ctx.getInputValue(node, "function", String.class, "");
@@ -75,7 +76,7 @@ public class CoreVariableNodes {
     }
 
     @DefineNode(id = "return", displayName = "Return", category = NodeDefinition.NodeCategory.FUNCTION,
-            inputs = {@FlowPin(name = "value", dataType = FlowType.ANY)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "value", dataType = FlowType.ANY)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void returnNode(FlowContext ctx, FlowNode node) {
         Object returnValue = ctx.getInputValue(node, "value", Object.class, null);

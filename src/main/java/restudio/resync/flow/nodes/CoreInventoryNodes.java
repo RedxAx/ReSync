@@ -14,7 +14,7 @@ import restudio.resync.flow.registry.NodeDefinition;
 public class CoreInventoryNodes {
 
     @DefineNode(id = "player_has_item", displayName = "Player Has Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
             outputs = {
                     @FlowPin(name = "has", dataType = FlowType.BOOLEAN),
                     @FlowPin(name = "count", dataType = FlowType.NUMBER),
@@ -44,7 +44,7 @@ public class CoreInventoryNodes {
     }
 
     @DefineNode(id = "player_remove_item", displayName = "Player Remove Item", category = NodeDefinition.NodeCategory.INVENTORY,
-            inputs = {@FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "material", dataType = FlowType.STRING), @FlowPin(name = "amount", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerRemoveItem(FlowContext ctx, FlowNode node) {
         Player player = ctx.getPlayer();
@@ -61,6 +61,7 @@ public class CoreInventoryNodes {
     }
 
     @DefineNode(id = "player_clear_inv", displayName = "Player Clear Inventory", category = NodeDefinition.NodeCategory.INVENTORY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void playerClearInv(FlowContext ctx, FlowNode node) {
         Player player = ctx.getPlayer();

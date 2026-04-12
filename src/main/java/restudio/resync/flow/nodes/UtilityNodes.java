@@ -548,19 +548,21 @@ public class UtilityNodes {
     }
 
     @DefineNode(id = "delay", displayName = "Delay", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void delay(FlowContext ctx, FlowNode node) {
         executeLegacy("delay", ctx, node);
     }
 
     @DefineNode(id = "run_async", displayName = "Run Async", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "async_flow", type = NodeDefinition.PinType.FLOW)})
     public void runAsync(FlowContext ctx, FlowNode node) {
         executeLegacy("run_async", ctx, node);
     }
 
     @DefineNode(id = "run_sync", displayName = "Run Sync", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "sync_flow", type = NodeDefinition.PinType.FLOW)})
     public void runSync(FlowContext ctx, FlowNode node) {
         executeLegacy("run_sync", ctx, node);
@@ -568,6 +570,7 @@ public class UtilityNodes {
 
     @DefineNode(id = "console_log", displayName = "Console Log", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "level", dataType = FlowType.STRING),
                     @FlowPin(name = "message", dataType = FlowType.STRING)
             },

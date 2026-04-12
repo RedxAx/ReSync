@@ -18,6 +18,7 @@ public class DebugNodes {
 
     @DefineNode(id = "debug_log", displayName = "Debug Log", category = NodeDefinition.NodeCategory.UTILITY,
             inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "message", dataType = FlowType.STRING),
                     @FlowPin(name = "level", dataType = FlowType.STRING)
             },
@@ -36,7 +37,7 @@ public class DebugNodes {
     }
 
     @DefineNode(id = "debug_print_variable", displayName = "Debug Print Variable", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "variable_name", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "variable_name", dataType = FlowType.STRING)},
             outputs = {
                     @FlowPin(name = "value", dataType = FlowType.ANY),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
@@ -54,7 +55,7 @@ public class DebugNodes {
     }
 
     @DefineNode(id = "debug_dump_variables", displayName = "Debug Dump Variables", category = NodeDefinition.NodeCategory.UTILITY,
-            inputs = {@FlowPin(name = "scope", dataType = FlowType.STRING)},
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "scope", dataType = FlowType.STRING)},
             outputs = {
                     @FlowPin(name = "variables", dataType = FlowType.LIST),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
@@ -86,6 +87,7 @@ public class DebugNodes {
     }
 
     @DefineNode(id = "debug_stack_trace", displayName = "Debug Stack Trace", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {
                     @FlowPin(name = "stack_trace", dataType = FlowType.STRING),
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)
@@ -106,6 +108,7 @@ public class DebugNodes {
     }
 
     @DefineNode(id = "debug_break", displayName = "Debug Break", category = NodeDefinition.NodeCategory.UTILITY,
+            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)},
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void debugBreak(FlowContext ctx, FlowNode node) {
         if (debugMode) {

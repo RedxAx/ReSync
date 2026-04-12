@@ -6,11 +6,14 @@ import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
+import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.flow.sync.NodePluginPayload;
+import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
 import restudio.resync.modules.flow.FlowGuiPacketHandler;
@@ -24,6 +27,9 @@ import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,10 +44,14 @@ public class FlowModule implements Module {
     private final FlowTabPacketHandler tabHandler;
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
+    private final NodeDefinitionRegistry definitionRegistry;
+    private final FlowNodePluginRegistry pluginRegistry;
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry) {
         this.storage = storage;
+        this.definitionRegistry = definitionRegistry;
+        this.pluginRegistry = pluginRegistry;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions);
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
         this.guiHandler = new FlowGuiPacketHandler(storage, sender);
@@ -123,6 +133,37 @@ public class FlowModule implements Module {
             Log.error("Error handling flow packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
             sender.sendError(session, "PROCESSING_ERROR", e.getMessage());
         }
+
+        if (packetId == 0x03 || packetId == 0x08) {
+            refreshCustomFunctionDefinitions();
+        }
+    }
+
+    public void refreshCustomFunctionDefinitions() {
+        CustomFunctionNodeDefinitions.rebuild(definitionRegistry, storage);
+        sender.broadcastNodeRegistry(buildFullNodeRegistrySnapshot());
+    }
+
+    private NodeRegistrySnapshot buildFullNodeRegistrySnapshot() {
+        NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
+        snapshot.setFullSync(true);
+
+        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
+        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
+        snapshot.setNodeIds(nodeIds);
+
+        List<NodePluginPayload> payloads = new ArrayList<>();
+        if (pluginRegistry != null) {
+            for (String pluginId : pluginRegistry.getPluginIds()) {
+                NodePluginPayload payload = pluginRegistry.buildPayload(pluginId);
+                if (payload != null) {
+                    payloads.add(payload);
+                }
+            }
+        }
+        snapshot.setPlugins(payloads);
+        snapshot.setRemovedPlugins(List.of());
+        return snapshot;
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {

@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -89,6 +91,12 @@ public class FlowExecutor {
 
         ensureInputNodesReady(runtime, node, player, event);
 
+        if (isCustomFunctionNode(type)) {
+            CompletableFuture<Void> result = executeCustomFunctionNode(runtime, node, startNodeId, player, event, steps);
+            runtime.endFlowExecution(startNodeId);
+            return result;
+        }
+
         var executor = registry.getExecutor(node.getType());
         if (executor == null) {
             if (enableDebug) {
@@ -122,6 +130,59 @@ public class FlowExecutor {
         FlowGraph graph = runtime.getGraph();
         List<String> nextNodeIds = findTargetNodes(graph, findNodeId(graph, currentNode), outputPin);
         return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
+    }
+
+    private CompletableFuture<Void> executeCustomFunctionNode(FlowRuntime runtime, FlowNode node, String startNodeId,
+                                                              Player player, Event event, int steps) {
+        String functionId = extractCustomFunctionId(node.getType());
+        if (functionId == null || functionId.isBlank()) {
+            return findNextAndExecute(runtime, node, "flow", player, event, steps);
+        }
+
+        FlowStorage storage = FlowRuntimeAccess.getStorage();
+        if (storage == null) {
+            return findNextAndExecute(runtime, node, "flow", player, event, steps);
+        }
+
+        FlowGraph functionGraph = storage.getGraph(functionId);
+        if (functionGraph == null || !functionGraph.isFunction()) {
+            return findNextAndExecute(runtime, node, "flow", player, event, steps);
+        }
+
+        Map<String, Object> callInputs = new HashMap<>();
+        if (functionGraph.getFunctionInputs() != null) {
+            for (FlowGraph.FunctionParameter input : functionGraph.getFunctionInputs()) {
+                if (input == null || input.getName() == null || input.getName().isBlank()) {
+                    continue;
+                }
+                callInputs.put(input.getName(), runtime.resolveInput(node, input.getName()));
+            }
+        }
+
+        int depthBefore = runtime.getCallDepth();
+        runtime.callFunction(functionGraph, startNodeId, callInputs);
+        String functionStartNodeId = runtime.findFunctionStartNodeId();
+        CompletableFuture<Void> functionExecution;
+        if (functionStartNodeId == null) {
+            functionExecution = CompletableFuture.completedFuture(null);
+        } else {
+            functionExecution = execute(runtime, functionStartNodeId, player, event, steps + 1);
+        }
+
+        return functionExecution.thenCompose(v -> {
+            while (runtime.getCallDepth() > depthBefore) {
+                runtime.returnFromFunction(Collections.emptyMap());
+            }
+
+            runtime.consumeFunctionReturnRequested();
+            String callerNodeId = runtime.consumeReturnedCallerNodeId();
+            if (callerNodeId == null) {
+                callerNodeId = startNodeId;
+            }
+
+            List<String> nextNodeIds = findTargetNodes(runtime.getGraph(), callerNodeId, "flow");
+            return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
+        });
     }
 
     private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
@@ -456,6 +517,17 @@ public class FlowExecutor {
             || "loop_for_each_entity".equals(type)
             || "loop_interval".equals(type)
             || "loop_while".equals(type);
+    }
+
+    private boolean isCustomFunctionNode(String type) {
+        return type != null && type.startsWith("custom_function:");
+    }
+
+    private String extractCustomFunctionId(String type) {
+        if (!isCustomFunctionNode(type)) {
+            return null;
+        }
+        return type.substring("custom_function:".length());
     }
 
     private void ensureInputNodesReady(FlowRuntime runtime, FlowNode node, Player player, Event event) {

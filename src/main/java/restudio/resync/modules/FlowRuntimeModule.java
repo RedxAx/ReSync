@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.core.Session;
+import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowRegistry;
@@ -61,6 +62,7 @@ public class FlowRuntimeModule implements Module {
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry);
+        CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         guiManager = new GuiManager(context.getServer(), storage, executor, delegate);
         context.registerService(FlowStorage.class, storage);
         context.registerService(FlowRegistry.class, flowRegistry);
@@ -76,6 +78,9 @@ public class FlowRuntimeModule implements Module {
 
     @Override
     public void start(ModuleContext context) {
+        if (delegate != null) {
+            delegate.refreshCustomFunctionDefinitions();
+        }
         Bukkit.getPluginManager().registerEvents(globalTriggers, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(systemEventListener, context.getPlugin());
         scoreboardRuntimeListener = new ScoreboardRuntimeListener();

@@ -5,8 +5,11 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -21,22 +24,25 @@ public class FlowRuntime {
     private final ThreadLocal<String> triggeredOutputPin = ThreadLocal.withInitial(() -> null);
     private final Set<String> evaluatingNodes = new HashSet<>();
     private final ThreadLocal<Set<String>> executingFlowNodes = ThreadLocal.withInitial(HashSet::new);
-    
+    private final Map<String, Object> functionInputs = new HashMap<>();
+
     private final Stack<Frame> callStack = new Stack<>();
     private boolean breakLoopRequested = false;
     private boolean continueLoopRequested = false;
-    
+    private boolean functionReturnRequested = false;
+    private String returnedCallerNodeId;
+
     private static class Frame {
         final FlowGraph graph;
         final Map<String, Object> localVariables;
         final Map<String, Object> nodeOutputs;
-        final String returnNodeId;
-        
-        Frame(FlowGraph graph, Map<String, Object> localVars, Map<String, Object> nodeOutputs, String returnNodeId) {
+        final String callerNodeId;
+
+        Frame(FlowGraph graph, Map<String, Object> localVars, Map<String, Object> nodeOutputs, String callerNodeId) {
             this.graph = graph;
             this.localVariables = localVars;
             this.nodeOutputs = nodeOutputs;
-            this.returnNodeId = returnNodeId;
+            this.callerNodeId = callerNodeId;
         }
     }
 
@@ -212,29 +218,95 @@ public class FlowRuntime {
     }
 
     public void callFunction(FlowGraph functionGraph, String returnNodeId) {
-        Frame frame = new Frame(graph, localVariables, nodeOutputs, returnNodeId);
+        callFunction(functionGraph, returnNodeId, Collections.emptyMap());
+    }
+
+    public void callFunction(FlowGraph functionGraph, String callerNodeId, Map<String, Object> inputs) {
+        Frame frame = new Frame(graph, new HashMap<>(localVariables), new HashMap<>(nodeOutputs), callerNodeId);
         callStack.push(frame);
+
+        this.graph = functionGraph;
+        this.localVariables.clear();
+        this.nodeOutputs.clear();
+        this.functionInputs.clear();
+
+        if (functionGraph != null && functionGraph.getLocalVariables() != null) {
+            functionGraph.getLocalVariables().forEach(var -> localVariables.put(var.getName(), var.getInitialValue()));
+        }
+
+        if (inputs != null) {
+            this.functionInputs.putAll(inputs);
+            this.localVariables.putAll(inputs);
+        }
     }
 
     public boolean returnFromFunction(Object returnValue) {
+        Map<String, Object> returnValues = new HashMap<>();
+        returnValues.put("return", returnValue);
+        return returnFromFunction(returnValues);
+    }
+
+    public boolean returnFromFunction(Map<String, Object> returnValues) {
         if (callStack.isEmpty()) return false;
-        
+
         Frame frame = callStack.pop();
         this.graph = frame.graph;
         this.localVariables.clear();
         this.localVariables.putAll(frame.localVariables);
         this.nodeOutputs.clear();
         this.nodeOutputs.putAll(frame.nodeOutputs);
-        
-        if (returnValue != null && frame.returnNodeId != null) {
-            nodeOutputs.put(frame.returnNodeId + ":return", returnValue);
+
+        if (frame.callerNodeId != null && returnValues != null) {
+            for (Map.Entry<String, Object> entry : returnValues.entrySet()) {
+                if (entry.getKey() != null) {
+                    nodeOutputs.put(frame.callerNodeId + ":" + entry.getKey(), entry.getValue());
+                }
+            }
         }
-        
+
+        functionInputs.clear();
+        functionReturnRequested = true;
+        returnedCallerNodeId = frame.callerNodeId;
+
         return true;
     }
 
     public int getCallDepth() {
         return callStack.size();
+    }
+
+    public Object getFunctionInput(String name) {
+        return functionInputs.get(name);
+    }
+
+    public Map<String, Object> getFunctionInputs() {
+        return functionInputs;
+    }
+
+    public boolean consumeFunctionReturnRequested() {
+        boolean requested = functionReturnRequested;
+        functionReturnRequested = false;
+        return requested;
+    }
+
+    public String consumeReturnedCallerNodeId() {
+        String callerNodeId = returnedCallerNodeId;
+        returnedCallerNodeId = null;
+        return callerNodeId;
+    }
+
+    public String findFunctionStartNodeId() {
+        if (graph == null || graph.getNodes() == null) {
+            return null;
+        }
+        for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
+            if (entry.getValue() != null && "function_start".equals(entry.getValue().getType())) {
+                return entry.getKey();
+            }
+        }
+        List<Map.Entry<String, FlowNode>> entries = new ArrayList<>(graph.getNodes().entrySet());
+        entries.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+        return entries.isEmpty() ? null : entries.getFirst().getKey();
     }
     
     public void setBreakLoopRequested(boolean requested) {

@@ -1,5 +1,7 @@
 package restudio.resync.flow;
 
+import restudio.resync.Log;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,14 +21,14 @@ public class CategoryLoader {
     public void registerCategory(NodeCategory category) {
         String categoryName = category.getCategoryName();
         if (registeredCategories.containsKey(categoryName)) {
-            System.err.println("[CategoryLoader] Category already registered: " + categoryName);
+            Log.warn("[CategoryLoader] Category already registered: " + categoryName);
             return;
         }
         
         registeredCategories.put(categoryName, category);
         category.registerNodes(registry);
-        
-        System.out.println("[CategoryLoader] Registered category: " + categoryName);
+
+        Log.info("[CategoryLoader] Registered category: " + categoryName);
     }
     
     public void registerAll(List<NodeCategory> categories) {
@@ -38,7 +40,7 @@ public class CategoryLoader {
     public void unregisterCategory(String categoryName) {
         NodeCategory category = registeredCategories.remove(categoryName);
         if (category != null) {
-            System.out.println("[CategoryLoader] Unregistered category: " + categoryName);
+            Log.info("[CategoryLoader] Unregistered category: " + categoryName);
         }
     }
     

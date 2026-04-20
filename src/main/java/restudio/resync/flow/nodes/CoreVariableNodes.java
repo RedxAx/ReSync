@@ -3,6 +3,7 @@ package restudio.resync.flow.nodes;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
+import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowStorage;
@@ -70,7 +71,7 @@ public class CoreVariableNodes {
             String returnNodeId = ctx.resolveNodeId(node);
             ctx.getRuntime().callFunction(functionGraph, returnNodeId);
         } else {
-            System.err.println("[Flow] Function not found: " + functionName);
+            Log.warn("[Flow] Function not found: " + functionName);
             ctx.triggerOutput("flow");
         }
     }
@@ -81,7 +82,7 @@ public class CoreVariableNodes {
     public void returnNode(FlowContext ctx, FlowNode node) {
         Object returnValue = ctx.getInputValue(node, "value", Object.class, null);
         if (!ctx.getRuntime().returnFromFunction(returnValue)) {
-            System.err.println("[Flow] return called outside function");
+            Log.warn("[Flow] return called outside function");
         }
         ctx.triggerOutput("flow");
     }

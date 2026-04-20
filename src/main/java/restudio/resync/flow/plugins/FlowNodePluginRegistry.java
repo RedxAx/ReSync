@@ -1,6 +1,7 @@
 package restudio.resync.flow.plugins;
 
 import com.google.gson.Gson;
+import restudio.resync.Log;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -126,7 +127,7 @@ public class FlowNodePluginRegistry {
         try {
             Files.createDirectories(pluginDirectory);
         } catch (IOException e) {
-            System.err.println("[ReSync] Failed to create node plugin directory: " + e.getMessage());
+            Log.error("[ReSync] Failed to create node plugin directory: " + e.getMessage(), e);
         }
     }
 
@@ -139,11 +140,11 @@ public class FlowNodePluginRegistry {
                     try {
                         currentFiles.put(path, Files.getLastModifiedTime(path).toMillis());
                     } catch (IOException e) {
-                        System.err.println("[ReSync] Failed to stat plugin jar: " + path + " - " + e.getMessage());
+                        Log.error("[ReSync] Failed to stat plugin jar: " + path + " - " + e.getMessage(), e);
                     }
                 });
         } catch (IOException e) {
-            System.err.println("[ReSync] Failed to scan plugin directory: " + e.getMessage());
+            Log.error("[ReSync] Failed to scan plugin directory: " + e.getMessage(), e);
             return;
         }
 
@@ -185,9 +186,9 @@ public class FlowNodePluginRegistry {
                 return;
             }
             jarStates.put(jarPath, new JarState(modified, loader, pluginIds));
-            System.out.println("[ReSync] Loaded node plugins from " + jarPath.getFileName());
+            Log.info("[ReSync] Loaded node plugins from " + jarPath.getFileName());
         } catch (Exception e) {
-            System.err.println("[ReSync] Failed to load plugin jar " + jarPath + ": " + e.getMessage());
+            Log.error("[ReSync] Failed to load plugin jar " + jarPath + ": " + e.getMessage(), e);
         }
     }
 
@@ -200,7 +201,7 @@ public class FlowNodePluginRegistry {
             unloadPlugin(pluginId);
         }
         closeClassLoader(state.classLoader);
-        System.out.println("[ReSync] Unloaded node plugins from " + jarPath.getFileName());
+        Log.info("[ReSync] Unloaded node plugins from " + jarPath.getFileName());
     }
 
     private void registerPlugin(FlowNodePlugin plugin, URLClassLoader loader, Path jarPath) {
@@ -210,14 +211,14 @@ public class FlowNodePluginRegistry {
         }
         if (plugins.containsKey(pluginId)) {
             unloadPlugin(pluginId);
-            System.out.println("[ReSync] Replacing node plugin: " + pluginId);
+            Log.info("[ReSync] Replacing node plugin: " + pluginId);
         }
 
         try {
             plugin.registerNodeDefinitions(definitionRegistry);
             plugin.registerNodes(flowRegistry);
         } catch (Exception e) {
-            System.err.println("[ReSync] Failed to register node plugin " + pluginId + ": " + e.getMessage());
+            Log.error("[ReSync] Failed to register node plugin " + pluginId + ": " + e.getMessage(), e);
             try {
                 plugin.unregisterNodes(flowRegistry);
                 plugin.unregisterNodeDefinitions(definitionRegistry);
@@ -247,7 +248,7 @@ public class FlowNodePluginRegistry {
             state.plugin.unregisterNodes(flowRegistry);
             state.plugin.unregisterNodeDefinitions(definitionRegistry);
         } catch (Exception e) {
-            System.err.println("[ReSync] Error unloading plugin " + pluginId + ": " + e.getMessage());
+            Log.error("[ReSync] Error unloading plugin " + pluginId + ": " + e.getMessage(), e);
         }
 
         for (String nodeId : state.nodeIds) {
@@ -297,7 +298,7 @@ public class FlowNodePluginRegistry {
         try {
             loader.close();
         } catch (IOException e) {
-            System.err.println("[ReSync] Failed to close plugin classloader: " + e.getMessage());
+            Log.error("[ReSync] Failed to close plugin classloader: " + e.getMessage(), e);
         }
     }
 

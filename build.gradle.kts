@@ -22,7 +22,7 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.6")
 
     implementation("org.apache.logging.log4j:log4j-core:2.25.2")
-    implementation("org.slf4j:slf4j-simple:2.0.17")
+    implementation("org.slf4j:slf4j-jdk14:2.0.17")
     implementation("io.javalin:javalin:6.7.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
@@ -41,6 +41,7 @@ tasks {
 
     shadowJar {
         archiveClassifier.set("")
+        mergeServiceFiles()
         relocate("io.javalin", "restudio.resync.libs.javalin")
         relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
         relocate("org.slf4j", "restudio.resync.libs.slf4j")

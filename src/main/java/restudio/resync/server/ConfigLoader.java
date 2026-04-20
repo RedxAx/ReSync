@@ -1,5 +1,7 @@
 package restudio.resync.server;
 
+import restudio.resync.Log;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
@@ -17,7 +19,7 @@ public class ConfigLoader {
             try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
                 props.load(fis);
             } catch (Exception e) {
-                System.err.println("Failed to load config: " + e.getMessage());
+                Log.error("Failed to load config: " + e.getMessage(), e);
             }
         }
 
@@ -71,7 +73,7 @@ public class ConfigLoader {
         try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
             props.store(fos, "ReSync Configuration");
         } catch (Exception e) {
-            System.err.println("Failed to save config: " + e.getMessage());
+            Log.error("Failed to save config: " + e.getMessage(), e);
         }
     }
 

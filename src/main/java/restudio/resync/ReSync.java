@@ -61,8 +61,7 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onError(WebSocket conn, Exception ex) {
-                getLogger().severe("[ReSync] WebSocket error: " + ex.getMessage());
-                ex.printStackTrace();
+                Log.error("[ReSync] WebSocket error: " + ex.getMessage(), ex);
             }
 
             @Override
@@ -73,10 +72,9 @@ public class ReSync extends JavaPlugin {
 
         try {
             wsServer.start();
-            getLogger().info("[ReSync] Server enabled on port " + config.getPort());
+            Log.info("[ReSync] Server enabled on port " + config.getPort());
         } catch (Exception e) {
-            getLogger().severe("[ReSync] Failed to start WebSocket server: " + e.getMessage());
-            e.printStackTrace();
+            Log.error("[ReSync] Failed to start WebSocket server: " + e.getMessage(), e);
         }
 
         if (getCommand("resync") != null) {

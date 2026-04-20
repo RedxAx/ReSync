@@ -10,6 +10,7 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.weather.WeatherChangeEvent;
+import org.bukkit.event.weather.LightningStrikeEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldSaveEvent;
@@ -48,6 +49,7 @@ public class TriggerDefinitions {
     @FlowTrigger(eventType = "block_break", eventClass = BlockBreakEvent.class, priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
+        vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.is_cancelled", event.isCancelled());
     }
 
@@ -55,6 +57,8 @@ public class TriggerDefinitions {
     public void onBlockPlace(BlockPlaceEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
         vars.put("event.placed_against", event.getBlockAgainst());
+        vars.put("event.location", event.getBlock().getLocation());
+        vars.put("event.against_location", event.getBlockAgainst() != null ? event.getBlockAgainst().getLocation() : null);
         vars.put("event.is_cancelled", event.isCancelled());
     }
 
@@ -105,6 +109,8 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "furnace_smelt", eventClass = FurnaceSmeltEvent.class, playerEvent = false)
     public void onFurnaceSmelt(FurnaceSmeltEvent event, Map<String, Object> vars) {
+        vars.put("event.furnace", event.getBlock());
+        vars.put("event.location", event.getBlock().getLocation());
         vars.put("event.result", event.getResult());
         vars.put("event.player", null);
     }
@@ -256,6 +262,11 @@ public class TriggerDefinitions {
     public void onEntityRegainHealth(EntityRegainHealthEvent event, Map<String, Object> vars) {
         vars.put("event.entity", event.getEntity());
         vars.put("event.amount", event.getAmount());
+        double newHealth = event.getAmount();
+        if (event.getEntity() instanceof org.bukkit.entity.Damageable damageable) {
+            newHealth = damageable.getHealth() + event.getAmount();
+        }
+        vars.put("event.new_health", newHealth);
         vars.put("event.reason", event.getRegainReason().name());
     }
 
@@ -378,8 +389,15 @@ public class TriggerDefinitions {
     @FlowTrigger(eventType = "block_spread", eventClass = BlockSpreadEvent.class, playerEvent = false)
     public void onBlockSpread(BlockSpreadEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
-        vars.put("event.new_block", event.getNewState());
+        vars.put("event.new_block", event.getNewState().getBlock());
         vars.put("event.location", event.getBlock().getLocation());
+    }
+
+    @FlowTrigger(eventType = "lightning_strike", eventClass = LightningStrikeEvent.class, playerEvent = false)
+    public void onLightningStrike(LightningStrikeEvent event, Map<String, Object> vars) {
+        vars.put("event.location", event.getLightning().getLocation());
+        vars.put("event.struck_entity", event.getLightning());
+        vars.put("event.world_name", event.getWorld().getName());
     }
 
     @FlowTrigger(eventType = "leaves_decay", eventClass = LeavesDecayEvent.class, playerEvent = false)
@@ -413,8 +431,8 @@ public class TriggerDefinitions {
     public void onNotePlay(NotePlayEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
         vars.put("event.location", event.getBlock().getLocation());
-        vars.put("event.instrument", event.getInstrument().getType());
-        vars.put("event.note", event.getNote().getId());
+        vars.put("event.instrument", (int) event.getInstrument().getType());
+        vars.put("event.note", (int) event.getNote().getId());
     }
 
     @FlowTrigger(eventType = "block_piston_extend", eventClass = BlockPistonExtendEvent.class, playerEvent = false)
@@ -441,6 +459,8 @@ public class TriggerDefinitions {
     public void onStructureSpawn(BlockGrowEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
         vars.put("event.location", event.getBlock().getLocation());
+        vars.put("event.structure_type", event.getNewState().getType().name());
+        vars.put("event.world_name", event.getBlock().getWorld().getName());
         vars.put("event.new_state", event.getBlock().getType().name());
     }
 

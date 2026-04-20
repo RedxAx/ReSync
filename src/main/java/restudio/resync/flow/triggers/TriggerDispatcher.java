@@ -21,7 +21,38 @@ public class TriggerDispatcher implements Listener {
     private final FlowExecutor executor;
     private final Plugin plugin;
     private final Map<String, TriggerEntry> entriesByType = new ConcurrentHashMap<>();
-    private final Map<String, String> eventTypeToNodeType = new ConcurrentHashMap<>();
+    private final Map<String, TriggerEntry> entriesByLookup = new ConcurrentHashMap<>();
+
+    private static final Map<String, String> LEGACY_EVENT_ALIASES = Map.ofEntries(
+            Map.entry("chat", "async_chat"),
+            Map.entry("join", "player_join"),
+            Map.entry("quit", "player_quit"),
+            Map.entry("sneak", "player_sneak"),
+            Map.entry("death", "player_death"),
+            Map.entry("move", "player_move"),
+            Map.entry("bed_enter", "player_bed_enter"),
+            Map.entry("bed_leave", "player_bed_leave"),
+            Map.entry("respawn", "player_respawn"),
+            Map.entry("level_up", "player_level_change"),
+            Map.entry("interact", "player_interact"),
+            Map.entry("entity_interact", "player_interact_entity"),
+            Map.entry("pickup", "player_pickup_item"),
+            Map.entry("drop", "player_drop_item"),
+            Map.entry("consume", "player_item_consume"),
+            Map.entry("shoot", "projectile_launch"),
+            Map.entry("flight_toggle", "player_toggle_flight"),
+            Map.entry("gamemode_change", "player_gamemode_change"),
+            Map.entry("shear", "player_shear_entity"),
+            Map.entry("command", "player_command"),
+            Map.entry("exp_change", "player_exp_change"),
+            Map.entry("explosion", "explosion_prime"),
+            Map.entry("physics", "block_physics"),
+            Map.entry("grow", "block_grow"),
+            Map.entry("time_change", "time_skip"),
+            Map.entry("leaf_decay", "leaves_decay"),
+            Map.entry("piston_extend", "block_piston_extend"),
+            Map.entry("piston_retract", "block_piston_retract")
+    );
 
     public TriggerDispatcher(FlowStorage storage, FlowExecutor executor, Plugin plugin) {
         this.storage = storage;
@@ -37,12 +68,36 @@ public class TriggerDispatcher implements Listener {
         ConcurrentHashMap<String, String> triggerMap = new ConcurrentHashMap<>();
         TriggerEntry entry = new TriggerEntry(eventType, nodeType, eventClass, priority,
                 ignoreCancelled, variableExtractor, playerExtractor, triggerMap);
-        entriesByType.put(eventType, entry);
+        indexLookup(eventType, entry, true);
         for (String alias : aliases) {
-            entriesByType.put(alias, entry);
+            indexLookup(alias, entry, true);
         }
-        if (!nodeType.isEmpty()) {
-            eventTypeToNodeType.put(eventType, nodeType);
+
+        if (nodeType != null && !nodeType.isEmpty()) {
+            indexLookup(nodeType, entry, false);
+            String normalizedNodeType = normalizeEventKey(nodeType);
+            if (normalizedNodeType != null && normalizedNodeType.startsWith("event:")) {
+                indexLookup(normalizedNodeType.substring(6), entry, false);
+            }
+        }
+
+        String normalizedEventType = normalizeEventKey(eventType);
+        if (normalizedEventType != null) {
+            if (normalizedEventType.startsWith("player_") && normalizedEventType.length() > 7) {
+                indexLookup(normalizedEventType.substring(7), entry, false);
+            }
+            if (normalizedEventType.startsWith("block_") && normalizedEventType.length() > 6) {
+                indexLookup(normalizedEventType.substring(6), entry, false);
+            }
+            if (normalizedEventType.startsWith("async_") && normalizedEventType.length() > 6) {
+                indexLookup(normalizedEventType.substring(6), entry, false);
+            }
+
+            for (Map.Entry<String, String> legacyAlias : LEGACY_EVENT_ALIASES.entrySet()) {
+                if (legacyAlias.getValue().equals(normalizedEventType)) {
+                    indexLookup(legacyAlias.getKey(), entry, false);
+                }
+            }
         }
 
         org.bukkit.plugin.EventExecutor bukkitExecutor = (listener, event) -> {
@@ -67,32 +122,49 @@ public class TriggerDispatcher implements Listener {
             if (player != null) {
                 eventVars.put("event.player", player);
             }
-            eventVars.putAll(customVars);
+            for (Map.Entry<String, Object> varEntry : customVars.entrySet()) {
+                String key = varEntry.getKey();
+                if (key == null || key.isBlank()) {
+                    continue;
+                }
+                Object value = varEntry.getValue();
+                if (value == null) {
+                    eventVars.remove(key);
+                } else {
+                    eventVars.put(key, value);
+                }
+            }
             executor.execute(graph, trigger.getValue(), player, event);
         }
     }
 
     public void registerBinding(String eventType, String flowId, String startNodeId) {
-        TriggerEntry entry = entriesByType.get(eventType);
+        TriggerEntry entry = resolveEntry(eventType);
         if (entry != null) {
             entry.triggerMap.put(flowId, startNodeId);
         }
     }
 
     public void unregisterBinding(String flowId) {
-        for (TriggerEntry entry : entriesByType.values()) {
+        for (TriggerEntry entry : new HashSet<>(entriesByType.values())) {
             entry.triggerMap.remove(flowId);
         }
     }
 
     public void clearBindings() {
-        for (TriggerEntry entry : entriesByType.values()) {
+        for (TriggerEntry entry : new HashSet<>(entriesByType.values())) {
             entry.triggerMap.clear();
         }
     }
 
     public String getNodeType(String eventType) {
-        return eventTypeToNodeType.get(eventType);
+        TriggerEntry entry = resolveEntry(eventType);
+        return entry != null ? entry.nodeType : null;
+    }
+
+    public String resolveEventType(String eventType) {
+        TriggerEntry entry = resolveEntry(eventType);
+        return entry != null ? normalizeEventKey(entry.eventType) : null;
     }
 
     public Set<String> getEventTypes() {
@@ -100,7 +172,68 @@ public class TriggerDispatcher implements Listener {
     }
 
     public boolean hasEventType(String eventType) {
-        return entriesByType.containsKey(eventType);
+        return resolveEntry(eventType) != null;
+    }
+
+    private void indexLookup(String key, TriggerEntry entry, boolean includeInPublicTypes) {
+        String normalized = normalizeEventKey(key);
+        if (normalized == null) {
+            return;
+        }
+        entriesByLookup.put(normalized, entry);
+        if (includeInPublicTypes) {
+            entriesByType.put(normalized, entry);
+        }
+    }
+
+    private TriggerEntry resolveEntry(String eventType) {
+        String normalized = normalizeEventKey(eventType);
+        if (normalized == null) {
+            return null;
+        }
+
+        TriggerEntry direct = entriesByLookup.get(normalized);
+        if (direct != null) {
+            return direct;
+        }
+
+        String legacy = LEGACY_EVENT_ALIASES.get(normalized);
+        if (legacy != null) {
+            TriggerEntry mapped = entriesByLookup.get(legacy);
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+
+        if (!normalized.startsWith("player_")) {
+            TriggerEntry playerPrefixed = entriesByLookup.get("player_" + normalized);
+            if (playerPrefixed != null) {
+                return playerPrefixed;
+            }
+        }
+
+        if (!normalized.startsWith("block_")) {
+            TriggerEntry blockPrefixed = entriesByLookup.get("block_" + normalized);
+            if (blockPrefixed != null) {
+                return blockPrefixed;
+            }
+        }
+
+        return null;
+    }
+
+    private String normalizeEventKey(String key) {
+        if (key == null) {
+            return null;
+        }
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.startsWith("event:")) {
+            normalized = normalized.substring(6);
+        }
+        return normalized;
     }
 
     public void registerFromContainer(Object container) {

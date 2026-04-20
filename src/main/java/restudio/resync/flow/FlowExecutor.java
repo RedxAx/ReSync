@@ -7,6 +7,7 @@ import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.Log;
 import restudio.resync.ReSync;
 
 import java.util.List;
@@ -74,12 +75,21 @@ public class FlowExecutor {
         FlowNode node = graph.getNodes().get(startNodeId);
         if (node == null) {
             if (enableDebug) {
-                System.err.println("[Flow] Node not found: " + startNodeId);
+                Log.warn("[Flow] Node not found: " + startNodeId);
             }
             runtime.endFlowExecution(startNodeId);
             return CompletableFuture.completedFuture(null);
         }
-        FlowContext context = new FlowContext(runtime, player, event);
+
+        // Clear any residual runtime output pin from a previous node execution on this thread.
+        runtime.consumeTriggeredOutput();
+
+        FlowContext context = new FlowContext(
+                runtime,
+                player,
+                event,
+                outputPin -> dispatchDeferredOutput(runtime, startNodeId, outputPin, player, event, steps)
+        );
 
         String type = node.getType();
         if (isLoopNode(type)) {
@@ -100,7 +110,7 @@ public class FlowExecutor {
         var executor = registry.getExecutor(node.getType());
         if (executor == null) {
             if (enableDebug) {
-                System.err.println("[Flow] No executor for node type: " + node.getType());
+                Log.warn("[Flow] No executor for node type: " + node.getType());
             }
             CompletableFuture<Void> result = findNextAndExecute(runtime, node, "flow", player, event, steps);
             runtime.endFlowExecution(startNodeId);
@@ -109,10 +119,28 @@ public class FlowExecutor {
 
         try {
             executor.accept(context, node);
-            
-            String outputPin = runtime.consumeTriggeredOutput();
-            String pin = outputPin != null ? outputPin : "flow";
-            CompletableFuture<Void> result = findNextAndExecute(runtime, node, pin, player, event, steps);
+            context.finishSynchronousCapture();
+
+            List<String> outputPins = context.consumeTriggeredOutputs();
+            String runtimeOutputPin = runtime.consumeTriggeredOutput();
+            if (runtimeOutputPin != null && !runtimeOutputPin.isBlank() && !outputPins.contains(runtimeOutputPin)) {
+                if (outputPins.isEmpty()) {
+                    outputPins = List.of(runtimeOutputPin);
+                } else {
+                    List<String> merged = new java.util.ArrayList<>(outputPins);
+                    merged.add(runtimeOutputPin);
+                    outputPins = merged;
+                }
+            }
+
+            CompletableFuture<Void> result;
+            if (!outputPins.isEmpty()) {
+                result = executeTriggeredOutputs(runtime, startNodeId, outputPins, player, event, steps);
+            } else if (context.hasPendingAsyncOperations()) {
+                result = CompletableFuture.completedFuture(null);
+            } else {
+                result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
+            }
             runtime.endFlowExecution(startNodeId);
             return result;
         } catch (Exception e) {
@@ -125,10 +153,81 @@ public class FlowExecutor {
         }
     }
 
+    private void dispatchDeferredOutput(FlowRuntime runtime, String currentNodeId, String outputPin,
+                                        Player player, Event event, int steps) {
+        if (outputPin == null || outputPin.isBlank()) {
+            return;
+        }
+
+        Runnable continuation = () -> {
+            try {
+                executeTriggeredOutputs(runtime, currentNodeId, List.of(outputPin), player, event, steps)
+                    .exceptionally(ex -> {
+                        if (enableDebug) {
+                            Log.warn("[Flow] Deferred output execution failed for node '" + currentNodeId + "': " + ex.getMessage(), ex);
+                        }
+                        return null;
+                    });
+            } catch (Exception ex) {
+                if (enableDebug) {
+                    Log.warn("[Flow] Deferred output dispatch failed for node '" + currentNodeId + "': " + ex.getMessage(), ex);
+                }
+            }
+        };
+
+        if (Bukkit.isPrimaryThread()) {
+            continuation.run();
+        } else {
+            Bukkit.getScheduler().runTask(ReSync.getInstance(), continuation);
+        }
+    }
+
+    private CompletableFuture<Void> executeTriggeredOutputs(FlowRuntime runtime, String currentNodeId, List<String> outputPins,
+                                                            Player player, Event event, int steps) {
+        if (outputPins == null || outputPins.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        List<CompletableFuture<Void>> futures = new java.util.ArrayList<>();
+        for (String outputPin : outputPins) {
+            if (outputPin == null || outputPin.isBlank()) {
+                continue;
+            }
+            futures.add(findNextAndExecute(runtime, currentNodeId, outputPin, player, event, steps));
+        }
+
+        if (futures.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    }
+
     private CompletableFuture<Void> findNextAndExecute(FlowRuntime runtime, FlowNode currentNode, String outputPin, 
                                                    Player player, Event event, int steps) {
         FlowGraph graph = runtime.getGraph();
-        List<String> nextNodeIds = findTargetNodes(graph, findNodeId(graph, currentNode), outputPin);
+        String currentNodeId = findNodeId(graph, currentNode);
+        return findNextAndExecute(runtime, currentNodeId, outputPin, player, event, steps);
+    }
+
+    private CompletableFuture<Void> findNextAndExecute(FlowRuntime runtime, String currentNodeId, String outputPin,
+                                                       Player player, Event event, int steps) {
+        if (currentNodeId == null || outputPin == null || outputPin.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        FlowGraph graph = runtime.getGraph();
+        List<String> nextNodeIds = findTargetNodes(graph, currentNodeId, outputPin);
+
+        // Backward/forward compatibility for legacy flow pins:
+        // some graphs use "flow" while newer event nodes commonly emit "next".
+        if (nextNodeIds.isEmpty()) {
+            if ("next".equals(outputPin)) {
+                nextNodeIds = findTargetNodes(graph, currentNodeId, "flow");
+            } else if ("flow".equals(outputPin)) {
+                nextNodeIds = findTargetNodes(graph, currentNodeId, "next");
+            }
+        }
+
         return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
     }
 
@@ -574,7 +673,7 @@ public class FlowExecutor {
             executor.accept(new FlowContext(runtime, player, event), sourceNode);
         } catch (Exception e) {
             if (enableDebug) {
-                System.err.println("[Flow] Error evaluating node '" + type + "' (ID: " + nodeId + "): " + e.getMessage());
+                Log.warn("[Flow] Error evaluating node '" + type + "' (ID: " + nodeId + "): " + e.getMessage(), e);
             }
         }
 
@@ -657,7 +756,7 @@ public class FlowExecutor {
                 listener.onFlowExecution(graph, startNodeId, player, event);
             } catch (Exception e) {
                 if (enableDebug) {
-                    System.err.println("[Flow] Execution listener failed: " + e.getMessage());
+                    Log.warn("[Flow] Execution listener failed: " + e.getMessage(), e);
                 }
             }
         }

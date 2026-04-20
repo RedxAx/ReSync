@@ -13,8 +13,12 @@ public final class Log {
         logger = pluginLogger;
     }
 
+    private static Logger logger() {
+        return logger != null ? logger : Logger.getLogger("ReSync");
+    }
+
     public static void setLevel(String levelName) {
-        if (logger == null || levelName == null) {
+        if (levelName == null) {
             return;
         }
         Level level = switch (levelName.toLowerCase()) {
@@ -27,25 +31,37 @@ public final class Log {
             case "all" -> Level.ALL;
             default -> Level.INFO;
         };
-        logger.setLevel(level);
-        for (var handler : logger.getParent().getHandlers()) {
+        Logger activeLogger = logger();
+        activeLogger.setLevel(level);
+        if (activeLogger.getParent() == null) {
+            return;
+        }
+        for (var handler : activeLogger.getParent().getHandlers()) {
             handler.setLevel(level);
         }
     }
 
     public static void info(String msg) {
-        logger.info(msg);
+        logger().info(msg);
     }
 
     public static void warn(String msg) {
-        logger.warning(msg);
+        logger().warning(msg);
+    }
+
+    public static void warn(String msg, Throwable throwable) {
+        logger().log(Level.WARNING, msg, throwable);
     }
 
     public static void error(String msg) {
-        logger.severe(msg);
+        logger().severe(msg);
+    }
+
+    public static void error(String msg, Throwable throwable) {
+        logger().log(Level.SEVERE, msg, throwable);
     }
 
     public static void fine(String msg) {
-        logger.fine(msg);
+        logger().fine(msg);
     }
 }

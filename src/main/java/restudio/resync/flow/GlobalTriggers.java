@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.SimplePluginManager;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.ReSync;
+import restudio.resync.Log;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerDefinitions;
 import restudio.resync.flow.triggers.TriggerDispatcher;
@@ -137,13 +138,17 @@ public class GlobalTriggers implements Listener {
     }
 
     private void setEventVariables(Player player, Map<String, Object> variables) {
-        variables.put("event.player", player);
+        if (player != null) {
+            variables.put("event.player", player);
+        } else {
+            variables.remove("event.player");
+        }
     }
 
     public void registerTrigger(String eventType, String flowId) {
         FlowGraph graph = storage.getGraph(flowId);
         if (graph == null) {
-            System.err.println("[ReSync] Failed to load flow for trigger: " + flowId);
+            Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
         }
 
@@ -152,7 +157,7 @@ public class GlobalTriggers implements Listener {
             startNode = findStartNode(graph);
         }
         if (startNode == null) {
-            System.err.println("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
+            Log.warn("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
             return;
         }
 
@@ -501,15 +506,44 @@ public class GlobalTriggers implements Listener {
     }
 
     private String findStartNodeForEvent(FlowGraph graph, String eventType) {
-        String nodeType = triggerDispatcher.getNodeType(eventType.toLowerCase());
-        if (nodeType == null) {
-            nodeType = "event:" + eventType.toLowerCase();
-        }
+        String normalizedRequested = normalizeEventKey(eventType);
+        String canonicalRequested = triggerDispatcher.resolveEventType(normalizedRequested);
+
         for (var entry : graph.getNodes().entrySet()) {
-            if (nodeType.equals(entry.getValue().getType())) {
+            String nodeType = entry.getValue().getType();
+            String normalizedNode = normalizeEventKey(nodeType);
+            if (normalizedNode == null) {
+                continue;
+            }
+
+            if (normalizedRequested != null && normalizedRequested.equals(normalizedNode)) {
+                return entry.getKey();
+            }
+
+            if (canonicalRequested == null) {
+                continue;
+            }
+
+            if (canonicalRequested.equals(normalizedNode)) {
+                return entry.getKey();
+            }
+
+            String canonicalNode = triggerDispatcher.resolveEventType(normalizedNode);
+            if (canonicalRequested.equals(canonicalNode)) {
                 return entry.getKey();
             }
         }
         return null;
+    }
+
+    private String normalizeEventKey(String key) {
+        if (key == null) {
+            return null;
+        }
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return normalized.startsWith("event:") ? normalized.substring(6) : normalized;
     }
 }

@@ -8,6 +8,7 @@ import org.bukkit.event.server.*;
 import org.bukkit.event.world.*;
 import org.bukkit.plugin.Plugin;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.Log;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
@@ -43,7 +44,7 @@ public class SystemEventListener implements Listener {
     public void registerTrigger(String eventType, String flowId) {
         FlowGraph graph = storage.getGraph(flowId);
         if (graph == null) {
-            System.err.println("[ReSync] Failed to load flow for trigger: " + flowId);
+            Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
         }
         
@@ -52,7 +53,7 @@ public class SystemEventListener implements Listener {
             startNode = findStartNode(graph);
         }
         if (startNode == null) {
-            System.err.println("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
+            Log.warn("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
             return;
         }
         
@@ -99,7 +100,7 @@ public class SystemEventListener implements Listener {
                 serverSaveTriggers.put(flowId, startNode);
                 break;
             default:
-                System.err.println("[ReSync] Unknown system trigger type: " + eventType);
+                Log.warn("[ReSync] Unknown system trigger type: " + eventType);
         }
     }
     

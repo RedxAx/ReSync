@@ -7,21 +7,33 @@ import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowNode;
 import restudio.resync.ReSync;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 public class FlowContext {
     private final Player player;
     private final Event event;
     private final FlowRuntime runtime;
-    private final Map<String, CompletableFuture<Void>> asyncOperations = new HashMap<>();
+    private final Map<String, CompletableFuture<Void>> asyncOperations = new ConcurrentHashMap<>();
+    private final List<String> triggeredOutputs = new CopyOnWriteArrayList<>();
+    private final Consumer<String> deferredOutputConsumer;
+    private final AtomicLong operationCounter = new AtomicLong(0);
+    private volatile boolean synchronousCapture = true;
 
     public FlowContext(FlowRuntime runtime, Player player, Event event) {
+        this(runtime, player, event, null);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer) {
         this.runtime = runtime;
         this.player = player;
         this.event = event;
+        this.deferredOutputConsumer = deferredOutputConsumer;
     }
 
     public Player getPlayer() {
@@ -85,7 +97,51 @@ public class FlowContext {
     }
 
     public void triggerOutput(String pinName) {
-        runtime.triggerOutput(pinName);
+        if (pinName == null || pinName.isBlank()) {
+            return;
+        }
+
+        // Keep legacy runtime pin behavior for synchronous capture and legacy contexts.
+        // For deferred outputs (after synchronous capture with a callback), route via callback
+        // only to avoid stale runtime pins leaking into subsequent node executions.
+        if (synchronousCapture || deferredOutputConsumer == null) {
+            runtime.triggerOutput(pinName);
+        }
+
+        if (synchronousCapture) {
+            triggeredOutputs.add(pinName);
+            return;
+        }
+
+        if (deferredOutputConsumer != null) {
+            deferredOutputConsumer.accept(pinName);
+        }
+    }
+
+    public void finishSynchronousCapture() {
+        this.synchronousCapture = false;
+    }
+
+    public List<String> consumeTriggeredOutputs() {
+        List<String> outputs = List.copyOf(triggeredOutputs);
+        triggeredOutputs.clear();
+        return outputs;
+    }
+
+    public boolean hasPendingAsyncOperations() {
+        return !asyncOperations.isEmpty();
+    }
+
+    private String nextOperationId(String prefix) {
+        return prefix + '_' + operationCounter.incrementAndGet() + '_' + System.nanoTime();
+    }
+
+    private void trackAsyncOperation(String taskId, CompletableFuture<Void> future) {
+        if (taskId == null || future == null) {
+            return;
+        }
+        asyncOperations.put(taskId, future);
+        future.whenComplete((v, e) -> asyncOperations.remove(taskId));
     }
 
     public void setNodeOutput(String nodeId, String pinName, Object value) {
@@ -110,6 +166,8 @@ public class FlowContext {
 
     public CompletableFuture<Void> runAsync(Runnable runnable) {
         CompletableFuture<Void> future = new CompletableFuture<>();
+        String taskId = nextOperationId("async");
+        trackAsyncOperation(taskId, future);
         Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> {
             try {
                 runnable.run();
@@ -123,6 +181,8 @@ public class FlowContext {
 
     public CompletableFuture<Void> runSync(Runnable runnable) {
         CompletableFuture<Void> future = new CompletableFuture<>();
+        String taskId = nextOperationId("sync");
+        trackAsyncOperation(taskId, future);
         Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
             try {
                 runnable.run();
@@ -136,6 +196,8 @@ public class FlowContext {
 
     public CompletableFuture<Void> runLater(Runnable runnable, long delayTicks) {
         CompletableFuture<Void> future = new CompletableFuture<>();
+        String taskId = nextOperationId("later");
+        trackAsyncOperation(taskId, future);
         BukkitTask task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> {
             try {
                 runnable.run();
@@ -144,10 +206,6 @@ public class FlowContext {
                 future.completeExceptionally(e);
             }
         }, delayTicks);
-        
-        String taskId = "task_" + System.nanoTime();
-        asyncOperations.put(taskId, future);
-        future.whenComplete((v, e) -> asyncOperations.remove(taskId));
         
         return future;
     }

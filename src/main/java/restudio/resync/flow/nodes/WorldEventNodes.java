@@ -5,6 +5,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowType;
@@ -138,25 +139,33 @@ public class WorldEventNodes {
 
         registry.register("event:block_break", (ctx, node) -> {
             String nodeId = findNodeId(ctx, node);
+            Player player = (Player) ctx.getVariable("event.player");
             Block block = (Block) ctx.getVariable("event.block");
             Location location = (Location) ctx.getVariable("event.location");
+            Boolean cancelled = (Boolean) ctx.getVariable("event.is_cancelled");
 
+            ctx.setNodeOutput(nodeId, "player", player);
             ctx.setNodeOutput(nodeId, "block", block);
             ctx.setNodeOutput(nodeId, "location", location);
+            ctx.setNodeOutput(nodeId, "is_cancelled", cancelled != null && cancelled);
             ctx.triggerOutput("next");
         });
 
         registry.register("event:block_place", (ctx, node) -> {
             String nodeId = findNodeId(ctx, node);
+            Player player = (Player) ctx.getVariable("event.player");
             Block block = (Block) ctx.getVariable("event.block");
             Block placedAgainst = (Block) ctx.getVariable("event.placed_against");
             Location location = (Location) ctx.getVariable("event.location");
             Location againstLocation = (Location) ctx.getVariable("event.against_location");
+            Boolean cancelled = (Boolean) ctx.getVariable("event.is_cancelled");
 
+            ctx.setNodeOutput(nodeId, "player", player);
             ctx.setNodeOutput(nodeId, "block", block);
             ctx.setNodeOutput(nodeId, "placed_against", placedAgainst);
             ctx.setNodeOutput(nodeId, "location", location);
             ctx.setNodeOutput(nodeId, "against_location", againstLocation);
+            ctx.setNodeOutput(nodeId, "is_cancelled", cancelled != null && cancelled);
             ctx.triggerOutput("next");
         });
 
@@ -450,8 +459,10 @@ public class WorldEventNodes {
     @DefineNode(id = "event:block_break", displayName = "On Block Break", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
                     @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
-                    @FlowPin(name = "location", dataType = FlowType.LOCATION)
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "is_cancelled", dataType = FlowType.BOOLEAN)
             })
     public void onBlockBreak(FlowContext ctx, FlowNode node) {
         executeLegacy("event:block_break", ctx, node);
@@ -460,10 +471,12 @@ public class WorldEventNodes {
     @DefineNode(id = "event:block_place", displayName = "On Block Place", category = NodeDefinition.NodeCategory.EVENT,
             outputs = {
                     @FlowPin(name = "next", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
                     @FlowPin(name = "block", dataType = FlowType.ANY),
                     @FlowPin(name = "placed_against", dataType = FlowType.ANY),
                     @FlowPin(name = "location", dataType = FlowType.LOCATION),
-                    @FlowPin(name = "against_location", dataType = FlowType.LOCATION)
+                    @FlowPin(name = "against_location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "is_cancelled", dataType = FlowType.BOOLEAN)
             })
     public void onBlockPlace(FlowContext ctx, FlowNode node) {
         executeLegacy("event:block_place", ctx, node);

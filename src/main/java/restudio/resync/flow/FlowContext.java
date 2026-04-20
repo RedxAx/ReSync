@@ -101,9 +101,6 @@ public class FlowContext {
             return;
         }
 
-        // Keep legacy runtime pin behavior for synchronous capture and legacy contexts.
-        // For deferred outputs (after synchronous capture with a callback), route via callback
-        // only to avoid stale runtime pins leaking into subsequent node executions.
         if (synchronousCapture || deferredOutputConsumer == null) {
             runtime.triggerOutput(pinName);
         }

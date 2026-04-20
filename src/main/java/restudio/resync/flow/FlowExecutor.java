@@ -81,7 +81,6 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
 
-        // Clear any residual runtime output pin from a previous node execution on this thread.
         runtime.consumeTriggeredOutput();
 
         FlowContext context = new FlowContext(
@@ -218,8 +217,6 @@ public class FlowExecutor {
         FlowGraph graph = runtime.getGraph();
         List<String> nextNodeIds = findTargetNodes(graph, currentNodeId, outputPin);
 
-        // Backward/forward compatibility for legacy flow pins:
-        // some graphs use "flow" while newer event nodes commonly emit "next".
         if (nextNodeIds.isEmpty()) {
             if ("next".equals(outputPin)) {
                 nextNodeIds = findTargetNodes(graph, currentNodeId, "flow");

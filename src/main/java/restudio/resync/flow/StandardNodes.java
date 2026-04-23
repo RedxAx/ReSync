@@ -59,6 +59,7 @@ public class StandardNodes {
         registrar.scan(new restudio.resync.flow.nodes.CustomEventNodes());
         scanSoftDependency(registrar, "Vault", "restudio.resync.flow.nodes.EconomyNodes");
         scanSoftDependency(registrar, "LuckPerms", "restudio.resync.flow.nodes.PermissionNodes");
+        scanSoftDependency(registrar, "PlaceholderAPI", "restudio.resync.flow.nodes.PlaceholderNodes");
         registrar.scan(new restudio.resync.flow.nodes.LocationNodes());
         registrar.scan(new restudio.resync.flow.nodes.MathAdvancedNodes());
         registrar.scan(new restudio.resync.flow.nodes.StringAdvancedNodes());

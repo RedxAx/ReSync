@@ -66,8 +66,24 @@ public class TriggerDispatcher implements Listener {
                                    Function<Event, Player> playerExtractor,
                                    String[] aliases) {
         ConcurrentHashMap<String, String> triggerMap = new ConcurrentHashMap<>();
+        Method getPlayer = null;
+        Method getEntity = null;
+        Method getWhoClicked = null;
+        try {
+            getPlayer = eventClass.getMethod("getPlayer");
+        } catch (NoSuchMethodException ignored) {
+        }
+        try {
+            getEntity = eventClass.getMethod("getEntity");
+        } catch (NoSuchMethodException ignored) {
+        }
+        try {
+            getWhoClicked = eventClass.getMethod("getWhoClicked");
+        } catch (NoSuchMethodException ignored) {
+        }
         TriggerEntry entry = new TriggerEntry(eventType, nodeType, eventClass, priority,
-                ignoreCancelled, variableExtractor, playerExtractor, triggerMap);
+                ignoreCancelled, variableExtractor, playerExtractor, triggerMap,
+                getPlayer, getEntity, getWhoClicked);
         indexLookup(eventType, entry, true);
         for (String alias : aliases) {
             indexLookup(alias, entry, true);
@@ -117,8 +133,7 @@ public class TriggerDispatcher implements Listener {
             FlowGraph graph = storage.getGraph(trigger.getKey());
             if (graph == null) continue;
 
-            executor.clearEventVariables();
-            Map<String, Object> eventVars = executor.getEventVariables();
+            Map<String, Object> eventVars = new java.util.HashMap<>();
             if (player != null) {
                 eventVars.put("event.player", player);
             }
@@ -134,7 +149,7 @@ public class TriggerDispatcher implements Listener {
                     eventVars.put(key, value);
                 }
             }
-            executor.execute(graph, trigger.getValue(), player, event);
+            executor.execute(graph, trigger.getValue(), player, event, eventVars);
         }
     }
 
@@ -302,25 +317,45 @@ public class TriggerDispatcher implements Listener {
         }
 
         Class<?> eventClass = annotation.eventClass();
+        Method getPlayer = null;
+        Method getEntity = null;
+        Method getWhoClicked = null;
+        try {
+            getPlayer = eventClass.getMethod("getPlayer");
+        } catch (NoSuchMethodException ignored) {
+        }
+        try {
+            getEntity = eventClass.getMethod("getEntity");
+        } catch (NoSuchMethodException ignored) {
+        }
+        try {
+            getWhoClicked = eventClass.getMethod("getWhoClicked");
+        } catch (NoSuchMethodException ignored) {
+        }
+        final Method cachedGetPlayer = getPlayer;
+        final Method cachedGetEntity = getEntity;
+        final Method cachedGetWhoClicked = getWhoClicked;
         return event -> {
             try {
-                Method getPlayer = eventClass.getMethod("getPlayer");
-                Object result = getPlayer.invoke(event);
-                if (result instanceof Player p) return p;
-            } catch (NoSuchMethodException ignored) {
+                if (cachedGetPlayer != null) {
+                    Object result = cachedGetPlayer.invoke(event);
+                    if (result instanceof Player p) return p;
+                }
             } catch (Exception e) {
                 return null;
             }
             try {
-                Method getEntity = eventClass.getMethod("getEntity");
-                Object entity = getEntity.invoke(event);
-                if (entity instanceof Player p) return p;
+                if (cachedGetEntity != null) {
+                    Object entity = cachedGetEntity.invoke(event);
+                    if (entity instanceof Player p) return p;
+                }
             } catch (Exception ignored) {
             }
             try {
-                Method getWhoClicked = eventClass.getMethod("getWhoClicked");
-                Object who = getWhoClicked.invoke(event);
-                if (who instanceof Player p) return p;
+                if (cachedGetWhoClicked != null) {
+                    Object who = cachedGetWhoClicked.invoke(event);
+                    if (who instanceof Player p) return p;
+                }
             } catch (Exception ignored) {
             }
             return null;
@@ -336,12 +371,16 @@ public class TriggerDispatcher implements Listener {
         final Function<Event, Map<String, Object>> variableExtractor;
         final Function<Event, Player> playerExtractor;
         final ConcurrentHashMap<String, String> triggerMap;
+        final Method cachedGetPlayer;
+        final Method cachedGetEntity;
+        final Method cachedGetWhoClicked;
 
         TriggerEntry(String eventType, String nodeType, Class<? extends Event> eventClass,
                      EventPriority priority, boolean ignoreCancelled,
                      Function<Event, Map<String, Object>> variableExtractor,
                      Function<Event, Player> playerExtractor,
-                     ConcurrentHashMap<String, String> triggerMap) {
+                     ConcurrentHashMap<String, String> triggerMap,
+                     Method cachedGetPlayer, Method cachedGetEntity, Method cachedGetWhoClicked) {
             this.eventType = eventType;
             this.nodeType = nodeType;
             this.eventClass = eventClass;
@@ -350,6 +389,9 @@ public class TriggerDispatcher implements Listener {
             this.variableExtractor = variableExtractor;
             this.playerExtractor = playerExtractor;
             this.triggerMap = triggerMap;
+            this.cachedGetPlayer = cachedGetPlayer;
+            this.cachedGetEntity = cachedGetEntity;
+            this.cachedGetWhoClicked = cachedGetWhoClicked;
         }
     }
 }

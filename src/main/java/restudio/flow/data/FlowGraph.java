@@ -1,7 +1,9 @@
 package restudio.flow.data;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,6 +16,10 @@ public class FlowGraph {
     private boolean function;
     private List<FunctionParameter> functionInputs;
     private List<FunctionParameter> functionOutputs;
+
+    private transient Map<String, List<FlowConnection>> connectionsBySource = new HashMap<>();
+    private transient Map<String, List<FlowConnection>> connectionsByTarget = new HashMap<>();
+    private transient IdentityHashMap<FlowNode, String> nodeToId = new IdentityHashMap<>();
 
     public static class FunctionParameter {
         private String name;
@@ -54,6 +60,7 @@ public class FlowGraph {
         this.function = false;
         this.functionInputs = new ArrayList<>();
         this.functionOutputs = new ArrayList<>();
+        rebuildIndices();
     }
 
     public FlowGraph(String id, Map<String, FlowNode> nodes, List<FlowConnection> connections, List<FlowVariable> localVariables) {
@@ -69,6 +76,7 @@ public class FlowGraph {
         this.function = function;
         this.functionInputs = functionInputs != null ? functionInputs : new ArrayList<>();
         this.functionOutputs = functionOutputs != null ? functionOutputs : new ArrayList<>();
+        rebuildIndices();
     }
 
     public String getId() {
@@ -84,7 +92,8 @@ public class FlowGraph {
     }
 
     public void setNodes(Map<String, FlowNode> nodes) {
-        this.nodes = nodes;
+        this.nodes = nodes != null ? nodes : new HashMap<>();
+        rebuildIndices();
     }
 
     public List<FlowConnection> getConnections() {
@@ -92,7 +101,8 @@ public class FlowGraph {
     }
 
     public void setConnections(List<FlowConnection> connections) {
-        this.connections = connections;
+        this.connections = connections != null ? connections : new ArrayList<>();
+        rebuildIndices();
     }
 
     public List<FlowVariable> getLocalVariables() {
@@ -125,5 +135,55 @@ public class FlowGraph {
 
     public void setFunctionOutputs(List<FunctionParameter> functionOutputs) {
         this.functionOutputs = functionOutputs;
+    }
+
+    private void rebuildIndices() {
+        connectionsBySource = new HashMap<>();
+        connectionsByTarget = new HashMap<>();
+        nodeToId = new IdentityHashMap<>();
+
+        if (nodes != null) {
+            for (Map.Entry<String, FlowNode> entry : nodes.entrySet()) {
+                nodeToId.put(entry.getValue(), entry.getKey());
+            }
+        }
+
+        if (connections != null) {
+            for (FlowConnection conn : connections) {
+                connectionsBySource.computeIfAbsent(conn.getSourceNodeId(), k -> new ArrayList<>()).add(conn);
+                connectionsByTarget.computeIfAbsent(conn.getTargetNodeId(), k -> new ArrayList<>()).add(conn);
+            }
+        }
+    }
+
+    public List<FlowConnection> getConnectionsFromSource(String nodeId) {
+        ensureIndicesBuilt();
+        return connectionsBySource.getOrDefault(nodeId, Collections.emptyList());
+    }
+
+    public List<FlowConnection> getConnectionsToTarget(String nodeId) {
+        ensureIndicesBuilt();
+        return connectionsByTarget.getOrDefault(nodeId, Collections.emptyList());
+    }
+
+    public String findNodeId(FlowNode node) {
+        ensureIndicesBuilt();
+        return nodeToId.get(node);
+    }
+
+    private void ensureIndicesBuilt() {
+        boolean needsRebuild = false;
+        if (connectionsBySource == null || connectionsByTarget == null || nodeToId == null) {
+            needsRebuild = true;
+        } else {
+            int nodeCount = nodes != null ? nodes.size() : 0;
+            int connCount = connections != null ? connections.size() : 0;
+            if (nodeToId.size() != nodeCount || connectionsBySource.size() != connCount) {
+                needsRebuild = true;
+            }
+        }
+        if (needsRebuild) {
+            rebuildIndices();
+        }
     }
 }

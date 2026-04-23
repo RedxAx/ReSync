@@ -10,6 +10,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,15 +38,22 @@ public class FlowExecutor {
                        int maxExecutionSteps, boolean enableDebug) {
         this.registry = registry;
         this.typeAdapter = typeAdapter;
-        this.globalVariables = globalVariables != null ? globalVariables : new java.util.HashMap<>();
+        this.globalVariables = globalVariables != null ? globalVariables : new HashMap<>();
         this.maxExecutionSteps = maxExecutionSteps;
         this.enableDebug = enableDebug;
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event) {
+        return execute(graph, startNodeId, player, event, new HashMap<>());
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
+                                           Map<String, Object> eventVars) {
         notifyExecutionListeners(graph, startNodeId, player, event);
-        FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables);
-        return execute(runtime, startNodeId, player, event, 0);
+        FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVars);
+        CompletableFuture<Void> future = execute(runtime, startNodeId, player, event, 0);
+        future.whenComplete((result, ex) -> runtime.cleanupThreadLocals());
+        return future;
     }
 
     public void addExecutionListener(FlowExecutionListener listener) {
@@ -126,7 +134,7 @@ public class FlowExecutor {
                 if (outputPins.isEmpty()) {
                     outputPins = List.of(runtimeOutputPin);
                 } else {
-                    List<String> merged = new java.util.ArrayList<>(outputPins);
+                    List<String> merged = new ArrayList<>(outputPins);
                     merged.add(runtimeOutputPin);
                     outputPins = merged;
                 }
@@ -136,7 +144,9 @@ public class FlowExecutor {
             if (!outputPins.isEmpty()) {
                 result = executeTriggeredOutputs(runtime, startNodeId, outputPins, player, event, steps);
             } else if (context.hasPendingAsyncOperations()) {
-                result = CompletableFuture.completedFuture(null);
+                result = CompletableFuture.allOf(
+                    context.getAsyncOperations().values().toArray(new CompletableFuture[0])
+                );
             } else {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
@@ -533,14 +543,11 @@ public class FlowExecutor {
     }
 
     private void clearFlowDataDependencies(FlowRuntime runtime, FlowGraph graph, List<String> targetNodeIds) {
-        if (graph.getConnections() == null || targetNodeIds == null || targetNodeIds.isEmpty()) {
+        if (targetNodeIds == null || targetNodeIds.isEmpty()) {
             return;
         }
         for (String targetNodeId : targetNodeIds) {
-            for (FlowConnection conn : graph.getConnections()) {
-                if (!conn.getTargetNodeId().equals(targetNodeId)) {
-                    continue;
-                }
+            for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
                 if ("flow".equals(conn.getTargetPin())) {
                     continue;
                 }
@@ -555,11 +562,11 @@ public class FlowExecutor {
     }
 
     private void clearDependencyOutputs(FlowRuntime runtime, FlowGraph graph, String targetNodeId, String pinName, Set<String> visited) {
-        if (graph.getConnections() == null || targetNodeId == null) {
+        if (targetNodeId == null) {
             return;
         }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (!conn.getTargetNodeId().equals(targetNodeId) || !conn.getTargetPin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
+            if (!conn.getTargetPin().equals(pinName)) {
                 continue;
             }
             String sourceId = conn.getSourceNodeId();
@@ -570,8 +577,8 @@ public class FlowExecutor {
                 continue;
             }
             runtime.clearNodeOutputs(sourceId);
-            for (FlowConnection sourceConn : graph.getConnections()) {
-                if (sourceConn.getTargetNodeId().equals(sourceId) && !"flow".equals(sourceConn.getTargetPin())) {
+            for (FlowConnection sourceConn : graph.getConnectionsToTarget(sourceId)) {
+                if (!"flow".equals(sourceConn.getTargetPin())) {
                     clearDependencyOutputs(runtime, graph, sourceId, sourceConn.getTargetPin(), visited);
                 }
             }
@@ -591,11 +598,8 @@ public class FlowExecutor {
     }
 
     private boolean hasIncomingFlowConnection(FlowGraph graph, String nodeId) {
-        if (graph.getConnections() == null) {
-            return false;
-        }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getTargetNodeId().equals(nodeId) && "flow".equals(conn.getTargetPin())) {
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
+            if ("flow".equals(conn.getTargetPin())) {
                 return true;
             }
         }
@@ -628,15 +632,12 @@ public class FlowExecutor {
 
     private void ensureInputNodesReady(FlowRuntime runtime, FlowNode node, Player player, Event event) {
         FlowGraph graph = runtime.getGraph();
-        String nodeId = findNodeId(graph, node);
-        if (nodeId == null || graph.getConnections() == null) {
+        String nodeId = graph.findNodeId(node);
+        if (nodeId == null) {
             return;
         }
 
-        for (FlowConnection conn : graph.getConnections()) {
-            if (!conn.getTargetNodeId().equals(nodeId)) {
-                continue;
-            }
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
             if ("flow".equals(conn.getTargetPin())) {
                 continue;
             }
@@ -679,18 +680,12 @@ public class FlowExecutor {
     }
 
     private String findNodeId(FlowGraph graph, FlowNode node) {
-        for (var entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() == node) {
-                return entry.getKey();
-            }
-        }
-        return null;
+        return graph.findNodeId(node);
     }
 
     private String findTargetNode(FlowGraph graph, String nodeId, String pinName) {
-        if (graph.getConnections() == null) return null;
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getSourceNodeId().equals(nodeId) && conn.getSourcePin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
+            if (conn.getSourcePin().equals(pinName)) {
                 return conn.getTargetNodeId();
             }
         }
@@ -699,11 +694,8 @@ public class FlowExecutor {
 
     private List<String> findTargetNodes(FlowGraph graph, String nodeId, String pinName) {
         List<String> targets = new java.util.ArrayList<>();
-        if (graph.getConnections() == null) {
-            return targets;
-        }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getSourceNodeId().equals(nodeId) && conn.getSourcePin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
+            if (conn.getSourcePin().equals(pinName)) {
                 targets.add(conn.getTargetNodeId());
             }
         }

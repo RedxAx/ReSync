@@ -147,9 +147,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : serverStartTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.server_name", Bukkit.getServer().getName());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.server_name", Bukkit.getServer().getName());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -161,10 +161,10 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : pluginDisableTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.plugin_name", plugin.getName());
-                executor.getEventVariables().put("event.plugin_instance", plugin);
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.plugin_name", plugin.getName());
+                eventVars.put("event.plugin_instance", plugin);
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -176,9 +176,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : pluginEnableTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.plugin_name", plugin.getName());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.plugin_name", plugin.getName());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -188,9 +188,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : worldLoadTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.world_name", event.getWorld().getName());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -200,9 +200,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : worldUnloadTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.world_name", event.getWorld().getName());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -212,10 +212,10 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : chunkLoadTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.chunk_x", event.getChunk().getX());
-                executor.getEventVariables().put("event.chunk_z", event.getChunk().getZ());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.chunk_x", event.getChunk().getX());
+                eventVars.put("event.chunk_z", event.getChunk().getZ());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -225,10 +225,10 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : chunkUnloadTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.chunk_x", event.getChunk().getX());
-                executor.getEventVariables().put("event.chunk_z", event.getChunk().getZ());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.chunk_x", event.getChunk().getX());
+                eventVars.put("event.chunk_z", event.getChunk().getZ());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }
@@ -239,9 +239,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : serverTickTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.tick_number", tick);
-                executor.execute(graph, entry.getValue(), null, null);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.tick_number", tick);
+                executor.execute(graph, entry.getValue(), null, null, eventVars);
             }
         }
     }
@@ -250,9 +250,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : serverStopTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.server_name", Bukkit.getServer().getName());
-                executor.execute(graph, entry.getValue(), null, null);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.server_name", Bukkit.getServer().getName());
+                executor.execute(graph, entry.getValue(), null, null, eventVars);
             }
         }
     }
@@ -262,9 +262,9 @@ public class SystemEventListener implements Listener {
         for (Map.Entry<String, String> entry : serverSaveTriggers.entrySet()) {
             FlowGraph graph = storage.getGraph(entry.getKey());
             if (graph != null) {
-                executor.clearEventVariables();
-                executor.getEventVariables().put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event);
+                Map<String, Object> eventVars = new java.util.HashMap<>();
+                eventVars.put("event.world_name", event.getWorld().getName());
+                executor.execute(graph, entry.getValue(), null, event, eventVars);
             }
         }
     }

@@ -5,14 +5,15 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 
 public class FlowRuntime {
     private FlowGraph graph;
@@ -26,7 +27,7 @@ public class FlowRuntime {
     private final ThreadLocal<Set<String>> executingFlowNodes = ThreadLocal.withInitial(HashSet::new);
     private final Map<String, Object> functionInputs = new HashMap<>();
 
-    private final Stack<Frame> callStack = new Stack<>();
+    private final Deque<Frame> callStack = new ArrayDeque<>();
     private boolean breakLoopRequested = false;
     private boolean continueLoopRequested = false;
     private boolean functionReturnRequested = false;
@@ -105,8 +106,8 @@ public class FlowRuntime {
         String nodeId = findNodeId(node);
         if (nodeId == null) return null;
 
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getTargetNodeId().equals(nodeId) && conn.getTargetPin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
+            if (conn.getTargetPin().equals(pinName)) {
                 String sourceKey = conn.getSourceNodeId() + ":" + conn.getSourcePin();
                 return nodeOutputs.get(sourceKey);
             }
@@ -149,12 +150,7 @@ public class FlowRuntime {
     }
 
     public String findNodeId(FlowNode node) {
-        for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() == node) {
-                return entry.getKey();
-            }
-        }
-        return null;
+        return graph != null ? graph.findNodeId(node) : null;
     }
 
     public void setNodeOutput(String nodeId, String pinName, Object value) {
@@ -328,5 +324,10 @@ public class FlowRuntime {
     public void resetLoopControl() {
         this.breakLoopRequested = false;
         this.continueLoopRequested = false;
+    }
+
+    public void cleanupThreadLocals() {
+        triggeredOutputPin.remove();
+        executingFlowNodes.remove();
     }
 }

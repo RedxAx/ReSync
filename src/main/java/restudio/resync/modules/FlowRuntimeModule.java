@@ -46,6 +46,7 @@ public class FlowRuntimeModule implements Module {
     @Override
     public void initialize(ModuleContext context) {
         storage = new FlowStorage(context.getPlugin());
+        storage.preloadAll();
         TypeAdapterRegistry typeAdapterRegistry = new TypeAdapterRegistry();
         FlowRegistry flowRegistry = new FlowRegistry();
         NodeDefinitionRegistry nodeDefinitionRegistry = new NodeDefinitionRegistry();

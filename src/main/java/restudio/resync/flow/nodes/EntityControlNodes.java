@@ -60,38 +60,6 @@ public class EntityControlNodes {
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "entity_set_name", displayName = "Entity Set Name", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "name", dataType = FlowType.STRING)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetName(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        String name = ctx.getInputValue(node, "name", String.class, "");
-        if (entity != null) {
-            entity.setCustomName(name);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_custom_name_visible", displayName = "Entity Set Name Visible", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "visible", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetCustomNameVisible(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean visible = ctx.getInputValue(node, "visible", Boolean.class, true);
-        if (entity != null) {
-            entity.setCustomNameVisible(visible);
-        }
-        ctx.triggerOutput("flow");
-    }
-
     @DefineNode(id = "entity_set_rotation", displayName = "Entity Set Rotation", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -109,54 +77,6 @@ public class EntityControlNodes {
             location.setYaw(yaw);
             location.setPitch(pitch);
             entity.teleport(location);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_health", displayName = "Entity Set Health", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "health", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetHealth(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Double health = ctx.getInputValue(node, "health", Double.class, 20.0);
-        if (entity instanceof LivingEntity living) {
-            living.setHealth(health);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_max_health", displayName = "Entity Set Max Health", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "max_health", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetMaxHealth(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Double maxHealth = ctx.getInputValue(node, "max_health", Double.class, 20.0);
-        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
-            living.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_speed", displayName = "Entity Set Speed", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "speed", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetSpeed(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Double speed = ctx.getInputValue(node, "speed", Double.class, 0.2);
-        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED) != null) {
-            living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
         }
         ctx.triggerOutput("flow");
     }
@@ -225,129 +145,6 @@ public class EntityControlNodes {
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "entity_set_target", displayName = "Entity Set Target", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "target", dataType = FlowType.ENTITY)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetTarget(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Entity target = ctx.getInputValue(node, "target", Entity.class, null);
-        if (entity instanceof Mob mob && target instanceof LivingEntity livingTarget) {
-            mob.setTarget(livingTarget);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_clear_target", displayName = "Entity Clear Target", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "entity", dataType = FlowType.ENTITY)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entityClearTarget(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity instanceof Mob mob) {
-            mob.setTarget(null);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_persistent", displayName = "Entity Set Persistent", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "persistent", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetPersistent(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean persistent = ctx.getInputValue(node, "persistent", Boolean.class, true);
-        if (entity instanceof Mob mob) {
-            mob.setPersistent(persistent);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_invulnerable", displayName = "Entity Set Invulnerable", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "invulnerable", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetInvulnerable(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean invulnerable = ctx.getInputValue(node, "invulnerable", Boolean.class, false);
-        if (entity != null) {
-            entity.setInvulnerable(invulnerable);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_silent", displayName = "Entity Set Silent", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "silent", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetSilent(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean silent = ctx.getInputValue(node, "silent", Boolean.class, false);
-        if (entity != null) {
-            entity.setSilent(silent);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_glowing", displayName = "Entity Set Glowing", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "glowing", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetGlowing(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean glowing = ctx.getInputValue(node, "glowing", Boolean.class, false);
-        if (entity != null) {
-            entity.setGlowing(glowing);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_burning", displayName = "Entity Set Burning", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetBurning(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (entity != null) {
-            entity.setFireTicks(ticks);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_frozen", displayName = "Entity Set Frozen", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetFrozen(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (entity != null) {
-            entity.setFreezeTicks(ticks);
-        }
-        ctx.triggerOutput("flow");
-    }
-
     @DefineNode(id = "entity_set_wet", displayName = "Entity Set Wet", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -360,22 +157,6 @@ public class EntityControlNodes {
         Boolean wet = ctx.getInputValue(node, "wet", Boolean.class, false);
         if (entity != null) {
             entity.setVisualFire(wet);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_swimming", displayName = "Entity Set Swimming", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "swimming", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetSwimming(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean swimming = ctx.getInputValue(node, "swimming", Boolean.class, false);
-        if (entity instanceof LivingEntity living) {
-            living.setSwimming(swimming);
         }
         ctx.triggerOutput("flow");
     }
@@ -396,41 +177,6 @@ public class EntityControlNodes {
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "entity_set_baby", displayName = "Entity Set Baby", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "is_baby", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetBaby(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean isBaby = ctx.getInputValue(node, "is_baby", Boolean.class, false);
-        if (entity instanceof Ageable ageable) {
-            ageable.setAdult();
-            if (Boolean.TRUE.equals(isBaby)) {
-                ageable.setBaby();
-            }
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_tamed", displayName = "Entity Set Tamed", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "tamed", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetTamed(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean tamed = ctx.getInputValue(node, "tamed", Boolean.class, true);
-        if (entity instanceof Tameable tameable) {
-            tameable.setTamed(tamed);
-        }
-        ctx.triggerOutput("flow");
-    }
-
     @DefineNode(id = "entity_set_owner", displayName = "Entity Set Owner", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -443,22 +189,6 @@ public class EntityControlNodes {
         Entity owner = ctx.getInputValue(node, "owner", Entity.class, null);
         if (entity instanceof Tameable tameable && owner instanceof AnimalTamer tamer) {
             tameable.setOwner(tamer);
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "entity_set_sitting", displayName = "Entity Set Sitting", category = NodeDefinition.NodeCategory.ENTITY,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "sitting", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entitySetSitting(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Boolean sitting = ctx.getInputValue(node, "sitting", Boolean.class, false);
-        if (entity instanceof Sittable sittable) {
-            sittable.setSitting(sitting);
         }
         ctx.triggerOutput("flow");
     }
@@ -696,18 +426,141 @@ public class EntityControlNodes {
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "entity_kill", displayName = "Entity Kill", category = NodeDefinition.NodeCategory.ENTITY,
+    @DefineNode(id = "entity_state", displayName = "Entity State", category = NodeDefinition.NodeCategory.ENTITY,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "reason", dataType = FlowType.STRING)
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
             },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void entityKill(FlowContext ctx, FlowNode node) {
-        LivingEntity entity = ctx.getInputValue(node, "entity", LivingEntity.class, null);
-        if (entity != null) {
-            entity.setHealth(0);
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
+            })
+    public void entityState(FlowContext ctx, FlowNode node) {
+        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        boolean success = false;
+        String nodeId = ctx.getRuntime().findNodeId(node);
+
+        if (entity != null && mode != null) {
+            switch (mode.toLowerCase()) {
+                case "name" -> {
+                    entity.setCustomName(value instanceof String s ? s : "");
+                    success = true;
+                }
+                case "name_visible" -> {
+                    entity.setCustomNameVisible(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                    success = true;
+                }
+                case "glowing" -> {
+                    entity.setGlowing(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                    success = true;
+                }
+                case "silent" -> {
+                    entity.setSilent(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                    success = true;
+                }
+                case "invulnerable" -> {
+                    entity.setInvulnerable(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                    success = true;
+                }
+                case "burning" -> {
+                    int ticks = value instanceof Number n ? n.intValue() : 0;
+                    entity.setFireTicks(ticks);
+                    success = true;
+                }
+                case "frozen" -> {
+                    int ticks = value instanceof Number n ? n.intValue() : 0;
+                    entity.setFreezeTicks(ticks);
+                    success = true;
+                }
+                case "persistent" -> {
+                    if (entity instanceof Mob mob) {
+                        mob.setPersistent(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                        success = true;
+                    }
+                }
+                case "health" -> {
+                    if (entity instanceof LivingEntity living) {
+                        double health = value instanceof Number n ? n.doubleValue() : 20.0;
+                        living.setHealth(Math.min(health, living.getMaxHealth()));
+                        success = true;
+                    }
+                }
+                case "max_health" -> {
+                    if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
+                        double maxHealth = value instanceof Number n ? n.doubleValue() : 20.0;
+                        living.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
+                        success = true;
+                    }
+                }
+                case "speed" -> {
+                    if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED) != null) {
+                        double speed = value instanceof Number n ? n.doubleValue() : 0.2;
+                        living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
+                        success = true;
+                    }
+                }
+                case "target" -> {
+                    if (entity instanceof Mob mob && value instanceof LivingEntity target) {
+                        mob.setTarget(target);
+                        success = true;
+                    } else if (entity instanceof Mob mob && value == null) {
+                        mob.setTarget(null);
+                        success = true;
+                    }
+                }
+                case "baby" -> {
+                    if (entity instanceof Ageable ageable) {
+                        boolean isBaby = value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value));
+                        if (isBaby) {
+                            ageable.setBaby();
+                        } else {
+                            ageable.setAdult();
+                        }
+                        success = true;
+                    }
+                }
+                case "tamed" -> {
+                    if (entity instanceof Tameable tameable) {
+                        tameable.setTamed(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                        success = true;
+                    }
+                }
+                case "sitting" -> {
+                    if (entity instanceof Sittable sittable) {
+                        sittable.setSitting(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                        success = true;
+                    }
+                }
+                case "swimming" -> {
+                    if (entity instanceof LivingEntity living) {
+                        living.setSwimming(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                        success = true;
+                    }
+                }
+                case "pickup_items" -> {
+                    if (entity instanceof LivingEntity living) {
+                        living.setCanPickupItems(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
+                        success = true;
+                    }
+                }
+                case "kill" -> {
+                    if (entity instanceof LivingEntity living) {
+                        living.setHealth(0);
+                        success = true;
+                    }
+                }
+                case "remove" -> {
+                    entity.remove();
+                    success = true;
+                }
+            }
         }
+
+        ctx.setNodeOutput(nodeId, "success", success);
         ctx.triggerOutput("flow");
     }
 }

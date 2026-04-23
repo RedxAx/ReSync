@@ -3,6 +3,7 @@ package restudio.resync.flow.nodes;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -27,483 +28,6 @@ public class PlayerActionNodes {
 
     private static final Map<String, BossBar> BOSS_BARS = new ConcurrentHashMap<>();
 
-    @DefineNode(id = "player_sprint", displayName = "Sprint", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSprint(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setSprinting(enabled));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_sneak", displayName = "Sneak", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSneak(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setSneaking(enabled));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_fly", displayName = "Fly", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerFly(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> {
-                target.setAllowFlight(enabled);
-                target.setFlying(enabled);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_gamemode", displayName = "Gamemode", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "mode", dataType = FlowType.STRING)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerGamemode(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        String modeName = ctx.getInputValue(node, "mode", String.class, "SURVIVAL");
-        if (target != null) {
-            try {
-                GameMode mode = GameMode.valueOf(modeName.toUpperCase());
-                runSync(() -> target.setGameMode(mode));
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_vanish", displayName = "Vanish", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerVanish(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setInvisible(enabled));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_glowing", displayName = "Glowing", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerGlowing(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setGlowing(enabled));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_invulnerable", displayName = "Invulnerable", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerInvulnerable(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setInvulnerable(enabled));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_food_level", displayName = "Food Level", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerFoodLevel(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Integer level = ctx.getInputValue(node, "level", Integer.class, 20);
-        if (target != null) {
-            runSync(() -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_saturation", displayName = "Saturation", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "saturation", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSaturation(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Float saturation = ctx.getInputValue(node, "saturation", Float.class, 20.0f);
-        if (target != null) {
-            runSync(() -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_exhaustion", displayName = "Exhaustion", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "exhaustion", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerExhaustion(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Float exhaustion = ctx.getInputValue(node, "exhaustion", Float.class, 0.0f);
-        if (target != null) {
-            runSync(() -> target.setExhaustion(Math.max(0, exhaustion)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_health", displayName = "Health", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "health", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerHealth(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Double health = ctx.getInputValue(node, "health", Double.class, 20.0);
-        if (target != null) {
-            runSync(() -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_max_health", displayName = "Max Health", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "max_health", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerMaxHealth(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Double maxHealth = ctx.getInputValue(node, "max_health", Double.class, 20.0);
-        if (target != null) {
-            runSync(() -> target.setMaxHealth(Math.max(1, maxHealth)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_absorption", displayName = "Absorption", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "absorption", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerAbsorption(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Double absorption = ctx.getInputValue(node, "absorption", Double.class, 0.0);
-        if (target != null) {
-            runSync(() -> target.setAbsorptionAmount(Math.max(0, absorption)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_xp", displayName = "Xp", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "level", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "points", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerXp(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Integer level = ctx.getInputValue(node, "level", Integer.class, 0);
-        Float points = ctx.getInputValue(node, "points", Float.class, 0.0f);
-        if (target != null) {
-            runSync(() -> {
-                target.setLevel(Math.max(0, level));
-                target.setExp(Math.max(0, Math.min(1, points)));
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_tp", displayName = "Teleport", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
-                    @FlowPin(name = "x", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "y", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "z", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerTp(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        if (target != null) {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            if (location == null) {
-                Location base = callSync(target::getLocation);
-                Double x = ctx.getInputValue(node, "x", Double.class, base.getX());
-                Double y = ctx.getInputValue(node, "y", Double.class, base.getY());
-                Double z = ctx.getInputValue(node, "z", Double.class, base.getZ());
-                Float yaw = ctx.getInputValue(node, "yaw", Float.class, base.getYaw());
-                Float pitch = ctx.getInputValue(node, "pitch", Float.class, base.getPitch());
-                location = new Location(base.getWorld(), x, y, z, yaw, pitch);
-            }
-            Location finalLocation = location;
-            runSync(() -> target.teleport(finalLocation));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_launch", displayName = "Launch", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "vx", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "vy", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "vz", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerLaunch(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Double vx = ctx.getInputValue(node, "vx", Double.class, 0.0);
-        Double vy = ctx.getInputValue(node, "vy", Double.class, 0.0);
-        Double vz = ctx.getInputValue(node, "vz", Double.class, 0.0);
-        if (target != null) {
-            runSync(() -> target.setVelocity(new Vector(vx, vy, vz)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_push", displayName = "Push", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "strength", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerPush(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Double strength = ctx.getInputValue(node, "strength", Double.class, 1.0);
-        Vector inputDirection = ctx.getInputValue(node, "direction_vector", Vector.class, null);
-        if (target != null) {
-            runSync(() -> {
-                Vector direction = inputDirection != null ? inputDirection.clone() : target.getLocation().getDirection();
-                if (direction.lengthSquared() > 0) {
-                    direction.normalize();
-                }
-                target.setVelocity(direction.multiply(strength));
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_spin", displayName = "Spin", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSpin(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Float yaw = ctx.getInputValue(node, "yaw", Float.class, 0.0f);
-        Float pitch = ctx.getInputValue(node, "pitch", Float.class, 0.0f);
-        if (target != null) {
-            runSync(() -> {
-                Location loc = target.getLocation();
-                loc.setYaw(loc.getYaw() + yaw);
-                loc.setPitch(loc.getPitch() + pitch);
-                target.teleport(loc);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_rotation", displayName = "Set Rotation", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetRotation(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        if (target != null) {
-            Location base = callSync(target::getLocation);
-            Float yaw = ctx.getInputValue(node, "yaw", Float.class, base.getYaw());
-            Float pitch = ctx.getInputValue(node, "pitch", Float.class, base.getPitch());
-            runSync(() -> {
-                Location loc = target.getLocation();
-                loc.setYaw(yaw);
-                loc.setPitch(pitch);
-                target.teleport(loc);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_allow_flight", displayName = "Allow Flight", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "allowed", dataType = FlowType.BOOLEAN)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerAllowFlight(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Boolean allowed = ctx.getInputValue(node, "allowed", Boolean.class, true);
-        if (target != null) {
-            runSync(() -> target.setAllowFlight(allowed));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_deny_flight", displayName = "Deny Flight", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerDenyFlight(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        if (target != null) {
-            runSync(() -> {
-                target.setAllowFlight(false);
-                target.setFlying(false);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_walk_speed", displayName = "Walk Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetWalkSpeed(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Float speed = ctx.getInputValue(node, "speed", Float.class, 0.2f);
-        if (target != null) {
-            runSync(() -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_fly_speed", displayName = "Fly Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetFlySpeed(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Float speed = ctx.getInputValue(node, "speed", Float.class, 0.1f);
-        if (target != null) {
-            runSync(() -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_freeze", displayName = "Freeze", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerFreeze(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        if (target != null) {
-            runSync(() -> {
-                target.setWalkSpeed(0);
-                target.setFlySpeed(0);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_unfreeze", displayName = "Unfreeze", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerUnfreeze(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        if (target != null) {
-            runSync(() -> {
-                target.setWalkSpeed(0.2f);
-                target.setFlySpeed(0.1f);
-            });
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_fire_ticks", displayName = "Fire Ticks", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetFireTicks(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (target != null) {
-            runSync(() -> target.setFireTicks(ticks));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_air_ticks", displayName = "Air Ticks", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetAirTicks(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 300);
-        if (target != null) {
-            runSync(() -> target.setRemainingAir(Math.max(-20, ticks)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_no_damage_ticks", displayName = "No Damage Ticks", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "target", dataType = FlowType.PLAYER), @FlowPin(name = "ticks", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetNoDamageTicks(FlowContext ctx, FlowNode node) {
-        Player target = ctx.getInputValue(node, "target", Player.class, null);
-        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (target != null) {
-            runSync(() -> target.setNoDamageTicks(ticks));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_add_potion", displayName = "Add Potion", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "effect_type", dataType = FlowType.STRING),
-                    @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerAddPotion(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        String effectType = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
-        Integer duration = ctx.getInputValue(node, "duration_ticks", Integer.class, 600);
-        Integer amplifier = ctx.getInputValue(node, "amplifier", Integer.class, 0);
-        if (player != null) {
-            PotionEffectType type = PotionEffectType.getByName(effectType.toUpperCase());
-            if (type != null) {
-                PotionEffect effect = new PotionEffect(type, Math.max(0, duration), Math.max(0, amplifier));
-                runSync(() -> player.addPotionEffect(effect));
-            }
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_clear_potions", displayName = "Clear Potions", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerClearPotions(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        if (player != null) {
-            runSync(() -> player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType())));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_has_potion", displayName = "Has Potion", category = NodeDefinition.NodeCategory.LOGIC,
-            inputs = {@FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "effect_type", dataType = FlowType.STRING)},
-            outputs = {@FlowPin(name = "has_effect", dataType = FlowType.BOOLEAN), @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)})
-    public void playerHasPotion(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        String effectType = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
-        boolean hasEffect = false;
-        int amplifier = 0;
-        if (player != null) {
-            PotionEffectType type = PotionEffectType.getByName(effectType.toUpperCase());
-            if (type != null) {
-                hasEffect = callSync(() -> player.hasPotionEffect(type));
-                if (hasEffect) {
-                    PotionEffect potionEffect = callSync(() -> player.getPotionEffect(type));
-                    amplifier = potionEffect != null ? potionEffect.getAmplifier() : 0;
-                }
-            }
-        }
-        ctx.setOutput(node, "has_effect", hasEffect);
-        ctx.setOutput(node, "amplifier", amplifier);
-    }
-
     @DefineNode(id = "player_send_resourcepack", displayName = "Send Resource Pack", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -517,29 +41,6 @@ public class PlayerActionNodes {
         String url = ctx.getInputValue(node, "url", String.class, "");
         if (player != null && !url.isEmpty()) {
             runSync(() -> player.setResourcePack(url));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_set_compass_target", displayName = "Set Compass Target", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "location", dataType = FlowType.LOCATION)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetCompassTarget(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Location location = ctx.getInputValue(node, "location", Location.class, null);
-        if (player != null && location != null) {
-            runSync(() -> player.setCompassTarget(location));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_reset_compass", displayName = "Reset Compass", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerResetCompass(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        if (player != null) {
-            runSync(() -> player.setCompassTarget(player.getWorld().getSpawnLocation()));
         }
         ctx.triggerOutput("flow");
     }
@@ -569,30 +70,6 @@ public class PlayerActionNodes {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         int totalExp = player == null ? 0 : callSync(player::getTotalExperience);
         ctx.setOutput(node, "total_exp", totalExp);
-    }
-
-    @DefineNode(id = "player_set_exp", displayName = "Set Xp", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "exp", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetExp(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Integer exp = ctx.getInputValue(node, "exp", Integer.class, 0);
-        if (player != null) {
-            runSync(() -> player.setTotalExperience(Math.max(0, exp)));
-        }
-        ctx.triggerOutput("flow");
-    }
-
-    @DefineNode(id = "player_give_exp", displayName = "Give Xp", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "exp", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerGiveExp(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Integer exp = ctx.getInputValue(node, "exp", Integer.class, 0);
-        if (player != null) {
-            runSync(() -> player.giveExp(Math.max(0, exp)));
-        }
-        ctx.triggerOutput("flow");
     }
 
     @DefineNode(id = "player_show_bossbar", displayName = "Show Boss Bar", category = NodeDefinition.NodeCategory.ACTION,
@@ -680,51 +157,435 @@ public class PlayerActionNodes {
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "player_set_walking_speed", displayName = "Set Walking Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetWalkingSpeed(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Float speed = ctx.getInputValue(node, "speed", Float.class, 0.2f);
-        if (player != null) {
-            runSync(() -> player.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
+    @DefineNode(id = "player_state", displayName = "Player State", category = NodeDefinition.NodeCategory.ACTION,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "value", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "string_value", dataType = FlowType.STRING),
+                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "level", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "points", dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
+            })
+    public void playerState(FlowContext ctx, FlowNode node) {
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Player target = ctx.getInputValue(node, "target", Player.class, null);
+        boolean success = false;
+        if (target != null) {
+            switch (mode.toLowerCase()) {
+                case "sprint" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setSprinting(enabled));
+                    success = true;
+                }
+                case "sneak" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setSneaking(enabled));
+                    success = true;
+                }
+                case "fly" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> {
+                        target.setAllowFlight(enabled);
+                        target.setFlying(enabled);
+                    });
+                    success = true;
+                }
+                case "vanish" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setInvisible(enabled));
+                    success = true;
+                }
+                case "glowing" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setGlowing(enabled));
+                    success = true;
+                }
+                case "invulnerable" -> {
+                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setInvulnerable(enabled));
+                    success = true;
+                }
+                case "gamemode" -> {
+                    String modeName = ctx.getInputValue(node, "string_value", String.class, "SURVIVAL");
+                    try {
+                        GameMode gm = GameMode.valueOf(modeName.toUpperCase());
+                        runSync(() -> target.setGameMode(gm));
+                        success = true;
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }
+                case "food_level" -> {
+                    Integer level = ctx.getInputValue(node, "value", Integer.class, 20);
+                    runSync(() -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
+                    success = true;
+                }
+                case "saturation" -> {
+                    Float saturation = ctx.getInputValue(node, "value", Float.class, 20.0f);
+                    runSync(() -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
+                    success = true;
+                }
+                case "exhaustion" -> {
+                    Float exhaustion = ctx.getInputValue(node, "value", Float.class, 0.0f);
+                    runSync(() -> target.setExhaustion(Math.max(0, exhaustion)));
+                    success = true;
+                }
+                case "health" -> {
+                    Double health = ctx.getInputValue(node, "value", Double.class, 20.0);
+                    runSync(() -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
+                    success = true;
+                }
+                case "max_health" -> {
+                    Double maxHealth = ctx.getInputValue(node, "value", Double.class, 20.0);
+                    runSync(() -> target.setMaxHealth(Math.max(1, maxHealth)));
+                    success = true;
+                }
+                case "absorption" -> {
+                    Double absorption = ctx.getInputValue(node, "value", Double.class, 0.0);
+                    runSync(() -> target.setAbsorptionAmount(Math.max(0, absorption)));
+                    success = true;
+                }
+                case "walk_speed" -> {
+                    Float speed = ctx.getInputValue(node, "value", Float.class, 0.2f);
+                    runSync(() -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
+                    success = true;
+                }
+                case "fly_speed" -> {
+                    Float speed = ctx.getInputValue(node, "value", Float.class, 0.1f);
+                    runSync(() -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
+                    success = true;
+                }
+                case "fire_ticks" -> {
+                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
+                    runSync(() -> target.setFireTicks(ticks));
+                    success = true;
+                }
+                case "air_ticks" -> {
+                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 300);
+                    runSync(() -> target.setRemainingAir(Math.max(-20, ticks)));
+                    success = true;
+                }
+                case "no_damage_ticks" -> {
+                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
+                    runSync(() -> target.setNoDamageTicks(ticks));
+                    success = true;
+                }
+                case "freeze" -> {
+                    runSync(() -> {
+                        target.setWalkSpeed(0);
+                        target.setFlySpeed(0);
+                    });
+                    success = true;
+                }
+                case "unfreeze" -> {
+                    runSync(() -> {
+                        target.setWalkSpeed(0.2f);
+                        target.setFlySpeed(0.1f);
+                    });
+                    success = true;
+                }
+                case "allow_flight" -> {
+                    Boolean allowed = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                    runSync(() -> target.setAllowFlight(allowed));
+                    success = true;
+                }
+                case "deny_flight" -> {
+                    runSync(() -> {
+                        target.setAllowFlight(false);
+                        target.setFlying(false);
+                    });
+                    success = true;
+                }
+                case "xp" -> {
+                    Integer level = ctx.getInputValue(node, "level", Integer.class, 0);
+                    Float points = ctx.getInputValue(node, "points", Float.class, 0.0f);
+                    runSync(() -> {
+                        target.setLevel(Math.max(0, level));
+                        target.setExp(Math.max(0, Math.min(1, points)));
+                    });
+                    success = true;
+                }
+                case "total_exp" -> {
+                    Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
+                    runSync(() -> target.setTotalExperience(Math.max(0, exp)));
+                    success = true;
+                }
+                case "give_exp" -> {
+                    Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
+                    runSync(() -> target.giveExp(Math.max(0, exp)));
+                    success = true;
+                }
+                case "compass_target" -> {
+                    Location location = ctx.getInputValue(node, "string_value", Location.class, null);
+                    if (location != null) {
+                        runSync(() -> target.setCompassTarget(location));
+                        success = true;
+                    }
+                }
+                case "reset_compass" -> {
+                    runSync(() -> target.setCompassTarget(target.getWorld().getSpawnLocation()));
+                    success = true;
+                }
+                default -> {
+                }
+            }
         }
+        ctx.setOutput(node, "success", success);
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "player_set_flying_speed", displayName = "Set Flying Speed", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "speed", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetFlyingSpeed(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Float speed = ctx.getInputValue(node, "speed", Float.class, 0.05f);
-        if (player != null) {
-            runSync(() -> player.setFlySpeed(Math.max(-1, Math.min(1, speed))));
+    @DefineNode(id = "player_movement", displayName = "Player Movement", category = NodeDefinition.NodeCategory.ACTION,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
+                    @FlowPin(name = "x", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "y", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "z", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "vx", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "vy", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "vz", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "strength", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
+            })
+    public void playerMovement(FlowContext ctx, FlowNode node) {
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Player target = ctx.getInputValue(node, "target", Player.class, null);
+        boolean success = false;
+        if (target != null) {
+            switch (mode.toLowerCase()) {
+                case "teleport" -> {
+                    Location location = ctx.getInputValue(node, "location", Location.class, null);
+                    if (location == null) {
+                        Location base = callSync(target::getLocation);
+                        Double x = ctx.getInputValue(node, "x", Double.class, base.getX());
+                        Double y = ctx.getInputValue(node, "y", Double.class, base.getY());
+                        Double z = ctx.getInputValue(node, "z", Double.class, base.getZ());
+                        Float yaw = ctx.getInputValue(node, "yaw", Float.class, base.getYaw());
+                        Float pitch = ctx.getInputValue(node, "pitch", Float.class, base.getPitch());
+                        location = new Location(base.getWorld(), x, y, z, yaw, pitch);
+                    }
+                    Location finalLocation = location;
+                    runSync(() -> target.teleport(finalLocation));
+                    success = true;
+                }
+                case "launch" -> {
+                    Double vx = ctx.getInputValue(node, "vx", Double.class, 0.0);
+                    Double vy = ctx.getInputValue(node, "vy", Double.class, 0.0);
+                    Double vz = ctx.getInputValue(node, "vz", Double.class, 0.0);
+                    runSync(() -> target.setVelocity(new Vector(vx, vy, vz)));
+                    success = true;
+                }
+                case "push" -> {
+                    Double strength = ctx.getInputValue(node, "strength", Double.class, 1.0);
+                    Vector inputDirection = ctx.getInputValue(node, "direction_vector", Vector.class, null);
+                    runSync(() -> {
+                        Vector direction = inputDirection != null ? inputDirection.clone() : target.getLocation().getDirection();
+                        if (direction.lengthSquared() > 0) {
+                            direction.normalize();
+                        }
+                        target.setVelocity(direction.multiply(strength));
+                    });
+                    success = true;
+                }
+                case "spin" -> {
+                    Float yaw = ctx.getInputValue(node, "yaw", Float.class, 0.0f);
+                    Float pitch = ctx.getInputValue(node, "pitch", Float.class, 0.0f);
+                    runSync(() -> {
+                        Location loc = target.getLocation();
+                        loc.setYaw(loc.getYaw() + yaw);
+                        loc.setPitch(loc.getPitch() + pitch);
+                        target.teleport(loc);
+                    });
+                    success = true;
+                }
+                case "set_rotation" -> {
+                    Location base = callSync(target::getLocation);
+                    Float yaw = ctx.getInputValue(node, "yaw", Float.class, base.getYaw());
+                    Float pitch = ctx.getInputValue(node, "pitch", Float.class, base.getPitch());
+                    runSync(() -> {
+                        Location loc = target.getLocation();
+                        loc.setYaw(yaw);
+                        loc.setPitch(pitch);
+                        target.teleport(loc);
+                    });
+                    success = true;
+                }
+                default -> {
+                }
+            }
         }
+        ctx.setOutput(node, "success", success);
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "player_set_saturation", displayName = "Set Saturation", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "saturation", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetSaturation(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Float saturation = ctx.getInputValue(node, "saturation", Float.class, 20.0f);
-        if (player != null) {
-            runSync(() -> player.setSaturation(Math.max(0, Math.min(20, saturation))));
+    @DefineNode(id = "player_potion", displayName = "Player Potion", category = NodeDefinition.NodeCategory.ACTION,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "effect_type", dataType = FlowType.STRING),
+                    @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER),
+                    @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "has_effect", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "effect_amplifier", dataType = FlowType.NUMBER)
+            })
+    public void playerPotion(FlowContext ctx, FlowNode node) {
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Player target = ctx.getInputValue(node, "target", Player.class, null);
+        boolean success = false;
+        boolean hasEffect = false;
+        int amplifier = 0;
+        if (target != null) {
+            switch (mode.toLowerCase()) {
+                case "add" -> {
+                    String effectType = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
+                    Integer duration = ctx.getInputValue(node, "duration_ticks", Integer.class, 600);
+                    Integer amp = ctx.getInputValue(node, "amplifier", Integer.class, 0);
+                    PotionEffectType type = PotionEffectType.getByName(effectType.toUpperCase());
+                    if (type != null) {
+                        PotionEffect effect = new PotionEffect(type, Math.max(0, duration), Math.max(0, amp));
+                        runSync(() -> target.addPotionEffect(effect));
+                        success = true;
+                    }
+                }
+                case "clear" -> {
+                    runSync(() -> target.getActivePotionEffects().forEach(effect -> target.removePotionEffect(effect.getType())));
+                    success = true;
+                }
+                case "has" -> {
+                    String effectType = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
+                    PotionEffectType type = PotionEffectType.getByName(effectType.toUpperCase());
+                    if (type != null) {
+                        hasEffect = callSync(() -> target.hasPotionEffect(type));
+                        if (hasEffect) {
+                            PotionEffect potionEffect = callSync(() -> target.getPotionEffect(type));
+                            amplifier = potionEffect != null ? potionEffect.getAmplifier() : 0;
+                        }
+                        success = true;
+                    }
+                }
+                default -> {
+                }
+            }
         }
+        ctx.setOutput(node, "success", success);
+        ctx.setOutput(node, "has_effect", hasEffect);
+        ctx.setOutput(node, "effect_amplifier", amplifier);
         ctx.triggerOutput("flow");
     }
 
-    @DefineNode(id = "player_set_food_level", displayName = "Set Food Level", category = NodeDefinition.NodeCategory.ACTION,
-            inputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW), @FlowPin(name = "player", dataType = FlowType.PLAYER), @FlowPin(name = "level", dataType = FlowType.NUMBER)},
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void playerSetFoodLevel(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        Integer level = ctx.getInputValue(node, "level", Integer.class, 20);
-        if (player != null) {
-            runSync(() -> player.setFoodLevel(Math.max(0, Math.min(20, level))));
+    @DefineNode(id = "player_advancement", displayName = "Player Advancement", category = NodeDefinition.NodeCategory.ACTION,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "advancement_key", dataType = FlowType.STRING)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "has_advancement", dataType = FlowType.BOOLEAN)
+            })
+    public void playerAdvancement(FlowContext ctx, FlowNode node) {
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Player target = ctx.getInputValue(node, "target", Player.class, null);
+        String key = ctx.getInputValue(node, "advancement_key", String.class, "");
+        boolean success = false;
+        boolean hasAdvancement = false;
+        if (target != null && !key.isEmpty()) {
+            org.bukkit.NamespacedKey namespacedKey = org.bukkit.NamespacedKey.fromString(key.toLowerCase());
+            if (namespacedKey != null) {
+                org.bukkit.advancement.Advancement advancement = Bukkit.getAdvancement(namespacedKey);
+                if (advancement != null) {
+                    switch (mode.toLowerCase()) {
+                        case "grant" -> {
+                            runSync(() -> target.getAdvancementProgress(advancement).awardCriteria("impossible"));
+                            success = true;
+                        }
+                        case "revoke" -> {
+                            runSync(() -> target.getAdvancementProgress(advancement).revokeCriteria("impossible"));
+                            success = true;
+                        }
+                        case "has" -> {
+                            hasAdvancement = callSync(() -> target.getAdvancementProgress(advancement).isDone());
+                            success = true;
+                        }
+                        default -> {
+                        }
+                    }
+                }
+            }
         }
+        ctx.setOutput(node, "success", success);
+        ctx.setOutput(node, "has_advancement", hasAdvancement);
+        ctx.triggerOutput("flow");
+    }
+
+    @DefineNode(id = "player_cooldown", displayName = "Player Cooldown", category = NodeDefinition.NodeCategory.ACTION,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "target", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "material", dataType = FlowType.STRING),
+                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "has_cooldown", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "remaining_ticks", dataType = FlowType.NUMBER)
+            })
+    public void playerCooldown(FlowContext ctx, FlowNode node) {
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        Player target = ctx.getInputValue(node, "target", Player.class, null);
+        String materialName = ctx.getInputValue(node, "material", String.class, "");
+        boolean success = false;
+        boolean hasCooldown = false;
+        int remainingTicks = 0;
+        if (target != null && !materialName.isEmpty()) {
+            Material material = Material.matchMaterial(materialName.toUpperCase());
+            if (material != null) {
+                Material finalMaterial = material;
+                switch (mode.toLowerCase()) {
+                    case "set" -> {
+                        Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
+                        runSync(() -> target.setCooldown(finalMaterial, Math.max(0, ticks)));
+                        success = true;
+                    }
+                    case "has" -> {
+                        hasCooldown = callSync(() -> target.hasCooldown(finalMaterial));
+                        success = true;
+                    }
+                    case "get" -> {
+                        remainingTicks = callSync(() -> target.getCooldown(finalMaterial));
+                        success = true;
+                    }
+                    default -> {
+                    }
+                }
+            }
+        }
+        ctx.setOutput(node, "success", success);
+        ctx.setOutput(node, "has_cooldown", hasCooldown);
+        ctx.setOutput(node, "remaining_ticks", remainingTicks);
         ctx.triggerOutput("flow");
     }
 

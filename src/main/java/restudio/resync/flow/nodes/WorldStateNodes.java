@@ -595,39 +595,6 @@ public class WorldStateNodes {
         executor.accept(ctx, node);
     }
 
-    @DefineNode(id = "world_set_time", displayName = "Set Time", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "world", dataType = FlowType.ANY),
-                    @FlowPin(name = "time", dataType = FlowType.NUMBER)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void worldSetTime(FlowContext ctx, FlowNode node) {
-        executeLegacy("world_set_time", ctx, node);
-    }
-
-    @DefineNode(id = "world_set_weather", displayName = "Set Weather", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "world", dataType = FlowType.ANY),
-                    @FlowPin(name = "weather", dataType = FlowType.STRING)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void worldSetWeather(FlowContext ctx, FlowNode node) {
-        executeLegacy("world_set_weather", ctx, node);
-    }
-
-    @DefineNode(id = "world_set_thunder", displayName = "Set Thunder", category = NodeDefinition.NodeCategory.WORLD,
-            inputs = {
-                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "world", dataType = FlowType.ANY),
-                    @FlowPin(name = "thundering", dataType = FlowType.BOOLEAN)
-            },
-            outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
-    public void worldSetThunder(FlowContext ctx, FlowNode node) {
-        executeLegacy("world_set_thunder", ctx, node);
-    }
-
     @DefineNode(id = "world_set_spawn", displayName = "Set Spawn", category = NodeDefinition.NodeCategory.WORLD,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -1059,6 +1026,122 @@ public class WorldStateNodes {
             })
     public void worldManagementTeleportPlayerToPortal(FlowContext ctx, FlowNode node) {
         executeLegacy("world_management_teleport_player_to_portal", ctx, node);
+    }
+
+    @DefineNode(id = "world_properties", displayName = "World Properties", category = NodeDefinition.NodeCategory.WORLD,
+            inputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "world", dataType = FlowType.ANY),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "property", dataType = FlowType.STRING),
+                    @FlowPin(name = "value", dataType = FlowType.ANY)
+            },
+            outputs = {
+                    @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "result", dataType = FlowType.ANY)
+            })
+    public void worldProperties(FlowContext ctx, FlowNode node) {
+        World world = ctx.getInputValue(node, "world", World.class, null);
+        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        String property = ctx.getInputValue(node, "property", String.class, "");
+        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        boolean success = false;
+        Object result = null;
+        String nodeId = findNodeId(ctx, node);
+
+        if (world != null && mode != null && property != null) {
+            switch (mode.toLowerCase()) {
+                case "set_gamerule" -> {
+                    try {
+                        org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(property);
+                        if (rule != null) {
+                            Object parsed = parseGameRuleValue(rule, value);
+                            if (parsed != null) {
+                                world.setGameRule(rule, parsed);
+                                success = true;
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                case "get_gamerule" -> {
+                    try {
+                        org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(property);
+                        if (rule != null) {
+                            result = world.getGameRuleValue(rule);
+                            success = true;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                case "set_biome" -> {
+                    if (value instanceof String biomeName) {
+                        try {
+                            org.bukkit.block.Biome biome = org.bukkit.block.Biome.valueOf(biomeName.toUpperCase());
+                            org.bukkit.Location loc = parseLocationInput(world, value);
+                            if (loc != null) {
+                                world.setBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), biome);
+                                success = true;
+                            }
+                        } catch (IllegalArgumentException ignored) {
+                        }
+                    }
+                }
+                case "get_biome" -> {
+                    org.bukkit.Location loc = parseLocationInput(world, value);
+                    if (loc != null) {
+                        result = world.getBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()).name();
+                        success = true;
+                    }
+                }
+                case "get_spawn_location" -> {
+                    result = world.getSpawnLocation();
+                    success = true;
+                }
+                case "get_time" -> {
+                    result = world.getTime();
+                    success = true;
+                }
+                case "get_weather" -> {
+                    if (world.isThundering()) {
+                        result = "thunder";
+                    } else if (world.hasStorm()) {
+                        result = "rain";
+                    } else {
+                        result = "clear";
+                    }
+                    success = true;
+                }
+            }
+        }
+
+        ctx.setNodeOutput(nodeId, "success", success);
+        ctx.setNodeOutput(nodeId, "result", result);
+        ctx.triggerOutput("flow");
+    }
+
+    private static org.bukkit.Location parseLocationInput(World world, Object value) {
+        if (value instanceof org.bukkit.Location loc) {
+            return loc;
+        }
+        if (value instanceof org.bukkit.block.Block block) {
+            return block.getLocation();
+        }
+        return null;
+    }
+
+    private static Object parseGameRuleValue(org.bukkit.GameRule rule, Object value) {
+        if (value == null || rule == null) {
+            return null;
+        }
+        if (rule.getType() == Boolean.class) {
+            return Boolean.valueOf(String.valueOf(value));
+        }
+        if (rule.getType() == Integer.class) {
+            return Integer.valueOf(String.valueOf(value));
+        }
+        return String.valueOf(value);
     }
 
     private static WorldManagementService getWorldManagementService() {

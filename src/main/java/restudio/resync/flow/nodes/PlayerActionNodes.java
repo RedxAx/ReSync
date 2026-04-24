@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.advancement.Advancement;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -18,8 +20,10 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.registry.DefineNode;
 import restudio.resync.flow.registry.FlowPin;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.VisibleWhen;
 
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -160,202 +164,269 @@ public class PlayerActionNodes {
     @DefineNode(id = "player_state", displayName = "Player State", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "property", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"sprint", "sneak", "fly", "vanish", "glowing", "invulnerable", "gamemode", "food_level", "saturation", "exhaustion", "health", "max_health", "absorption", "walk_speed", "fly_speed", "fire_ticks", "air_ticks", "no_damage_ticks", "freeze_state", "flight_state", "compass_target", "xp", "total_exp"},
+                            defaultValue = "sprint"),
+                    @FlowPin(name = "action", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"get", "set"},
+                            defaultValue = "get"),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "value", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "string_value", dataType = FlowType.STRING),
-                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "level", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "points", dataType = FlowType.NUMBER)
+                    @FlowPin(name = "enabled", dataType = FlowType.BOOLEAN, widget = NodeDefinition.WidgetType.TOGGLE, defaultValue = "true",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "sprint,sneak,fly,vanish,glowing,invulnerable,freeze_state,flight_state"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "value", dataType = FlowType.NUMBER, defaultValue = "0",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "food_level,saturation,exhaustion,health,max_health,absorption,walk_speed,fly_speed,fire_ticks,air_ticks,no_damage_ticks,total_exp"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "gamemode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "minecraft:gamemode",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "gamemode"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "compass_location", dataType = FlowType.LOCATION,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "compass_target"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "level", dataType = FlowType.NUMBER, defaultValue = "0",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "xp"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "points", dataType = FlowType.NUMBER, defaultValue = "0",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "xp"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            })
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "result", dataType = FlowType.ANY,
+                            visibleWhen = {@VisibleWhen(pin = "action", value = "get")})
             })
     public void playerState(FlowContext ctx, FlowNode node) {
-        String mode = ctx.getInputValue(node, "mode", String.class, "");
+        String property = ctx.getInputValue(node, "property", String.class, "");
+        String action = ctx.getInputValue(node, "action", String.class, "get");
         Player target = ctx.getInputValue(node, "target", Player.class, null);
         boolean success = false;
-        if (target != null) {
-            switch (mode.toLowerCase()) {
-                case "sprint" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setSprinting(enabled));
-                    success = true;
-                }
-                case "sneak" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setSneaking(enabled));
-                    success = true;
-                }
-                case "fly" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> {
-                        target.setAllowFlight(enabled);
-                        target.setFlying(enabled);
-                    });
-                    success = true;
-                }
-                case "vanish" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setInvisible(enabled));
-                    success = true;
-                }
-                case "glowing" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setGlowing(enabled));
-                    success = true;
-                }
-                case "invulnerable" -> {
-                    Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setInvulnerable(enabled));
-                    success = true;
-                }
-                case "gamemode" -> {
-                    String modeName = ctx.getInputValue(node, "string_value", String.class, "SURVIVAL");
-                    try {
-                        GameMode gm = GameMode.valueOf(modeName.toUpperCase());
-                        runSync(() -> target.setGameMode(gm));
-                        success = true;
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                }
-                case "food_level" -> {
-                    Integer level = ctx.getInputValue(node, "value", Integer.class, 20);
-                    runSync(() -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
-                    success = true;
-                }
-                case "saturation" -> {
-                    Float saturation = ctx.getInputValue(node, "value", Float.class, 20.0f);
-                    runSync(() -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
-                    success = true;
-                }
-                case "exhaustion" -> {
-                    Float exhaustion = ctx.getInputValue(node, "value", Float.class, 0.0f);
-                    runSync(() -> target.setExhaustion(Math.max(0, exhaustion)));
-                    success = true;
-                }
-                case "health" -> {
-                    Double health = ctx.getInputValue(node, "value", Double.class, 20.0);
-                    runSync(() -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
-                    success = true;
-                }
-                case "max_health" -> {
-                    Double maxHealth = ctx.getInputValue(node, "value", Double.class, 20.0);
-                    runSync(() -> target.setMaxHealth(Math.max(1, maxHealth)));
-                    success = true;
-                }
-                case "absorption" -> {
-                    Double absorption = ctx.getInputValue(node, "value", Double.class, 0.0);
-                    runSync(() -> target.setAbsorptionAmount(Math.max(0, absorption)));
-                    success = true;
-                }
-                case "walk_speed" -> {
-                    Float speed = ctx.getInputValue(node, "value", Float.class, 0.2f);
-                    runSync(() -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
-                    success = true;
-                }
-                case "fly_speed" -> {
-                    Float speed = ctx.getInputValue(node, "value", Float.class, 0.1f);
-                    runSync(() -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
-                    success = true;
-                }
-                case "fire_ticks" -> {
-                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-                    runSync(() -> target.setFireTicks(ticks));
-                    success = true;
-                }
-                case "air_ticks" -> {
-                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 300);
-                    runSync(() -> target.setRemainingAir(Math.max(-20, ticks)));
-                    success = true;
-                }
-                case "no_damage_ticks" -> {
-                    Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-                    runSync(() -> target.setNoDamageTicks(ticks));
-                    success = true;
-                }
-                case "freeze" -> {
-                    runSync(() -> {
-                        target.setWalkSpeed(0);
-                        target.setFlySpeed(0);
-                    });
-                    success = true;
-                }
-                case "unfreeze" -> {
-                    runSync(() -> {
-                        target.setWalkSpeed(0.2f);
-                        target.setFlySpeed(0.1f);
-                    });
-                    success = true;
-                }
-                case "allow_flight" -> {
-                    Boolean allowed = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                    runSync(() -> target.setAllowFlight(allowed));
-                    success = true;
-                }
-                case "deny_flight" -> {
-                    runSync(() -> {
-                        target.setAllowFlight(false);
-                        target.setFlying(false);
-                    });
-                    success = true;
-                }
-                case "xp" -> {
-                    Integer level = ctx.getInputValue(node, "level", Integer.class, 0);
-                    Float points = ctx.getInputValue(node, "points", Float.class, 0.0f);
-                    runSync(() -> {
-                        target.setLevel(Math.max(0, level));
-                        target.setExp(Math.max(0, Math.min(1, points)));
-                    });
-                    success = true;
-                }
-                case "total_exp" -> {
-                    Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
-                    runSync(() -> target.setTotalExperience(Math.max(0, exp)));
-                    success = true;
-                }
-                case "give_exp" -> {
-                    Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
-                    runSync(() -> target.giveExp(Math.max(0, exp)));
-                    success = true;
-                }
-                case "compass_target" -> {
-                    Location location = ctx.getInputValue(node, "string_value", Location.class, null);
-                    if (location != null) {
-                        runSync(() -> target.setCompassTarget(location));
+        Object result = null;
+        if (target != null && property != null && action != null) {
+            if ("set".equalsIgnoreCase(action)) {
+                switch (property.toLowerCase()) {
+                    case "sprint" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> target.setSprinting(enabled));
                         success = true;
                     }
+                    case "sneak" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> target.setSneaking(enabled));
+                        success = true;
+                    }
+                    case "fly" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> {
+                            target.setAllowFlight(enabled);
+                            target.setFlying(enabled);
+                        });
+                        success = true;
+                    }
+                    case "vanish" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> target.setInvisible(enabled));
+                        success = true;
+                    }
+                    case "glowing" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> target.setGlowing(enabled));
+                        success = true;
+                    }
+                    case "invulnerable" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> target.setInvulnerable(enabled));
+                        success = true;
+                    }
+                    case "gamemode" -> {
+                        String modeName = ctx.getInputValue(node, "gamemode", String.class, "SURVIVAL");
+                        try {
+                            GameMode gm = GameMode.valueOf(modeName.toUpperCase());
+                            runSync(() -> target.setGameMode(gm));
+                            success = true;
+                        } catch (IllegalArgumentException ignored) {
+                        }
+                    }
+                    case "food_level" -> {
+                        Integer level = ctx.getInputValue(node, "value", Integer.class, 20);
+                        runSync(() -> target.setFoodLevel(Math.max(0, Math.min(20, level))));
+                        success = true;
+                    }
+                    case "saturation" -> {
+                        Float saturation = ctx.getInputValue(node, "value", Float.class, 20.0f);
+                        runSync(() -> target.setSaturation(Math.max(0, Math.min(20, saturation))));
+                        success = true;
+                    }
+                    case "exhaustion" -> {
+                        Float exhaustion = ctx.getInputValue(node, "value", Float.class, 0.0f);
+                        runSync(() -> target.setExhaustion(Math.max(0, exhaustion)));
+                        success = true;
+                    }
+                    case "health" -> {
+                        Double health = ctx.getInputValue(node, "value", Double.class, 20.0);
+                        runSync(() -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
+                        success = true;
+                    }
+                    case "max_health" -> {
+                        Double maxHealth = ctx.getInputValue(node, "value", Double.class, 20.0);
+                        runSync(() -> target.setMaxHealth(Math.max(1, maxHealth)));
+                        success = true;
+                    }
+                    case "absorption" -> {
+                        Double absorption = ctx.getInputValue(node, "value", Double.class, 0.0);
+                        runSync(() -> target.setAbsorptionAmount(Math.max(0, absorption)));
+                        success = true;
+                    }
+                    case "walk_speed" -> {
+                        Float speed = ctx.getInputValue(node, "value", Float.class, 0.2f);
+                        runSync(() -> target.setWalkSpeed(Math.max(-1, Math.min(1, speed))));
+                        success = true;
+                    }
+                    case "fly_speed" -> {
+                        Float speed = ctx.getInputValue(node, "value", Float.class, 0.1f);
+                        runSync(() -> target.setFlySpeed(Math.max(-1, Math.min(1, speed))));
+                        success = true;
+                    }
+                    case "fire_ticks" -> {
+                        Integer ticks = ctx.getInputValue(node, "value", Integer.class, 0);
+                        runSync(() -> target.setFireTicks(ticks));
+                        success = true;
+                    }
+                    case "air_ticks" -> {
+                        Integer ticks = ctx.getInputValue(node, "value", Integer.class, 300);
+                        runSync(() -> target.setRemainingAir(Math.max(-20, ticks)));
+                        success = true;
+                    }
+                    case "no_damage_ticks" -> {
+                        Integer ticks = ctx.getInputValue(node, "value", Integer.class, 0);
+                        runSync(() -> target.setNoDamageTicks(ticks));
+                        success = true;
+                    }
+                    case "freeze_state" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> {
+                            if (enabled) {
+                                target.setWalkSpeed(0);
+                                target.setFlySpeed(0);
+                            } else {
+                                target.setWalkSpeed(0.2f);
+                                target.setFlySpeed(0.1f);
+                            }
+                        });
+                        success = true;
+                    }
+                    case "flight_state" -> {
+                        Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
+                        runSync(() -> {
+                            target.setAllowFlight(enabled);
+                            if (!enabled) {
+                                target.setFlying(false);
+                            }
+                        });
+                        success = true;
+                    }
+                    case "compass_target" -> {
+                        Location location = ctx.getInputValue(node, "compass_location", Location.class, null);
+                        if (location != null) {
+                            runSync(() -> target.setCompassTarget(location));
+                            success = true;
+                        }
+                    }
+                    case "xp" -> {
+                        Integer level = ctx.getInputValue(node, "level", Integer.class, 0);
+                        Float points = ctx.getInputValue(node, "points", Float.class, 0.0f);
+                        runSync(() -> {
+                            target.setLevel(Math.max(0, level));
+                            target.setExp(Math.max(0, Math.min(1, points)));
+                        });
+                        success = true;
+                    }
+                    case "total_exp" -> {
+                        Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
+                        runSync(() -> target.setTotalExperience(Math.max(0, exp)));
+                        success = true;
+                    }
+                    default -> {
+                    }
                 }
-                case "reset_compass" -> {
-                    runSync(() -> target.setCompassTarget(target.getWorld().getSpawnLocation()));
-                    success = true;
+            } else {
+                switch (property.toLowerCase()) {
+                    case "sprint" -> result = callSync(target::isSprinting);
+                    case "sneak" -> result = callSync(target::isSneaking);
+                    case "fly" -> result = callSync(target::isFlying);
+                    case "vanish" -> result = callSync(target::isInvisible);
+                    case "glowing" -> result = callSync(target::isGlowing);
+                    case "invulnerable" -> result = callSync(target::isInvulnerable);
+                    case "gamemode" -> result = callSync(() -> target.getGameMode().name().toLowerCase(Locale.ROOT));
+                    case "food_level" -> result = callSync(target::getFoodLevel);
+                    case "saturation" -> result = callSync(target::getSaturation);
+                    case "exhaustion" -> result = callSync(target::getExhaustion);
+                    case "health" -> result = callSync(target::getHealth);
+                    case "max_health" -> result = callSync(target::getMaxHealth);
+                    case "absorption" -> result = callSync(target::getAbsorptionAmount);
+                    case "walk_speed" -> result = callSync(target::getWalkSpeed);
+                    case "fly_speed" -> result = callSync(target::getFlySpeed);
+                    case "fire_ticks" -> result = callSync(target::getFireTicks);
+                    case "air_ticks" -> result = callSync(target::getRemainingAir);
+                    case "no_damage_ticks" -> result = callSync(target::getNoDamageTicks);
+                    case "freeze_state" -> result = callSync(() -> target.getWalkSpeed() == 0 && target.getFlySpeed() == 0);
+                    case "flight_state" -> result = callSync(target::getAllowFlight);
+                    case "compass_target" -> result = callSync(target::getCompassTarget);
+                    case "xp" -> result = callSync(target::getLevel);
+                    case "total_exp" -> result = callSync(target::getTotalExperience);
+                    default -> {
+                    }
                 }
-                default -> {
-                }
+                success = result != null || !property.isBlank();
             }
         }
         ctx.setOutput(node, "success", success);
+        ctx.setOutput(node, "result", result);
         ctx.triggerOutput("flow");
     }
 
     @DefineNode(id = "player_movement", displayName = "Player Movement", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"teleport", "launch", "push", "spin", "set_rotation"},
+                            defaultValue = "teleport"),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "location", dataType = FlowType.LOCATION),
-                    @FlowPin(name = "x", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "y", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "z", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "vx", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "vy", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "vz", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "strength", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION)
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport")}),
+                    @FlowPin(name = "x", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport")}),
+                    @FlowPin(name = "y", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport")}),
+                    @FlowPin(name = "z", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport")}),
+                    @FlowPin(name = "yaw", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport,spin,set_rotation")}),
+                    @FlowPin(name = "pitch", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "teleport,spin,set_rotation")}),
+                    @FlowPin(name = "vx", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "launch")}),
+                    @FlowPin(name = "vy", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "launch")}),
+                    @FlowPin(name = "vz", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "launch")}),
+                    @FlowPin(name = "strength", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "push")}),
+                    @FlowPin(name = "direction_vector", dataType = FlowType.LOCATION,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "push")})
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -435,17 +506,25 @@ public class PlayerActionNodes {
     @DefineNode(id = "player_potion", displayName = "Player Potion", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"add", "clear", "has"},
+                            defaultValue = "add"),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "effect_type", dataType = FlowType.STRING),
-                    @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER),
-                    @FlowPin(name = "amplifier", dataType = FlowType.NUMBER)
+                    @FlowPin(name = "effect_type", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "minecraft:potion_effect",
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "add,has")}),
+                    @FlowPin(name = "duration_ticks", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "add")}),
+                    @FlowPin(name = "amplifier", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "add")})
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "has_effect", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "effect_amplifier", dataType = FlowType.NUMBER)
+                    @FlowPin(name = "has_effect", dataType = FlowType.BOOLEAN,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "has")}),
+                    @FlowPin(name = "effect_amplifier", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "has")})
             })
     public void playerPotion(FlowContext ctx, FlowNode node) {
         String mode = ctx.getInputValue(node, "mode", String.class, "");
@@ -495,14 +574,18 @@ public class PlayerActionNodes {
     @DefineNode(id = "player_advancement", displayName = "Player Advancement", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"grant", "revoke", "has"},
+                            defaultValue = "grant"),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "advancement_key", dataType = FlowType.STRING)
+                    @FlowPin(name = "advancement_key", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.SEARCHABLE_LIST,
+                            optionsSource = "minecraft:advancement")
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "has_advancement", dataType = FlowType.BOOLEAN)
+                    @FlowPin(name = "has_advancement", dataType = FlowType.BOOLEAN,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "has")})
             })
     public void playerAdvancement(FlowContext ctx, FlowNode node) {
         String mode = ctx.getInputValue(node, "mode", String.class, "");
@@ -511,9 +594,9 @@ public class PlayerActionNodes {
         boolean success = false;
         boolean hasAdvancement = false;
         if (target != null && !key.isEmpty()) {
-            org.bukkit.NamespacedKey namespacedKey = org.bukkit.NamespacedKey.fromString(key.toLowerCase());
+            NamespacedKey namespacedKey = NamespacedKey.fromString(key.toLowerCase());
             if (namespacedKey != null) {
-                org.bukkit.advancement.Advancement advancement = Bukkit.getAdvancement(namespacedKey);
+                Advancement advancement = Bukkit.getAdvancement(namespacedKey);
                 if (advancement != null) {
                     switch (mode.toLowerCase()) {
                         case "grant" -> {
@@ -542,10 +625,15 @@ public class PlayerActionNodes {
     @DefineNode(id = "player_cooldown", displayName = "Player Cooldown", category = NodeDefinition.NodeCategory.ACTION,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"set", "has", "get", "clear"},
+                            defaultValue = "set"),
                     @FlowPin(name = "target", dataType = FlowType.PLAYER),
-                    @FlowPin(name = "material", dataType = FlowType.STRING),
-                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER)
+                    @FlowPin(name = "material", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "minecraft:material",
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "set,has,get,clear")}),
+                    @FlowPin(name = "ticks", dataType = FlowType.NUMBER,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "set")})
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
@@ -576,6 +664,10 @@ public class PlayerActionNodes {
                     }
                     case "get" -> {
                         remainingTicks = callSync(() -> target.getCooldown(finalMaterial));
+                        success = true;
+                    }
+                    case "clear" -> {
+                        runSync(() -> target.setCooldown(finalMaterial, 0));
                         success = true;
                     }
                     default -> {

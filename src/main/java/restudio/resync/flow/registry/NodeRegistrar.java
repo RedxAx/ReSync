@@ -8,7 +8,9 @@ import restudio.resync.flow.FlowRuntime;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 public class NodeRegistrar {
@@ -61,19 +63,11 @@ public class NodeRegistrar {
         );
 
         for (FlowPin pin : annotation.inputs()) {
-            FlowType dataType = pin.dataType();
-            if (pin.type() == NodeDefinition.PinType.FLOW && dataType == FlowType.ANY) {
-                dataType = FlowType.EXECUTION;
-            }
-            builder.input(pin.name(), pin.type(), dataType);
+            builder.input(buildPin(pin, NodeDefinition.PinDirection.INPUT));
         }
 
         for (FlowPin pin : annotation.outputs()) {
-            FlowType dataType = pin.dataType();
-            if (pin.type() == NodeDefinition.PinType.FLOW && dataType == FlowType.ANY) {
-                dataType = FlowType.EXECUTION;
-            }
-            builder.output(pin.name(), pin.type(), dataType);
+            builder.output(buildPin(pin, NodeDefinition.PinDirection.OUTPUT));
         }
 
         if (annotation.color() != -1) {
@@ -86,6 +80,62 @@ public class NodeRegistrar {
         }
 
         return builder.build();
+    }
+
+    private NodeDefinition.PinDefinition buildPin(FlowPin pin, NodeDefinition.PinDirection direction) {
+        FlowType dataType = pin.dataType();
+        if (pin.type() == NodeDefinition.PinType.FLOW && dataType == FlowType.ANY) {
+            dataType = FlowType.EXECUTION;
+        }
+
+        boolean hasMetadata = pin.widget() != NodeDefinition.WidgetType.AUTO
+                || pin.options().length > 0
+                || !pin.optionsSource().isEmpty()
+                || !pin.defaultValue().isEmpty()
+                || !Double.isNaN(pin.min())
+                || !Double.isNaN(pin.max())
+                || !Double.isNaN(pin.step())
+                || pin.visibleWhen().length > 0
+                || !pin.description().isEmpty();
+
+        if (!hasMetadata) {
+            return new NodeDefinition.PinDefinition(pin.name(), pin.type(), direction, dataType);
+        }
+
+        NodeDefinition.PinBuilder pb = new NodeDefinition.PinBuilder(pin.name(), pin.type(), direction, dataType);
+        if (pin.widget() != NodeDefinition.WidgetType.AUTO) {
+            pb.widget(pin.widget());
+        }
+        if (pin.options().length > 0) {
+            pb.options(List.of(pin.options()));
+        }
+        if (!pin.optionsSource().isEmpty()) {
+            pb.optionsSource(pin.optionsSource());
+            if (pin.options().length == 0) {
+                pb.options(NodeCatalogs.resolve(pin.optionsSource()));
+            }
+        }
+        if (!pin.defaultValue().isEmpty()) {
+            pb.defaultValue(pin.defaultValue());
+        }
+        if (!Double.isNaN(pin.min()) || !Double.isNaN(pin.max()) || !Double.isNaN(pin.step())) {
+            pb.constraints(
+                Double.isNaN(pin.min()) ? null : pin.min(),
+                Double.isNaN(pin.max()) ? null : pin.max(),
+                Double.isNaN(pin.step()) ? null : pin.step()
+            );
+        }
+        if (pin.visibleWhen().length > 0) {
+            Map<String, String> conditions = new HashMap<>();
+            for (VisibleWhen vw : pin.visibleWhen()) {
+                conditions.put(vw.pin(), vw.value());
+            }
+            pb.visibleWhen(conditions);
+        }
+        if (!pin.description().isEmpty()) {
+            pb.description(pin.description());
+        }
+        return pb.build();
     }
 
     private BiConsumer<FlowContext, FlowNode> buildExecutor(Method method, Object container) {

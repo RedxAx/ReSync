@@ -14,4 +14,22 @@ public @interface FlowPin {
     NodeDefinition.PinType type() default NodeDefinition.PinType.DATA;
 
     FlowType dataType() default FlowType.ANY;
+
+    NodeDefinition.WidgetType widget() default NodeDefinition.WidgetType.AUTO;
+
+    String[] options() default {};
+
+    String optionsSource() default "";
+
+    String defaultValue() default "";
+
+    double min() default Double.NaN;
+
+    double max() default Double.NaN;
+
+    double step() default Double.NaN;
+
+    VisibleWhen[] visibleWhen() default {};
+
+    String description() default "";
 }

@@ -32,6 +32,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.registry.DefineNode;
 import restudio.resync.flow.registry.FlowPin;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.VisibleWhen;
 
 public class EntityControlNodes {
 
@@ -39,7 +40,8 @@ public class EntityControlNodes {
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "entity_type", dataType = FlowType.STRING)
+                    @FlowPin(name = "entity_type", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.SEARCHABLE_LIST,
+                            optionsSource = "minecraft:entity_type")
             },
             outputs = {@FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW)})
     public void entitySetType(FlowContext ctx, FlowNode node) {
@@ -430,137 +432,264 @@ public class EntityControlNodes {
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "entity", dataType = FlowType.ENTITY),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
-                    @FlowPin(name = "value", dataType = FlowType.ANY)
+                    @FlowPin(name = "property", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"name", "name_visible", "glowing", "silent", "invulnerable", "burning", "frozen", "persistent", "health", "max_health", "speed", "target", "baby", "tamed", "sitting", "swimming", "pickup_items", "kill", "remove", "exists"},
+                            defaultValue = "name"),
+                    @FlowPin(name = "action", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"get", "set", "do"},
+                            defaultValue = "get"),
+                    @FlowPin(name = "string_value", dataType = FlowType.STRING,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "name"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "boolean_value", dataType = FlowType.BOOLEAN,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "name_visible,glowing,silent,invulnerable,persistent,baby,tamed,sitting,swimming,pickup_items"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "number_value", dataType = FlowType.NUMBER,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "burning,frozen,health,max_health,speed"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "entity_value", dataType = FlowType.ENTITY,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "target"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            })
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN)
+                    @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
+                    @FlowPin(name = "result", dataType = FlowType.ANY,
+                            visibleWhen = {@VisibleWhen(pin = "action", value = "get")})
             })
     public void entityState(FlowContext ctx, FlowNode node) {
         Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        String mode = ctx.getInputValue(node, "mode", String.class, "");
-        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        String property = ctx.getInputValue(node, "property", String.class, "");
+        String action = ctx.getInputValue(node, "action", String.class, "get");
+        String stringValue = ctx.getInputValue(node, "string_value", String.class, "");
+        Boolean booleanValue = ctx.getInputValue(node, "boolean_value", Boolean.class, false);
+        Double numberValue = ctx.getInputValue(node, "number_value", Double.class, 0.0);
+        Entity entityValue = ctx.getInputValue(node, "entity_value", Entity.class, null);
         boolean success = false;
+        Object result = null;
         String nodeId = ctx.getRuntime().findNodeId(node);
 
-        if (entity != null && mode != null) {
-            switch (mode.toLowerCase()) {
+        if (entity != null && property != null && action != null) {
+            switch (property.toLowerCase()) {
                 case "name" -> {
-                    entity.setCustomName(value instanceof String s ? s : "");
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        entity.setCustomName(stringValue);
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.getCustomName();
+                        success = true;
+                    }
                 }
                 case "name_visible" -> {
-                    entity.setCustomNameVisible(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        entity.setCustomNameVisible(Boolean.TRUE.equals(booleanValue));
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.isCustomNameVisible();
+                        success = true;
+                    }
                 }
                 case "glowing" -> {
-                    entity.setGlowing(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        entity.setGlowing(Boolean.TRUE.equals(booleanValue));
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.isGlowing();
+                        success = true;
+                    }
                 }
                 case "silent" -> {
-                    entity.setSilent(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        entity.setSilent(Boolean.TRUE.equals(booleanValue));
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.isSilent();
+                        success = true;
+                    }
                 }
                 case "invulnerable" -> {
-                    entity.setInvulnerable(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        entity.setInvulnerable(Boolean.TRUE.equals(booleanValue));
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.isInvulnerable();
+                        success = true;
+                    }
                 }
                 case "burning" -> {
-                    int ticks = value instanceof Number n ? n.intValue() : 0;
-                    entity.setFireTicks(ticks);
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        int ticks = numberValue.intValue();
+                        entity.setFireTicks(ticks);
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.getFireTicks();
+                        success = true;
+                    }
                 }
                 case "frozen" -> {
-                    int ticks = value instanceof Number n ? n.intValue() : 0;
-                    entity.setFreezeTicks(ticks);
-                    success = true;
+                    if ("set".equalsIgnoreCase(action)) {
+                        int ticks = numberValue.intValue();
+                        entity.setFreezeTicks(ticks);
+                        success = true;
+                    } else if ("get".equalsIgnoreCase(action)) {
+                        result = entity.getFreezeTicks();
+                        success = true;
+                    }
                 }
                 case "persistent" -> {
                     if (entity instanceof Mob mob) {
-                        mob.setPersistent(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            mob.setPersistent(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = mob.isPersistent();
+                            success = true;
+                        }
                     }
                 }
                 case "health" -> {
                     if (entity instanceof LivingEntity living) {
-                        double health = value instanceof Number n ? n.doubleValue() : 20.0;
-                        living.setHealth(Math.min(health, living.getMaxHealth()));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            double health = numberValue;
+                            living.setHealth(Math.min(health, living.getMaxHealth()));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = living.getHealth();
+                            success = true;
+                        }
                     }
                 }
                 case "max_health" -> {
                     if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
-                        double maxHealth = value instanceof Number n ? n.doubleValue() : 20.0;
-                        living.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            double maxHealth = numberValue;
+                            living.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = living.getMaxHealth();
+                            success = true;
+                        }
                     }
                 }
                 case "speed" -> {
                     if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED) != null) {
-                        double speed = value instanceof Number n ? n.doubleValue() : 0.2;
-                        living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            double speed = numberValue;
+                            living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).getBaseValue();
+                            success = true;
+                        }
                     }
                 }
                 case "target" -> {
-                    if (entity instanceof Mob mob && value instanceof LivingEntity target) {
-                        mob.setTarget(target);
-                        success = true;
-                    } else if (entity instanceof Mob mob && value == null) {
-                        mob.setTarget(null);
-                        success = true;
+                    if (entity instanceof Mob mob) {
+                        if ("set".equalsIgnoreCase(action)) {
+                            if (entityValue instanceof LivingEntity target) {
+                                mob.setTarget(target);
+                                success = true;
+                            } else if (entityValue == null) {
+                                mob.setTarget(null);
+                                success = true;
+                            }
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = mob.getTarget();
+                            success = true;
+                        }
                     }
                 }
                 case "baby" -> {
                     if (entity instanceof Ageable ageable) {
-                        boolean isBaby = value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value));
-                        if (isBaby) {
-                            ageable.setBaby();
-                        } else {
-                            ageable.setAdult();
+                        if ("set".equalsIgnoreCase(action)) {
+                            boolean isBaby = Boolean.TRUE.equals(booleanValue);
+                            if (isBaby) {
+                                ageable.setBaby();
+                            } else {
+                                ageable.setAdult();
+                            }
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = !ageable.isAdult();
+                            success = true;
                         }
-                        success = true;
                     }
                 }
                 case "tamed" -> {
                     if (entity instanceof Tameable tameable) {
-                        tameable.setTamed(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            tameable.setTamed(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = tameable.isTamed();
+                            success = true;
+                        }
                     }
                 }
                 case "sitting" -> {
                     if (entity instanceof Sittable sittable) {
-                        sittable.setSitting(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            sittable.setSitting(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = sittable.isSitting();
+                            success = true;
+                        }
                     }
                 }
                 case "swimming" -> {
                     if (entity instanceof LivingEntity living) {
-                        living.setSwimming(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            living.setSwimming(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = living.isSwimming();
+                            success = true;
+                        }
                     }
                 }
                 case "pickup_items" -> {
                     if (entity instanceof LivingEntity living) {
-                        living.setCanPickupItems(value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value)));
-                        success = true;
+                        if ("set".equalsIgnoreCase(action)) {
+                            living.setCanPickupItems(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = living.getCanPickupItems();
+                            success = true;
+                        }
                     }
                 }
                 case "kill" -> {
-                    if (entity instanceof LivingEntity living) {
+                    if ("do".equalsIgnoreCase(action) && entity instanceof LivingEntity living) {
                         living.setHealth(0);
                         success = true;
                     }
                 }
                 case "remove" -> {
-                    entity.remove();
-                    success = true;
+                    if ("do".equalsIgnoreCase(action)) {
+                        entity.remove();
+                        success = true;
+                    }
+                }
+                case "exists" -> {
+                    if ("get".equalsIgnoreCase(action)) {
+                        result = entity.isValid();
+                        success = true;
+                    }
                 }
             }
         }
 
         ctx.setNodeOutput(nodeId, "success", success);
+        ctx.setNodeOutput(nodeId, "result", result);
         ctx.triggerOutput("flow");
     }
 }

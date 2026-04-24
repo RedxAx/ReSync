@@ -1,8 +1,12 @@
 package restudio.resync.flow.registry;
 
 import restudio.flow.data.FlowType;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class NodeDefinition {
     public enum PinType {
@@ -35,6 +39,18 @@ public class NodeDefinition {
         VISUAL,
         SCOREBOARD,
         UTILITY
+    }
+
+    public enum WidgetType {
+        AUTO,
+        TEXT,
+        TOGGLE,
+        DROPDOWN,
+        SEARCHABLE_LIST,
+        SLIDER,
+        NUMBER,
+        MULTILINE,
+        COLOR
     }
 
     private final String id;
@@ -89,17 +105,61 @@ public class NodeDefinition {
         return hidden;
     }
 
+    public static class PinConstraints {
+        private final Double min;
+        private final Double max;
+        private final Double step;
+
+        public PinConstraints(Double min, Double max, Double step) {
+            this.min = min;
+            this.max = max;
+            this.step = step;
+        }
+
+        public Double getMin() {
+            return min;
+        }
+
+        public Double getMax() {
+            return max;
+        }
+
+        public Double getStep() {
+            return step;
+        }
+    }
+
     public static class PinDefinition {
         private final String name;
         private final PinType type;
         private final PinDirection direction;
         private final FlowType dataType;
+        private final WidgetType widgetType;
+        private final List<String> options;
+        private final String optionsSource;
+        private final String defaultValue;
+        private final PinConstraints constraints;
+        private final Map<String, String> visibleWhen;
+        private final String description;
 
         public PinDefinition(String name, PinType type, PinDirection direction, FlowType dataType) {
+            this(name, type, direction, dataType, null, null, null, null, null, null, null);
+        }
+
+        public PinDefinition(String name, PinType type, PinDirection direction, FlowType dataType,
+                             WidgetType widgetType, List<String> options, String optionsSource, String defaultValue,
+                             PinConstraints constraints, Map<String, String> visibleWhen, String description) {
             this.name = name;
             this.type = type;
             this.direction = direction;
             this.dataType = dataType;
+            this.widgetType = widgetType;
+            this.options = options != null ? options : Collections.emptyList();
+            this.optionsSource = optionsSource;
+            this.defaultValue = defaultValue;
+            this.constraints = constraints;
+            this.visibleWhen = visibleWhen != null ? visibleWhen : Collections.emptyMap();
+            this.description = description;
         }
 
         public String getName() {
@@ -116,6 +176,34 @@ public class NodeDefinition {
 
         public FlowType getDataType() {
             return dataType;
+        }
+
+        public WidgetType getWidgetType() {
+            return widgetType;
+        }
+
+        public List<String> getOptions() {
+            return options;
+        }
+
+        public String getOptionsSource() {
+            return optionsSource;
+        }
+
+        public String getDefaultValue() {
+            return defaultValue;
+        }
+
+        public PinConstraints getConstraints() {
+            return constraints;
+        }
+
+        public Map<String, String> getVisibleWhen() {
+            return visibleWhen;
+        }
+
+        public String getDescription() {
+            return description;
         }
     }
 
@@ -140,8 +228,18 @@ public class NodeDefinition {
             return this;
         }
 
+        public Builder input(PinDefinition pin) {
+            inputs.add(pin);
+            return this;
+        }
+
         public Builder output(String name, PinType type, FlowType dataType) {
             outputs.add(new PinDefinition(name, type, PinDirection.OUTPUT, dataType));
+            return this;
+        }
+
+        public Builder output(PinDefinition pin) {
+            outputs.add(pin);
             return this;
         }
 
@@ -194,6 +292,77 @@ public class NodeDefinition {
                 color(category);
             }
             return new NodeDefinition(this);
+        }
+    }
+
+    public static class PinBuilder {
+        private String name;
+        private PinType type;
+        private PinDirection direction;
+        private FlowType dataType;
+        private WidgetType widgetType;
+        private List<String> options;
+        private String optionsSource;
+        private String defaultValue;
+        private PinConstraints constraints;
+        private Map<String, String> visibleWhen;
+        private String description;
+
+        public PinBuilder(String name, PinType type, PinDirection direction, FlowType dataType) {
+            this.name = name;
+            this.type = type;
+            this.direction = direction;
+            this.dataType = dataType;
+        }
+
+        public PinBuilder widget(WidgetType widgetType) {
+            this.widgetType = widgetType;
+            return this;
+        }
+
+        public PinBuilder options(List<String> options) {
+            this.options = options;
+            return this;
+        }
+
+        public PinBuilder optionsSource(String optionsSource) {
+            this.optionsSource = optionsSource;
+            return this;
+        }
+
+        public PinBuilder defaultValue(String defaultValue) {
+            this.defaultValue = defaultValue;
+            return this;
+        }
+
+        public PinBuilder constraints(Double min, Double max, Double step) {
+            this.constraints = new PinConstraints(min, max, step);
+            return this;
+        }
+
+        public PinBuilder visibleWhen(String pinName, String expectedValue) {
+            if (this.visibleWhen == null) {
+                this.visibleWhen = new HashMap<>();
+            }
+            this.visibleWhen.put(pinName, expectedValue);
+            return this;
+        }
+
+        public PinBuilder visibleWhen(Map<String, String> conditions) {
+            if (this.visibleWhen == null) {
+                this.visibleWhen = new HashMap<>();
+            }
+            this.visibleWhen.putAll(conditions);
+            return this;
+        }
+
+        public PinBuilder description(String description) {
+            this.description = description;
+            return this;
+        }
+
+        public PinDefinition build() {
+            return new PinDefinition(name, type, direction, dataType, widgetType, options, optionsSource, defaultValue, constraints, visibleWhen, description);
         }
     }
 }

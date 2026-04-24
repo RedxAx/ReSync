@@ -14,6 +14,7 @@ import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.registry.DefineNode;
 import restudio.resync.flow.registry.FlowPin;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.VisibleWhen;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.world.WorldOperationResult;
 import restudio.resync.world.WorldPortal;
@@ -1032,86 +1033,204 @@ public class WorldStateNodes {
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "world", dataType = FlowType.ANY),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
-                    @FlowPin(name = "property", dataType = FlowType.STRING),
-                    @FlowPin(name = "value", dataType = FlowType.ANY)
+                    @FlowPin(name = "property", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"gamerule", "time", "weather", "difficulty", "spawn", "biome", "seed", "name", "environment", "entities", "players"},
+                            defaultValue = "gamerule"),
+                    @FlowPin(name = "action", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"get", "set"},
+                            defaultValue = "get"),
+                    @FlowPin(name = "gamerule", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.SEARCHABLE_LIST,
+                            optionsSource = "minecraft:gamerule",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "gamerule"),
+                                    @VisibleWhen(pin = "action", value = "set,get")
+                            }),
+                    @FlowPin(name = "gamerule_value", dataType = FlowType.STRING,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "gamerule"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "time", dataType = FlowType.NUMBER,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "time"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "weather", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            options = {"clear", "rain", "thunder"},
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "weather"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "difficulty", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "minecraft:difficulty",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "difficulty"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            }),
+                    @FlowPin(name = "location", dataType = FlowType.LOCATION,
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "spawn,biome"),
+                                    @VisibleWhen(pin = "action", value = "set,get")
+                            }),
+                    @FlowPin(name = "biome", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "minecraft:biome",
+                            visibleWhen = {
+                                    @VisibleWhen(pin = "property", value = "biome"),
+                                    @VisibleWhen(pin = "action", value = "set")
+                            })
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
                     @FlowPin(name = "success", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "result", dataType = FlowType.ANY)
+                    @FlowPin(name = "result", dataType = FlowType.ANY,
+                            visibleWhen = {@VisibleWhen(pin = "action", value = "get")})
             })
     public void worldProperties(FlowContext ctx, FlowNode node) {
         World world = ctx.getInputValue(node, "world", World.class, null);
-        String mode = ctx.getInputValue(node, "mode", String.class, "");
         String property = ctx.getInputValue(node, "property", String.class, "");
-        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        String action = ctx.getInputValue(node, "action", String.class, "get");
+        String gamerule = ctx.getInputValue(node, "gamerule", String.class, "");
+        String gameruleValue = ctx.getInputValue(node, "gamerule_value", String.class, "");
+        Long time = ctx.getInputValue(node, "time", Long.class, 6000L);
+        String weather = ctx.getInputValue(node, "weather", String.class, "clear");
+        String difficulty = ctx.getInputValue(node, "difficulty", String.class, "normal");
+        Location location = ctx.getInputValue(node, "location", Location.class, null);
+        String biome = ctx.getInputValue(node, "biome", String.class, "");
         boolean success = false;
         Object result = null;
         String nodeId = findNodeId(ctx, node);
 
-        if (world != null && mode != null && property != null) {
-            switch (mode.toLowerCase()) {
-                case "set_gamerule" -> {
-                    try {
-                        org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(property);
-                        if (rule != null) {
-                            Object parsed = parseGameRuleValue(rule, value);
-                            if (parsed != null) {
-                                world.setGameRule(rule, parsed);
-                                success = true;
+        if (world != null && property != null && action != null) {
+            if ("set".equalsIgnoreCase(action)) {
+                switch (property.toLowerCase()) {
+                    case "gamerule" -> {
+                        if (!gamerule.isBlank()) {
+                            try {
+                                org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(gamerule);
+                                if (rule != null) {
+                                    Object parsed = parseGameRuleValue(rule, gameruleValue);
+                                    if (parsed != null) {
+                                        world.setGameRule(rule, parsed);
+                                        success = true;
+                                    }
+                                }
+                            } catch (Exception ignored) {
                             }
                         }
-                    } catch (Exception ignored) {
                     }
-                }
-                case "get_gamerule" -> {
-                    try {
-                        org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(property);
-                        if (rule != null) {
-                            result = world.getGameRuleValue(rule);
-                            success = true;
+                    case "time" -> {
+                        world.setTime(Math.max(0L, time));
+                        success = true;
+                    }
+                    case "weather" -> {
+                        String normalized = weather.toLowerCase();
+                        switch (normalized) {
+                            case "rain", "storm" -> {
+                                world.setStorm(true);
+                                world.setThundering(false);
+                                success = true;
+                            }
+                            case "thunder" -> {
+                                world.setStorm(true);
+                                world.setThundering(true);
+                                success = true;
+                            }
+                            case "clear" -> {
+                                world.setStorm(false);
+                                world.setThundering(false);
+                                success = true;
+                            }
+                            default -> {
+                            }
                         }
-                    } catch (Exception ignored) {
                     }
-                }
-                case "set_biome" -> {
-                    if (value instanceof String biomeName) {
+                    case "difficulty" -> {
                         try {
-                            org.bukkit.block.Biome biome = org.bukkit.block.Biome.valueOf(biomeName.toUpperCase());
-                            org.bukkit.Location loc = parseLocationInput(world, value);
-                            if (loc != null) {
-                                world.setBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), biome);
-                                success = true;
-                            }
+                            Difficulty worldDifficulty = Difficulty.valueOf(difficulty.toUpperCase());
+                            world.setDifficulty(worldDifficulty);
+                            success = true;
                         } catch (IllegalArgumentException ignored) {
                         }
                     }
+                    case "spawn" -> {
+                        if (location != null) {
+                            world.setSpawnLocation(location);
+                            success = true;
+                        }
+                    }
+                    case "biome" -> {
+                        if (location != null && !biome.isBlank()) {
+                            try {
+                                org.bukkit.block.Biome worldBiome = org.bukkit.block.Biome.valueOf(biome.toUpperCase());
+                                world.setBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ(), worldBiome);
+                                success = true;
+                            } catch (IllegalArgumentException ignored) {
+                            }
+                        }
+                    }
                 }
-                case "get_biome" -> {
-                    org.bukkit.Location loc = parseLocationInput(world, value);
-                    if (loc != null) {
-                        result = world.getBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()).name();
+            } else {
+                switch (property.toLowerCase()) {
+                    case "gamerule" -> {
+                        if (!gamerule.isBlank()) {
+                            try {
+                                org.bukkit.GameRule rule = org.bukkit.GameRule.getByName(gamerule);
+                                if (rule != null) {
+                                    result = world.getGameRuleValue(rule);
+                                    success = true;
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
+                    case "time" -> {
+                        result = world.getTime();
                         success = true;
                     }
-                }
-                case "get_spawn_location" -> {
-                    result = world.getSpawnLocation();
-                    success = true;
-                }
-                case "get_time" -> {
-                    result = world.getTime();
-                    success = true;
-                }
-                case "get_weather" -> {
-                    if (world.isThundering()) {
-                        result = "thunder";
-                    } else if (world.hasStorm()) {
-                        result = "rain";
-                    } else {
-                        result = "clear";
+                    case "weather" -> {
+                        if (world.isThundering()) {
+                            result = "thunder";
+                        } else if (world.hasStorm()) {
+                            result = "rain";
+                        } else {
+                            result = "clear";
+                        }
+                        success = true;
                     }
-                    success = true;
+                    case "difficulty" -> {
+                        result = world.getDifficulty().name().toLowerCase();
+                        success = true;
+                    }
+                    case "spawn" -> {
+                        result = world.getSpawnLocation();
+                        success = true;
+                    }
+                    case "biome" -> {
+                        if (location != null) {
+                            result = world.getBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ()).name();
+                            success = true;
+                        }
+                    }
+                    case "seed" -> {
+                        result = world.getSeed();
+                        success = true;
+                    }
+                    case "name" -> {
+                        result = world.getName();
+                        success = true;
+                    }
+                    case "environment" -> {
+                        result = world.getEnvironment().name().toLowerCase();
+                        success = true;
+                    }
+                    case "entities" -> {
+                        result = world.getEntities();
+                        success = true;
+                    }
+                    case "players" -> {
+                        result = world.getPlayers();
+                        success = true;
+                    }
                 }
             }
         }

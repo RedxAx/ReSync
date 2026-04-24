@@ -9,6 +9,7 @@ import restudio.resync.flow.PersistentVariableStore;
 import restudio.resync.flow.registry.DefineNode;
 import restudio.resync.flow.registry.FlowPin;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.VisibleWhen;
 
 import java.util.HashMap;
 import java.util.List;
@@ -333,19 +334,27 @@ public class VariableNodes {
     @DefineNode(id = "variable_access", displayName = "Variable", category = NodeDefinition.NodeCategory.VARIABLE, priority = -10,
             inputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "mode", dataType = FlowType.STRING),
-                    @FlowPin(name = "scope", dataType = FlowType.STRING),
-                    @FlowPin(name = "persist", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "player", dataType = FlowType.PLAYER),
+                    @FlowPin(name = "mode", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "variable:mode", defaultValue = "get"),
+                    @FlowPin(name = "scope", dataType = FlowType.STRING, widget = NodeDefinition.WidgetType.DROPDOWN,
+                            optionsSource = "variable:scope", defaultValue = "local"),
+                    @FlowPin(name = "persist", dataType = FlowType.BOOLEAN, widget = NodeDefinition.WidgetType.TOGGLE, defaultValue = "false"),
+                    @FlowPin(name = "player", dataType = FlowType.PLAYER,
+                            visibleWhen = {@VisibleWhen(pin = "scope", value = "player")}),
                     @FlowPin(name = "name", dataType = FlowType.STRING),
-                    @FlowPin(name = "value", dataType = FlowType.ANY),
-                    @FlowPin(name = "amount", dataType = FlowType.NUMBER)
+                    @FlowPin(name = "value", dataType = FlowType.ANY,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "set")}),
+                    @FlowPin(name = "amount", dataType = FlowType.NUMBER, defaultValue = "1",
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "increment,decrement,multiply,divide")})
             },
             outputs = {
                     @FlowPin(name = "flow", type = NodeDefinition.PinType.FLOW),
-                    @FlowPin(name = "value", dataType = FlowType.ANY),
-                    @FlowPin(name = "exists", dataType = FlowType.BOOLEAN),
-                    @FlowPin(name = "variables", dataType = FlowType.LIST)
+                    @FlowPin(name = "value", dataType = FlowType.ANY,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "get,set,increment,decrement,multiply,divide")}),
+                    @FlowPin(name = "exists", dataType = FlowType.BOOLEAN,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "exists")}),
+                    @FlowPin(name = "variables", dataType = FlowType.LIST,
+                            visibleWhen = {@VisibleWhen(pin = "mode", value = "list")})
             })
     public void variableAccess(FlowContext ctx, FlowNode node) {
         executeLegacy("variable_access", ctx, node);

@@ -1,0 +1,324 @@
+[
+  {
+    "id": "json.parse",
+    "displayName": "Parse JSON",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_parse"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "json_string",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "json.to.string",
+    "displayName": "JSON to String",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_to_string"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "string",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "json.get",
+    "displayName": "Get JSON Value",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_get"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "json.set",
+    "displayName": "Set JSON Value",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_set"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "json.delete",
+    "displayName": "Delete JSON Key",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_delete"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "json.has",
+    "displayName": "JSON Has Key",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_has"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "json.keys",
+    "displayName": "Get JSON Keys",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_keys"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "keys",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "json.merge",
+    "displayName": "Merge JSON",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_merge"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object1",
+        "dataType": "map"
+      },
+      {
+        "name": "object2",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "merged",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "json.create",
+    "displayName": "Create JSON Object",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_create"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "object",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "json.set.array",
+    "displayName": "Create JSON Array",
+    "category": "DATABASE",
+    "handler": "JsonHandler",
+    "handlerConfig": {
+      "operation": "json_set_array"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "values",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "array",
+        "dataType": "list"
+      }
+    ]
+  }
+]

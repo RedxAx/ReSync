@@ -1,0 +1,393 @@
+[
+  {
+    "id": "logic.logic_and",
+    "displayName": "And",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "boolean"
+      },
+      {
+        "name": "b",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "and"
+    }
+  },
+  {
+    "id": "logic.logic_or",
+    "displayName": "Or",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "boolean"
+      },
+      {
+        "name": "b",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "or"
+    }
+  },
+  {
+    "id": "logic.logic_not",
+    "displayName": "Not",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "not"
+    }
+  },
+  {
+    "id": "logic.logic_xor",
+    "displayName": "Xor",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "boolean"
+      },
+      {
+        "name": "b",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "xor"
+    }
+  },
+  {
+    "id": "logic.logic_nand",
+    "displayName": "Nand",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "boolean"
+      },
+      {
+        "name": "b",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "nand"
+    }
+  },
+  {
+    "id": "logic.logic_nor",
+    "displayName": "Nor",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "boolean"
+      },
+      {
+        "name": "b",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "nor"
+    }
+  },
+  {
+    "id": "logic.logic_true",
+    "displayName": "True",
+    "category": "LOGIC",
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "true"
+    }
+  },
+  {
+    "id": "logic.logic_false",
+    "displayName": "False",
+    "category": "LOGIC",
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "false"
+    }
+  },
+  {
+    "id": "logic.compare_equals",
+    "displayName": "Equals",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "any"
+      },
+      {
+        "name": "b",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "equals"
+    }
+  },
+  {
+    "id": "logic.compare_not_equals",
+    "displayName": "Not Equals",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "any"
+      },
+      {
+        "name": "b",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "not_equals"
+    }
+  },
+  {
+    "id": "logic.compare_greater",
+    "displayName": "Greater",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "greater"
+    }
+  },
+  {
+    "id": "logic.compare_less",
+    "displayName": "Less",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "less"
+    }
+  },
+  {
+    "id": "logic.compare_greater_or_equal",
+    "displayName": "Greater Or Equal",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "greater_or_equal"
+    }
+  },
+  {
+    "id": "logic.compare_less_or_equal",
+    "displayName": "Less Or Equal",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "less_or_equal"
+    }
+  },
+  {
+    "id": "logic.compare_between",
+    "displayName": "Between",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      },
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "between"
+    }
+  },
+  {
+    "id": "logic.compare_type",
+    "displayName": "Compare Type",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      },
+      {
+        "name": "type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "string",
+          "number",
+          "boolean",
+          "list",
+          "map",
+          "json",
+          "null"
+        ],
+        "defaultValue": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "LogicHandler",
+    "handlerConfig": {
+      "operation": "type"
+    }
+  }
+]

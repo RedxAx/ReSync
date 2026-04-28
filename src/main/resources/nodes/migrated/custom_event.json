@@ -1,0 +1,180 @@
+[
+  {
+    "id": "custom.event.emit",
+    "displayName": "Custom Event Emit",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_trigger"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      },
+      {
+        "name": "data_payload",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "custom.event.listen",
+    "displayName": "Custom Event Listen",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_listen"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      },
+      {
+        "name": "timeout_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "listening",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "event.custom_event_define",
+    "displayName": "Custom Event Define",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_define"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "event.custom_event_remove_listener",
+    "displayName": "Custom Event Remove Listener",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_remove_listener"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "custom.event.clear",
+    "displayName": "Clear Custom Event Listeners",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_clear"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "custom.event.get.data",
+    "displayName": "Get Custom Event Data",
+    "category": "EVENT",
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_get_data"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "data",
+        "dataType": "map"
+      }
+    ]
+  }
+]

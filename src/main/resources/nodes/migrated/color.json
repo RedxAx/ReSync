@@ -1,0 +1,168 @@
+[
+  {
+    "id": "color.from.rgb",
+    "displayName": "Color From RGB",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_from_rgb"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.from.hex",
+    "displayName": "Color From Hex",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_from_hex"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.to.hex",
+    "displayName": "Color To Hex",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_to_hex"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.to.rgb",
+    "displayName": "Color To RGB",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_to_rgb"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.invert",
+    "displayName": "Color Invert",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_invert"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.brighten",
+    "displayName": "Color Brighten",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_brighten"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "color.darken",
+    "displayName": "Color Darken",
+    "category": "DATA",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_darken"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "utility.color_blend",
+    "displayName": "Color Blend",
+    "category": "UTILITY",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_blend"
+    },
+    "inputs": [
+      {
+        "name": "color1",
+        "dataType": "color"
+      },
+      {
+        "name": "color2",
+        "dataType": "color"
+      },
+      {
+        "name": "ratio",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "mixed_color",
+        "dataType": "color"
+      }
+    ]
+  },
+  {
+    "id": "utility.color_random",
+    "displayName": "Color Random",
+    "category": "UTILITY",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_random"
+    },
+    "outputs": [
+      {
+        "name": "color",
+        "dataType": "color"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "utility.color_distance",
+    "displayName": "Color Distance",
+    "category": "UTILITY",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "color_distance"
+    },
+    "inputs": [
+      {
+        "name": "color1",
+        "dataType": "color"
+      },
+      {
+        "name": "color2",
+        "dataType": "color"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "distance",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "color.mix",
+    "displayName": "Color Mix",
+    "category": "UTILITY",
+    "handler": "ColorHandler",
+    "handlerConfig": {
+      "operation": "mix"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

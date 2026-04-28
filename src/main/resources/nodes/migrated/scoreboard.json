@@ -1,0 +1,403 @@
+[
+  {
+    "id": "scoreboard.create",
+    "displayName": "Create Objective",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_create"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.set.display",
+    "displayName": "Set Display Slot",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_set_display"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.set.score",
+    "displayName": "Set Score",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_set_score"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.reset.score",
+    "displayName": "Reset Score",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_reset_score"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.get.score",
+    "displayName": "Get Score",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_get_score"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.remove",
+    "displayName": "Scoreboard Remove",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_remove"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.delete",
+    "displayName": "Scoreboard Delete",
+    "category": "SCOREBOARD",
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "delete"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.clear",
+    "displayName": "Scoreboard Clear",
+    "category": "SCOREBOARD",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "clear"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "scoreboard.add.score",
+    "displayName": "Add Score",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_add_score"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.remove.score",
+    "displayName": "Remove Score",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_remove_score"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.get.objectives",
+    "displayName": "Get Objectives",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_get_objectives"
+    },
+    "outputs": [
+      {
+        "name": "objectives",
+        "dataType": "list"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "scoreboard.set.name",
+    "displayName": "Set Objective Name",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_set_name"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.set.render.type",
+    "displayName": "Set Render Type",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_set_render_type"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      },
+      {
+        "name": "render_type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "integer",
+          "hearts"
+        ],
+        "defaultValue": "integer"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.set.sidebar.line",
+    "displayName": "Set Sidebar Line",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_set_sidebar_line"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "line",
+        "dataType": "number"
+      },
+      {
+        "name": "score",
+        "dataType": "number"
+      },
+      {
+        "name": "use_papi",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.clear.sidebar",
+    "displayName": "Clear Sidebar",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_clear_sidebar"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.hide.active",
+    "displayName": "Hide Active Scoreboard",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_hide_active"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "scoreboard.show.template",
+    "displayName": "Show Scoreboard Template",
+    "category": "SCOREBOARD",
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {
+      "operation": "scoreboard_show_template"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "scoreboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "use_papi",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  }
+]

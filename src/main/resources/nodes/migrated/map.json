@@ -1,0 +1,293 @@
+[
+  {
+    "id": "map.create",
+    "displayName": "Create",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "create"
+    },
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "map.get",
+    "displayName": "Map Get",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "get"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "map.set",
+    "displayName": "Map Set",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "set"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "map.contains_key",
+    "displayName": "Contains Key",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "contains_key"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "contains",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "map.contains_value",
+    "displayName": "Contains Value",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "contains_value"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "contains",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "map.keys",
+    "displayName": "Keys",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "keys"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "keys",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "map.values",
+    "displayName": "Values",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "values"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "values",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "map.size",
+    "displayName": "Map Size",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "size"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "size",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "map.is_empty",
+    "displayName": "Map Is Empty",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "is_empty"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_empty",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "map.remove",
+    "displayName": "Map Remove",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "remove"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "map.clear",
+    "displayName": "Map Clear",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "clear"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "map.merge",
+    "displayName": "Merge",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "merge"
+    },
+    "inputs": [
+      {
+        "name": "mapA",
+        "dataType": "map"
+      },
+      {
+        "name": "mapB",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  },
+  {
+    "id": "map.put_all",
+    "displayName": "Put All",
+    "category": "DATA",
+    "handler": "GenericMapHandler",
+    "handlerConfig": {
+      "operation": "put_all"
+    },
+    "inputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      },
+      {
+        "name": "other",
+        "dataType": "map"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "map",
+        "dataType": "map"
+      }
+    ]
+  }
+]

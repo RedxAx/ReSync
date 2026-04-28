@@ -1,0 +1,335 @@
+[
+  {
+    "id": "file.write",
+    "displayName": "Write File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_write"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      },
+      {
+        "name": "content",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.append",
+    "displayName": "Append File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_append"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      },
+      {
+        "name": "content",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.read",
+    "displayName": "Read File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_read"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "content",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "file.read.lines",
+    "displayName": "Read File Lines",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_read_lines"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "lines",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "file.delete",
+    "displayName": "Delete File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_delete"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.exists",
+    "displayName": "File Exists",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_exists"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "exists",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "file.copy",
+    "displayName": "Copy File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_copy"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "source_path",
+        "dataType": "string"
+      },
+      {
+        "name": "dest_path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.move",
+    "displayName": "Move File",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_move"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "source_path",
+        "dataType": "string"
+      },
+      {
+        "name": "dest_path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.list.dir",
+    "displayName": "List Directory",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_list_dir"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "files",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "file.create.dir",
+    "displayName": "Create Directory",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_create_dir"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "file.get.size",
+    "displayName": "Get File Size",
+    "category": "DATABASE",
+    "handler": "FileHandler",
+    "handlerConfig": {
+      "operation": "file_get_size"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "size",
+        "dataType": "number"
+      }
+    ]
+  }
+]

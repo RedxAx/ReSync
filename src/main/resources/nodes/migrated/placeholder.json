@@ -1,0 +1,177 @@
+[
+  {
+    "id": "placeholder.parse",
+    "displayName": "Parse Placeholder",
+    "category": "PLAYER",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_parse"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "placeholder.placeholder_set",
+    "displayName": "Placeholder Set",
+    "category": "UTILITY",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_set"
+    },
+    "inputs": [
+      {
+        "name": "player_one",
+        "dataType": "player"
+      },
+      {
+        "name": "player_two",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "result",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "placeholder.placeholder_remove",
+    "displayName": "Placeholder Remove",
+    "category": "UTILITY",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_remove"
+    },
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "result",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "placeholder.set.relational",
+    "displayName": "Set Relational Placeholder",
+    "category": "UTILITY",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_set_relational"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player_one",
+        "dataType": "player"
+      },
+      {
+        "name": "player_two",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "placeholder.strip.brackets",
+    "displayName": "Strip Placeholder Brackets",
+    "category": "UTILITY",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_strip_brackets"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ]
+  }
+]

@@ -1,0 +1,85 @@
+[
+  {
+    "id": "title.send",
+    "displayName": "Send Title",
+    "category": "VISUAL",
+    "handler": "TitleHandler",
+    "handlerConfig": {
+      "operation": "title_send"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "title.clear",
+    "displayName": "Clear Title",
+    "category": "VISUAL",
+    "handler": "TitleHandler",
+    "handlerConfig": {
+      "operation": "title_clear"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "title.action.bar",
+    "displayName": "Actionbar Send",
+    "category": "VISUAL",
+    "handler": "TitleHandler",
+    "handlerConfig": {
+      "operation": "actionbar_send"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "duration_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "title.times",
+    "displayName": "Title Times",
+    "category": "VISUAL",
+    "handler": "TitleHandler",
+    "handlerConfig": {
+      "operation": "times"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "title.subtitle",
+    "displayName": "Title Subtitle",
+    "category": "VISUAL",
+    "handler": "TitleHandler",
+    "handlerConfig": {
+      "operation": "subtitle"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

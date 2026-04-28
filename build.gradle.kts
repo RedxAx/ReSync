@@ -62,4 +62,17 @@ tasks {
     runServer {
         minecraftVersion("1.21")
     }
+
+    val validateNodeDefinitions by registering(JavaExec::class) {
+        group = "verification"
+        description = "Validate migrated node JSON definitions against source handler contracts"
+        classpath = sourceSets["main"].runtimeClasspath
+        mainClass.set("restudio.resync.flow.validation.NodeDefinitionBuildValidator")
+        args(projectDir.absolutePath)
+        workingDir = projectDir
+    }
+
+    check {
+        dependsOn(validateNodeDefinitions)
+    }
 }

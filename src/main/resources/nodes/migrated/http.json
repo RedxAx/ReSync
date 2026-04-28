@@ -1,0 +1,271 @@
+[
+  {
+    "id": "http.get",
+    "displayName": "HTTP GET",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "headers", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.post",
+    "displayName": "HTTP POST",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_post" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map" },
+      { "name": "headers", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.put",
+    "displayName": "HTTP PUT",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_put" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map" },
+      { "name": "headers", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.delete",
+    "displayName": "HTTP DELETE",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_delete" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "headers", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.patch",
+    "displayName": "HTTP PATCH",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_patch" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map" },
+      { "name": "headers", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.request",
+    "displayName": "HTTP Request",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_request" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "method", "dataType": "string", "widget": "DROPDOWN", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "defaultValue": "GET" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map" },
+      { "name": "headers", "dataType": "map" },
+      { "name": "query_params", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.get.status",
+    "displayName": "HTTP Get Status",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_status" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "status_code", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "http.get.body",
+    "displayName": "HTTP Get Body",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_body" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "body", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.get.header",
+    "displayName": "HTTP Get Header",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_header" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" },
+      { "name": "header_name", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "header_value", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.get.headers",
+    "displayName": "HTTP Get Headers",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_headers" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "headers", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.is.success",
+    "displayName": "HTTP Is Success",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_is_success" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "http.parse.json",
+    "displayName": "HTTP Parse JSON",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_parse_json" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "json", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "http.build.query",
+    "displayName": "HTTP Build Query",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_build_query" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "params", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "query_string", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.build.url",
+    "displayName": "HTTP Build URL",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_build_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "base_url", "dataType": "string" },
+      { "name": "path", "dataType": "string" },
+      { "name": "query", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.set.timeout",
+    "displayName": "HTTP Set Timeout",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_set_timeout" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "timeout_ms", "dataType": "number" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "http.encode.url",
+    "displayName": "HTTP Encode URL",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_encode_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "encoded_url", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.decode.url",
+    "displayName": "HTTP Decode URL",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_decode_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "decoded_url", "dataType": "string" }
+    ]
+  }
+]

@@ -1,0 +1,264 @@
+[
+  {
+    "id": "server.system_broadcast",
+    "displayName": "System Broadcast",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_broadcast"
+    },
+    "inputs": [
+      {
+        "name": "message",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sent_count",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "server.execute.command",
+    "displayName": "System Execute Command",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_execute_command"
+    },
+    "inputs": [
+      {
+        "name": "command",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "server.get.online.players",
+    "displayName": "System Get Online Players",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_get_online_players"
+    },
+    "outputs": [
+      {
+        "name": "players",
+        "dataType": "list"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.get.max.players",
+    "displayName": "System Get Max Players",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_get_max_players"
+    },
+    "outputs": [
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.system_get_tps",
+    "displayName": "System Get Tps",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_get_tps"
+    },
+    "outputs": [
+      {
+        "name": "tps",
+        "dataType": "number"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.system_get_mspt",
+    "displayName": "System Get Mspt",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_get_mspt"
+    },
+    "outputs": [
+      {
+        "name": "mspt",
+        "dataType": "number"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.system_restart",
+    "displayName": "System Restart",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_restart"
+    },
+    "inputs": [
+      {
+        "name": "reason",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "server.system_shutdown",
+    "displayName": "System Shutdown",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_shutdown"
+    },
+    "inputs": [
+      {
+        "name": "reason",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "server.system_get_motd",
+    "displayName": "System Get Motd",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_get_motd"
+    },
+    "outputs": [
+      {
+        "name": "motd",
+        "dataType": "string"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.system_set_motd",
+    "displayName": "System Set Motd",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_set_motd"
+    },
+    "inputs": [
+      {
+        "name": "motd",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "server.broadcast",
+    "displayName": "Server Broadcast",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_broadcast"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "server.shutdown",
+    "displayName": "Server Shutdown",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_shutdown"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "server.restart",
+    "displayName": "Server Restart",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "system_restart"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "server.reload",
+    "displayName": "Server Reload",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "reload"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "get.server.uptime",
+    "displayName": "Get Server Uptime",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "server_get_uptime"
+    },
+    "outputs": [
+      {
+        "name": "uptime_seconds",
+        "dataType": "number"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "server.get.info",
+    "displayName": "Get Server Info",
+    "category": "UTILITY",
+    "handler": "ServerHandler",
+    "handlerConfig": {
+      "operation": "server_get_info"
+    },
+    "outputs": [
+      {
+        "name": "motd",
+        "dataType": "string"
+      },
+      {
+        "name": "version",
+        "dataType": "string"
+      },
+      {
+        "name": "online_players",
+        "dataType": "number"
+      },
+      {
+        "name": "max_players",
+        "dataType": "number"
+      }
+    ],
+    "inputs": []
+  }
+]

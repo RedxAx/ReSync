@@ -1,0 +1,312 @@
+[
+  {
+    "id": "discord.webhook.send",
+    "displayName": "Discord Webhook Send",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_webhook_send" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "content", "dataType": "string", "widget": "MULTILINE" },
+      { "name": "username", "dataType": "string" },
+      { "name": "avatar_url", "dataType": "string" },
+      { "name": "tts", "dataType": "boolean" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "discord.webhook.send.embed",
+    "displayName": "Discord Webhook Send Embed",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_webhook_send_embed" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "embed", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "discord.webhook.send.multiple",
+    "displayName": "Discord Webhook Send Multiple",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_webhook_send_multiple" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "messages", "dataType": "list" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "discord.embed.create",
+    "displayName": "Discord Create Embed",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_create_embed" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "title", "dataType": "string" },
+      { "name": "description", "dataType": "string", "widget": "MULTILINE" },
+      { "name": "color", "dataType": "number" },
+      { "name": "url", "dataType": "string" },
+      { "name": "thumbnail", "dataType": "string" },
+      { "name": "image", "dataType": "string" },
+      { "name": "author_name", "dataType": "string" },
+      { "name": "author_url", "dataType": "string" },
+      { "name": "author_icon", "dataType": "string" },
+      { "name": "footer_text", "dataType": "string" },
+      { "name": "footer_icon", "dataType": "string" },
+      { "name": "timestamp", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.add.field",
+    "displayName": "Discord Add Field",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_add_field" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "name", "dataType": "string" },
+      { "name": "value", "dataType": "string", "widget": "MULTILINE" },
+      { "name": "inline", "dataType": "boolean" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.webhook.add.embed",
+    "displayName": "Discord Add Embed",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_add_embed" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_data", "dataType": "map" },
+      { "name": "embed", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_data", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.color",
+    "displayName": "Discord Set Color",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_color" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "color", "dataType": "number" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.color.from.hex",
+    "displayName": "Discord Color From Hex",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_color_from_hex" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "hex_color", "dataType": "string", "widget": "COLOR" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "color", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "discord.color.from.rgb",
+    "displayName": "Discord Color From RGB",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_color_from_rgb" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "red", "dataType": "number" },
+      { "name": "green", "dataType": "number" },
+      { "name": "blue", "dataType": "number" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "color", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "discord.webhook.edit",
+    "displayName": "Discord Webhook Edit",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_webhook_edit" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "message_id", "dataType": "string" },
+      { "name": "content", "dataType": "string", "widget": "MULTILINE" },
+      { "name": "embeds", "dataType": "list" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "discord.webhook.delete",
+    "displayName": "Discord Webhook Delete",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_webhook_delete" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "message_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.thumbnail",
+    "displayName": "Discord Set Thumbnail",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_thumbnail" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.image",
+    "displayName": "Discord Set Image",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_image" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.author",
+    "displayName": "Discord Set Author",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_author" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "name", "dataType": "string" },
+      { "name": "url", "dataType": "string" },
+      { "name": "icon_url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.footer",
+    "displayName": "Discord Set Footer",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_footer" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "text", "dataType": "string" },
+      { "name": "icon_url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.embed.set.timestamp",
+    "displayName": "Discord Set Timestamp",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_set_timestamp" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" },
+      { "name": "timestamp", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "embed", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.webhook.data.create",
+    "displayName": "Discord Create Webhook Data",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_create_webhook_data" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "content", "dataType": "string", "widget": "MULTILINE" },
+      { "name": "username", "dataType": "string" },
+      { "name": "avatar_url", "dataType": "string" },
+      { "name": "tts", "dataType": "boolean" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_data", "dataType": "map" }
+    ]
+  },
+  {
+    "id": "discord.webhook.data.send",
+    "displayName": "Discord Send Webhook Data",
+    "category": "DISCORD",
+    "handler": "DiscordHandler",
+    "handlerConfig": { "operation": "discord_send_webhook_data" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "webhook_url", "dataType": "string" },
+      { "name": "webhook_data", "dataType": "map" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  }
+]

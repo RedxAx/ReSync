@@ -1,0 +1,62 @@
+[
+  {
+    "id": "debug.log",
+    "displayName": "Debug Log",
+    "category": "UTILITY",
+    "handler": "DebugHandler",
+    "handlerConfig": {
+      "operation": "debug_log"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "debug.print.variable",
+    "displayName": "Debug Print Variable",
+    "category": "UTILITY",
+    "handler": "DebugHandler",
+    "handlerConfig": {
+      "operation": "debug_print_variable"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "debug.dump.variables",
+    "displayName": "Debug Dump Variables",
+    "category": "UTILITY",
+    "handler": "DebugHandler",
+    "handlerConfig": {
+      "operation": "debug_dump_variables"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "debug.stack.trace",
+    "displayName": "Debug Stack Trace",
+    "category": "UTILITY",
+    "handler": "DebugHandler",
+    "handlerConfig": {
+      "operation": "debug_stack_trace"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "debug.break",
+    "displayName": "Debug Break",
+    "category": "UTILITY",
+    "handler": "DebugHandler",
+    "handlerConfig": {
+      "operation": "debug_break"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

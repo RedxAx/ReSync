@@ -1,0 +1,247 @@
+[
+  {
+    "id": "entity_mount",
+    "displayName": "Entity Mount",
+    "category": "ACTION",
+    "handler": "entity_mount",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "mount_entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_dismount",
+    "displayName": "Entity Dismount",
+    "category": "ACTION",
+    "handler": "entity_dismount",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_ai_disable",
+    "displayName": "Entity AI Disable",
+    "category": "ACTION",
+    "handler": "entity_ai_disable",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_ai_enable",
+    "displayName": "Entity AI Enable",
+    "category": "ACTION",
+    "handler": "entity_ai_enable",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_set_no_damage",
+    "displayName": "Entity Set No Damage",
+    "category": "ACTION",
+    "handler": "entity_set_no_damage",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "no_damage", "pinType": "DATA", "dataType": "boolean"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_set_silent",
+    "displayName": "Entity Set Silent",
+    "category": "ACTION",
+    "handler": "entity_set_silent",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "silent", "pinType": "DATA", "dataType": "boolean"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_add_potion",
+    "displayName": "Entity Add Potion",
+    "category": "ACTION",
+    "handler": "entity_add_potion",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "effect_type", "pinType": "DATA", "dataType": "potion_effect", "optionsSource": "client:minecraft:potion_effect"},
+      {"name": "duration", "pinType": "DATA", "dataType": "number", "defaultValue": "200"},
+      {"name": "amplifier", "pinType": "DATA", "dataType": "number", "defaultValue": "0"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_clear_potions",
+    "displayName": "Entity Clear Potions",
+    "category": "ACTION",
+    "handler": "entity_clear_potions",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_leash",
+    "displayName": "Entity Leash",
+    "category": "ACTION",
+    "handler": "entity_leash",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "holder_entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_unleash",
+    "displayName": "Entity Unleash",
+    "category": "ACTION",
+    "handler": "entity_unleash",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_set_custom_name",
+    "displayName": "Entity Set Custom Name",
+    "category": "ACTION",
+    "handler": "entity_set_custom_name",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "name", "pinType": "DATA", "dataType": "string"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_get_passengers",
+    "displayName": "Entity Get Passengers",
+    "category": "DATA",
+    "handler": "entity_get_passengers",
+    "inputs": [{"name": "entity", "pinType": "DATA", "dataType": "entity"}],
+    "outputs": [{"name": "passengers_list", "pinType": "DATA", "dataType": "list"}]
+  },
+  {
+    "id": "entity_get_vehicle",
+    "displayName": "Entity Get Vehicle",
+    "category": "DATA",
+    "handler": "entity_get_vehicle",
+    "inputs": [{"name": "entity", "pinType": "DATA", "dataType": "entity"}],
+    "outputs": [{"name": "vehicle", "pinType": "DATA", "dataType": "entity"}]
+  },
+  {
+    "id": "entity_set_fire_ticks",
+    "displayName": "Entity Set Fire Ticks",
+    "category": "ACTION",
+    "handler": "entity_set_fire_ticks",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "ticks", "pinType": "DATA", "dataType": "number"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_set_frozen",
+    "displayName": "Entity Set Frozen",
+    "category": "ACTION",
+    "handler": "entity_set_frozen",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "ticks", "pinType": "DATA", "dataType": "number"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_add_tag",
+    "displayName": "Entity Add Tag",
+    "category": "ACTION",
+    "handler": "entity_add_tag",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "tag", "pinType": "DATA", "dataType": "string"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_remove_tag",
+    "displayName": "Entity Remove Tag",
+    "category": "ACTION",
+    "handler": "entity_remove_tag",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "tag", "pinType": "DATA", "dataType": "string"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_clear_tags",
+    "displayName": "Entity Clear Tags",
+    "category": "ACTION",
+    "handler": "entity_clear_tags",
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"}
+    ],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}]
+  },
+  {
+    "id": "entity_has_tag",
+    "displayName": "Entity Has Tag",
+    "category": "LOGIC",
+    "handler": "entity_has_tag",
+    "inputs": [
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "tag", "pinType": "DATA", "dataType": "string"}
+    ],
+    "outputs": [{"name": "has_tag", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "entity_has_any_tag",
+    "displayName": "Entity Has Any Tag",
+    "category": "LOGIC",
+    "handler": "entity_has_any_tag",
+    "inputs": [
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "tags", "pinType": "DATA", "dataType": "list"}
+    ],
+    "outputs": [{"name": "has_any", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "entity_has_all_tags",
+    "displayName": "Entity Has All Tags",
+    "category": "LOGIC",
+    "handler": "entity_has_all_tags",
+    "inputs": [
+      {"name": "entity", "pinType": "DATA", "dataType": "entity"},
+      {"name": "tags", "pinType": "DATA", "dataType": "list"}
+    ],
+    "outputs": [{"name": "has_all", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "entity_get_tags",
+    "displayName": "Entity Get Tags",
+    "category": "DATA",
+    "handler": "entity_get_tags",
+    "inputs": [{"name": "entity", "pinType": "DATA", "dataType": "entity"}],
+    "outputs": [{"name": "tags", "pinType": "DATA", "dataType": "list"}]
+  }
+]

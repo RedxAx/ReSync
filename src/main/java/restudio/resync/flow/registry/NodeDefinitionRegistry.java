@@ -87,6 +87,10 @@ public class NodeDefinitionRegistry {
         return nodeToPlugin.get(nodeId);
     }
 
+    public NodeDefinition get(String id) {
+        return definitions.get(id);
+    }
+
     public void clear() {
         definitions.clear();
         pluginDefinitions.clear();

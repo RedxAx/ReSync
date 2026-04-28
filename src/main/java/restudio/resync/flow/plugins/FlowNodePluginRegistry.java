@@ -1,10 +1,17 @@
 package restudio.resync.flow.plugins;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.resync.Log;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.flow.sync.FlowCategoryMetadata;
+import restudio.resync.flow.sync.FlowConversionRule;
+import restudio.resync.flow.sync.FlowOptionSourceMetadata;
+import restudio.resync.flow.sync.FlowTypeMetadata;
 import restudio.resync.flow.sync.NodePluginPayload;
 
 import java.io.IOException;
@@ -40,7 +47,9 @@ public class FlowNodePluginRegistry {
     private final Map<String, PluginState> plugins = new ConcurrentHashMap<>();
     private final Map<Path, JarState> jarStates = new ConcurrentHashMap<>();
     private final List<PluginChangeListener> listeners = new CopyOnWriteArrayList<>();
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder()
+            .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+            .create();
     private long lastScan = 0L;
 
     public FlowNodePluginRegistry(FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, Path pluginDirectory) {
@@ -94,6 +103,38 @@ public class FlowNodePluginRegistry {
         Set<String> ids = new HashSet<>(plugins.keySet());
         ids.addAll(definitionRegistry.getPluginIds());
         return ids;
+    }
+
+    public List<FlowTypeMetadata> getAllCustomTypes() {
+        List<FlowTypeMetadata> list = new ArrayList<>();
+        for (PluginState state : plugins.values()) {
+            list.addAll(state.plugin.getCustomTypes());
+        }
+        return list;
+    }
+
+    public List<FlowCategoryMetadata> getAllCustomCategories() {
+        List<FlowCategoryMetadata> list = new ArrayList<>();
+        for (PluginState state : plugins.values()) {
+            list.addAll(state.plugin.getCustomCategories());
+        }
+        return list;
+    }
+
+    public List<FlowOptionSourceMetadata> getAllCustomOptionSources() {
+        List<FlowOptionSourceMetadata> list = new ArrayList<>();
+        for (PluginState state : plugins.values()) {
+            list.addAll(state.plugin.getCustomOptionSources());
+        }
+        return list;
+    }
+
+    public List<FlowConversionRule> getAllCustomConversionRules() {
+        List<FlowConversionRule> list = new ArrayList<>();
+        for (PluginState state : plugins.values()) {
+            list.addAll(state.plugin.getCustomConversionRules());
+        }
+        return list;
     }
 
     public NodePluginPayload buildPayload(String pluginId) {

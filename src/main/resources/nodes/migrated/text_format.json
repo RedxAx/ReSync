@@ -1,0 +1,156 @@
+[
+  {
+    "id": "format.color",
+    "displayName": "Color",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_color"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.bold",
+    "displayName": "Bold",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_bold"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.italic",
+    "displayName": "Italic",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_italic"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.underline",
+    "displayName": "Underline",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_underline"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.strikethrough",
+    "displayName": "Strikethrough",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_strikethrough"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.reset",
+    "displayName": "Reset",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_reset"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "text.format_gradient",
+    "displayName": "Format Gradient",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_gradient"
+    },
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "colors",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "text.format_mini_message",
+    "displayName": "Format Mini Message",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "format_mini_message"
+    },
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "format.obfuscated",
+    "displayName": "Format Obfuscated",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "obfuscated"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.hover",
+    "displayName": "Format Hover",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "hover"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "format.click",
+    "displayName": "Format Click",
+    "category": "VISUAL",
+    "handler": "TextFormatHandler",
+    "handlerConfig": {
+      "operation": "click"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

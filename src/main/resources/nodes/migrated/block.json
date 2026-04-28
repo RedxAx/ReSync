@@ -1,0 +1,1050 @@
+﻿[
+  {
+    "id": "block.properties",
+    "displayName": "Block Properties",
+    "category": "BLOCK",
+    "handler": "block",
+    "inputs": [
+      {
+        "name": "flow",
+        "description": "Flow input",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target block",
+        "pinType": "DATA",
+        "dataType": "block"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set",
+          "do",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "type",
+          "data",
+          "light_level",
+          "biome",
+          "temperature",
+          "humidity",
+          "is_solid",
+          "is_liquid",
+          "is_air",
+          "break_naturally",
+          "location",
+          "world",
+          "x",
+          "y",
+          "z"
+        ],
+        "defaultValue": "type"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "description": "Flow output",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      },
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "name": "type",
+        "dataType": "material",
+        "visibleWhen": {
+          "action": "get",
+          "property": "type"
+        }
+      },
+      {
+        "name": "data",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "data"
+        }
+      },
+      {
+        "name": "light_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "light_level"
+        }
+      },
+      {
+        "name": "biome",
+        "dataType": "biome",
+        "visibleWhen": {
+          "action": "get",
+          "property": "biome"
+        }
+      },
+      {
+        "name": "temperature",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "temperature"
+        }
+      },
+      {
+        "name": "humidity",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "humidity"
+        }
+      },
+      {
+        "name": "is_solid",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_solid"
+        }
+      },
+      {
+        "name": "is_liquid",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_liquid"
+        }
+      },
+      {
+        "name": "is_air",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_air"
+        }
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "location"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "world",
+        "visibleWhen": {
+          "action": "get",
+          "property": "world"
+        }
+      },
+      {
+        "name": "x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "x"
+        }
+      },
+      {
+        "name": "y",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "y"
+        }
+      },
+      {
+        "name": "z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "z"
+        }
+      }
+    ]
+  },
+  {
+    "id": "block.type",
+    "displayName": "Block Type",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "type"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.data",
+    "displayName": "Block Data",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "data"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.light_level",
+    "displayName": "Block Light Level",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "light_level"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.biome",
+    "displayName": "Block Biome",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "biome"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.temperature",
+    "displayName": "Block Temperature",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "temperature"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.humidity",
+    "displayName": "Block Humidity",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "humidity"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.is_solid",
+    "displayName": "Block Is Solid",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_solid"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.is_liquid",
+    "displayName": "Block Is Liquid",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_liquid"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.is_air",
+    "displayName": "Block Is Air",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_air"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.break_naturally",
+    "displayName": "Block Break Naturally",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "break_naturally"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "do"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "execution",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "FLOW"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.location",
+    "displayName": "Block Location",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "location"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.world",
+    "displayName": "Block World",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "world"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "world",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.x",
+    "displayName": "Block X",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "x"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.y",
+    "displayName": "Block Y",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "y"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "block.z",
+    "displayName": "Block Z",
+    "category": "BLOCK",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "z"
+    },
+    "inputs": [
+      {
+        "dataType": "block",
+        "description": "Target block",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  }
+]

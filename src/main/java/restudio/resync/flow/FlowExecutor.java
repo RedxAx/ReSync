@@ -9,7 +9,13 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.flow.handler.HandlerRegistry;
+import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.migration.IdCompatibilityLayer;
+import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,32 +26,62 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class FlowExecutor {
-    private final FlowRegistry registry;
+    private final HandlerRegistry handlerRegistry;
+    private final NodeDefinitionRegistry nodeDefinitionRegistry;
     private final TypeAdapterRegistry typeAdapter;
     private final Map<String, Object> globalVariables;
     private final int maxExecutionSteps;
     private final boolean enableDebug;
+    private final IdCompatibilityLayer idCompatibility;
     private final Map<String, Object> eventVariables = new java.util.concurrent.ConcurrentHashMap<>();
     private Map<String, BukkitTask> pendingTasks = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
 
-    public FlowExecutor(FlowRegistry registry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
-        this(registry, typeAdapter, globalVariables, 10000, false);
+    public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
+        this(handlerRegistry, null, typeAdapter, globalVariables, 10000, false);
     }
 
-    public FlowExecutor(FlowRegistry registry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, 
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, 10000, false);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
                        int maxExecutionSteps, boolean enableDebug) {
-        this.registry = registry;
+        this(handlerRegistry, null, typeAdapter, globalVariables, maxExecutionSteps, enableDebug);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                        int maxExecutionSteps, boolean enableDebug) {
+        this.handlerRegistry = handlerRegistry;
+        this.nodeDefinitionRegistry = nodeDefinitionRegistry;
         this.typeAdapter = typeAdapter;
-        this.globalVariables = globalVariables != null ? globalVariables : new java.util.HashMap<>();
+        this.globalVariables = globalVariables != null ? globalVariables : new HashMap<>();
         this.maxExecutionSteps = maxExecutionSteps;
         this.enableDebug = enableDebug;
+        this.idCompatibility = new IdCompatibilityLayer();
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event) {
+        return execute(graph, startNodeId, player, event, new HashMap<>());
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
+                                           Map<String, Object> eventVars) {
         notifyExecutionListeners(graph, startNodeId, player, event);
-        FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVariables);
-        return execute(runtime, startNodeId, player, event, 0);
+        FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVars);
+        CompletableFuture<Void> future = execute(runtime, startNodeId, player, event, 0);
+        future.whenComplete((result, ex) -> runtime.cleanupThreadLocals());
+        return future;
+    }
+
+    public CompletableFuture<Object> executeSubFlow(FlowGraph subGraph, String startNodeId, String outputNodeId, String outputPin,
+                                                     Player player, Event event, Map<String, Object> localInputs) {
+        FlowRuntime runtime = new FlowRuntime(subGraph, typeAdapter, globalVariables);
+        if (localInputs != null) {
+            runtime.getLocalVariables().putAll(localInputs);
+        }
+        return execute(runtime, startNodeId, player, event, 0)
+            .thenApply(v -> runtime.getNodeOutput(outputNodeId, outputPin));
     }
 
     public void addExecutionListener(FlowExecutionListener listener) {
@@ -87,7 +123,8 @@ public class FlowExecutor {
                 runtime,
                 player,
                 event,
-                outputPin -> dispatchDeferredOutput(runtime, startNodeId, outputPin, player, event, steps)
+                outputPin -> dispatchDeferredOutput(runtime, startNodeId, outputPin, player, event, steps),
+                this
         );
 
         String type = node.getType();
@@ -106,18 +143,18 @@ public class FlowExecutor {
             return result;
         }
 
-        var executor = registry.getExecutor(node.getType());
-        if (executor == null) {
-            if (enableDebug) {
-                Log.warn("[Flow] No executor for node type: " + node.getType());
-            }
-            CompletableFuture<Void> result = findNextAndExecute(runtime, node, "flow", player, event, steps);
+        NodeHandler handler = resolveHandler(node);
+        if (handler == null) {
             runtime.endFlowExecution(startNodeId);
-            return result;
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "No handler registered for node type: " + node.getType(),
+                null,
+                startNodeId
+            ));
         }
 
         try {
-            executor.accept(context, node);
+            handler.execute(context, node);
             context.finishSynchronousCapture();
 
             List<String> outputPins = context.consumeTriggeredOutputs();
@@ -126,7 +163,7 @@ public class FlowExecutor {
                 if (outputPins.isEmpty()) {
                     outputPins = List.of(runtimeOutputPin);
                 } else {
-                    List<String> merged = new java.util.ArrayList<>(outputPins);
+                    List<String> merged = new ArrayList<>(outputPins);
                     merged.add(runtimeOutputPin);
                     outputPins = merged;
                 }
@@ -136,7 +173,9 @@ public class FlowExecutor {
             if (!outputPins.isEmpty()) {
                 result = executeTriggeredOutputs(runtime, startNodeId, outputPins, player, event, steps);
             } else if (context.hasPendingAsyncOperations()) {
-                result = CompletableFuture.completedFuture(null);
+                result = CompletableFuture.allOf(
+                    context.getAsyncOperations().values().toArray(new CompletableFuture[0])
+                );
             } else {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
@@ -533,14 +572,11 @@ public class FlowExecutor {
     }
 
     private void clearFlowDataDependencies(FlowRuntime runtime, FlowGraph graph, List<String> targetNodeIds) {
-        if (graph.getConnections() == null || targetNodeIds == null || targetNodeIds.isEmpty()) {
+        if (targetNodeIds == null || targetNodeIds.isEmpty()) {
             return;
         }
         for (String targetNodeId : targetNodeIds) {
-            for (FlowConnection conn : graph.getConnections()) {
-                if (!conn.getTargetNodeId().equals(targetNodeId)) {
-                    continue;
-                }
+            for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
                 if ("flow".equals(conn.getTargetPin())) {
                     continue;
                 }
@@ -555,11 +591,11 @@ public class FlowExecutor {
     }
 
     private void clearDependencyOutputs(FlowRuntime runtime, FlowGraph graph, String targetNodeId, String pinName, Set<String> visited) {
-        if (graph.getConnections() == null || targetNodeId == null) {
+        if (targetNodeId == null) {
             return;
         }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (!conn.getTargetNodeId().equals(targetNodeId) || !conn.getTargetPin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
+            if (!conn.getTargetPin().equals(pinName)) {
                 continue;
             }
             String sourceId = conn.getSourceNodeId();
@@ -570,8 +606,8 @@ public class FlowExecutor {
                 continue;
             }
             runtime.clearNodeOutputs(sourceId);
-            for (FlowConnection sourceConn : graph.getConnections()) {
-                if (sourceConn.getTargetNodeId().equals(sourceId) && !"flow".equals(sourceConn.getTargetPin())) {
+            for (FlowConnection sourceConn : graph.getConnectionsToTarget(sourceId)) {
+                if (!"flow".equals(sourceConn.getTargetPin())) {
                     clearDependencyOutputs(runtime, graph, sourceId, sourceConn.getTargetPin(), visited);
                 }
             }
@@ -591,11 +627,8 @@ public class FlowExecutor {
     }
 
     private boolean hasIncomingFlowConnection(FlowGraph graph, String nodeId) {
-        if (graph.getConnections() == null) {
-            return false;
-        }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getTargetNodeId().equals(nodeId) && "flow".equals(conn.getTargetPin())) {
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
+            if ("flow".equals(conn.getTargetPin())) {
                 return true;
             }
         }
@@ -628,15 +661,12 @@ public class FlowExecutor {
 
     private void ensureInputNodesReady(FlowRuntime runtime, FlowNode node, Player player, Event event) {
         FlowGraph graph = runtime.getGraph();
-        String nodeId = findNodeId(graph, node);
-        if (nodeId == null || graph.getConnections() == null) {
+        String nodeId = graph.findNodeId(node);
+        if (nodeId == null) {
             return;
         }
 
-        for (FlowConnection conn : graph.getConnections()) {
-            if (!conn.getTargetNodeId().equals(nodeId)) {
-                continue;
-            }
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
             if ("flow".equals(conn.getTargetPin())) {
                 continue;
             }
@@ -654,10 +684,8 @@ public class FlowExecutor {
         if (sourceNode == null) {
             return;
         }
-        String type = sourceNode.getType();
-
-        var executor = registry.getExecutor(type);
-        if (executor == null) {
+        NodeHandler handler = resolveHandler(sourceNode);
+        if (handler == null) {
             return;
         }
 
@@ -667,10 +695,10 @@ public class FlowExecutor {
 
         ensureInputNodesReady(runtime, sourceNode, player, event);
         try {
-            executor.accept(new FlowContext(runtime, player, event), sourceNode);
+            handler.execute(new FlowContext(runtime, player, event, null, this), sourceNode);
         } catch (Exception e) {
             if (enableDebug) {
-                Log.warn("[Flow] Error evaluating node '" + type + "' (ID: " + nodeId + "): " + e.getMessage(), e);
+                Log.warn("[Flow] Error evaluating node '" + sourceNode.getType() + "' (ID: " + nodeId + "): " + e.getMessage(), e);
             }
         }
 
@@ -679,18 +707,12 @@ public class FlowExecutor {
     }
 
     private String findNodeId(FlowGraph graph, FlowNode node) {
-        for (var entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() == node) {
-                return entry.getKey();
-            }
-        }
-        return null;
+        return graph.findNodeId(node);
     }
 
     private String findTargetNode(FlowGraph graph, String nodeId, String pinName) {
-        if (graph.getConnections() == null) return null;
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getSourceNodeId().equals(nodeId) && conn.getSourcePin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
+            if (conn.getSourcePin().equals(pinName)) {
                 return conn.getTargetNodeId();
             }
         }
@@ -699,11 +721,8 @@ public class FlowExecutor {
 
     private List<String> findTargetNodes(FlowGraph graph, String nodeId, String pinName) {
         List<String> targets = new java.util.ArrayList<>();
-        if (graph.getConnections() == null) {
-            return targets;
-        }
-        for (FlowConnection conn : graph.getConnections()) {
-            if (conn.getSourceNodeId().equals(nodeId) && conn.getSourcePin().equals(pinName)) {
+        for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
+            if (conn.getSourcePin().equals(pinName)) {
                 targets.add(conn.getTargetNodeId());
             }
         }
@@ -757,6 +776,35 @@ public class FlowExecutor {
                 }
             }
         }
+    }
+
+    private NodeHandler resolveHandler(FlowNode node) {
+        String nodeType = node.getType();
+        if (nodeType == null) {
+            return null;
+        }
+
+        String mappedType = idCompatibility.mapToNew(nodeType);
+        if (!mappedType.equals(nodeType)) {
+            node.setType(mappedType);
+            nodeType = mappedType;
+        }
+
+        if (nodeDefinitionRegistry != null) {
+            NodeDefinition definition = nodeDefinitionRegistry.get(nodeType);
+            if (definition != null) {
+                node.setHandlerConfig(definition.getHandlerConfig());
+                String handlerName = definition.getHandler();
+                if (handlerName != null && !handlerName.isBlank()) {
+                    NodeHandler handler = handlerRegistry.getHandler(handlerName);
+                    if (handler != null) {
+                        return handler;
+                    }
+                }
+            }
+        }
+
+        return handlerRegistry.getHandler(nodeType);
     }
 
     public static class FlowExecutionException extends Exception {

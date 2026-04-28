@@ -1,0 +1,194 @@
+[
+  {
+    "id": "particle.spawn",
+    "displayName": "Spawn Particle",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_spawn"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.area",
+    "displayName": "Particle Area",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_area"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.player.spawn",
+    "displayName": "Particle Player Spawn",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_player_spawn"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.line",
+    "displayName": "Particle Line",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_line"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.circle",
+    "displayName": "Particle Circle",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_circle"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.sphere",
+    "displayName": "Particle Sphere",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_sphere"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.ellipse",
+    "displayName": "Particle Ellipse",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_ellipse"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.spiral",
+    "displayName": "Particle Spiral",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_spiral"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.cone",
+    "displayName": "Particle Cone",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_cone"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.ring",
+    "displayName": "Particle Ring",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_ring"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.cube",
+    "displayName": "Particle Cube",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_cube"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.wave",
+    "displayName": "Particle Wave",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_wave"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.text",
+    "displayName": "Particle Text",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_text"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.block.dust",
+    "displayName": "Block Dust Particle",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_block_dust"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.item.break",
+    "displayName": "Item Break Particle",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_item_break"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.explosion",
+    "displayName": "Explosion Particle",
+    "category": "VISUAL",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_explosion"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

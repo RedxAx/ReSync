@@ -1,0 +1,98 @@
+[
+  {
+    "id": "location.add",
+    "displayName": "Location Add",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_add"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.multiply",
+    "displayName": "Location Multiply",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_multiply"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.direction",
+    "displayName": "Location Direction",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_direction"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.relative.to.entity",
+    "displayName": "Location Relative To Entity",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_relative_to_entity"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.look.at",
+    "displayName": "Location Look At",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_look_at"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.get.offset",
+    "displayName": "Location Get Offset",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_get_offset"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.center",
+    "displayName": "Location Center",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_center"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "location.distance",
+    "displayName": "Location Distance",
+    "category": "DATA",
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_distance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

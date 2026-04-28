@@ -266,6 +266,8 @@
   "variable_decrement": "variable.access",
   "variable_multiply": "variable.access",
   "variable_divide": "variable.access",
+  "player_push": "player.player_movement",
+  "entity_kill": "entity.kill",
   "loop_count": "loop.count",
   "loop_for_each": "loop.for.each",
   "loop_for_each_player": "loop.for.each.player",

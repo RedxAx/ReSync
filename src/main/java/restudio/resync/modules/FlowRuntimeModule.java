@@ -21,6 +21,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.BlockActionHandler;
 import restudio.resync.flow.handler.generic.ColorHandler;
 import restudio.resync.flow.handler.generic.ConversionHandler;
+import restudio.resync.flow.migration.FlowGraphMigrator;
 import restudio.resync.flow.handler.generic.CustomEventHandler;
 import restudio.resync.flow.handler.generic.DebugHandler;
 import restudio.resync.flow.handler.generic.DiscordHandler;
@@ -97,6 +98,7 @@ public class FlowRuntimeModule implements Module {
     public void initialize(ModuleContext context) {
         this.moduleContext = context;
         storage = new FlowStorage(context.getPlugin());
+        new FlowGraphMigrator(storage).migrateStoredFlows();
         storage.preloadAll();
         TypeAdapterRegistry typeAdapterRegistry = new TypeAdapterRegistry();
         HandlerRegistry handlerRegistry = new HandlerRegistry();
@@ -157,10 +159,12 @@ public class FlowRuntimeModule implements Module {
         NodeDefinitionLoader jsonLoader = new NodeDefinitionLoader();
         jsonLoader.setValidator(new NodeDefinitionValidator(handlerRegistry, true));
         java.util.List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
+        classpathDefs.removeIf(this::isUnavailable);
         jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
         java.nio.file.Path nodesDir = context.getPlugin().getDataFolder().toPath().resolve("nodes");
         if (java.nio.file.Files.exists(nodesDir)) {
             java.util.List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
+            jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
         nodePluginRegistry = new FlowNodePluginRegistry(
@@ -260,10 +264,12 @@ public class FlowRuntimeModule implements Module {
         NodeDefinitionValidator validator = new NodeDefinitionValidator(handlerRegistry, true);
         jsonLoader.setValidator(validator);
         java.util.List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
+        classpathDefs.removeIf(this::isUnavailable);
         jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
         java.nio.file.Path nodesDir = moduleContext.getPlugin().getDataFolder().toPath().resolve("nodes");
         if (java.nio.file.Files.exists(nodesDir)) {
             java.util.List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
+            jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
         nodePluginRegistry = new FlowNodePluginRegistry(
@@ -275,6 +281,11 @@ public class FlowRuntimeModule implements Module {
         if (delegate != null) {
             delegate.refreshCustomFunctionDefinitions();
         }
+    }
+
+    private boolean isUnavailable(NodeDefinition def) {
+        NodeDefinition.Availability availability = def.getAvailability();
+        return availability != null && availability.getPlugin() != null && Bukkit.getPluginManager().getPlugin(availability.getPlugin()) == null;
     }
 
     @Override

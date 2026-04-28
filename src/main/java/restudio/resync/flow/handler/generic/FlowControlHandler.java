@@ -169,6 +169,11 @@ public class FlowControlHandler implements NodeHandler {
             });
         });
 
+        operations.put("loop_while", (ctx, node) -> {
+            Boolean condition = ctx.getInputValue(node, "condition", Boolean.class, false);
+            ctx.triggerOutput(Boolean.TRUE.equals(condition) ? "loop" : "completed");
+        });
+
         operations.put("break_loop", (ctx, node) -> {
             ctx.getRuntime().setBreakLoopRequested(true);
             ctx.triggerOutput("flow");

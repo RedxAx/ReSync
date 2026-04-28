@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public class FlowBlueprintPacketHandler {
+    private static final Set<String> DIRECT_DISPATCH_EVENT_NODES = Set.of("resync_command", "click");
     private final FlowStorage storage;
     private final TriggerRegistry triggerRegistry;
     private final GlobalTriggers globalTriggers;
@@ -32,6 +33,7 @@ public class FlowBlueprintPacketHandler {
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
         this.sender = sender;
+        refreshAllEventBindings();
     }
 
     public void handleRequest(Session session, ByteBuffer buffer) {
@@ -115,10 +117,23 @@ public class FlowBlueprintPacketHandler {
         String json = new String(jsonBytes, StandardCharsets.UTF_8);
         List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
         }.getType());
-        triggerRegistry.setBindings(bindings);
+        triggerRegistry.setBindingsPreservingType(bindings, TriggerType.EVENT);
         if (globalTriggers != null) {
             globalTriggers.refreshBindings();
         }
+    }
+
+    private void refreshAllEventBindings() {
+        if (triggerRegistry == null || globalTriggers == null) {
+            return;
+        }
+        for (String flowId : storage.listFlowIds()) {
+            FlowGraph graph = storage.getGraph(flowId);
+            if (graph != null) {
+                updateEventBindings(graph);
+            }
+        }
+        globalTriggers.refreshBindings();
     }
 
     private void updateEventBindings(FlowGraph graph) {
@@ -145,6 +160,18 @@ public class FlowBlueprintPacketHandler {
         if (nodeType == null) {
             return null;
         }
-        return nodeType.startsWith("event:") ? nodeType.substring(6) : null;
+        String normalized = nodeType.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.startsWith("event:")) {
+            normalized = normalized.substring(6);
+        } else if (normalized.startsWith("event.")) {
+            normalized = normalized.substring(6);
+        } else {
+            return null;
+        }
+        normalized = normalized.replace('.', '_');
+        if (DIRECT_DISPATCH_EVENT_NODES.contains(normalized)) {
+            return null;
+        }
+        return normalized.isBlank() ? null : normalized;
     }
 }

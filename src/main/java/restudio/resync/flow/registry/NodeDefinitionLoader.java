@@ -541,7 +541,6 @@ public class NodeDefinitionLoader {
 
     private static class PinJson {
         String name;
-        @SerializedName("type")
         NodeDefinition.PinType pinType;
         String dataType;
         NodeDefinition.WidgetType widget;

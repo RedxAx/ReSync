@@ -247,8 +247,10 @@ public class TriggerDispatcher implements Listener {
         }
         if (normalized.startsWith("event:")) {
             normalized = normalized.substring(6);
+        } else if (normalized.startsWith("event.")) {
+            normalized = normalized.substring(6);
         }
-        return normalized;
+        return normalized.replace('.', '_');
     }
 
     public void registerFromContainer(Object container) {

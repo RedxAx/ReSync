@@ -38,6 +38,7 @@ public class GlobalTriggers implements Listener {
 
     private final Map<String, CommandTrigger> commandTriggers = new ConcurrentHashMap<>();
     private final Map<String, RuntimeFlowCommand> runtimeCommands = new ConcurrentHashMap<>();
+    private static final Set<String> RESYNC_COMMAND_EVENT_TYPES = Set.of("event.resync.command", "event:resync_command");
 
     private static class CommandTrigger {
         private final String flowId;
@@ -174,13 +175,10 @@ public class GlobalTriggers implements Listener {
         }
         String startNode = null;
         for (var entry : graph.getNodes().entrySet()) {
-            if ("event:resync_command".equals(entry.getValue().getType())) {
+            if (entry.getValue() != null && RESYNC_COMMAND_EVENT_TYPES.contains(entry.getValue().getType())) {
                 startNode = entry.getKey();
                 break;
             }
-        }
-        if (startNode == null) {
-            startNode = findStartNodeForEvent(graph, "command");
         }
         if (startNode == null) {
             startNode = findStartNode(graph);
@@ -543,6 +541,11 @@ public class GlobalTriggers implements Listener {
         if (normalized.isBlank()) {
             return null;
         }
-        return normalized.startsWith("event:") ? normalized.substring(6) : normalized;
+        if (normalized.startsWith("event:")) {
+            normalized = normalized.substring(6);
+        } else if (normalized.startsWith("event.")) {
+            normalized = normalized.substring(6);
+        }
+        return normalized.replace('.', '_');
     }
 }

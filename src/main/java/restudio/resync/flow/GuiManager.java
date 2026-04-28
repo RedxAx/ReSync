@@ -24,6 +24,7 @@ import restudio.resync.server.ReSyncServer;
 import restudio.resync.flow.util.TextFormatter;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -174,7 +175,7 @@ public class GuiManager implements Listener {
                 if (flowId != null) {
                     FlowGraph graph = storage.getGraph(flowId);
                     if (graph != null) {
-                        executor.execute(graph, findStartNode(graph), player, event);
+                        executor.execute(graph, findStartNode(graph), player, event, createClickEventVariables(event, player));
                     } else {
                         player.sendMessage("Flow not found: " + flowId);
                     }
@@ -209,11 +210,23 @@ public class GuiManager implements Listener {
 
     private String findStartNode(FlowGraph graph) {
         for (var entry : graph.getNodes().entrySet()) {
-            if ("event:click".equals(entry.getValue().getType()) || "start".equals(entry.getValue().getType())) {
+            if ("event.click".equals(entry.getValue().getType()) || "event:click".equals(entry.getValue().getType()) || "start".equals(entry.getValue().getType())) {
                 return entry.getKey();
             }
         }
         return graph.getNodes().keySet().stream().findFirst().orElse(null);
+    }
+
+    private Map<String, Object> createClickEventVariables(InventoryClickEvent event, Player player) {
+        Map<String, Object> eventVars = new HashMap<>();
+        eventVars.put("event.player", player);
+        eventVars.put("event.slot", event.getSlot());
+        eventVars.put("event.raw_slot", event.getRawSlot());
+        eventVars.put("event.button", event.getHotbarButton());
+        eventVars.put("event.action", event.getAction().name());
+        eventVars.put("event.item", event.getCurrentItem());
+        eventVars.put("event.cursor_item", event.getCursor());
+        return eventVars;
     }
 
     private String findFlowIdForGui(GuiDefinition def) {

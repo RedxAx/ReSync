@@ -116,6 +116,49 @@
     ]
   },
   {
+    "id": "loop_while",
+    "displayName": "While",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_while"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "condition",
+        "dataType": "boolean",
+        "defaultValue": true
+      },
+      {
+        "name": "interval_ticks",
+        "dataType": "number",
+        "defaultValue": 1
+      },
+      {
+        "name": "max_iterations",
+        "dataType": "number",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "name": "loop",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "completed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
     "id": "break.loop",
     "displayName": "Break",
     "category": "LOGIC",

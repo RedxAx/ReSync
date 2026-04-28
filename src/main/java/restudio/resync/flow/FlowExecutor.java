@@ -145,6 +145,13 @@ public class FlowExecutor {
 
         NodeHandler handler = resolveHandler(node);
         if (handler == null) {
+            NodeDefinition triggerDefinition = resolveTriggerDefinition(node);
+            if (triggerDefinition != null) {
+                publishTriggerOutputs(runtime, startNodeId, triggerDefinition);
+                CompletableFuture<Void> result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
+                runtime.endFlowExecution(startNodeId);
+                return result;
+            }
             runtime.endFlowExecution(startNodeId);
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "No handler registered for node type: " + node.getType(),
@@ -620,10 +627,38 @@ public class FlowExecutor {
             return false;
         }
         String type = node.getType();
-        if (type != null && type.startsWith("event:")) {
+        if (type != null && (type.startsWith("event:") || type.startsWith("event."))) {
             return false;
         }
         return !hasIncomingFlowConnection(graph, nodeId);
+    }
+
+    private NodeDefinition resolveTriggerDefinition(FlowNode node) {
+        if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
+            return null;
+        }
+        String mappedType = idCompatibility.mapToNew(node.getType());
+        if (!mappedType.equals(node.getType())) {
+            node.setType(mappedType);
+        }
+        NodeDefinition definition = nodeDefinitionRegistry.get(mappedType);
+        return definition != null && definition.isTrigger() ? definition : null;
+    }
+
+    private void publishTriggerOutputs(FlowRuntime runtime, String nodeId, NodeDefinition definition) {
+        Map<String, Object> eventVars = runtime.getEventVariables();
+        for (NodeDefinition.PinDefinition output : definition.getOutputs()) {
+            if (output.getType() == NodeDefinition.PinType.FLOW) {
+                continue;
+            }
+            String name = output.getName();
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            if (eventVars.containsKey(name)) {
+                runtime.setNodeOutput(nodeId, name, eventVars.get(name));
+            }
+        }
     }
 
     private boolean hasIncomingFlowConnection(FlowGraph graph, String nodeId) {

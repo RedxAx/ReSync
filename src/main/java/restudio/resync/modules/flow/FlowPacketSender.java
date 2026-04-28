@@ -11,6 +11,7 @@ import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
+import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
@@ -28,6 +29,18 @@ public class FlowPacketSender {
     private final Set<Session> subscribedSessions;
     private final Gson gson = new GsonBuilder()
             .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+            .registerTypeAdapter(NodeDefinition.NodeCategory.class, new com.google.gson.TypeAdapter<NodeDefinition.NodeCategory>() {
+                @Override
+                public void write(com.google.gson.stream.JsonWriter out, NodeDefinition.NodeCategory value) throws java.io.IOException {
+                    out.value(value != null ? value.getId() : null);
+                }
+
+                @Override
+                public NodeDefinition.NodeCategory read(com.google.gson.stream.JsonReader in) throws java.io.IOException {
+                    String id = in.nextString();
+                    return NodeDefinition.NodeCategory.fromString(id);
+                }
+            })
             .create();
 
     public FlowPacketSender(Codec codec, int channelId, Set<Session> subscribedSessions) {

@@ -13,7 +13,7 @@ import restudio.flow.data.TabDefinition;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
-import restudio.resync.flow.nodes.ScoreboardNodes;
+import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.world.WorldGameRuleDescriptor;
 import restudio.resync.world.WorldGeneratorDescriptor;
@@ -56,6 +56,7 @@ public class ReSyncCommand implements TabExecutor {
             case "tab" -> handleTab(sender, args);
             case "world" -> handleWorld(sender, args);
             case "portal" -> handlePortal(sender, args);
+            case "flow" -> handleFlow(sender, args);
             default -> {
                 sendUsage(sender);
                 yield true;
@@ -66,7 +67,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("scoreboard", "tab", "world", "portal"), args[0]);
+            return filter(List.of("scoreboard", "tab", "world", "portal", "flow"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -74,8 +75,52 @@ public class ReSyncCommand implements TabExecutor {
             case "tab" -> tabCompleteTab(args);
             case "world" -> tabCompleteWorld(args);
             case "portal" -> tabCompletePortal(args);
+            case "flow" -> tabCompleteFlow(args);
             default -> List.of();
         };
+    }
+
+    private boolean handleFlow(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync flow reload nodes");
+            return true;
+        }
+        String sub = args[1].toLowerCase(Locale.ROOT);
+        if (!"reload".equals(sub)) {
+            sendError(sender, "Unknown flow subcommand: " + sub);
+            return true;
+        }
+        if (args.length < 3 || !"nodes".equalsIgnoreCase(args[2])) {
+            sendUsageLine(sender, "/resync flow reload nodes");
+            return true;
+        }
+        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server not initialized");
+            return true;
+        }
+        restudio.resync.modules.FlowRuntimeModule module = server.getModuleContext().getService(restudio.resync.modules.FlowRuntimeModule.class);
+        if (module == null) {
+            sendError(sender, "Flow module not initialized");
+            return true;
+        }
+        try {
+            module.reloadNodeDefinitions();
+            sendSuccess(sender, "Node definitions reloaded.");
+        } catch (Exception e) {
+            sendError(sender, "Failed to reload nodes: " + e.getMessage());
+        }
+        return true;
+    }
+
+    private List<String> tabCompleteFlow(String[] args) {
+        if (args.length == 2) {
+            return filter(List.of("reload"), args[1]);
+        }
+        if (args.length == 3 && "reload".equalsIgnoreCase(args[1])) {
+            return filter(List.of("nodes"), args[2]);
+        }
+        return List.of();
     }
 
     private List<String> tabCompleteScoreboard(String[] args) {
@@ -321,17 +366,17 @@ public class ReSyncCommand implements TabExecutor {
         }
         if ("default".equals(action)) {
             if (args.length == 2) {
-                String defaultId = ScoreboardNodes.getDefaultScoreboardId();
+                String defaultId = ScoreboardTemplateManager.getDefaultScoreboardId();
                 if (defaultId == null || defaultId.isBlank()) {
                     sendInfo(sender, "Default Scoreboard", "None");
                 } else {
-                    sendInfo(sender, "Default Scoreboard", defaultId + " · Papi " + ScoreboardNodes.isDefaultScoreboardUsePapi());
+                    sendInfo(sender, "Default Scoreboard", defaultId + " · Papi " + ScoreboardTemplateManager.isDefaultScoreboardUsePapi());
                 }
                 return true;
             }
             String id = args[2];
             if ("none".equalsIgnoreCase(id)) {
-                boolean cleared = ScoreboardNodes.clearDefaultScoreboard();
+                boolean cleared = ScoreboardTemplateManager.clearDefaultScoreboard();
                 if (cleared) {
                     sendSuccess(sender, "Default Scoreboard Cleared");
                 } else {
@@ -340,7 +385,7 @@ public class ReSyncCommand implements TabExecutor {
                 return true;
             }
             boolean usePapi = args.length < 4 || Boolean.parseBoolean(args[3]);
-            boolean changed = ScoreboardNodes.setDefaultScoreboard(id, usePapi);
+            boolean changed = ScoreboardTemplateManager.setDefaultScoreboard(id, usePapi);
             if (changed) {
                 sendSuccess(sender, "Default Scoreboard", id + " · Papi " + usePapi);
             } else {
@@ -358,7 +403,7 @@ public class ReSyncCommand implements TabExecutor {
             return true;
         }
         if ("hide".equals(action)) {
-            ScoreboardNodes.hideActive(target);
+            ScoreboardTemplateManager.hideActive(target);
             sendSuccess(sender, "Scoreboard Hidden", target.getName());
             return true;
         }
@@ -378,7 +423,7 @@ public class ReSyncCommand implements TabExecutor {
             return true;
         }
         boolean usePapi = args.length < 5 || Boolean.parseBoolean(args[4]);
-        boolean applied = ScoreboardNodes.showTemplate(target, definition, usePapi);
+        boolean applied = ScoreboardTemplateManager.showTemplate(target, definition, usePapi);
         if (applied) {
             sendSuccess(sender, "Scoreboard Applied", scoreboardId + " -> " + target.getName());
         } else {
@@ -2327,6 +2372,7 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync portal cannon <portal> <power>");
         sendUsageLine(sender, "/resync portal tp <player> <portal>");
         sendUsageLine(sender, "/resync portal delete <portal>");
+        sendUsageLine(sender, "/resync flow reload nodes");
     }
 
     private void sendUsageLine(CommandSender sender, String usage) {

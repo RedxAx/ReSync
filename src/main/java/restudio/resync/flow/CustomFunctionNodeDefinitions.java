@@ -1,7 +1,7 @@
 package restudio.resync.flow;
 
 import restudio.flow.data.FlowGraph;
-import restudio.flow.data.FlowType;
+import restudio.flow.data.FlowDataType;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
@@ -51,7 +51,7 @@ public final class CustomFunctionNodeDefinitions {
             NodeDefinition.NodeCategory.FUNCTION
         ).priority(220).color(NodeDefinition.NodeCategory.FUNCTION);
 
-        builder.input("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION);
+        builder.input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION);
         if (graph.getFunctionInputs() != null) {
             List<FlowGraph.FunctionParameter> inputs = new ArrayList<>(graph.getFunctionInputs());
             inputs.sort(Comparator.comparing(FlowGraph.FunctionParameter::getName, String.CASE_INSENSITIVE_ORDER));
@@ -63,7 +63,7 @@ public final class CustomFunctionNodeDefinitions {
             }
         }
 
-        builder.output("flow", NodeDefinition.PinType.FLOW, FlowType.EXECUTION);
+        builder.output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION);
         if (graph.getFunctionOutputs() != null) {
             List<FlowGraph.FunctionParameter> outputs = new ArrayList<>(graph.getFunctionOutputs());
             outputs.sort(Comparator.comparing(FlowGraph.FunctionParameter::getName, String.CASE_INSENSITIVE_ORDER));
@@ -103,13 +103,14 @@ public final class CustomFunctionNodeDefinitions {
         return out.isEmpty() ? "Function" : out.toString();
     }
 
-    private static FlowType normalizeType(FlowType type) {
+    private static FlowDataType normalizeType(FlowDataType type) {
         if (type == null) {
-            return FlowType.ANY;
+            return FlowDataType.ANY;
         }
-        return switch (type) {
-            case MAP, SET, QUEUE, STACK -> FlowType.ANY;
-            default -> type;
-        };
+        String id = type.getId();
+        if ("map".equals(id) || "set".equals(id) || "queue".equals(id) || "stack".equals(id)) {
+            return FlowDataType.ANY;
+        }
+        return type;
     }
 }

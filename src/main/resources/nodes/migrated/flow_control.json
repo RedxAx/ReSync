@@ -1,0 +1,551 @@
+[
+  {
+    "id": "if",
+    "displayName": "If",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "if"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "condition",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "true",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "false",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "branch.random",
+    "displayName": "Random Branch",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "branch_random"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branches",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "branch_0",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_1",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_2",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_3",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "selected",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "branch.all",
+    "displayName": "Branch All",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "branch_all"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "branch_0",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_1",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_2",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "branch_3",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "break.loop",
+    "displayName": "Break",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "break_loop"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "continue.loop",
+    "displayName": "Continue",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "continue_loop"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "flow.switch_case",
+    "displayName": "Switch Case",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "switch_case"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      },
+      {
+        "name": "cases",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "matched",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "flow.loop_count",
+    "displayName": "Loop Count",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_count"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "flow.loop_for_each",
+    "displayName": "Loop For Each",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "element",
+        "dataType": "any"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "flow.loop_for_each_player",
+    "displayName": "Loop For Each Player",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each_player"
+    },
+    "outputs": [
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "flow.loop_for_each_entity",
+    "displayName": "Loop For Each Entity",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each_entity"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "radius",
+        "dataType": "number"
+      },
+      {
+        "name": "center",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "loop.count",
+    "displayName": "Loop Count",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_count"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "loop.for.each",
+    "displayName": "Loop For Each",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "element",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "loop.for.each.player",
+    "displayName": "Loop For Each Player",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each_player"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "loop.for.each.entity",
+    "displayName": "Loop For Each Entity",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "loop_for_each_entity"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "radius",
+        "dataType": "number"
+      },
+      {
+        "name": "center",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity"
+      }
+    ]
+  },
+  {
+    "id": "logic.switch_case",
+    "displayName": "Logic Switch Case",
+    "category": "LOGIC",
+    "handler": "FlowControlHandler",
+    "handlerConfig": {
+      "operation": "switch_case"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      },
+      {
+        "name": "cases",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "matched",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  }
+]

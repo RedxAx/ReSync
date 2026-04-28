@@ -11,6 +11,7 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.plugins.FlowNodePluginRegistry;
+import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
@@ -48,7 +49,8 @@ public class FlowModule implements Module {
     private final FlowNodePluginRegistry pluginRegistry;
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
-                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry) {
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
+                      PropertyRegistry propertyRegistry) {
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
         this.pluginRegistry = pluginRegistry;
@@ -58,7 +60,7 @@ public class FlowModule implements Module {
         this.scoreboardHandler = new FlowScoreboardPacketHandler(storage, sender);
         this.tabHandler = new FlowTabPacketHandler(storage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
-        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender);
+        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry);
     }
 
     @Override
@@ -163,6 +165,7 @@ public class FlowModule implements Module {
         }
         snapshot.setPlugins(payloads);
         snapshot.setRemovedPlugins(List.of());
+        nodeRegistryHandler.populateServerMetadata(snapshot);
         return snapshot;
     }
 

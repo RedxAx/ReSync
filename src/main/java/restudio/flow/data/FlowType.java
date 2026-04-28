@@ -1,5 +1,6 @@
 package restudio.flow.data;
 
+@Deprecated
 public enum FlowType {
     EXECUTION(0xFFFFFF, "Execution"),
     STRING(0xDA00FF, "String"),

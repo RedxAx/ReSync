@@ -1,10 +1,15 @@
 package restudio.flow.data;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class FlowGraph {
     private String id;
@@ -15,18 +20,22 @@ public class FlowGraph {
     private List<FunctionParameter> functionInputs;
     private List<FunctionParameter> functionOutputs;
 
+    private transient Map<String, List<FlowConnection>> connectionsBySource = new HashMap<>();
+    private transient Map<String, List<FlowConnection>> connectionsByTarget = new HashMap<>();
+    private transient IdentityHashMap<FlowNode, String> nodeToId = new IdentityHashMap<>();
+
     public static class FunctionParameter {
         private String name;
-        private FlowType type;
+        private FlowDataType type;
 
         public FunctionParameter() {
             this.name = "";
-            this.type = FlowType.ANY;
+            this.type = FlowDataType.ANY;
         }
 
-        public FunctionParameter(String name, FlowType type) {
+        public FunctionParameter(String name, FlowDataType type) {
             this.name = name;
-            this.type = type != null ? type : FlowType.ANY;
+            this.type = type != null ? type : FlowDataType.ANY;
         }
 
         public String getName() {
@@ -37,11 +46,11 @@ public class FlowGraph {
             this.name = name;
         }
 
-        public FlowType getType() {
+        public FlowDataType getType() {
             return type;
         }
 
-        public void setType(FlowType type) {
+        public void setType(FlowDataType type) {
             this.type = type;
         }
     }
@@ -54,6 +63,7 @@ public class FlowGraph {
         this.function = false;
         this.functionInputs = new ArrayList<>();
         this.functionOutputs = new ArrayList<>();
+        rebuildIndices();
     }
 
     public FlowGraph(String id, Map<String, FlowNode> nodes, List<FlowConnection> connections, List<FlowVariable> localVariables) {
@@ -69,6 +79,7 @@ public class FlowGraph {
         this.function = function;
         this.functionInputs = functionInputs != null ? functionInputs : new ArrayList<>();
         this.functionOutputs = functionOutputs != null ? functionOutputs : new ArrayList<>();
+        rebuildIndices();
     }
 
     public String getId() {
@@ -84,7 +95,8 @@ public class FlowGraph {
     }
 
     public void setNodes(Map<String, FlowNode> nodes) {
-        this.nodes = nodes;
+        this.nodes = nodes != null ? nodes : new HashMap<>();
+        rebuildIndices();
     }
 
     public List<FlowConnection> getConnections() {
@@ -92,7 +104,8 @@ public class FlowGraph {
     }
 
     public void setConnections(List<FlowConnection> connections) {
-        this.connections = connections;
+        this.connections = connections != null ? connections : new ArrayList<>();
+        rebuildIndices();
     }
 
     public List<FlowVariable> getLocalVariables() {
@@ -125,5 +138,92 @@ public class FlowGraph {
 
     public void setFunctionOutputs(List<FunctionParameter> functionOutputs) {
         this.functionOutputs = functionOutputs;
+    }
+
+    private void rebuildIndices() {
+        connectionsBySource = new HashMap<>();
+        connectionsByTarget = new HashMap<>();
+        nodeToId = new IdentityHashMap<>();
+
+        if (nodes != null) {
+            for (Map.Entry<String, FlowNode> entry : nodes.entrySet()) {
+                nodeToId.put(entry.getValue(), entry.getKey());
+            }
+        }
+
+        if (connections != null) {
+            for (FlowConnection conn : connections) {
+                connectionsBySource.computeIfAbsent(conn.getSourceNodeId(), k -> new ArrayList<>()).add(conn);
+                connectionsByTarget.computeIfAbsent(conn.getTargetNodeId(), k -> new ArrayList<>()).add(conn);
+            }
+        }
+    }
+
+    public List<FlowConnection> getConnectionsFromSource(String nodeId) {
+        ensureIndicesBuilt();
+        return connectionsBySource.getOrDefault(nodeId, Collections.emptyList());
+    }
+
+    public List<FlowConnection> getConnectionsToTarget(String nodeId) {
+        ensureIndicesBuilt();
+        return connectionsByTarget.getOrDefault(nodeId, Collections.emptyList());
+    }
+
+    public String findNodeId(FlowNode node) {
+        ensureIndicesBuilt();
+        return nodeToId.get(node);
+    }
+
+    public FlowGraph extractSubGraph(String startNodeId, String startPin) {
+        ensureIndicesBuilt();
+        Set<String> visitedNodes = new HashSet<>();
+        List<FlowConnection> subConnections = new ArrayList<>();
+        List<String> queue = new ArrayList<>();
+
+        for (FlowConnection conn : connectionsBySource.getOrDefault(startNodeId, Collections.emptyList())) {
+            if (conn.getSourcePin().equals(startPin)) {
+                queue.add(conn.getTargetNodeId());
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            String currentId = queue.removeFirst();
+            if (!visitedNodes.add(currentId)) {
+                continue;
+            }
+            for (FlowConnection conn : connectionsBySource.getOrDefault(currentId, Collections.emptyList())) {
+                subConnections.add(conn);
+                queue.add(conn.getTargetNodeId());
+            }
+        }
+
+        Map<String, FlowNode> subNodes = new HashMap<>();
+        for (String nodeId : visitedNodes) {
+            FlowNode node = nodes.get(nodeId);
+            if (node != null) {
+                subNodes.put(nodeId, node);
+            }
+        }
+
+        FlowGraph subGraph = new FlowGraph();
+        subGraph.setNodes(subNodes);
+        subGraph.setConnections(subConnections);
+        return subGraph;
+    }
+
+    private void ensureIndicesBuilt() {
+        boolean needsRebuild = false;
+        if (connectionsBySource == null || connectionsByTarget == null || nodeToId == null) {
+            needsRebuild = true;
+        } else {
+            int nodeCount = nodes != null ? nodes.size() : 0;
+            int connCount = connections != null ? connections.size() : 0;
+            if (nodeToId.size() != nodeCount || connectionsBySource.size() != connCount) {
+                needsRebuild = true;
+            }
+        }
+        if (needsRebuild) {
+            rebuildIndices();
+        }
     }
 }

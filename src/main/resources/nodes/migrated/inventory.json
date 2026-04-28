@@ -1,0 +1,2451 @@
+[
+  {
+    "id": "inventory.properties",
+    "displayName": "Inventory Properties",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "inputs": [
+      {
+        "name": "flow",
+        "description": "Flow input",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target inventory",
+        "pinType": "DATA",
+        "dataType": "inventory"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "do",
+          "set",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "size",
+          "type",
+          "items",
+          "first_empty",
+          "max_stack_size",
+          "holder",
+          "clear"
+        ],
+        "defaultValue": "size"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "description": "Flow output",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      },
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "name": "size",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "size"
+        }
+      },
+      {
+        "name": "type",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "type"
+        }
+      },
+      {
+        "name": "items",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "items"
+        }
+      },
+      {
+        "name": "first_empty",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "first_empty"
+        }
+      },
+      {
+        "name": "max_stack_size",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_stack_size"
+        }
+      },
+      {
+        "name": "holder",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "get",
+          "property": "holder"
+        }
+      }
+    ]
+  },
+  {
+    "id": "inventory.size",
+    "displayName": "Inventory Size",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "size"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.type",
+    "displayName": "Inventory Type",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "type"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.items",
+    "displayName": "Inventory Items",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "items"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.first_empty",
+    "displayName": "Inventory First Empty",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "first_empty"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.max_stack_size",
+    "displayName": "Inventory Max Stack Size",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "max_stack_size"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.holder",
+    "displayName": "Inventory Holder",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "holder"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "entity",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.clear",
+    "displayName": "Inventory Clear",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "handlerConfig": {
+      "property": "clear"
+    },
+    "inputs": [
+      {
+        "dataType": "inventory",
+        "description": "Target inventory",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "do"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "execution",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "FLOW"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "inventory.player_has_item",
+    "displayName": "Player Has Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "player_has_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.player_remove_item",
+    "displayName": "Player Remove Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "player_remove_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "pinType": "DATA"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.player_clear_inv",
+    "displayName": "Player Clear Inv",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_inv"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_open_gui",
+    "displayName": "Inventory Open Gui",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_open_gui"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "title",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "rows",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_close",
+    "displayName": "Inventory Close",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_close"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_set_title",
+    "displayName": "Inventory Set Title",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_title"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_set_rows",
+    "displayName": "Inventory Set Rows",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_rows"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "rows",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_contents",
+    "displayName": "Inventory Get Contents",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_contents"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "contents",
+        "dataType": "list",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_set_contents",
+    "displayName": "Inventory Set Contents",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_contents"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_add_item",
+    "displayName": "Inventory Add Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_add_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_remove_item",
+    "displayName": "Inventory Remove Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_remove_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_has_item",
+    "displayName": "Inventory Has Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_has_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_count_item",
+    "displayName": "Inventory Count Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_count_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_slot",
+    "displayName": "Inventory Get Slot",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_set_slot",
+    "displayName": "Inventory Set Slot",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_clear_slot",
+    "displayName": "Inventory Clear Slot",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_move_item",
+    "displayName": "Inventory Move Item",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_move_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "from_slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "to_slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_swap_items",
+    "displayName": "Inventory Swap Items",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_swap_items"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot1",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot2",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_clear",
+    "displayName": "Inventory Clear",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_update",
+    "displayName": "Inventory Update",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_update"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_has_space",
+    "displayName": "Inventory Has Space",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_has_space"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "has_space",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_count_material",
+    "displayName": "Inventory Count Material",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_count_material"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_sort",
+    "displayName": "Inventory Sort",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_sort"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "inventory",
+        "dataType": "inventory"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_all",
+    "displayName": "Inventory Get All",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_all"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "items_list",
+        "dataType": "list",
+        "pinType": "DATA"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_clear_all",
+    "displayName": "Inventory Clear All",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear_all"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "inventory",
+        "dataType": "inventory"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_storage_contents",
+    "displayName": "Inventory Get Storage Contents",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_storage_contents"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "items_list",
+        "dataType": "list",
+        "pinType": "DATA"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_contains_at_least",
+    "displayName": "Inventory Contains At Least",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_contains_at_least"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "contains",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_remove_any",
+    "displayName": "Inventory Remove Any",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_remove_any"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_set_all_contents",
+    "displayName": "Inventory Set All Contents",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_all_contents"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "inventory",
+        "dataType": "inventory"
+      },
+      {
+        "name": "items_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_add_to_slot",
+    "displayName": "Inventory Add To Slot",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_add_to_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "slot",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_create",
+    "displayName": "Item Create",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_create"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "pinType": "DATA"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_material",
+    "displayName": "Item Set Material",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_material"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_amount",
+    "displayName": "Item Set Amount",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_amount"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_damage",
+    "displayName": "Item Set Damage",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_damage"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "damage",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_max_damage",
+    "displayName": "Item Set Max Damage",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_max_damage"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_unbreakable",
+    "displayName": "Item Set Unbreakable",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_unbreakable"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "unbreakable",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_custom_name",
+    "displayName": "Item Set Custom Name",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_custom_name"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_lore",
+    "displayName": "Item Set Lore",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_lore"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_add_lore",
+    "displayName": "Item Add Lore",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_lore"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_clear_lore",
+    "displayName": "Item Clear Lore",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_clear_lore"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_flags",
+    "displayName": "Item Set Flags",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_flags"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_add_flag",
+    "displayName": "Item Add Flag",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_flag"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "flag",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_remove_flag",
+    "displayName": "Item Remove Flag",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_remove_flag"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "flag",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_add_enchant",
+    "displayName": "Item Add Enchant",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_enchant"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "enchantment",
+        "dataType": "enchantment",
+        "pinType": "DATA"
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_remove_enchant",
+    "displayName": "Item Remove Enchant",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_remove_enchant"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "enchantment",
+        "dataType": "enchantment",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_clear_enchants",
+    "displayName": "Item Clear Enchants",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_clear_enchants"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_custom_model",
+    "displayName": "Item Set Custom Model",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_custom_model"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "model_data",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_color",
+    "displayName": "Item Set Color",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_color"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "red",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "green",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "blue",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_skull_owner",
+    "displayName": "Item Set Skull Owner",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_skull_owner"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_book_pages",
+    "displayName": "Item Set Book Pages",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_book_pages"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "title",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "author",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "pages",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_potion_effect",
+    "displayName": "Item Set Potion Effect",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_potion_effect"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "effect",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "duration",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "amplifier",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_get_nbt",
+    "displayName": "Item Get Nbt",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_get_nbt"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "nbt",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.item_set_nbt",
+    "displayName": "Item Set Nbt",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_nbt"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      },
+      {
+        "name": "nbt",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_first_empty",
+    "displayName": "Inventory Inventory Get First Empty",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_first_empty"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "slot_index",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_size",
+    "displayName": "Inventory Inventory Size",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_size"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "size",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "inventory.inventory_get_max_stack_size",
+    "displayName": "Inventory Inventory Get Max Stack Size",
+    "category": "INVENTORY",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_get_max_stack_size"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "max_size",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  }
+]

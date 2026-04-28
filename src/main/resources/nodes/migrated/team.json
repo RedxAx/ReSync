@@ -1,0 +1,245 @@
+[
+  {
+    "id": "team.create",
+    "displayName": "Create Team",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_create"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.set.prefix",
+    "displayName": "Set Team Prefix",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_set_prefix"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.set.suffix",
+    "displayName": "Set Team Suffix",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_set_suffix"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.set.color",
+    "displayName": "Set Team Color",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_set_color"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.add.player",
+    "displayName": "Add Player to Team",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_add_player"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.remove.player",
+    "displayName": "Remove Player from Team",
+    "category": "SCOREBOARD",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_remove_player"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.remove",
+    "displayName": "Team Remove",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_remove"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "team.set.allow.friendly.fire",
+    "displayName": "Team Set Friendly Fire",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_set_friendly_fire"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      },
+      {
+        "name": "allow",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "team.delete",
+    "displayName": "Team Delete",
+    "category": "UTILITY",
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "delete"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "team.get.players",
+    "displayName": "Get Team Players",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_get_players"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "players",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "team.get.team",
+    "displayName": "Get Player Team",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_get_team"
+    },
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "team.get.teams",
+    "displayName": "Get All Teams",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_get_teams"
+    },
+    "outputs": [
+      {
+        "name": "teams",
+        "dataType": "list"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "team.has.player",
+    "displayName": "Team Has Player",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_has_player"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "team.see.friendly.invisibles",
+    "displayName": "Team See Friendly Invisibles",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_see_friendly_invisibles"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      },
+      {
+        "name": "see",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "team.set.display.name",
+    "displayName": "Set Team Display Name",
+    "category": "UTILITY",
+    "handler": "TeamHandler",
+    "handlerConfig": {
+      "operation": "team_set_display_name"
+    },
+    "inputs": [
+      {
+        "name": "team_id",
+        "dataType": "string"
+      },
+      {
+        "name": "display_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  }
+]

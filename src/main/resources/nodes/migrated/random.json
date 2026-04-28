@@ -1,0 +1,271 @@
+[
+  {
+    "id": "random.choice",
+    "displayName": "Random Choice",
+    "category": "DATA",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_choice"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "random.uuid",
+    "displayName": "Random Uuid",
+    "category": "DATA",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_uuid"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "utility.random_int",
+    "displayName": "Random Int",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_int"
+    },
+    "inputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "number",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "utility.random_double",
+    "displayName": "Random Double",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_double"
+    },
+    "inputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "number",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "utility.random_boolean",
+    "displayName": "Random Boolean",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_boolean"
+    },
+    "inputs": [
+      {
+        "name": "chance_0_to_100",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "utility.random_shuffle",
+    "displayName": "Random Shuffle",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_shuffle"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "shuffled_list",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "utility.random_gaussian",
+    "displayName": "Random Gaussian",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_gaussian"
+    },
+    "inputs": [
+      {
+        "name": "mean",
+        "dataType": "number"
+      },
+      {
+        "name": "stddev",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "number",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "utility.random_hex",
+    "displayName": "Random Hex",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_hex"
+    },
+    "inputs": [
+      {
+        "name": "length",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hex",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "random.range",
+    "displayName": "Random Range",
+    "category": "UTILITY",
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_range"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "random.chance",
+    "displayName": "Random Chance",
+    "category": "UTILITY",
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_chance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "random.number",
+    "displayName": "Random Number",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_number"
+    },
+    "inputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "random.item",
+    "displayName": "Random Item",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_item"
+    },
+    "inputs": [
+      {
+        "name": "items",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "random.player",
+    "displayName": "Random Player",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_player"
+    },
+    "inputs": [
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ]
+  },
+  {
+    "id": "random.color",
+    "displayName": "Random Color",
+    "category": "UTILITY",
+    "handler": "RandomHandler",
+    "handlerConfig": {
+      "operation": "random_color"
+    },
+    "outputs": [
+      {
+        "name": "color",
+        "dataType": "string"
+      }
+    ],
+    "inputs": []
+  }
+]

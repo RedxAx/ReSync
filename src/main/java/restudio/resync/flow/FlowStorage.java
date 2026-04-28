@@ -66,7 +66,10 @@ public class FlowStorage {
     }
 
     public FlowGraph getGraph(String id) {
-        if (graphCache.containsKey(id)) return graphCache.get(id);
+        FlowGraph cached = graphCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
         
         File file = new File(flowDir, id + ".json");
         if (file.exists()) {
@@ -109,7 +112,10 @@ public class FlowStorage {
     }
 
     public GuiDefinition getGui(String id) {
-        if (guiCache.containsKey(id)) return guiCache.get(id);
+        GuiDefinition cached = guiCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
         
         File file = new File(guiDir, id + ".json");
         if (file.exists()) {
@@ -155,7 +161,10 @@ public class FlowStorage {
     }
 
     public ScoreboardDefinition getScoreboard(String id) {
-        if (scoreboardCache.containsKey(id)) return scoreboardCache.get(id);
+        ScoreboardDefinition cached = scoreboardCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
 
         File file = new File(scoreboardDir, id + ".json");
         if (file.exists()) {
@@ -201,7 +210,10 @@ public class FlowStorage {
     }
 
     public TabDefinition getTab(String id) {
-        if (tabCache.containsKey(id)) return tabCache.get(id);
+        TabDefinition cached = tabCache.get(id);
+        if (cached != null) {
+            return cached;
+        }
 
         File file = new File(tabDir, id + ".json");
         if (file.exists()) {
@@ -379,6 +391,21 @@ public class FlowStorage {
     public synchronized void setTabRefreshIntervalTicks(int ticks) {
         this.tabRefreshIntervalTicks = Math.max(1, ticks);
         persistTabRefreshConfig();
+    }
+
+    public void preloadAll() {
+        for (String id : listFlowIds()) {
+            getGraph(id);
+        }
+        for (String id : listGuiIds()) {
+            getGui(id);
+        }
+        for (String id : listScoreboardIds()) {
+            getScoreboard(id);
+        }
+        for (String id : listTabIds()) {
+            getTab(id);
+        }
     }
 
     public void clearCache() {

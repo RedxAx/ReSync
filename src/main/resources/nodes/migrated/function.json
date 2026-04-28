@@ -1,0 +1,115 @@
+[
+  {
+    "id": "call.function",
+    "displayName": "Call Function",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "call_function"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "return",
+    "displayName": "Return",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "return_value"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "function.function_start",
+    "displayName": "Function Start",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_start"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "function.function_end",
+    "displayName": "Function End",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_end"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "function.function_input",
+    "displayName": "Function Input",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_input"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "function.function_output",
+    "displayName": "Function Output",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_output"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "function.start",
+    "displayName": "Function Start",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_start"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "function.end",
+    "displayName": "Function End",
+    "category": "FUNCTION",
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_end"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

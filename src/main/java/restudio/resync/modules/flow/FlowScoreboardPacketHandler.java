@@ -5,7 +5,7 @@ import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
-import restudio.resync.flow.nodes.ScoreboardNodes;
+import restudio.resync.flow.ScoreboardTemplateManager;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -58,7 +58,7 @@ public class FlowScoreboardPacketHandler {
                 return;
             }
             storage.saveScoreboard(scoreboard);
-            ScoreboardNodes.refreshActiveTemplates(storage, scoreboard.getId());
+            ScoreboardTemplateManager.refreshActiveTemplates(storage, scoreboard.getId());
             Log.fine("Scoreboard saved: " + scoreboard.getId());
             sender.sendScoreboardSaveAck(session, scoreboard.getId());
         } catch (Exception e) {
@@ -74,7 +74,7 @@ public class FlowScoreboardPacketHandler {
         buffer.get(idBytes);
         String scoreboardId = new String(idBytes, StandardCharsets.UTF_8);
         storage.deleteScoreboard(scoreboardId);
-        ScoreboardNodes.clearActiveTemplateReferences(scoreboardId, true);
+        ScoreboardTemplateManager.clearActiveTemplateReferences(scoreboardId, true);
         String defaultId = storage.getDefaultScoreboardId();
         if (defaultId != null && defaultId.equalsIgnoreCase(scoreboardId)) {
             storage.clearDefaultScoreboard();

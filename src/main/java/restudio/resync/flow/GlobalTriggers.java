@@ -387,8 +387,7 @@ public class GlobalTriggers implements Listener {
         if (graph == null) {
             return false;
         }
-        executor.clearEventVariables();
-        Map<String, Object> eventVars = executor.getEventVariables();
+        Map<String, Object> eventVars = new java.util.HashMap<>();
         setEventVariables(player, eventVars);
         eventVars.put("event.command_label", commandLabel);
         eventVars.put("event.args", args);
@@ -399,7 +398,7 @@ public class GlobalTriggers implements Listener {
         eventVars.put("event.command_allowed_subcommands", new ArrayList<>(trigger.subcommands));
         eventVars.put("event.is_console", isConsole);
         eventVars.put("event.bound_command", trigger.command);
-        executor.execute(graph, trigger.startNode, player, event);
+        executor.execute(graph, trigger.startNode, player, event, eventVars);
         return true;
     }
 

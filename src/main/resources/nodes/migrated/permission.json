@@ -1,0 +1,972 @@
+[
+  {
+    "id": "perm.set.group",
+    "displayName": "Set Primary Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_group"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.get.groups",
+    "displayName": "Get Groups",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_groups"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.get.prefix",
+    "displayName": "Get Prefix",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_prefix"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.get.suffix",
+    "displayName": "Get Suffix",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_suffix"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "permission.perm_has",
+    "displayName": "Perm Has",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_has"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_add",
+    "displayName": "Perm Add",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_remove",
+    "displayName": "Perm Remove",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_in_group",
+    "displayName": "Perm In Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_in_group"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_add_temp",
+    "displayName": "Perm Add Temp",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add_temp"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      },
+      {
+        "name": "duration",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_get_meta",
+    "displayName": "Perm Get Meta",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_meta"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_set_meta",
+    "displayName": "Perm Set Meta",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_meta"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_remove_meta",
+    "displayName": "Perm Remove Meta",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove_meta"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_get_all_perms",
+    "displayName": "Perm Get All Perms",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_all_perms"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "permissions",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "permission.perm_check_inheritance",
+    "displayName": "Perm Check Inheritance",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_check_inheritance"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      },
+      {
+        "name": "parent_group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "inherits",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "perm.check",
+    "displayName": "Perm Check",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_has"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.grant",
+    "displayName": "Perm Grant",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.revoke",
+    "displayName": "Perm Revoke",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "perm.add.group",
+    "displayName": "Add Group to Player",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add_group"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.remove.group",
+    "displayName": "Remove Group from Player",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove_group"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.has.group",
+    "displayName": "Player Has Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_has_group"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "perm.get.permissions",
+    "displayName": "Get Player Permissions",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_permissions"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "permissions",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "perm.get.primary.group",
+    "displayName": "Get Primary Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_primary_group"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.get.all.groups",
+    "displayName": "Get All Groups",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_all_groups"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "groups",
+        "dataType": "list"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "perm.group.add.permission",
+    "displayName": "Add Permission to Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_add_permission"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.group.has.permission",
+    "displayName": "Group Has Permission",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_has_permission"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "perm.group.remove.permission",
+    "displayName": "Remove Permission from Group",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_remove_permission"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      },
+      {
+        "name": "permission",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.get.group.permissions",
+    "displayName": "Get Group Permissions",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_group_permissions"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "group",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "permissions",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "perm.set.prefix",
+    "displayName": "Set Player Prefix",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_prefix"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "prefix",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "perm.set.suffix",
+    "displayName": "Set Player Suffix",
+    "category": "PERMISSION",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_suffix"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "suffix",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  }
+]

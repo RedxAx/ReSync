@@ -1,0 +1,2611 @@
+[
+  {
+    "id": "get.location",
+    "displayName": "Get Location",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "get_location"
+    },
+    "inputs": [
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "world.world_get_by_name",
+    "displayName": "World Get By Name",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_by_name"
+    },
+    "inputs": [
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ]
+  },
+  {
+    "id": "world.world_get_all",
+    "displayName": "World Get All",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_all"
+    },
+    "outputs": [
+      {
+        "name": "worlds_list",
+        "dataType": "list"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "world.world_set_day_time",
+    "displayName": "World Set Day Time",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_day_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "time",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_weather",
+    "displayName": "World Set Weather",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_weather"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "weather_type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "clear",
+          "rain",
+          "thunder"
+        ],
+        "defaultValue": "clear"
+      },
+      {
+        "name": "duration_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_spawn_set",
+    "displayName": "World Spawn Set",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_spawn_set"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_difficulty",
+    "displayName": "World Set Difficulty",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_difficulty"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_save",
+    "displayName": "World Save",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_save"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_auto_save_set",
+    "displayName": "World Auto Save Set",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_auto_save_set"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "interval_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_set_spawn_limits",
+    "displayName": "World Set Spawn Limits",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_spawn_limits"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "monsters",
+        "dataType": "number"
+      },
+      {
+        "name": "animals",
+        "dataType": "number"
+      },
+      {
+        "name": "water_ambient",
+        "dataType": "number"
+      },
+      {
+        "name": "water_animals",
+        "dataType": "number"
+      },
+      {
+        "name": "water_underground",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_management_get_snapshot",
+    "displayName": "World Management Get Snapshot",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_snapshot"
+    },
+    "outputs": [
+      {
+        "name": "snapshot",
+        "dataType": "map"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_worlds",
+    "displayName": "World Management Get Worlds",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_worlds"
+    },
+    "outputs": [
+      {
+        "name": "worlds",
+        "dataType": "list"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_world",
+    "displayName": "World Management Get World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_portals",
+    "displayName": "World Management Get Portals",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_portals"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "portals",
+        "dataType": "list"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_portal",
+    "displayName": "World Management Get Portal",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_portal"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "portal",
+        "dataType": "string"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_game_rules",
+    "displayName": "World Management Get Game Rules",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_game_rules"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "game_rules",
+        "dataType": "map"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_game_rule_descriptors",
+    "displayName": "World Management Get Game Rule Descriptors",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_game_rule_descriptors"
+    },
+    "outputs": [
+      {
+        "name": "descriptors",
+        "dataType": "list"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_get_map_snapshot",
+    "displayName": "World Management Get Map Snapshot",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_get_map_snapshot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "center_x",
+        "dataType": "number"
+      },
+      {
+        "name": "center_z",
+        "dataType": "number"
+      },
+      {
+        "name": "zoom",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "snapshot",
+        "dataType": "map"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_spawn",
+    "displayName": "World Set Spawn",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_spawn"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_keep_spawn",
+    "displayName": "World Set Keep Spawn",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_keep_spawn"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "keep_spawn_time",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_auto_save",
+    "displayName": "World Set Auto Save",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_auto_save"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "auto_save",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_spawn_lightning",
+    "displayName": "World Spawn Lightning",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_spawn_lightning"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "effect",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_set_border_size",
+    "displayName": "World Set Border Size",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_border_size"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "size",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_set_border_damage",
+    "displayName": "World Set Border Damage",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_border_damage"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "damage_amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_set_border_warning",
+    "displayName": "World Set Border Warning",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_border_warning"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "warning_distance",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "world.world_management_create_world",
+    "displayName": "World Management Create World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_create_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "seed",
+        "dataType": "string"
+      },
+      {
+        "name": "environment",
+        "dataType": "string"
+      },
+      {
+        "name": "generator",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_scan_worlds",
+    "displayName": "World Management Scan Worlds",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_scan_worlds"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_import_worlds",
+    "displayName": "World Management Import Worlds",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_import_worlds"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_clone_world",
+    "displayName": "World Management Clone World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_clone_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "source_world",
+        "dataType": "string"
+      },
+      {
+        "name": "target_world",
+        "dataType": "string"
+      },
+      {
+        "name": "load_after_clone",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_load_world",
+    "displayName": "World Management Load World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_load_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_unload_world",
+    "displayName": "World Management Unload World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_unload_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "fallback_world",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_delete_world",
+    "displayName": "World Management Delete World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_delete_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "delete_files",
+        "dataType": "boolean"
+      },
+      {
+        "name": "fallback_world",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_rule",
+    "displayName": "World Management Set Rule",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_rule"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "rule_name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_difficulty",
+    "displayName": "World Management Set Difficulty",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_difficulty"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_time_lock",
+    "displayName": "World Management Set Time Lock",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_time_lock"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "locked_time",
+        "dataType": "number"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_weather_lock",
+    "displayName": "World Management Set Weather Lock",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_weather_lock"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean"
+      },
+      {
+        "name": "storm",
+        "dataType": "boolean"
+      },
+      {
+        "name": "thundering",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_isolated_state",
+    "displayName": "World Management Set Isolated State",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_isolated_state"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_create_portal",
+    "displayName": "World Management Create Portal",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_create_portal"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_name",
+        "dataType": "string"
+      },
+      {
+        "name": "source_world",
+        "dataType": "string"
+      },
+      {
+        "name": "min_x",
+        "dataType": "number"
+      },
+      {
+        "name": "min_y",
+        "dataType": "number"
+      },
+      {
+        "name": "min_z",
+        "dataType": "number"
+      },
+      {
+        "name": "max_x",
+        "dataType": "number"
+      },
+      {
+        "name": "max_y",
+        "dataType": "number"
+      },
+      {
+        "name": "max_z",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_world",
+        "dataType": "string"
+      },
+      {
+        "name": "destination_x",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_y",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_z",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_yaw",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_pitch",
+        "dataType": "number"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_delete_portal",
+    "displayName": "World Management Delete Portal",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_delete_portal"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_portal_enabled",
+    "displayName": "World Management Set Portal Enabled",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_portal_enabled"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_portal_destination",
+    "displayName": "World Management Set Portal Destination",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_portal_destination"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      },
+      {
+        "name": "destination_world",
+        "dataType": "string"
+      },
+      {
+        "name": "destination_x",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_y",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_z",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_yaw",
+        "dataType": "number"
+      },
+      {
+        "name": "destination_pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_set_portal_bounds",
+    "displayName": "World Management Set Portal Bounds",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_set_portal_bounds"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      },
+      {
+        "name": "source_world",
+        "dataType": "string"
+      },
+      {
+        "name": "min_x",
+        "dataType": "number"
+      },
+      {
+        "name": "min_y",
+        "dataType": "number"
+      },
+      {
+        "name": "min_z",
+        "dataType": "number"
+      },
+      {
+        "name": "max_x",
+        "dataType": "number"
+      },
+      {
+        "name": "max_y",
+        "dataType": "number"
+      },
+      {
+        "name": "max_z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_teleport_player_to_world",
+    "displayName": "World Management Teleport Player To World",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_teleport_player_to_world"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      },
+      {
+        "name": "yaw",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_teleport_player_to_world_spawn",
+    "displayName": "World Management Teleport Player To World Spawn",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_teleport_player_to_world_spawn"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management_teleport_player_to_portal",
+    "displayName": "World Management Teleport Player To Portal",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management_teleport_player_to_portal"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_management",
+    "displayName": "World Management",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_management"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "action",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "get_snapshot",
+          "get_worlds",
+          "get_world",
+          "get_portals",
+          "get_portal",
+          "get_game_rules",
+          "get_game_rule_descriptors",
+          "get_map_snapshot",
+          "create_world",
+          "scan_worlds",
+          "import_worlds",
+          "clone_world",
+          "load_world",
+          "unload_world",
+          "delete_world",
+          "set_rule",
+          "set_difficulty",
+          "set_time_lock",
+          "set_weather_lock",
+          "set_isolated_state",
+          "create_portal",
+          "delete_portal",
+          "set_portal_enabled",
+          "set_portal_destination",
+          "set_portal_bounds",
+          "teleport_player_to_world",
+          "teleport_player_to_world_spawn",
+          "teleport_player_to_portal"
+        ],
+        "defaultValue": "get_worlds"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get_world,get_portals,get_game_rules,get_map_snapshot,create_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,teleport_player_to_world,teleport_player_to_world_spawn"
+        }
+      },
+      {
+        "name": "seed",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_world"
+        }
+      },
+      {
+        "name": "environment",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "NORMAL",
+          "NETHER",
+          "THE_END",
+          "CUSTOM"
+        ],
+        "visibleWhen": {
+          "action": "create_world"
+        }
+      },
+      {
+        "name": "generator",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_world"
+        }
+      },
+      {
+        "name": "source_world",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "clone_world,set_portal_bounds"
+        }
+      },
+      {
+        "name": "target_world",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "clone_world"
+        }
+      },
+      {
+        "name": "load_after_clone",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "clone_world"
+        }
+      },
+      {
+        "name": "fallback_world",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "unload_world,delete_world"
+        }
+      },
+      {
+        "name": "delete_files",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "delete_world"
+        }
+      },
+      {
+        "name": "rule_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set_rule"
+        }
+      },
+      {
+        "name": "value",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set_rule"
+        }
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty",
+        "visibleWhen": {
+          "action": "set_difficulty"
+        }
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set_time_lock,set_weather_lock,set_isolated_state,create_portal,set_portal_enabled"
+        }
+      },
+      {
+        "name": "locked_time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set_time_lock"
+        }
+      },
+      {
+        "name": "storm",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set_weather_lock"
+        }
+      },
+      {
+        "name": "thundering",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set_weather_lock"
+        }
+      },
+      {
+        "name": "portal_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_portal"
+        }
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_portal"
+        }
+      },
+      {
+        "name": "min_x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "min_y",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "min_z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "max_x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "max_y",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "max_z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_bounds"
+        }
+      },
+      {
+        "name": "destination_world",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination"
+        }
+      },
+      {
+        "name": "destination_x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination,teleport_player_to_world"
+        }
+      },
+      {
+        "name": "destination_y",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination"
+        }
+      },
+      {
+        "name": "destination_z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination,teleport_player_to_world"
+        }
+      },
+      {
+        "name": "destination_yaw",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination"
+        }
+      },
+      {
+        "name": "destination_pitch",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_destination"
+        }
+      },
+      {
+        "name": "target",
+        "dataType": "player",
+        "visibleWhen": {
+          "action": "teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
+        }
+      },
+      {
+        "name": "x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "teleport_player_to_world"
+        }
+      },
+      {
+        "name": "y",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "teleport_player_to_world"
+        }
+      },
+      {
+        "name": "z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "teleport_player_to_world"
+        }
+      },
+      {
+        "name": "yaw",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "teleport_player_to_world"
+        }
+      },
+      {
+        "name": "pitch",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "teleport_player_to_world"
+        }
+      },
+      {
+        "name": "center_x",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get_map_snapshot"
+        }
+      },
+      {
+        "name": "center_z",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get_map_snapshot"
+        }
+      },
+      {
+        "name": "zoom",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get_map_snapshot"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "create_world,scan_worlds,import_worlds,clone_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,create_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
+        }
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_world,scan_worlds,import_worlds,clone_world,load_world,unload_world,delete_world,set_rule,set_difficulty,set_time_lock,set_weather_lock,set_isolated_state,create_portal,delete_portal,set_portal_enabled,set_portal_destination,set_portal_bounds,teleport_player_to_world,teleport_player_to_world_spawn,teleport_player_to_portal"
+        }
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "scan_worlds,import_worlds"
+        }
+      },
+      {
+        "name": "portal_id",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "create_portal,set_portal_enabled,set_portal_destination,set_portal_bounds"
+        }
+      },
+      {
+        "name": "snapshot",
+        "dataType": "map",
+        "visibleWhen": {
+          "action": "get_snapshot,get_map_snapshot"
+        }
+      },
+      {
+        "name": "worlds",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get_worlds"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "get_world"
+        }
+      },
+      {
+        "name": "portals",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get_portals"
+        }
+      },
+      {
+        "name": "portal",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "get_portal"
+        }
+      },
+      {
+        "name": "game_rules",
+        "dataType": "map",
+        "visibleWhen": {
+          "action": "get_game_rules"
+        }
+      },
+      {
+        "name": "descriptors",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get_game_rule_descriptors"
+        }
+      }
+    ]
+  },
+  {
+    "id": "world.world_properties",
+    "displayName": "World Properties",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_properties"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "property",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "gamerule",
+          "time",
+          "full_time",
+          "weather",
+          "difficulty",
+          "spawn",
+          "biome",
+          "seed",
+          "name",
+          "environment",
+          "entities",
+          "players",
+          "has_storm",
+          "thundering",
+          "weather_type",
+          "pvp",
+          "auto_save",
+          "keep_spawn"
+        ],
+        "defaultValue": "time"
+      },
+      {
+        "name": "action",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "gamerule",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "announceAdvancements",
+          "commandBlockOutput",
+          "disableElytraMovementCheck",
+          "disableRaids",
+          "doDaylightCycle",
+          "doEntityDrops",
+          "doFireTick",
+          "doImmediateRespawn",
+          "doInsomnia",
+          "doLimitedCrafting",
+          "doMobLoot",
+          "doMobSpawning",
+          "doPatrolSpawning",
+          "doTileDrops",
+          "doTraderSpawning",
+          "doVinesSpread",
+          "doWeatherCycle",
+          "drowningDamage",
+          "fallDamage",
+          "fireDamage",
+          "forgiveDeadPlayers",
+          "freezeDamage",
+          "keepInventory",
+          "logAdminCommands",
+          "maxCommandChainLength",
+          "maxEntityCramming",
+          "mobGriefing",
+          "naturalRegeneration",
+          "playersSleepingPercentage",
+          "randomTickSpeed",
+          "reducedDebugInfo",
+          "sendCommandFeedback",
+          "showDeathMessages",
+          "spawnRadius",
+          "spectatorsGenerateChunks",
+          "universalAnger"
+        ],
+        "visibleWhen": {
+          "property": "gamerule"
+        }
+      },
+      {
+        "name": "gamerule_value",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set",
+          "property": "gamerule"
+        }
+      },
+      {
+        "name": "time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "time"
+        }
+      },
+      {
+        "name": "weather",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "clear",
+          "rain",
+          "thunder"
+        ],
+        "visibleWhen": {
+          "action": "set",
+          "property": "weather"
+        },
+        "defaultValue": "clear"
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty",
+        "visibleWhen": {
+          "action": "set",
+          "property": "difficulty"
+        }
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "visibleWhen": {
+          "property": "spawn,biome"
+        }
+      },
+      {
+        "name": "biome",
+        "dataType": "biome",
+        "visibleWhen": {
+          "action": "set",
+          "property": "biome"
+        }
+      },
+      {
+        "name": "full_time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "full_time"
+        }
+      },
+      {
+        "name": "pvp",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set",
+          "property": "pvp"
+        }
+      },
+      {
+        "name": "auto_save",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set",
+          "property": "auto_save"
+        }
+      },
+      {
+        "name": "keep_spawn",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set",
+          "property": "keep_spawn"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "gamerule",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gamerule"
+        }
+      },
+      {
+        "name": "time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "time"
+        }
+      },
+      {
+        "name": "weather",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "weather"
+        }
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty",
+        "visibleWhen": {
+          "action": "get",
+          "property": "difficulty"
+        }
+      },
+      {
+        "name": "spawn",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "spawn"
+        }
+      },
+      {
+        "name": "biome",
+        "dataType": "biome",
+        "visibleWhen": {
+          "action": "get",
+          "property": "biome"
+        }
+      },
+      {
+        "name": "seed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "seed"
+        }
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "name": "environment",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "environment"
+        }
+      },
+      {
+        "name": "entities",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "entities"
+        }
+      },
+      {
+        "name": "players",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "players"
+        }
+      },
+      {
+        "name": "full_time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "full_time"
+        }
+      },
+      {
+        "name": "has_storm",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "has_storm"
+        }
+      },
+      {
+        "name": "thundering",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "thundering"
+        }
+      },
+      {
+        "name": "weather_type",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "weather_type"
+        }
+      },
+      {
+        "name": "pvp",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "pvp"
+        }
+      },
+      {
+        "name": "auto_save",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "auto_save"
+        }
+      },
+      {
+        "name": "keep_spawn",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "keep_spawn"
+        }
+      }
+    ]
+  },
+  {
+    "id": "world.world_set_time",
+    "displayName": "World World Set Time",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "time_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_get_time",
+    "displayName": "World World Get Time",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "time_ticks",
+        "dataType": "number"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_full_time",
+    "displayName": "World World Set Full Time",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_full_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "full_time_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_get_full_time",
+    "displayName": "World World Get Full Time",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_full_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "full_time_ticks",
+        "dataType": "number"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_get_weather",
+    "displayName": "World World Get Weather",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_weather"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "weather_type",
+        "dataType": "string"
+      },
+      {
+        "name": "thundering",
+        "dataType": "boolean"
+      },
+      {
+        "name": "has_storm",
+        "dataType": "boolean"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_spawn_get",
+    "displayName": "World World Spawn Get",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_spawn_get"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "spawn_location",
+        "dataType": "location"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_get_difficulty",
+    "displayName": "World World Get Difficulty",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_difficulty"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "difficulty",
+        "dataType": "string"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_set_pvp",
+    "displayName": "World World Set Pvp",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_set_pvp"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      },
+      {
+        "name": "pvp_enabled",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "world.world_get_pvp",
+    "displayName": "World World Get Pvp",
+    "category": "WORLD",
+    "handler": "WorldActionHandler",
+    "handlerConfig": {
+      "operation": "world_get_pvp"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pvp_enabled",
+        "dataType": "boolean"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "hidden": true
+  }
+]

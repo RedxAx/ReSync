@@ -1,0 +1,1305 @@
+[
+  {
+    "id": "math.random_range",
+    "displayName": "Random Range",
+    "category": "UTILITY",
+    "inputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_range"
+    }
+  },
+  {
+    "id": "math.random_chance",
+    "displayName": "Random Chance",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "chance_percent",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_chance"
+    }
+  },
+  {
+    "id": "math.random_choice",
+    "displayName": "Random Choice",
+    "category": "UTILITY",
+    "inputs": [
+      {
+        "name": "items_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "chosen_item",
+        "dataType": "itemstack"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_choice"
+    }
+  },
+  {
+    "id": "math.random_choice_weighted",
+    "displayName": "Random Choice Weighted",
+    "category": "UTILITY",
+    "inputs": [
+      {
+        "name": "items_list",
+        "dataType": "list"
+      },
+      {
+        "name": "weights_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "chosen_item",
+        "dataType": "itemstack"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random_choice_weighted"
+    }
+  },
+  {
+    "id": "math.vector_create",
+    "displayName": "Vector Create",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_create"
+    }
+  },
+  {
+    "id": "math.vector_add",
+    "displayName": "Vector Add",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_add"
+    }
+  },
+  {
+    "id": "math.vector_subtract",
+    "displayName": "Vector Subtract",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_subtract"
+    }
+  },
+  {
+    "id": "math.vector_multiply",
+    "displayName": "Vector Multiply",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      },
+      {
+        "name": "scalar",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_multiply"
+    }
+  },
+  {
+    "id": "math.vector_divide",
+    "displayName": "Vector Divide",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      },
+      {
+        "name": "scalar",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_divide"
+    }
+  },
+  {
+    "id": "math.vector_dot",
+    "displayName": "Vector Dot",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_dot"
+    }
+  },
+  {
+    "id": "math.vector_cross",
+    "displayName": "Vector Cross",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_cross"
+    }
+  },
+  {
+    "id": "math.vector_distance",
+    "displayName": "Vector Distance",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "distance",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_distance"
+    }
+  },
+  {
+    "id": "math.vector_length",
+    "displayName": "Vector Length",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "length",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_length"
+    }
+  },
+  {
+    "id": "math.vector_normalize",
+    "displayName": "Vector Normalize",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "normalized_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_normalize"
+    }
+  },
+  {
+    "id": "math.vector_angle_between",
+    "displayName": "Vector Angle Between",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "angle",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_angle_between"
+    }
+  },
+  {
+    "id": "math.vector_midpoint",
+    "displayName": "Vector Midpoint",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "location"
+      },
+      {
+        "name": "vector2",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "midpoint_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_midpoint"
+    }
+  },
+  {
+    "id": "math.vector_rotate_x",
+    "displayName": "Vector Rotate X",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      },
+      {
+        "name": "degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "rotated_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_rotate_x"
+    }
+  },
+  {
+    "id": "math.vector_rotate_y",
+    "displayName": "Vector Rotate Y",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      },
+      {
+        "name": "degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "rotated_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_rotate_y"
+    }
+  },
+  {
+    "id": "math.vector_rotate_z",
+    "displayName": "Vector Rotate Z",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "location"
+      },
+      {
+        "name": "degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "rotated_vector",
+        "dataType": "location"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_rotate_z"
+    }
+  },
+  {
+    "id": "math.lerp",
+    "displayName": "Lerp",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      },
+      {
+        "name": "t",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "lerp"
+    }
+  },
+  {
+    "id": "math.clamp",
+    "displayName": "Clamp",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      },
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "clamped",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "clamp"
+    }
+  },
+  {
+    "id": "math.abs",
+    "displayName": "Absolute",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "absolute",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "abs"
+    }
+  },
+  {
+    "id": "math.min",
+    "displayName": "Math Min",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "values_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "min"
+    }
+  },
+  {
+    "id": "math.max",
+    "displayName": "Math Max",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "values_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "max"
+    }
+  },
+  {
+    "id": "math.round",
+    "displayName": "Round",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      },
+      {
+        "name": "decimal_places",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "rounded",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "round"
+    }
+  },
+  {
+    "id": "math.floor",
+    "displayName": "Floor",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "floored",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "floor"
+    }
+  },
+  {
+    "id": "math.ceil",
+    "displayName": "Ceil",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ceiling",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "ceil"
+    }
+  },
+  {
+    "id": "math.hypotenuse",
+    "displayName": "Hypotenuse",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hypotenuse",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "hypotenuse"
+    }
+  },
+  {
+    "id": "math.log",
+    "displayName": "Log",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "log",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "log"
+    }
+  },
+  {
+    "id": "math.log10",
+    "displayName": "Log10",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "log10",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "log10"
+    }
+  },
+  {
+    "id": "math.sqrt",
+    "displayName": "Sqrt",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sqrt",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "sqrt"
+    }
+  },
+  {
+    "id": "math.cbrt",
+    "displayName": "Cube Root",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "cbrt",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "cbrt"
+    }
+  },
+  {
+    "id": "math.pow",
+    "displayName": "Math Power",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "base",
+        "dataType": "number"
+      },
+      {
+        "name": "exponent",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "pow"
+    }
+  },
+  {
+    "id": "math.signum",
+    "displayName": "Signum",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sign",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "signum"
+    }
+  },
+  {
+    "id": "math.to_radians",
+    "displayName": "To Radians",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "radians",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "to_radians"
+    }
+  },
+  {
+    "id": "math.to_degrees",
+    "displayName": "To Degrees",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "radians",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "degrees",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "to_degrees"
+    }
+  },
+  {
+    "id": "math.sin",
+    "displayName": "Sin",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sin",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "sin"
+    }
+  },
+  {
+    "id": "math.cos",
+    "displayName": "Cos",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "cos",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "cos"
+    }
+  },
+  {
+    "id": "math.tan",
+    "displayName": "Tan",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tan",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "tan"
+    }
+  },
+  {
+    "id": "math.asin",
+    "displayName": "Arc Sin",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "asin"
+    }
+  },
+  {
+    "id": "math.acos",
+    "displayName": "Arc Cos",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "acos"
+    }
+  },
+  {
+    "id": "math.atan",
+    "displayName": "Arc Tan",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "atan"
+    }
+  },
+  {
+    "id": "math.atan2",
+    "displayName": "Arc Tan2",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "x",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "angle_degrees",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "atan2"
+    }
+  },
+  {
+    "id": "math.add",
+    "displayName": "Math Add",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "add"
+    }
+  },
+  {
+    "id": "math.subtract",
+    "displayName": "Subtract",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "subtract"
+    }
+  },
+  {
+    "id": "math.multiply",
+    "displayName": "Multiply",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "multiply"
+    }
+  },
+  {
+    "id": "math.divide",
+    "displayName": "Divide",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "divide"
+    }
+  },
+  {
+    "id": "math.modulo",
+    "displayName": "Modulo",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "number"
+      },
+      {
+        "name": "b",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "modulo"
+    }
+  },
+  {
+    "id": "math.power",
+    "displayName": "Math Power Alias",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "base",
+        "dataType": "number"
+      },
+      {
+        "name": "exponent",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "power"
+    }
+  },
+  {
+    "id": "math.random",
+    "displayName": "Math Random",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      },
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "random"
+    }
+  },
+  {
+    "id": "math.distance",
+    "displayName": "Distance",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "x1",
+        "dataType": "number"
+      },
+      {
+        "name": "y1",
+        "dataType": "number"
+      },
+      {
+        "name": "z1",
+        "dataType": "number"
+      },
+      {
+        "name": "x2",
+        "dataType": "number"
+      },
+      {
+        "name": "y2",
+        "dataType": "number"
+      },
+      {
+        "name": "z2",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "distance"
+    }
+  },
+  {
+    "id": "math.negate",
+    "displayName": "Negate",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "negate"
+    }
+  },
+  {
+    "id": "math.min_list",
+    "displayName": "Min List",
+    "category": "DATA",
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "min_list"
+    },
+    "inputs": [
+      {
+        "name": "values_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "math.max_list",
+    "displayName": "Max List",
+    "category": "DATA",
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "max_list"
+    },
+    "inputs": [
+      {
+        "name": "values_list",
+        "dataType": "list"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "math.round_decimal",
+    "displayName": "Round Decimal",
+    "category": "DATA",
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "round_decimal"
+    },
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "number"
+      },
+      {
+        "name": "decimal_places",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "rounded",
+        "dataType": "number"
+      }
+    ]
+  }
+]

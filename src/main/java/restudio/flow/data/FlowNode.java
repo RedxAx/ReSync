@@ -1,5 +1,7 @@
 package restudio.flow.data;
 
+import restudio.resync.flow.handler.HandlerConfig;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -8,6 +10,7 @@ public class FlowNode {
     private double x;
     private double y;
     private Map<String, Object> inputValues;
+    private Map<String, Object> handlerConfig = new HashMap<>();
 
     public FlowNode() {
         this.inputValues = new HashMap<>();
@@ -50,5 +53,13 @@ public class FlowNode {
 
     public void setInputValues(Map<String, Object> inputValues) {
         this.inputValues = inputValues;
+    }
+
+    public HandlerConfig getHandlerConfig() {
+        return new HandlerConfig(handlerConfig);
+    }
+
+    public void setHandlerConfig(Map<String, Object> handlerConfig) {
+        this.handlerConfig = handlerConfig != null ? new HashMap<>(handlerConfig) : new HashMap<>();
     }
 }

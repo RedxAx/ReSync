@@ -1,0 +1,96 @@
+[
+  {
+    "id": "uuid.from.string",
+    "displayName": "UUID From String",
+    "category": "DATA",
+    "handler": "UuidHandler",
+    "handlerConfig": {
+      "operation": "uuid_from_string"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "uuid.to.string",
+    "displayName": "UUID To String",
+    "category": "DATA",
+    "handler": "UuidHandler",
+    "handlerConfig": {
+      "operation": "uuid_to_string"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "utility.uuid_generate",
+    "displayName": "Uuid Generate",
+    "category": "UTILITY",
+    "handler": "UuidHandler",
+    "handlerConfig": {
+      "operation": "uuid_generate"
+    },
+    "outputs": [
+      {
+        "name": "uuid_string",
+        "dataType": "string"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "utility.uuid_version",
+    "displayName": "Uuid Version",
+    "category": "UTILITY",
+    "handler": "UuidHandler",
+    "handlerConfig": {
+      "operation": "uuid_version"
+    },
+    "inputs": [
+      {
+        "name": "uuid_object",
+        "dataType": "uuid"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "version",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "utility.uuid_timestamp",
+    "displayName": "Uuid Timestamp",
+    "category": "UTILITY",
+    "handler": "UuidHandler",
+    "handlerConfig": {
+      "operation": "uuid_timestamp"
+    },
+    "inputs": [
+      {
+        "name": "uuid_object",
+        "dataType": "uuid"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "timestamp",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "uuid.random",
+    "displayName": "Uuid Random",
+    "category": "UTILITY",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "random"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

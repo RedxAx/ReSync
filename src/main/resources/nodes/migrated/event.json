@@ -1,0 +1,3353 @@
+[
+  {
+    "id": "event.bed.enter",
+    "displayName": "Event Bed Enter",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.bed_location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerBedEnterEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.bed.location",
+        "target": "event.bed_location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.bed.leave",
+    "displayName": "Event Bed Leave",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.bed_location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerBedLeaveEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.bed.location",
+        "target": "event.bed_location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.resync.command",
+    "displayName": "Event Resync Command",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.bound_command",
+        "dataType": "string"
+      },
+      {
+        "name": "event.command_label",
+        "dataType": "string"
+      },
+      {
+        "name": "event.args",
+        "dataType": "string"
+      },
+      {
+        "name": "event.args_list",
+        "dataType": "list"
+      },
+      {
+        "name": "event.args_count",
+        "dataType": "number"
+      },
+      {
+        "name": "event.is_console",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerCommandPreprocessEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.bound_command",
+        "target": "event.bound_command"
+      },
+      {
+        "source": "event.command_label",
+        "target": "event.command_label"
+      },
+      {
+        "source": "event.args",
+        "target": "event.args"
+      },
+      {
+        "source": "event.args_list",
+        "target": "event.args_list"
+      },
+      {
+        "source": "event.args_count",
+        "target": "event.args_count"
+      },
+      {
+        "source": "event.is_console",
+        "target": "event.is_console"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.furnace.smelt",
+    "displayName": "Event Furnace Smelt",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.furnace",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.result",
+        "dataType": "item"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.FurnaceSmeltEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.furnace"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.result",
+        "target": "event.result"
+      },
+      {
+        "source": "event.player",
+        "target": "event.player"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.sign.change",
+    "displayName": "Event Sign Change",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.lines",
+        "dataType": "list"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.SignChangeEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.lines",
+        "target": "event.lines"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.craft",
+    "displayName": "Event Craft",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.result",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.CraftItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.result",
+        "target": "event.result"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.gamemode.change",
+    "displayName": "Event Gamemode Change",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.old_gamemode",
+        "dataType": "string"
+      },
+      {
+        "name": "event.new_gamemode",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerGameModeChangeEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.previousGameMode",
+        "target": "event.old_gamemode"
+      },
+      {
+        "source": "event.newGameMode",
+        "target": "event.new_gamemode"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.tab.complete",
+    "displayName": "Event Tab Complete",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.command",
+        "dataType": "string"
+      },
+      {
+        "name": "event.completions",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.TabCompleteEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.command",
+        "target": "event.command"
+      },
+      {
+        "source": "event.completions",
+        "target": "event.completions"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.smelt",
+    "displayName": "Event Smelt",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.result",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.FurnaceSmeltEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.result",
+        "target": "event.result"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.weather.change",
+    "displayName": "Event Weather Change",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "event.old_weather",
+        "dataType": "string"
+      },
+      {
+        "name": "event.new_weather",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.weather.WeatherChangeEvent",
+    "outputMappings": [
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      },
+      {
+        "source": "event.world.hasStorm",
+        "target": "event.old_weather"
+      },
+      {
+        "source": "event.toWeatherState",
+        "target": "event.new_weather"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.shoot",
+    "displayName": "Event Shoot",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.projectile",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityShootBowEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.player"
+      },
+      {
+        "source": "event.projectile",
+        "target": "event.projectile"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.break",
+    "displayName": "Event Block Break",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.is_cancelled",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockBreakEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.cancelled",
+        "target": "event.is_cancelled"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.place",
+    "displayName": "Event Block Place",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.placed_against",
+        "dataType": "item"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.against_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.is_cancelled",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockPlaceEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.blockAgainst",
+        "target": "event.placed_against"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.blockAgainst.location",
+        "target": "event.against_location"
+      },
+      {
+        "source": "event.cancelled",
+        "target": "event.is_cancelled"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.redstone",
+    "displayName": "Event Block Redstone",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.old_power",
+        "dataType": "number"
+      },
+      {
+        "name": "event.new_power",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockRedstoneEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.oldCurrent",
+        "target": "event.old_power"
+      },
+      {
+        "source": "event.newCurrent",
+        "target": "event.new_power"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.from.to",
+    "displayName": "Event Block From To",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.from_block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.to_block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.from_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.to_location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockFromToEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.from_block"
+      },
+      {
+        "source": "event.toBlock",
+        "target": "event.to_block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.from_location"
+      },
+      {
+        "source": "event.toBlock.location",
+        "target": "event.to_location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.dispense",
+    "displayName": "Event Block Dispense",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockDispenseEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.fade",
+    "displayName": "Event Block Fade",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.new_state",
+        "dataType": "item"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockFadeEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.newState",
+        "target": "event.new_state"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.form",
+    "displayName": "Event Block Form",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.new_state",
+        "dataType": "item"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockFormEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.newState",
+        "target": "event.new_state"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.block.spread",
+    "displayName": "Event Block Spread",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.new_block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockSpreadEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.newState.block",
+        "target": "event.new_block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.join",
+    "displayName": "Event Join",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.join_message",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerJoinEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.joinMessage",
+        "target": "event.join_message"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.exp.change",
+    "displayName": "Event Exp Change",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.amount",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerExpChangeEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.amount",
+        "target": "event.amount"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.sneak",
+    "displayName": "Event Sneak",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.is_sneaking",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerToggleSneakEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.isSneaking",
+        "target": "event.is_sneaking"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.vanish.toggle",
+    "displayName": "Event Vanish Toggle",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.is_vanished",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerHideEntityEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.is_vanished",
+        "target": "event.is_vanished"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.lightning.strike",
+    "displayName": "Event Lightning Strike",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.struck_entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.weather.LightningStrikeEvent",
+    "outputMappings": [
+      {
+        "source": "event.lightning.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.hitEntity",
+        "target": "event.struck_entity"
+      },
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.item.merge",
+    "displayName": "Event Item Merge",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.item1",
+        "dataType": "item"
+      },
+      {
+        "name": "event.item2",
+        "dataType": "item"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.result",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.ItemMergeEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.item1"
+      },
+      {
+        "source": "event.target",
+        "target": "event.item2"
+      },
+      {
+        "source": "event.entity.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.target",
+        "target": "event.result"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.item.damage",
+    "displayName": "Event Item Damage",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      },
+      {
+        "name": "event.damage",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerItemDamageEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      },
+      {
+        "source": "event.damage",
+        "target": "event.damage"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.item.break",
+    "displayName": "Event Item Break",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.broken_item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerItemBreakEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.brokenItem",
+        "target": "event.broken_item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.grow",
+    "displayName": "Event Grow",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.new_state",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockGrowEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.newState",
+        "target": "event.new_state"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.level.up",
+    "displayName": "Event Level Up",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.old_level",
+        "dataType": "number"
+      },
+      {
+        "name": "event.new_level",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerLevelChangeEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.oldLevel",
+        "target": "event.old_level"
+      },
+      {
+        "source": "event.newLevel",
+        "target": "event.new_level"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.click",
+    "displayName": "Event Click",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.slot",
+        "dataType": "number"
+      },
+      {
+        "name": "event.raw_slot",
+        "dataType": "number"
+      },
+      {
+        "name": "event.button",
+        "dataType": "number"
+      },
+      {
+        "name": "event.action",
+        "dataType": "string"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      },
+      {
+        "name": "event.cursor_item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.InventoryClickEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.slot",
+        "target": "event.slot"
+      },
+      {
+        "source": "event.raw_slot",
+        "target": "event.raw_slot"
+      },
+      {
+        "source": "event.button",
+        "target": "event.button"
+      },
+      {
+        "source": "event.action",
+        "target": "event.action"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      },
+      {
+        "source": "event.cursor_item",
+        "target": "event.cursor_item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.respawn",
+    "displayName": "Event Respawn",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.respawn_location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerRespawnEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.respawnLocation",
+        "target": "event.respawn_location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.drop",
+    "displayName": "Event Drop",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerDropItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.itemDrop",
+        "target": "event.item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.note.play",
+    "displayName": "Event Note Play",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.instrument",
+        "dataType": "string"
+      },
+      {
+        "name": "event.note",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.NotePlayEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.instrument",
+        "target": "event.instrument"
+      },
+      {
+        "source": "event.note",
+        "target": "event.note"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.server.start",
+    "displayName": "Event Server Start",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.server_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.ServerLoadEvent",
+    "outputMappings": [
+      {
+        "source": "event.server_name",
+        "target": "event.server_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.server.stop",
+    "displayName": "Event Server Stop",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.server_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.PluginDisableEvent",
+    "outputMappings": [
+      {
+        "source": "event.server_name",
+        "target": "event.server_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.server.tick",
+    "displayName": "Event Server Tick",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.tick_number",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.ServerLoadEvent",
+    "outputMappings": [
+      {
+        "source": "event.tick_number",
+        "target": "event.tick_number"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.server.save",
+    "displayName": "Event Server Save",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.WorldSaveEvent",
+    "outputMappings": [
+      {
+        "source": "event.world_name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.flight.toggle",
+    "displayName": "Event Flight Toggle",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.is_flying",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerToggleFlightEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.isFlying",
+        "target": "event.is_flying"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.death",
+    "displayName": "Event Death",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.death_message",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.PlayerDeathEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.player"
+      },
+      {
+        "source": "event.deathMessage",
+        "target": "event.death_message"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.teleport",
+    "displayName": "Event Teleport",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.from_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.to_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.cause",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerTeleportEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.from",
+        "target": "event.from_location"
+      },
+      {
+        "source": "event.to",
+        "target": "event.to_location"
+      },
+      {
+        "source": "event.cause",
+        "target": "event.cause"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.interact",
+    "displayName": "Event Interact",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.clicked_block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.clicked_entity",
+        "dataType": "string"
+      },
+      {
+        "name": "event.action_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerInteractEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.clickedBlock",
+        "target": "event.clicked_block"
+      },
+      {
+        "source": "event.clickedBlock",
+        "target": "event.clicked_entity"
+      },
+      {
+        "source": "event.action",
+        "target": "event.action_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chunk.load",
+    "displayName": "Event Chunk Load",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.chunk",
+        "dataType": "string"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "event.chunk_x",
+        "dataType": "number"
+      },
+      {
+        "name": "event.chunk_z",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.ChunkLoadEvent",
+    "outputMappings": [
+      {
+        "source": "event.chunk",
+        "target": "event.chunk"
+      },
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      },
+      {
+        "source": "event.chunk.x",
+        "target": "event.chunk_x"
+      },
+      {
+        "source": "event.chunk.z",
+        "target": "event.chunk_z"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chunk.unload",
+    "displayName": "Event Chunk Unload",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.chunk",
+        "dataType": "string"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "event.chunk_x",
+        "dataType": "number"
+      },
+      {
+        "name": "event.chunk_z",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.ChunkUnloadEvent",
+    "outputMappings": [
+      {
+        "source": "event.chunk",
+        "target": "event.chunk"
+      },
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      },
+      {
+        "source": "event.chunk.x",
+        "target": "event.chunk_x"
+      },
+      {
+        "source": "event.chunk.z",
+        "target": "event.chunk_z"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.consume",
+    "displayName": "Event Consume",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerItemConsumeEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.inventory.open",
+    "displayName": "Event Inventory Open",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.inventory_title",
+        "dataType": "string"
+      },
+      {
+        "name": "event.inventory_type",
+        "dataType": "string"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.InventoryOpenEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.view.title",
+        "target": "event.inventory_title"
+      },
+      {
+        "source": "event.view.type",
+        "target": "event.inventory_type"
+      },
+      {
+        "source": "event.inventory.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.inventory.close",
+    "displayName": "Event Inventory Close",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.inventory_title",
+        "dataType": "string"
+      },
+      {
+        "name": "event.inventory_type",
+        "dataType": "string"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.inventory.InventoryCloseEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.view.title",
+        "target": "event.inventory_title"
+      },
+      {
+        "source": "event.view.type",
+        "target": "event.inventory_type"
+      },
+      {
+        "source": "event.inventory.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.world.load",
+    "displayName": "Event World Load",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.WorldLoadEvent",
+    "outputMappings": [
+      {
+        "source": "event.world_name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.world.unload",
+    "displayName": "Event World Unload",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.WorldUnloadEvent",
+    "outputMappings": [
+      {
+        "source": "event.world_name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.world.save",
+    "displayName": "Event World Save",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.WorldSaveEvent",
+    "outputMappings": [
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.physics",
+    "displayName": "Event Physics",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockPhysicsEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.move",
+    "displayName": "Event Move",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.from_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.to_location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.distance",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerMoveEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.from",
+        "target": "event.from_location"
+      },
+      {
+        "source": "event.to",
+        "target": "event.to_location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.shear",
+    "displayName": "Event Shear",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerShearEntityEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.piston.extend",
+    "displayName": "Event Piston Extend",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.length",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockPistonExtendEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.length",
+        "target": "event.length"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.piston.retract",
+    "displayName": "Event Piston Retract",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.BlockPistonRetractEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.pickup",
+    "displayName": "Event Pickup",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityPickupItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.player"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.leaf.decay",
+    "displayName": "Event Leaf Decay",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.block.LeavesDecayEvent",
+    "outputMappings": [
+      {
+        "source": "event.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.block.location",
+        "target": "event.location"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.structure.spawn",
+    "displayName": "Event Structure Spawn",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.block",
+        "dataType": "block"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.structure_type",
+        "dataType": "string"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "event.new_state",
+        "dataType": "item"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.StructureGrowEvent",
+    "outputMappings": [
+      {
+        "source": "event.location.block",
+        "target": "event.block"
+      },
+      {
+        "source": "event.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.species",
+        "target": "event.structure_type"
+      },
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      },
+      {
+        "source": "event.blocks",
+        "target": "event.new_state"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.command",
+    "displayName": "Event Command",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.command",
+        "dataType": "string"
+      },
+      {
+        "name": "event.is_cancelled",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerCommandPreprocessEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.message",
+        "target": "event.command"
+      },
+      {
+        "source": "event.cancelled",
+        "target": "event.is_cancelled"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.explosion",
+    "displayName": "Event Explosion",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.power",
+        "dataType": "number"
+      },
+      {
+        "name": "event.break_blocks",
+        "dataType": "boolean"
+      },
+      {
+        "name": "event.fire",
+        "dataType": "boolean"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityExplodeEvent",
+    "outputMappings": [
+      {
+        "source": "event.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.yield",
+        "target": "event.power"
+      },
+      {
+        "source": "event.blockList",
+        "target": "event.break_blocks"
+      },
+      {
+        "source": "event.fire",
+        "target": "event.fire"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.location.world.name",
+        "target": "event.world_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.plugin.enable",
+    "displayName": "Event Plugin Enable",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.plugin_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.PluginEnableEvent",
+    "outputMappings": [
+      {
+        "source": "event.plugin_name",
+        "target": "event.plugin_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.plugin.disable",
+    "displayName": "Event Plugin Disable",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.plugin_name",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.server.PluginDisableEvent",
+    "outputMappings": [
+      {
+        "source": "event.plugin_name",
+        "target": "event.plugin_name"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat",
+    "displayName": "Event Chat",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.message",
+        "dataType": "string"
+      },
+      {
+        "name": "event.format",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.AsyncPlayerChatEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.message",
+        "target": "event.message"
+      },
+      {
+        "source": "event.format",
+        "target": "event.format"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.fish",
+    "displayName": "Event Fish",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.state",
+        "dataType": "string"
+      },
+      {
+        "name": "event.caught",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerFishEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.state",
+        "target": "event.state"
+      },
+      {
+        "source": "event.caught",
+        "target": "event.caught"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.enchant",
+    "displayName": "Event Enchant",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      },
+      {
+        "name": "event.enchantment",
+        "dataType": "string"
+      },
+      {
+        "name": "event.level",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.enchantment.EnchantItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      },
+      {
+        "source": "event.enchantment",
+        "target": "event.enchantment"
+      },
+      {
+        "source": "event.level",
+        "target": "event.level"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.quit",
+    "displayName": "Event Quit",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.quit_message",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerQuitEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.quitMessage",
+        "target": "event.quit_message"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.time.change",
+    "displayName": "Event Time Change",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.world_name",
+        "dataType": "string"
+      },
+      {
+        "name": "event.old_time",
+        "dataType": "number"
+      },
+      {
+        "name": "event.new_time",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.world.TimeSkipEvent",
+    "outputMappings": [
+      {
+        "source": "event.world.name",
+        "target": "event.world_name"
+      },
+      {
+        "source": "event.world.time",
+        "target": "event.old_time"
+      },
+      {
+        "source": "event.skipAmount",
+        "target": "event.new_time"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.projectile.hit",
+    "displayName": "Event Projectile Hit",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.projectile",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.hit_entity",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.ProjectileHitEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity.shooter",
+        "target": "event.player"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.projectile"
+      },
+      {
+        "source": "event.hitEntity",
+        "target": "event.hit_entity"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.spawn",
+    "displayName": "Event Entity Spawn",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.entity_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntitySpawnEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.entity.type",
+        "target": "event.entity_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.target",
+    "displayName": "Event Entity Target",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.target",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityTargetEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.target",
+        "target": "event.target"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.breed",
+    "displayName": "Event Entity Breed",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity1",
+        "dataType": "string"
+      },
+      {
+        "name": "event.entity2",
+        "dataType": "string"
+      },
+      {
+        "name": "event.experience",
+        "dataType": "number"
+      },
+      {
+        "name": "event.bred_entity",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityBreedEvent",
+    "outputMappings": [
+      {
+        "source": "event.mother",
+        "target": "event.entity1"
+      },
+      {
+        "source": "event.father",
+        "target": "event.entity2"
+      },
+      {
+        "source": "event.experience",
+        "target": "event.experience"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.bred_entity"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.tame",
+    "displayName": "Event Entity Tame",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.tamer",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.entity_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityTameEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.owner",
+        "target": "event.tamer"
+      },
+      {
+        "source": "event.entity.type",
+        "target": "event.entity_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.transform",
+    "displayName": "Event Entity Transform",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.old_entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.new_entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.new_entity_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityTransformEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.old_entity"
+      },
+      {
+        "source": "event.transformedEntity",
+        "target": "event.new_entity"
+      },
+      {
+        "source": "event.transformedEntity.type",
+        "target": "event.new_entity_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.death",
+    "displayName": "Event Entity Death",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.killer",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityDeathEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.killer",
+        "target": "event.killer"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.combust",
+    "displayName": "Event Entity Combust",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.duration",
+        "dataType": "number"
+      },
+      {
+        "name": "event.cancelled",
+        "dataType": "boolean"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityCombustEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.duration",
+        "target": "event.duration"
+      },
+      {
+        "source": "event.cancelled",
+        "target": "event.cancelled"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.damaged",
+    "displayName": "Event Entity Damaged",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.damager",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.damage",
+        "dataType": "number"
+      },
+      {
+        "name": "event.cause",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityDamageEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.damager"
+      },
+      {
+        "source": "event.damage",
+        "target": "event.damage"
+      },
+      {
+        "source": "event.cause",
+        "target": "event.cause"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.heal",
+    "displayName": "Event Entity Heal",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.amount",
+        "dataType": "number"
+      },
+      {
+        "name": "event.new_health",
+        "dataType": "number"
+      },
+      {
+        "name": "event.reason",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityRegainHealthEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.amount",
+        "target": "event.amount"
+      },
+      {
+        "source": "event.entity.health",
+        "target": "event.new_health"
+      },
+      {
+        "source": "event.regainReason",
+        "target": "event.reason"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.regain.health",
+    "displayName": "Event Entity Regain Health",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.amount",
+        "dataType": "number"
+      },
+      {
+        "name": "event.new_health",
+        "dataType": "number"
+      },
+      {
+        "name": "event.reason",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityRegainHealthEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.amount",
+        "target": "event.amount"
+      },
+      {
+        "source": "event.entity.health",
+        "target": "event.new_health"
+      },
+      {
+        "source": "event.regainReason",
+        "target": "event.reason"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.pickup",
+    "displayName": "Event Entity Pickup",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.item",
+        "dataType": "item"
+      },
+      {
+        "name": "event.remaining",
+        "dataType": "number"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityPickupItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.item",
+        "target": "event.item"
+      },
+      {
+        "source": "event.remaining",
+        "target": "event.remaining"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.drop",
+    "displayName": "Event Entity Drop",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.dropped",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityDropItemEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.itemDrop",
+        "target": "event.dropped"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.enter.portal",
+    "displayName": "Event Entity Enter Portal",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.portal_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityPortalEnterEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.portal_type",
+        "target": "event.portal_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.exit.portal",
+    "displayName": "Event Entity Exit Portal",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.location",
+        "dataType": "location"
+      },
+      {
+        "name": "event.portal_type",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityPortalExitEvent",
+    "outputMappings": [
+      {
+        "source": "event.entity",
+        "target": "event.entity"
+      },
+      {
+        "source": "event.location",
+        "target": "event.location"
+      },
+      {
+        "source": "event.portal_type",
+        "target": "event.portal_type"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.interact",
+    "displayName": "Event Entity Interact",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.entity",
+        "dataType": "entity"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.player.PlayerInteractEntityEvent",
+    "outputMappings": [
+      {
+        "source": "event.player",
+        "target": "event.player"
+      },
+      {
+        "source": "event.rightClicked",
+        "target": "event.entity"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.entity.damage",
+    "displayName": "Event Entity Damage",
+    "category": "EVENT",
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "event.player",
+        "dataType": "player"
+      },
+      {
+        "name": "event.damager",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.victim",
+        "dataType": "entity"
+      },
+      {
+        "name": "event.damage",
+        "dataType": "number"
+      },
+      {
+        "name": "event.cause",
+        "dataType": "string"
+      }
+    ],
+    "trigger": true,
+    "eventType": "org.bukkit.event.entity.EntityDamageByEntityEvent",
+    "outputMappings": [
+      {
+        "source": "event.damager",
+        "target": "event.player"
+      },
+      {
+        "source": "event.damager",
+        "target": "event.damager"
+      },
+      {
+        "source": "event.entity",
+        "target": "event.victim"
+      },
+      {
+        "source": "event.damage",
+        "target": "event.damage"
+      },
+      {
+        "source": "event.cause",
+        "target": "event.cause"
+      }
+    ],
+    "inputs": []
+  }
+]

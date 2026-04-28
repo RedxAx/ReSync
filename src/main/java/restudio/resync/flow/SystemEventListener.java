@@ -57,7 +57,7 @@ public class SystemEventListener implements Listener {
             return;
         }
         
-        String key = eventType.toLowerCase();
+        String key = normalizeEventKey(eventType);
         switch (key) {
             case "event:server_start":
             case "server_start":
@@ -129,17 +129,25 @@ public class SystemEventListener implements Listener {
     }
     
     private boolean isSystemEvent(String eventType) {
-        String key = eventType.toLowerCase();
-        return key.equals("event:server_start") || key.equals("server_start") ||
-               key.equals("event:server_stop") || key.equals("server_stop") ||
-               key.equals("event:plugin_enable") || key.equals("plugin_enable") ||
-               key.equals("event:plugin_disable") || key.equals("plugin_disable") ||
-               key.equals("event:world_load") || key.equals("world_load") ||
-               key.equals("event:world_unload") || key.equals("world_unload") ||
-               key.equals("event:chunk_load") || key.equals("chunk_load") ||
-               key.equals("event:chunk_unload") || key.equals("chunk_unload") ||
-               key.equals("event:server_tick") || key.equals("server_tick") ||
-               key.equals("event:server_save") || key.equals("server_save");
+        String key = normalizeEventKey(eventType);
+        return key.equals("server_start") || key.equals("server_stop") ||
+               key.equals("plugin_enable") || key.equals("plugin_disable") ||
+               key.equals("world_load") || key.equals("world_unload") ||
+               key.equals("chunk_load") || key.equals("chunk_unload") ||
+               key.equals("server_tick") || key.equals("server_save");
+    }
+
+    private String normalizeEventKey(String eventType) {
+        if (eventType == null) {
+            return "";
+        }
+        String key = eventType.trim().toLowerCase(java.util.Locale.ROOT);
+        if (key.startsWith("event:")) {
+            key = key.substring(6);
+        } else if (key.startsWith("event.")) {
+            key = key.substring(6);
+        }
+        return key.replace('.', '_');
     }
     
     @EventHandler

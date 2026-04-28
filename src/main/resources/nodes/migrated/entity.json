@@ -1760,45 +1760,28 @@
     "category": "ENTITY",
     "handler": "entity",
     "handlerConfig": {
-      "property": "kill"
+      "property": "kill",
+      "action": "do"
     },
     "inputs": [
+      {
+        "dataType": "execution",
+        "description": "Flow input",
+        "name": "flow",
+        "pinType": "FLOW"
+      },
       {
         "dataType": "entity",
         "description": "Target entity",
         "name": "target",
         "pinType": "DATA"
-      },
-      {
-        "dataType": "string",
-        "description": "Action",
-        "widget": "DROPDOWN",
-        "options": [
-          "get",
-          "do"
-        ],
-        "defaultValue": "get",
-        "name": "action",
-        "pinType": "DATA"
       }
     ],
     "outputs": [
       {
-        "dataType": "execution",
-        "description": "Property value",
-        "name": "value",
-        "pinType": "FLOW"
-      },
-      {
         "dataType": "boolean",
         "description": "Operation success",
         "name": "success",
-        "pinType": "DATA"
-      },
-      {
-        "dataType": "boolean",
-        "description": "Has value",
-        "name": "has",
         "pinType": "DATA"
       },
       {
@@ -1807,8 +1790,7 @@
         "name": "flow",
         "pinType": "FLOW"
       }
-    ],
-    "hidden": true
+    ]
   },
   {
     "id": "entity.exists",

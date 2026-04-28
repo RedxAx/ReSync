@@ -277,6 +277,23 @@ public class FlowStorage {
         return flowIds;
     }
 
+    public boolean hasStoredGraphVersion(String id) {
+        if (id == null) {
+            return false;
+        }
+        File file = new File(flowDir, id + ".json");
+        if (!file.exists()) {
+            return false;
+        }
+        try {
+            String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            return json.contains("\"version\"");
+        } catch (IOException e) {
+            Log.warn("Failed to inspect flow version: " + id + " - " + e.getMessage());
+            return false;
+        }
+    }
+
     public List<String> listGuiIds() {
         List<String> guiIds = new ArrayList<>();
         File[] files = guiDir.listFiles((dir, name) -> name.endsWith(".json"));

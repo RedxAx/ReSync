@@ -51,6 +51,24 @@ public class TriggerRegistry {
         save();
     }
 
+    public synchronized void setBindingsPreservingType(List<TriggerBinding> newBindings, TriggerType preservedType) {
+        List<TriggerBinding> preserved = getBindings(preservedType);
+        bindings.clear();
+        if (newBindings != null) {
+            for (TriggerBinding binding : newBindings) {
+                if (binding.getId() != null && binding.getType() != preservedType) {
+                    bindings.put(binding.getId(), binding);
+                }
+            }
+        }
+        for (TriggerBinding binding : preserved) {
+            if (binding.getId() != null) {
+                bindings.put(binding.getId(), binding);
+            }
+        }
+        save();
+    }
+
     public synchronized void addBinding(TriggerBinding binding) {
         if (binding == null || binding.getId() == null) {
             return;

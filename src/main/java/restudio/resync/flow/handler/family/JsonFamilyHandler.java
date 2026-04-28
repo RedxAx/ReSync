@@ -3,6 +3,7 @@ package restudio.resync.flow.handler.family;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -44,7 +45,8 @@ public class JsonFamilyHandler implements NodeHandler {
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
         String property = node.getHandlerConfig() != null ? node.getHandlerConfig().getString("property") : null;
-        String action = ctx.getInputValue(node, "action", String.class, "get");
+        String configuredAction = node.getHandlerConfig() != null ? node.getHandlerConfig().getString("action", "get") : "get";
+        String action = ctx.getInputValue(node, "action", String.class, configuredAction);
         if (property == null || property.isBlank()) {
             property = ctx.getInputValue(node, "property", String.class, "");
         }
@@ -130,6 +132,10 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private boolean executeAction(Object target, String property) {
+        if ("kill".equals(property) && target instanceof LivingEntity living) {
+            living.setHealth(0);
+            return true;
+        }
         String methodName = toMethodName(property);
         for (String candidate : new String[] {methodName, "set" + toMethodSuffix(property)}) {
             try {

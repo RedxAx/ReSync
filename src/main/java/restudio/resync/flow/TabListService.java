@@ -4,7 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.TabDefinition;
-import restudio.resync.flow.nodes.ScoreboardNodes;
+import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.flow.util.TextFormatter;
 
@@ -224,7 +224,7 @@ public final class TabListService {
                 }
             }
         }
-        ScoreboardNodes.refreshActiveTemplates(storage);
+        ScoreboardTemplateManager.refreshActiveTemplates(storage);
     }
 
     private static FlowStorage getFlowStorage() {

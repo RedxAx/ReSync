@@ -3,10 +3,13 @@ package restudio.flow.data;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class FlowGraph {
     private String id;
@@ -23,16 +26,16 @@ public class FlowGraph {
 
     public static class FunctionParameter {
         private String name;
-        private FlowType type;
+        private FlowDataType type;
 
         public FunctionParameter() {
             this.name = "";
-            this.type = FlowType.ANY;
+            this.type = FlowDataType.ANY;
         }
 
-        public FunctionParameter(String name, FlowType type) {
+        public FunctionParameter(String name, FlowDataType type) {
             this.name = name;
-            this.type = type != null ? type : FlowType.ANY;
+            this.type = type != null ? type : FlowDataType.ANY;
         }
 
         public String getName() {
@@ -43,11 +46,11 @@ public class FlowGraph {
             this.name = name;
         }
 
-        public FlowType getType() {
+        public FlowDataType getType() {
             return type;
         }
 
-        public void setType(FlowType type) {
+        public void setType(FlowDataType type) {
             this.type = type;
         }
     }
@@ -169,6 +172,43 @@ public class FlowGraph {
     public String findNodeId(FlowNode node) {
         ensureIndicesBuilt();
         return nodeToId.get(node);
+    }
+
+    public FlowGraph extractSubGraph(String startNodeId, String startPin) {
+        ensureIndicesBuilt();
+        Set<String> visitedNodes = new HashSet<>();
+        List<FlowConnection> subConnections = new ArrayList<>();
+        List<String> queue = new ArrayList<>();
+
+        for (FlowConnection conn : connectionsBySource.getOrDefault(startNodeId, Collections.emptyList())) {
+            if (conn.getSourcePin().equals(startPin)) {
+                queue.add(conn.getTargetNodeId());
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            String currentId = queue.removeFirst();
+            if (!visitedNodes.add(currentId)) {
+                continue;
+            }
+            for (FlowConnection conn : connectionsBySource.getOrDefault(currentId, Collections.emptyList())) {
+                subConnections.add(conn);
+                queue.add(conn.getTargetNodeId());
+            }
+        }
+
+        Map<String, FlowNode> subNodes = new HashMap<>();
+        for (String nodeId : visitedNodes) {
+            FlowNode node = nodes.get(nodeId);
+            if (node != null) {
+                subNodes.put(nodeId, node);
+            }
+        }
+
+        FlowGraph subGraph = new FlowGraph();
+        subGraph.setNodes(subNodes);
+        subGraph.setConnections(subConnections);
+        return subGraph;
     }
 
     private void ensureIndicesBuilt() {

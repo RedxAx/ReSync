@@ -4,9 +4,16 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 public class FlowSerializer {
+    private static final FlowDataObjectAdapter DATA_OBJECT_ADAPTER = new FlowDataObjectAdapter();
     private static final Gson gson = new GsonBuilder()
             .setPrettyPrinting()
+            .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+            .registerTypeAdapter(FlowDataObject.class, DATA_OBJECT_ADAPTER)
             .create();
+
+    public static FlowDataObjectAdapter getDataObjectAdapter() {
+        return DATA_OBJECT_ADAPTER;
+    }
 
     public static String serialize(FlowGraph graph) {
         return gson.toJson(graph);

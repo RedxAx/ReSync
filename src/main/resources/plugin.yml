@@ -19,5 +19,5 @@ permissions:
 commands:
   resync:
     description: Manage ReSync systems
-    usage: /resync <scoreboard|tab|world|portal> ...
+    usage: /resync <scoreboard|tab|world|portal|flow> ...
     permission: resync.command

@@ -169,6 +169,10 @@ public class FlowRuntime {
         return nodeOutputs.containsKey(nodeId + ":" + pinName);
     }
 
+    public Object getNodeOutput(String nodeId, String pinName) {
+        return nodeOutputs.get(nodeId + ":" + pinName);
+    }
+
     public boolean isEvaluating(String nodeId) {
         return evaluatingNodes.contains(nodeId);
     }

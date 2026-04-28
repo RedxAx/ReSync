@@ -1,12 +1,15 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
-import restudio.resync.Log;
+import com.google.gson.GsonBuilder;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
+import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.protocol.Codec;
@@ -23,7 +26,9 @@ public class FlowPacketSender {
     private final Codec codec;
     private final int channelId;
     private final Set<Session> subscribedSessions;
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder()
+            .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+            .create();
 
     public FlowPacketSender(Codec codec, int channelId, Set<Session> subscribedSessions) {
         this.codec = codec;

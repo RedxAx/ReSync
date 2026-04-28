@@ -4,14 +4,19 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.scheduler.BukkitTask;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.ReSync;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -19,6 +24,7 @@ public class FlowContext {
     private final Player player;
     private final Event event;
     private final FlowRuntime runtime;
+    private final FlowExecutor executor;
     private final Map<String, CompletableFuture<Void>> asyncOperations = new ConcurrentHashMap<>();
     private final List<String> triggeredOutputs = new CopyOnWriteArrayList<>();
     private final Consumer<String> deferredOutputConsumer;
@@ -26,14 +32,19 @@ public class FlowContext {
     private volatile boolean synchronousCapture = true;
 
     public FlowContext(FlowRuntime runtime, Player player, Event event) {
-        this(runtime, player, event, null);
+        this(runtime, player, event, null, null);
     }
 
     public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer) {
+        this(runtime, player, event, deferredOutputConsumer, null);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer, FlowExecutor executor) {
         this.runtime = runtime;
         this.player = player;
         this.event = event;
         this.deferredOutputConsumer = deferredOutputConsumer;
+        this.executor = executor;
     }
 
     public Player getPlayer() {
@@ -94,6 +105,26 @@ public class FlowContext {
         }
         if (value == null) return defaultValue;
         return type.cast(value);
+    }
+
+    public <T> T getInput(FlowNode node, String pinName, FlowDataType type) {
+        if (type == null) {
+            return (T) runtime.resolveInput(node, pinName);
+        }
+        Class<?> javaType = type.getJavaType();
+        if (javaType == null) {
+            return (T) runtime.resolveInput(node, pinName);
+        }
+        Object value = runtime.resolveInput(node, pinName, javaType);
+        if (value == null && type == FlowDataType.PLAYER && player != null) {
+            return (T) player;
+        }
+        return (T) value;
+    }
+
+    public <T> T getInput(FlowNode node, String pinName, FlowDataType type, T defaultValue) {
+        T value = getInput(node, pinName, type);
+        return value != null ? value : defaultValue;
     }
 
     public void triggerOutput(String pinName) {
@@ -209,5 +240,110 @@ public class FlowContext {
 
     public Map<String, CompletableFuture<Void>> getAsyncOperations() {
         return asyncOperations;
+    }
+
+    public FlowContext createSubContext(Map<String, Object> variables) {
+        FlowContext child = new FlowContext(runtime, player, event, deferredOutputConsumer, executor);
+        if (variables != null) {
+            child.getLocalVariables().putAll(variables);
+        }
+        return child;
+    }
+
+    public FlowGraph extractSubGraph(FlowNode node, String pinName) {
+        String nodeId = runtime.findNodeId(node);
+        if (nodeId == null || runtime.getGraph() == null) {
+            return null;
+        }
+        return runtime.getGraph().extractSubGraph(nodeId, pinName);
+    }
+
+    public Boolean executeSubFlowBoolean(FlowGraph subGraph, FlowNode node) {
+        return executeSubFlowBoolean(subGraph, node, null);
+    }
+
+    public Boolean executeSubFlowBoolean(FlowGraph subGraph, FlowNode node, Map<String, Object> extraInputs) {
+        if (executor == null || subGraph == null) {
+            return null;
+        }
+        String startNodeId = findSubFlowStartNodeId(subGraph);
+        if (startNodeId == null) {
+            return null;
+        }
+        String outputNodeId = findSubFlowOutputNodeId(subGraph, "condition");
+        Map<String, Object> inputs = new HashMap<>(runtime.getLocalVariables());
+        if (extraInputs != null) {
+            inputs.putAll(extraInputs);
+        }
+        try {
+            Object result = executor.executeSubFlow(subGraph, startNodeId, outputNodeId, "condition", player, event, inputs)
+                .get(5, TimeUnit.SECONDS);
+            return result instanceof Boolean b ? b : Boolean.valueOf(String.valueOf(result));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public Object executeSubFlowObject(FlowGraph subGraph, FlowNode node) {
+        return executeSubFlowObject(subGraph, node, null);
+    }
+
+    public Object executeSubFlowObject(FlowGraph subGraph, FlowNode node, Map<String, Object> extraInputs) {
+        if (executor == null || subGraph == null) {
+            return null;
+        }
+        String startNodeId = findSubFlowStartNodeId(subGraph);
+        if (startNodeId == null) {
+            return null;
+        }
+        String outputNodeId = findSubFlowOutputNodeId(subGraph, "result");
+        Map<String, Object> inputs = new HashMap<>(runtime.getLocalVariables());
+        if (extraInputs != null) {
+            inputs.putAll(extraInputs);
+        }
+        try {
+            return executor.executeSubFlow(subGraph, startNodeId, outputNodeId, "result", player, event, inputs)
+                .get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String findSubFlowStartNodeId(FlowGraph subGraph) {
+        if (subGraph == null || subGraph.getNodes() == null || subGraph.getNodes().isEmpty()) {
+            return null;
+        }
+        List<Map.Entry<String, FlowNode>> entries = new ArrayList<>(subGraph.getNodes().entrySet());
+        entries.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+        return entries.getFirst().getKey();
+    }
+
+    private static String findSubFlowOutputNodeId(FlowGraph subGraph, String pinName) {
+        if (subGraph == null || subGraph.getNodes() == null) {
+            return null;
+        }
+        List<Map.Entry<String, FlowNode>> entries = new ArrayList<>(subGraph.getNodes().entrySet());
+        entries.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+
+        List<String> terminalNodes = new ArrayList<>();
+        for (Map.Entry<String, FlowNode> entry : entries) {
+            String nodeId = entry.getKey();
+            boolean hasOutgoing = false;
+            for (restudio.flow.data.FlowConnection conn : subGraph.getConnectionsFromSource(nodeId)) {
+                if (!"flow".equals(conn.getSourcePin())) {
+                    continue;
+                }
+                hasOutgoing = true;
+                break;
+            }
+            if (!hasOutgoing) {
+                terminalNodes.add(nodeId);
+            }
+        }
+
+        if (terminalNodes.size() == 1) {
+            return terminalNodes.getFirst();
+        }
+        return entries.isEmpty() ? null : entries.getLast().getKey();
     }
 }

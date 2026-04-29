@@ -94,12 +94,17 @@ public class WorldGenNodeDefinition {
         }
 
         public Builder input(String name, FlowDataType dataType, Object defaultValue, String widgetType) {
-            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null));
+            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null, List.of()));
+            return this;
+        }
+
+        public Builder input(String name, FlowDataType dataType, Object defaultValue, String widgetType, List<String> options) {
+            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null, options != null ? options : List.of()));
             return this;
         }
 
         public Builder output(String name, FlowDataType dataType) {
-            outputs.add(new PinDefinition(name, dataType, PinDirection.OUTPUT, null, null, Map.of(), "", null));
+            outputs.add(new PinDefinition(name, dataType, PinDirection.OUTPUT, null, null, Map.of(), "", null, List.of()));
             return this;
         }
 
@@ -109,7 +114,21 @@ public class WorldGenNodeDefinition {
         }
 
         public WorldGenNodeDefinition build() {
+            if ("World Gen".equals(category)) {
+                category = inferCategory(id);
+            }
             return new WorldGenNodeDefinition(this);
+        }
+
+        private String inferCategory(String id) {
+            if (id == null) return "World Gen";
+            if (id.startsWith("biome_") || "climate_map".equals(id) || "temperature".equals(id) || "humidity".equals(id) || "continentalness".equals(id) || "erosion".equals(id) || "weirdness".equals(id) || "output_biome".equals(id)) return "Biomes";
+            if (id.startsWith("surface_") || id.endsWith("_rule") || "material_layer".equals(id) || "height_band".equals(id) || "slope_mask".equals(id) || "output_block".equals(id)) return "Surface";
+            if (id.contains("cave") || "ravine".equals(id) || "carve_if".equals(id) || "density_combine".equals(id)) return "Caves";
+            if (id.contains("feature") || id.contains("scatter") || id.endsWith("_filter") || "ore_vein".equals(id) || "vegetation_patch".equals(id) || "liquid_lake".equals(id) || "disk".equals(id) || "boulder".equals(id) || "output_features".equals(id)) return "Features";
+            if (id.contains("structure") || "output_structures".equals(id)) return "Structures";
+            if (id.contains("spawn") || "output_spawns".equals(id)) return "Spawns";
+            return "Terrain";
         }
     }
 
@@ -119,6 +138,6 @@ public class WorldGenNodeDefinition {
     }
 
     public record PinDefinition(String name, FlowDataType dataType, PinDirection direction, Object defaultValue, String widgetType,
-                                Map<String, Object> constraints, String description, String visibleWhen) {
+                                Map<String, Object> constraints, String description, String visibleWhen, List<String> options) {
     }
 }

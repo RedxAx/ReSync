@@ -7,6 +7,7 @@ import org.bukkit.WorldType;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import restudio.resync.worldgen.data.WorldGenGraph;
+import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
@@ -33,6 +34,15 @@ public class WorldGenPreviewManager {
 
     public void createPreview(String previewId, String playerUuid, WorldGenGraph graph, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
         TerrainPipeline pipeline = PipelineCompiler.compile(graph);
+        createPreview(previewId, playerUuid, pipeline, environment, seed, onSuccess, onError);
+    }
+
+    public void createPreview(String previewId, String playerUuid, WorldGenProject project, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
+        TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
+        createPreview(previewId, playerUuid, pipeline, environment, seed, onSuccess, onError);
+    }
+
+    private void createPreview(String previewId, String playerUuid, TerrainPipeline pipeline, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
         PreviewWorld previous = activePreviews.remove(previewId);
         String worldName = "resync_preview_" + previewId.replaceAll("[^A-Za-z0-9_-]", "_") + "_" + previewRevision.incrementAndGet();
         Bukkit.getScheduler().runTask(plugin, () -> {

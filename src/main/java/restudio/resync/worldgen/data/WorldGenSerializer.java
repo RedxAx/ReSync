@@ -17,4 +17,16 @@ public class WorldGenSerializer {
         }
         return graph;
     }
+
+    public static String serializeProject(WorldGenProject project) {
+        return GSON.toJson(project);
+    }
+
+    public static WorldGenProject deserializeProject(String json) {
+        WorldGenProject project = GSON.fromJson(json, WorldGenProject.class);
+        if (project != null) {
+            project.rebuildIndices();
+        }
+        return project;
+    }
 }

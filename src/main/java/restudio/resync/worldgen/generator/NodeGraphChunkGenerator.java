@@ -25,7 +25,11 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
                 int worldZ = chunkZ * 16 + localZ;
                 int height = Math.max(minHeight, Math.min(maxHeight - 1, Math.round(pipeline.getHeight(worldX, worldZ, seed, worldInfo))));
                 for (int y = minHeight; y <= height; y++) {
-                    chunkData.setBlock(localX, y, localZ, y == height ? Material.GRASS_BLOCK : Material.STONE);
+                    Material material = y == height ? pipeline.getBlock(worldX, y, worldZ, seed, height, worldInfo) : Material.STONE;
+                    if (y < height - 3 && pipeline.getCaveDensity(worldX, y, worldZ, seed, worldInfo) < -0.38f) {
+                        material = Material.AIR;
+                    }
+                    chunkData.setBlock(localX, y, localZ, material);
                 }
             }
         }
@@ -40,7 +44,9 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
                 int worldZ = chunkZ * 16 + localZ;
                 int height = Math.round(pipeline.getHeight(worldX, worldZ, seed, worldInfo));
                 Material material = pipeline.getBlock(worldX, height, worldZ, seed, height, worldInfo);
-                chunkData.setBlock(localX, height, localZ, material);
+                if (height >= worldInfo.getMinHeight() && height < worldInfo.getMaxHeight()) {
+                    chunkData.setBlock(localX, height, localZ, material);
+                }
             }
         }
     }
@@ -67,16 +73,16 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
 
     @Override
     public boolean shouldGenerateDecorations() {
-        return true;
+        return pipeline.isVanillaFeaturesEnabled();
     }
 
     @Override
     public boolean shouldGenerateMobs() {
-        return true;
+        return pipeline.isVanillaSpawnsEnabled();
     }
 
     @Override
     public boolean shouldGenerateStructures() {
-        return true;
+        return pipeline.isVanillaStructuresEnabled();
     }
 }

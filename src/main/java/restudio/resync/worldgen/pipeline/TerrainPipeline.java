@@ -15,15 +15,39 @@ public class TerrainPipeline {
     private final PipelineNode heightOutput;
     private final PipelineNode biomeOutput;
     private final PipelineNode blockOutput;
+    private final PipelineNode caveOutput;
+    private final PipelineNode featureOutput;
+    private final PipelineNode structureOutput;
+    private final PipelineNode spawnOutput;
+    private final boolean vanillaFeaturesEnabled;
+    private final boolean vanillaStructuresEnabled;
+    private final boolean vanillaSpawnsEnabled;
+    private final Map<String, Boolean> biomeVanillaFeatureOverrides;
 
     public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
                            PipelineNode heightOutput, PipelineNode biomeOutput, PipelineNode blockOutput) {
+        this(nodes, upstreams, outputNodes, heightOutput, biomeOutput, blockOutput, null, null, null, null, true, true, true, Map.of());
+    }
+
+    public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
+                           PipelineNode heightOutput, PipelineNode biomeOutput, PipelineNode blockOutput, PipelineNode caveOutput,
+                           PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
+                           boolean vanillaFeaturesEnabled, boolean vanillaStructuresEnabled, boolean vanillaSpawnsEnabled,
+                           Map<String, Boolean> biomeVanillaFeatureOverrides) {
         this.nodes = Map.copyOf(nodes);
         this.upstreams = copyUpstreams(upstreams);
         this.outputNodes = List.copyOf(outputNodes);
         this.heightOutput = heightOutput;
         this.biomeOutput = biomeOutput;
         this.blockOutput = blockOutput;
+        this.caveOutput = caveOutput;
+        this.featureOutput = featureOutput;
+        this.structureOutput = structureOutput;
+        this.spawnOutput = spawnOutput;
+        this.vanillaFeaturesEnabled = vanillaFeaturesEnabled;
+        this.vanillaStructuresEnabled = vanillaStructuresEnabled;
+        this.vanillaSpawnsEnabled = vanillaSpawnsEnabled;
+        this.biomeVanillaFeatureOverrides = biomeVanillaFeatureOverrides != null ? Map.copyOf(biomeVanillaFeatureOverrides) : Map.of();
     }
 
     public float getHeight(float x, float z, int seed, WorldInfo worldInfo) {
@@ -33,7 +57,10 @@ public class TerrainPipeline {
 
     public Biome getBiome(float x, float y, float z, int seed, WorldInfo worldInfo) {
         if (biomeOutput == null) return Biome.PLAINS;
-        float value = asFloat(evaluate(biomeOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>()), 0f);
+        Object raw = evaluate(biomeOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
+        if (raw instanceof Biome biome) return biome;
+        if (raw instanceof String id) return biome(id, Biome.PLAINS);
+        float value = asFloat(raw, 0f);
         Biome[] biomes = {Biome.PLAINS, Biome.FOREST, Biome.DESERT, Biome.SAVANNA, Biome.TAIGA, Biome.SNOWY_PLAINS};
         int index = Math.max(0, Math.min(biomes.length - 1, Math.round(Math.abs(value) * (biomes.length - 1))));
         return biomes[index];
@@ -43,7 +70,49 @@ public class TerrainPipeline {
         if (blockOutput == null) return y >= height ? Material.GRASS_BLOCK : Material.STONE;
         Object value = evaluate(blockOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         if (value instanceof Material material) return material;
+        if (value instanceof String id) return material(id, y >= height ? Material.GRASS_BLOCK : Material.STONE);
         return y >= height ? Material.GRASS_BLOCK : Material.STONE;
+    }
+
+    public float getCaveDensity(float x, float y, float z, int seed, WorldInfo worldInfo) {
+        if (caveOutput == null) return 1f;
+        return asFloat(evaluate(caveOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>()), 1f);
+    }
+
+    public String getFeaturePlacement(float x, float y, float z, int seed, WorldInfo worldInfo) {
+        if (featureOutput == null) return "";
+        Object value = evaluate(featureOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    public String getStructurePlacement(float x, float y, float z, int seed, WorldInfo worldInfo) {
+        if (structureOutput == null) return "";
+        Object value = evaluate(structureOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    public String getSpawnTable(float x, float y, float z, int seed, WorldInfo worldInfo) {
+        if (spawnOutput == null) return "";
+        Object value = evaluate(spawnOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    public boolean isVanillaFeaturesEnabled() {
+        return vanillaFeaturesEnabled;
+    }
+
+    public boolean isVanillaFeaturesEnabled(Biome biome) {
+        if (biome == null) return vanillaFeaturesEnabled;
+        String key = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
+        return biomeVanillaFeatureOverrides.getOrDefault(key, vanillaFeaturesEnabled);
+    }
+
+    public boolean isVanillaStructuresEnabled() {
+        return vanillaStructuresEnabled;
+    }
+
+    public boolean isVanillaSpawnsEnabled() {
+        return vanillaSpawnsEnabled;
     }
 
     Object evaluate(PipelineNode node, EvalContext context, Map<PipelineNode, Object> memo) {
@@ -65,6 +134,23 @@ public class TerrainPipeline {
     private static float asFloat(Object value, float fallback) {
         if (value instanceof Number number) return number.floatValue();
         return fallback;
+    }
+
+    public static Material material(String id, Material fallback) {
+        if (id == null || id.isBlank()) return fallback;
+        String value = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+        Material material = Material.matchMaterial(value.toUpperCase(java.util.Locale.ROOT));
+        return material != null ? material : fallback;
+    }
+
+    public static Biome biome(String id, Biome fallback) {
+        if (id == null || id.isBlank()) return fallback;
+        String value = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+        try {
+            return Biome.valueOf(value.toUpperCase(java.util.Locale.ROOT));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private static Map<String, Map<String, PipelineNode>> copyUpstreams(Map<String, Map<String, PipelineNode>> upstreams) {

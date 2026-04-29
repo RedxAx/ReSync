@@ -13,6 +13,7 @@ import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.worldgen.data.WorldGenGraph;
+import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
 import restudio.resync.worldgen.preview.WorldGenPreviewManager;
 import restudio.resync.worldgen.registry.WorldGenNodeDefinitions;
@@ -80,6 +81,8 @@ public class WorldGenModule implements Module {
                 case 0x21 -> handlePreviewCreate(session, buffer);
                 case 0x22 -> handlePreviewStop(buffer);
                 case 0x24 -> sendRegistrySnapshot(session);
+                case 0x30 -> handleSaveProject(buffer);
+                case 0x31 -> handlePreviewApply(session, buffer);
                 default -> Log.warn("Unknown worldgen packet: 0x" + String.format("%02X", packetId));
             }
         } catch (Exception e) {
@@ -95,6 +98,13 @@ public class WorldGenModule implements Module {
         }
     }
 
+    private void handleSaveProject(ByteBuffer buffer) {
+        WorldGenProject project = WorldGenSerializer.deserializeProject(readJson(buffer));
+        if (project != null) {
+            project.rebuildIndices();
+        }
+    }
+
     private void handlePreviewCreate(Session session, ByteBuffer buffer) {
         PreviewCreateRequest request = gson.fromJson(readJson(buffer), PreviewCreateRequest.class);
         WorldGenGraph graph = gson.fromJson(gson.toJson(request.graph()), WorldGenGraph.class);
@@ -107,6 +117,26 @@ public class WorldGenModule implements Module {
             environment,
             request.seed(),
             preview -> sendStatus(session, request.previewId(), "ready", "Ready"),
+            throwable -> sendStatus(session, request.previewId(), "error", throwable.getMessage())
+        );
+    }
+
+    private void handlePreviewApply(Session session, ByteBuffer buffer) {
+        PreviewApplyRequest request = gson.fromJson(readJson(buffer), PreviewApplyRequest.class);
+        WorldGenProject project = gson.fromJson(gson.toJson(request.project()), WorldGenProject.class);
+        if (project == null || project.getTerrainGraph() == null) {
+            throw new IllegalArgumentException("Terrain Graph Missing");
+        }
+        project.rebuildIndices();
+        long started = System.nanoTime();
+        World.Environment environment = parseEnvironment(request.environment());
+        previewManager.createPreview(
+            request.previewId(),
+            request.playerUuid(),
+            project,
+            environment,
+            request.seed(),
+            preview -> sendStatus(session, request.previewId(), "ready", "Ready " + Math.max(1L, (System.nanoTime() - started) / 1_000_000L) + "ms"),
             throwable -> sendStatus(session, request.previewId(), "error", throwable.getMessage())
         );
     }
@@ -153,6 +183,9 @@ public class WorldGenModule implements Module {
     }
 
     private record PreviewCreateRequest(WorldGenGraph graph, String previewId, String environment, long seed, String playerUuid) {
+    }
+
+    private record PreviewApplyRequest(WorldGenProject project, String previewId, String environment, long seed, String playerUuid) {
     }
 
     private record PreviewStopRequest(String previewId) {

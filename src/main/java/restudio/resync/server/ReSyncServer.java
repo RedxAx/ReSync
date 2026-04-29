@@ -24,6 +24,7 @@ import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleRegistry;
 import restudio.resync.modules.PlayerTrackingModule;
 import restudio.resync.modules.WorldManagementModule;
+import restudio.resync.modules.WorldGenModule;
 import restudio.resync.player.DefaultPlayerSessionLinkService;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.player.PlayerTrackingManager;
@@ -115,6 +116,7 @@ public class ReSyncServer {
         moduleRegistry.registerModule(new FlowRuntimeModule());
         moduleRegistry.registerModule(new PlayerTrackingModule());
         moduleRegistry.registerModule(new WorldManagementModule());
+        moduleRegistry.registerModule(new WorldGenModule());
     }
 
     private void startScheduler() {

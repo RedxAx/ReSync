@@ -228,6 +228,7 @@ public class NodeDefinitionValidator {
                 "entity_type",
                 "gamemode",
                 "material",
+                "particle",
                 "potion_effect",
                 "sound"
             ).contains(category);

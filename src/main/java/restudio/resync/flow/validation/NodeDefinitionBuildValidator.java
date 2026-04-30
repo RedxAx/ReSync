@@ -30,6 +30,7 @@ public final class NodeDefinitionBuildValidator {
         "entity_type",
         "gamemode",
         "material",
+        "particle",
         "potion_effect",
         "sound"
     );

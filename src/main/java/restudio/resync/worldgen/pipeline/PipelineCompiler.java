@@ -2,9 +2,11 @@ package restudio.resync.worldgen.pipeline;
 
 import restudio.flow.data.FlowDataType;
 import restudio.resync.worldgen.data.WorldGenConnection;
+import restudio.resync.worldgen.data.WorldGenBiomeProfile;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.data.WorldGenSpawnRule;
 import restudio.resync.worldgen.data.WorldGenStage;
 import restudio.resync.worldgen.evaluator.FractalEvaluator;
 import restudio.resync.worldgen.evaluator.NoiseEvaluator;
@@ -21,6 +23,36 @@ import java.util.Map;
 import java.util.Set;
 
 public class PipelineCompiler {
+    public static WorldGenCompileDiagnostics diagnoseProject(WorldGenProject project) {
+        long started = System.nanoTime();
+        WorldGenCompileDiagnostics diagnostics = new WorldGenCompileDiagnostics();
+        try {
+            compileProject(project);
+            diagnostics.setSuccess(true);
+        } catch (CompilationException exception) {
+            diagnostics.setSuccess(false);
+            diagnostics.add(stageFromMessage(exception.getMessage()), "error", exception.getMessage());
+        } catch (Exception exception) {
+            diagnostics.setSuccess(false);
+            diagnostics.add("project", "error", exception.getMessage());
+        }
+        diagnostics.setElapsedMillis(Math.max(1L, (System.nanoTime() - started) / 1_000_000L));
+        return diagnostics;
+    }
+
+    private static String stageFromMessage(String message) {
+        if (message == null) {
+            return "project";
+        }
+        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        for (WorldGenStage stage : WorldGenStage.values()) {
+            if (lower.startsWith(stage.name().toLowerCase(java.util.Locale.ROOT))) {
+                return stage.name().toLowerCase(java.util.Locale.ROOT);
+            }
+        }
+        return "project";
+    }
+
     public static TerrainPipeline compileProject(WorldGenProject project) {
         if (project == null) throw new CompilationException("Project Missing");
         WorldGenNodeRegistry registry = WorldGenNodeRegistry.getInstance();
@@ -45,12 +77,119 @@ public class PipelineCompiler {
         compileInto(compiled, "spawn", project.getSpawnGraph());
         if (compiled.heightOutput == null) throw new CompilationException("Output Height Missing");
         var settings = project.getSettings();
+        Map<String, Boolean> featureOverrides = new HashMap<>(settings == null ? Map.of() : settings.getBiomeVanillaFeatureOverrides());
+        Map<String, Boolean> structureOverrides = new HashMap<>();
+        Map<String, Boolean> spawnOverrides = new HashMap<>();
+        List<WorldGenSpawnRule> spawnRules = new ArrayList<>();
+        collectProfilePolicies(project, featureOverrides, structureOverrides, spawnOverrides, spawnRules);
+        collectNodePolicies(project.getBiomeGraph(), featureOverrides, structureOverrides, spawnOverrides);
+        collectSpawnRules(project.getSpawnGraph(), spawnRules);
         return new TerrainPipeline(compiled.nodes, compiled.upstreams, compiled.outputNodes, compiled.heightOutput, compiled.biomeOutput,
             compiled.blockOutput, compiled.caveOutput, compiled.featureOutput, compiled.structureOutput, compiled.spawnOutput,
             settings == null || settings.isVanillaFeaturesEnabled(),
             settings == null || settings.isVanillaStructuresEnabled(),
             settings == null || settings.isVanillaSpawnsEnabled(),
-            settings == null ? Map.of() : settings.getBiomeVanillaFeatureOverrides());
+            featureOverrides, structureOverrides, spawnOverrides, spawnRules);
+    }
+
+    private static void collectProfilePolicies(WorldGenProject project, Map<String, Boolean> featureOverrides, Map<String, Boolean> structureOverrides,
+                                               Map<String, Boolean> spawnOverrides, List<WorldGenSpawnRule> spawnRules) {
+        if (project == null || project.getBiomeProfiles() == null) {
+            return;
+        }
+        for (WorldGenBiomeProfile profile : project.getBiomeProfiles()) {
+            if (profile == null || profile.getId() == null || profile.getId().isBlank()) {
+                continue;
+            }
+            featureOverrides.put(profile.getId(), profile.isKeepVanillaFeatures());
+            structureOverrides.put(profile.getId(), profile.isKeepVanillaStructures());
+            spawnOverrides.put(profile.getId(), profile.isKeepVanillaSpawns());
+            if (profile.getVanillaBaseBiome() != null && !profile.getVanillaBaseBiome().isBlank()) {
+                featureOverrides.put(profile.getVanillaBaseBiome(), profile.isKeepVanillaFeatures());
+                structureOverrides.put(profile.getVanillaBaseBiome(), profile.isKeepVanillaStructures());
+                spawnOverrides.put(profile.getVanillaBaseBiome(), profile.isKeepVanillaSpawns());
+            }
+            if (profile.getSpawnRules() != null) {
+                spawnRules.addAll(profile.getSpawnRules());
+            }
+        }
+    }
+
+    private static void collectNodePolicies(WorldGenGraph graph, Map<String, Boolean> featureOverrides, Map<String, Boolean> structureOverrides,
+                                            Map<String, Boolean> spawnOverrides) {
+        if (graph == null || graph.getNodes() == null) {
+            return;
+        }
+        for (WorldGenNode node : graph.getNodes().values()) {
+            if (node == null || node.getInputValues() == null) {
+                continue;
+            }
+            List<String> ids = new ArrayList<>();
+            addPolicyId(ids, node.getInputValues().get("biome"));
+            addPolicyId(ids, node.getInputValues().get("true_biome"));
+            addPolicyId(ids, node.getInputValues().get("false_biome"));
+            addPolicyId(ids, node.getInputValues().get("profile"));
+            if ("climate_map".equals(node.getType())) {
+                ids.addAll(List.of("minecraft:snowy_plains", "minecraft:desert", "minecraft:forest", "minecraft:savanna", "minecraft:plains"));
+            }
+            for (String biomeId : ids) {
+                featureOverrides.put(biomeId, booleanValue(node.getInputValues().get("keep_vanilla_features"), false));
+                structureOverrides.put(biomeId, booleanValue(node.getInputValues().get("keep_vanilla_structures"), false));
+                spawnOverrides.put(biomeId, booleanValue(node.getInputValues().get("keep_vanilla_spawns"), false));
+            }
+            if (booleanValue(node.getInputValues().get("keep_vanilla_features"), false)) {
+                featureOverrides.put(TerrainPipeline.ANY_POLICY_KEY, true);
+            }
+            if (booleanValue(node.getInputValues().get("keep_vanilla_structures"), false)) {
+                structureOverrides.put(TerrainPipeline.ANY_POLICY_KEY, true);
+            }
+            if (booleanValue(node.getInputValues().get("keep_vanilla_spawns"), false)) {
+                spawnOverrides.put(TerrainPipeline.ANY_POLICY_KEY, true);
+            }
+        }
+    }
+
+    private static void addPolicyId(List<String> ids, Object value) {
+        if (value == null) {
+            return;
+        }
+        String id = String.valueOf(value);
+        if (!id.isBlank()) {
+            ids.add(id);
+        }
+    }
+
+    private static void collectSpawnRules(WorldGenGraph graph, List<WorldGenSpawnRule> spawnRules) {
+        if (graph == null || graph.getNodes() == null) {
+            return;
+        }
+        for (WorldGenNode node : graph.getNodes().values()) {
+            if (node == null || !"spawn_rule".equals(node.getType())) {
+                continue;
+            }
+            WorldGenSpawnRule rule = new WorldGenSpawnRule();
+            rule.setEntityType(String.valueOf(node.getInputValues().getOrDefault("entity", "minecraft:zombie")));
+            rule.setWeight(Math.round(number(node.getInputValues().get("weight"), 10f)));
+            rule.setMinGroup(Math.round(number(node.getInputValues().get("min_group"), 1f)));
+            rule.setMaxGroup(Math.round(number(node.getInputValues().get("max_group"), 4f)));
+            spawnRules.add(rule);
+        }
+    }
+
+    private static boolean booleanValue(Object value, boolean fallback) {
+        if (value instanceof Boolean bool) return bool;
+        if (value == null) return fallback;
+        return Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private static float number(Object value, float fallback) {
+        if (value instanceof Number number) return number.floatValue();
+        if (value == null) return fallback;
+        try {
+            return Float.parseFloat(String.valueOf(value));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     public static TerrainPipeline compile(WorldGenGraph graph) {
@@ -106,12 +245,12 @@ public class PipelineCompiler {
             compiled.nodes.put(id, node);
             String type = entry.getValue().getType();
             if ("output_height".equals(type)) compiled.heightOutput = node;
-            if ("output_biome".equals(type) || "biome_constant".equals(type) || "climate_map".equals(type)) compiled.biomeOutput = node;
-            if ("output_block".equals(type) || "surface_rule".equals(type)) compiled.blockOutput = node;
-            if ("carve_if".equals(type) || "density_combine".equals(type) || "cave_noise".equals(type)) compiled.caveOutput = node;
-            if ("output_features".equals(type) || "scatter".equals(type) || "poisson_scatter".equals(type)) compiled.featureOutput = node;
-            if ("output_structures".equals(type) || "structure_placement".equals(type)) compiled.structureOutput = node;
-            if ("output_spawns".equals(type) || "spawn_rule".equals(type)) compiled.spawnOutput = node;
+            if ("output_biome".equals(type)) compiled.biomeOutput = node;
+            if ("output_block".equals(type)) compiled.blockOutput = node;
+            if ("carve_if".equals(type)) compiled.caveOutput = node;
+            if ("output_features".equals(type)) compiled.featureOutput = node;
+            if ("output_structures".equals(type)) compiled.structureOutput = node;
+            if ("output_spawns".equals(type)) compiled.spawnOutput = node;
         }
         Set<String> nodesWithOutgoing = new HashSet<>();
         for (WorldGenConnection connection : graph.getConnections()) {
@@ -224,12 +363,16 @@ public class PipelineCompiler {
             case "terrace" -> (ctx, upstreams) -> terrace(inputFloat(node, upstreams, "in", 0f), inputFloat(node, upstreams, "step_count", 8f));
             case "seed_offset" -> (ctx, upstreams) -> inputFloat(node, upstreams, "in", 0f);
             case "output_height" -> (ctx, upstreams) -> inputFloat(node, upstreams, "height", 64f);
-            case "output_biome" -> (ctx, upstreams) -> input(node, upstreams, "biome", inputFloat(node, upstreams, "biome", 0f));
+            case "output_biome" -> (ctx, upstreams) -> {
+                Object value = input(node, upstreams, "biome", inputFloat(node, upstreams, "biome", 0f));
+                return biomeChoice(node, value);
+            };
             case "output_block" -> (ctx, upstreams) -> input(node, upstreams, "block", null);
-            case "biome_constant" -> (ctx, upstreams) -> input(node, upstreams, "biome", "minecraft:plains");
-            case "biome_select" -> (ctx, upstreams) -> inputBoolean(node, upstreams, "mask", false) ? input(node, upstreams, "true_biome", "minecraft:forest") : input(node, upstreams, "false_biome", "minecraft:plains");
+            case "biome_constant" -> (ctx, upstreams) -> biomeChoice(node, input(node, upstreams, "biome", "minecraft:plains"));
+            case "biome_profile" -> (ctx, upstreams) -> biomeChoice(node, input(node, upstreams, "profile", "minecraft:plains"));
+            case "biome_select" -> (ctx, upstreams) -> biomeChoice(node, inputBoolean(node, upstreams, "mask", false) ? input(node, upstreams, "true_biome", "minecraft:forest") : input(node, upstreams, "false_biome", "minecraft:plains"));
             case "biome_blend" -> (ctx, upstreams) -> inputFloat(node, upstreams, "weight", 0.5f) >= 0.5f ? input(node, upstreams, "b", "minecraft:forest") : input(node, upstreams, "a", "minecraft:plains");
-            case "climate_map" -> (ctx, upstreams) -> climateBiome(inputFloat(node, upstreams, "temperature", 0.5f), inputFloat(node, upstreams, "humidity", 0.5f));
+            case "climate_map" -> (ctx, upstreams) -> biomeChoice(node, climateBiome(inputFloat(node, upstreams, "temperature", 0.5f), inputFloat(node, upstreams, "humidity", 0.5f)));
             case "temperature", "humidity", "continentalness", "erosion", "weirdness" -> (ctx, upstreams) -> inputFloat(node, upstreams, "value", 0f);
             case "surface_rule" -> (ctx, upstreams) -> input(node, upstreams, "top", "minecraft:grass_block");
             case "material_layer" -> (ctx, upstreams) -> input(node, upstreams, "block", "minecraft:stone");
@@ -282,6 +425,18 @@ public class PipelineCompiler {
         Object value = input(node, upstreams, pin, fallback);
         if (value instanceof Boolean bool) return bool;
         return fallback;
+    }
+
+    private static BiomeChoice biomeChoice(WorldGenNode node, Object value) {
+        if (value instanceof BiomeChoice choice) {
+            return new BiomeChoice(choice.biomeId(), booleanValue(node.getInputValues().get("keep_vanilla_features"), choice.keepVanillaFeatures()),
+                booleanValue(node.getInputValues().get("keep_vanilla_structures"), choice.keepVanillaStructures()),
+                booleanValue(node.getInputValues().get("keep_vanilla_spawns"), choice.keepVanillaSpawns()));
+        }
+        return new BiomeChoice(TerrainPipeline.normalizeBiomeId(value),
+            booleanValue(node.getInputValues().get("keep_vanilla_features"), false),
+            booleanValue(node.getInputValues().get("keep_vanilla_structures"), false),
+            booleanValue(node.getInputValues().get("keep_vanilla_spawns"), false));
     }
 
     private static String climateBiome(float temperature, float humidity) {

@@ -47,6 +47,12 @@ import org.bukkit.util.Vector;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.player.PlayerTrackingService;
+import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
+import restudio.resync.worldgen.pipeline.PipelineCompiler;
+import restudio.resync.worldgen.pipeline.TerrainPipeline;
+import restudio.resync.worldgen.runtime.WorldGenRuntimeRegistry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,6 +81,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private final ReSync plugin;
     private final PlayerTrackingService trackingService;
     private final WorldStateStorage storage;
+    private final WorldGenProjectStorage worldGenProjectStorage;
     private final WorldMapService mapService;
     private final Map<String, WorldRegistryEntry> worlds = new ConcurrentHashMap<>();
     private final Map<String, WorldPortal> portals = new ConcurrentHashMap<>();
@@ -92,6 +99,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         this.plugin = plugin;
         this.trackingService = trackingService;
         this.storage = new WorldStateStorage(plugin);
+        this.worldGenProjectStorage = new WorldGenProjectStorage(plugin);
         this.mapService = new DefaultWorldMapService();
         for (WorldRegistryEntry entry : storage.loadWorlds()) {
             if (entry == null || entry.getWorldName() == null || entry.getWorldName().isBlank()) {
@@ -720,6 +728,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         World world = creator.createWorld();
         if (world == null) {
             return WorldOperationResult.failure("createWorld", normalizedName, "WorldCreationFailed");
+        }
+        if (chunkGenerator instanceof NodeGraphChunkGenerator nodeGraphChunkGenerator) {
+            WorldGenRuntimeRegistry.register(world, nodeGraphChunkGenerator.getPipeline());
         }
         WorldRegistryEntry entry = getOrCreateEntry(world.getName());
         syncEntryFromWorld(entry, world);
@@ -1926,6 +1937,14 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         for (WorldGeneratorDescriptor descriptor : ReSyncBuiltInGenerators.createDescriptors()) {
             descriptors.add(descriptor.copy());
         }
+        WorldGeneratorDescriptor worldGen = new WorldGeneratorDescriptor();
+        worldGen.setId("worldgen_project");
+        worldGen.setDisplayName("WorldGen Project");
+        worldGen.setBuiltIn(true);
+        worldGen.setConfigurable(true);
+        worldGen.setConfigPlaceholder("WorldGen Project ID");
+        worldGen.setDefaultConfig(worldGenProjectStorage.listProjectIds().isEmpty() ? "" : worldGenProjectStorage.listProjectIds().getFirst());
+        descriptors.add(worldGen);
         for (String hint : createGeneratorHints()) {
             if (descriptors.stream().anyMatch(value -> value.getId() != null && value.getId().equalsIgnoreCase(hint))) {
                 continue;
@@ -1944,6 +1963,14 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     }
 
     private ChunkGenerator createGenerator(String generator, String generatorConfig) {
+        if ("worldgen_project".equalsIgnoreCase(generator) || "WORLDGEN_PROJECT".equalsIgnoreCase(generator)) {
+            WorldGenProject project = worldGenProjectStorage.getProject(generatorConfig);
+            if (project == null) {
+                throw new IllegalArgumentException("WorldGen Project Missing");
+            }
+            TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
+            return new NodeGraphChunkGenerator(pipeline);
+        }
         ChunkGenerator builtIn = ReSyncBuiltInGenerators.createGenerator(generator, generatorConfig);
         return builtIn;
     }

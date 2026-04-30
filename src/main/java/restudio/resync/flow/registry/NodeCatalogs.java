@@ -7,6 +7,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Biome;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
+import org.bukkit.Particle;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ public final class NodeCatalogs {
             case "minecraft:biome", "minecraft:biomes" -> fromBiomes();
             case "minecraft:entity_type", "minecraft:entity_types" -> fromEntityTypes();
             case "minecraft:enchantment", "minecraft:enchantments" -> fromEnchantments();
+            case "minecraft:particle", "minecraft:particles" -> fromParticles();
             case "minecraft:advancement", "minecraft:advancements" -> fromAdvancements();
             case "minecraft:gamerule", "minecraft:gamerules" -> fromGameRules();
             case "variable:mode", "flow:variable_mode" -> List.of("get", "set", "delete", "exists", "list", "increment", "decrement", "multiply", "divide");
@@ -109,6 +111,18 @@ public final class NodeCatalogs {
                 continue;
             }
             values.add(enchantment.getKey().getKey().toLowerCase(Locale.ROOT));
+        }
+        values.sort(String.CASE_INSENSITIVE_ORDER);
+        return List.copyOf(values);
+    }
+
+    private static List<String> fromParticles() {
+        List<String> values = new ArrayList<>();
+        for (Particle particle : Particle.values()) {
+            if (particle == null || particle.name() == null || particle.name().isBlank()) {
+                continue;
+            }
+            values.add(particle.name().toLowerCase(Locale.ROOT));
         }
         values.sort(String.CASE_INSENSITIVE_ORDER);
         return List.copyOf(values);

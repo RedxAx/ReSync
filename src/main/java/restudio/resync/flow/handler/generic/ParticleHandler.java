@@ -20,6 +20,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Map;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -28,6 +29,8 @@ public class ParticleHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public ParticleHandler() {
+        operations.put("particle_apply", this::applyParticle);
+
         operations.put("particle_spawn", (ctx, node) -> {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
             String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
@@ -632,14 +635,35 @@ public class ParticleHandler implements NodeHandler {
 
                     AtomicInteger particleCount = new AtomicInteger(0);
                     int maxParticles = 500;
+                    int minPixelX = 256;
+                    int maxPixelX = 0;
+                    int minPixelY = 128;
+                    int maxPixelY = 0;
+                    for (int y = 0; y < 128; y += 2) {
+                        for (int x = 0; x < 256; x += 2) {
+                            int rgb = image.getRGB(x, y);
+                            if ((rgb & 0xFF000000) != 0) {
+                                minPixelX = Math.min(minPixelX, x);
+                                maxPixelX = Math.max(maxPixelX, x);
+                                minPixelY = Math.min(minPixelY, y);
+                                maxPixelY = Math.max(maxPixelY, y);
+                            }
+                        }
+                    }
+                    if (minPixelX > maxPixelX || minPixelY > maxPixelY) {
+                        return;
+                    }
+                    double centerPixelX = (minPixelX + maxPixelX) / 2.0;
+                    double bottomPixelY = maxPixelY;
+                    double baseYOffset = 1.05;
 
                     if (Bukkit.isPrimaryThread()) {
                         for (int y = 0; y < 128 && particleCount.get() < maxParticles; y += 2) {
                             for (int x = 0; x < 256 && particleCount.get() < maxParticles; x += 2) {
                                 int rgb = image.getRGB(x, y);
                                 if ((rgb & 0xFF000000) != 0) {
-                                    double px = (x - 128) * size;
-                                    double py = (64 - y) * size;
+                                    double px = (x - centerPixelX) * size;
+                                    double py = (bottomPixelY - y) * size + baseYOffset;
                                     Location loc = location.clone().add(px, py, 0);
                                     location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
                                     particleCount.incrementAndGet();
@@ -652,8 +676,8 @@ public class ParticleHandler implements NodeHandler {
                                 for (int x = 0; x < 256 && particleCount.get() < maxParticles; x += 2) {
                                     int rgb = image.getRGB(x, y);
                                     if ((rgb & 0xFF000000) != 0) {
-                                        double px = (x - 128) * size;
-                                        double py = (64 - y) * size;
+                                        double px = (x - centerPixelX) * size;
+                                        double py = (bottomPixelY - y) * size + baseYOffset;
                                         Location loc = location.clone().add(px, py, 0);
                                         location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
                                         particleCount.incrementAndGet();
@@ -666,6 +690,434 @@ public class ParticleHandler implements NodeHandler {
                 }
             }
         });
+    }
+
+    private void applyParticle(FlowContext ctx, FlowNode node) {
+        String spawnType = text(ctx, node, "spawn_type", "point").toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        String particleName = text(ctx, node, "particle", text(ctx, node, "particle_type", "FLAME"));
+        Particle particle = parseParticle(particleName);
+
+        switch (spawnType) {
+            case "point", "spawn" -> spawnPoint(ctx, node, particle);
+            case "burst" -> spawnBurst(ctx, node, particle);
+            case "player", "player_spawn" -> spawnForPlayer(ctx, node, particle);
+            case "area" -> spawnArea(ctx, node, particle, true);
+            case "line" -> spawnLine(ctx, node, particle);
+            case "circle" -> spawnCircle(ctx, node, particle);
+            case "ring" -> spawnRing(ctx, node, particle);
+            case "sphere" -> spawnSphere(ctx, node, particle);
+            case "ellipse" -> spawnEllipse(ctx, node, particle);
+            case "spiral" -> spawnSpiral(ctx, node, particle);
+            case "cone" -> spawnCone(ctx, node, particle);
+            case "cube" -> spawnCube(ctx, node, particle);
+            case "wave" -> spawnWave(ctx, node, particle);
+            case "text" -> spawnText(ctx, node, particle);
+            case "block_dust", "block" -> spawnBlockDust(ctx, node);
+            case "item_break", "item" -> spawnItemBreak(ctx, node);
+            case "explosion" -> spawnExplosion(ctx, node);
+            default -> spawnPoint(ctx, node, particle);
+        }
+    }
+
+    private void spawnPoint(FlowContext ctx, FlowNode node, Particle particle) {
+        Location location = location(ctx, node, "location");
+        if (!valid(location)) return;
+        int count = integer(ctx, node, "count", 1);
+        double offsetX = decimal(ctx, node, "offset_x", 0.0);
+        double offsetY = decimal(ctx, node, "offset_y", 0.0);
+        double offsetZ = decimal(ctx, node, "offset_z", 0.0);
+        double speed = decimal(ctx, node, "speed", 0.0);
+        run(location, () -> location.getWorld().spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
+    }
+
+    private void spawnBurst(FlowContext ctx, FlowNode node, Particle particle) {
+        Location location = location(ctx, node, "location");
+        if (!valid(location)) return;
+        int count = integer(ctx, node, "count", 24);
+        double spread = decimal(ctx, node, "spread", 0.6);
+        double speed = decimal(ctx, node, "speed", 0.02);
+        run(location, () -> location.getWorld().spawnParticle(particle, location, count, spread, spread, spread, speed, null));
+    }
+
+    private void spawnForPlayer(FlowContext ctx, FlowNode node, Particle particle) {
+        Player player = ctx.getInputValue(node, "player", Player.class, null);
+        Location location = location(ctx, node, "location");
+        if (player == null || !valid(location)) return;
+        int count = integer(ctx, node, "count", 1);
+        double offsetX = decimal(ctx, node, "offset_x", 0.0);
+        double offsetY = decimal(ctx, node, "offset_y", 0.0);
+        double offsetZ = decimal(ctx, node, "offset_z", 0.0);
+        double speed = decimal(ctx, node, "speed", 0.0);
+        run(location, () -> player.spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
+    }
+
+    private void spawnArea(FlowContext ctx, FlowNode node, Particle particle, boolean filled) {
+        Location min = location(ctx, node, "min_location");
+        Location max = location(ctx, node, "max_location");
+        if (!sameWorld(min, max)) return;
+        int density = Math.max(1, integer(ctx, node, "density", 10));
+        double stepX = Math.max(0.5, Math.abs(max.getX() - min.getX()) / density);
+        double stepY = Math.max(0.5, Math.abs(max.getY() - min.getY()) / density);
+        double stepZ = Math.max(0.5, Math.abs(max.getZ() - min.getZ()) / density);
+        double minX = Math.min(min.getX(), max.getX());
+        double maxX = Math.max(min.getX(), max.getX());
+        double minY = Math.min(min.getY(), max.getY());
+        double maxY = Math.max(min.getY(), max.getY());
+        double minZ = Math.min(min.getZ(), max.getZ());
+        double maxZ = Math.max(min.getZ(), max.getZ());
+        run(min, () -> {
+            for (double x = minX; x <= maxX; x += stepX) {
+                for (double y = minY; y <= maxY; y += stepY) {
+                    for (double z = minZ; z <= maxZ; z += stepZ) {
+                        Location loc = new Location(min.getWorld(), x, y, z);
+                        min.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+                    }
+                }
+            }
+        });
+    }
+
+    private void spawnLine(FlowContext ctx, FlowNode node, Particle particle) {
+        Location start = location(ctx, node, "start_location");
+        Location end = location(ctx, node, "end_location");
+        if (!sameWorld(start, end)) return;
+        int density = Math.max(1, integer(ctx, node, "density", 10));
+        double distance = start.distance(end);
+        if (distance <= 0.0) {
+            run(start, () -> start.getWorld().spawnParticle(particle, start, 1, 0, 0, 0, 0));
+            return;
+        }
+        run(start, () -> {
+            for (int i = 0; i <= density; i++) {
+                double ratio = i / (double) density;
+                Location loc = new Location(start.getWorld(),
+                    start.getX() + (end.getX() - start.getX()) * ratio,
+                    start.getY() + (end.getY() - start.getY()) * ratio,
+                    start.getZ() + (end.getZ() - start.getZ()) * ratio);
+                start.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnCircle(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
+        int count = Math.max(1, integer(ctx, node, "count", integer(ctx, node, "points", 30)));
+        run(center, () -> {
+            for (int i = 0; i < count; i++) {
+                double angle = (2 * Math.PI * i) / count;
+                Location loc = new Location(center.getWorld(), center.getX() + radius * Math.cos(angle), center.getY(), center.getZ() + radius * Math.sin(angle));
+                center.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnRing(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
+        int count = Math.max(1, integer(ctx, node, "count", 30));
+        String axis = text(ctx, node, "axis", "y").toLowerCase(Locale.ROOT);
+        run(center, () -> {
+            for (int i = 0; i < count; i++) {
+                double angle = (2 * Math.PI * i) / count;
+                double x;
+                double y;
+                double z;
+                switch (axis) {
+                    case "x" -> {
+                        x = center.getX();
+                        y = center.getY() + radius * Math.cos(angle);
+                        z = center.getZ() + radius * Math.sin(angle);
+                    }
+                    case "z" -> {
+                        x = center.getX() + radius * Math.cos(angle);
+                        y = center.getY() + radius * Math.sin(angle);
+                        z = center.getZ();
+                    }
+                    default -> {
+                        x = center.getX() + radius * Math.cos(angle);
+                        y = center.getY();
+                        z = center.getZ() + radius * Math.sin(angle);
+                    }
+                }
+                center.getWorld().spawnParticle(particle, new Location(center.getWorld(), x, y, z), 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnSphere(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
+        int count = Math.max(2, integer(ctx, node, "count", integer(ctx, node, "points", 50)));
+        run(center, () -> {
+            double phi = Math.PI * (3.0 - Math.sqrt(5.0));
+            for (int i = 0; i < count; i++) {
+                double y = 1.0 - (i / (double) (count - 1)) * 2.0;
+                double radiusAtY = Math.sqrt(1.0 - y * y);
+                double theta = phi * i;
+                double x = Math.cos(theta) * radiusAtY;
+                double z = Math.sin(theta) * radiusAtY;
+                Location loc = new Location(center.getWorld(), center.getX() + x * radius, center.getY() + y * radius, center.getZ() + z * radius);
+                center.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnEllipse(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radiusX = decimal(ctx, node, "radius_x", 5.0);
+        double radiusZ = decimal(ctx, node, "radius_z", 3.0);
+        int count = Math.max(1, integer(ctx, node, "count", 30));
+        run(center, () -> {
+            for (int i = 0; i < count; i++) {
+                double angle = (2 * Math.PI * i) / count;
+                Location loc = new Location(center.getWorld(), center.getX() + radiusX * Math.cos(angle), center.getY(), center.getZ() + radiusZ * Math.sin(angle));
+                center.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnSpiral(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radius = decimal(ctx, node, "radius", 3.0);
+        double height = decimal(ctx, node, "height", 5.0);
+        double rotations = decimal(ctx, node, "rotations", 3.0);
+        int count = Math.max(1, integer(ctx, node, "count", 100));
+        run(center, () -> {
+            for (int i = 0; i < count; i++) {
+                double angle = (2 * Math.PI * rotations * i) / count;
+                double y = (height * i) / count;
+                Location loc = new Location(center.getWorld(), center.getX() + radius * Math.cos(angle), center.getY() + y, center.getZ() + radius * Math.sin(angle));
+                center.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnCone(FlowContext ctx, FlowNode node, Particle particle) {
+        Location center = location(ctx, node, "location");
+        if (!valid(center)) return;
+        double radius = decimal(ctx, node, "radius", 3.0);
+        double height = decimal(ctx, node, "height", 5.0);
+        int count = Math.max(1, integer(ctx, node, "count", 50));
+        run(center, () -> {
+            for (int i = 0; i < count; i++) {
+                double progress = i / (double) count;
+                double angle = (2 * Math.PI * i) % (2 * Math.PI);
+                Location loc = new Location(center.getWorld(),
+                    center.getX() + radius * progress * Math.cos(angle),
+                    center.getY() + height * progress,
+                    center.getZ() + radius * progress * Math.sin(angle));
+                center.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnCube(FlowContext ctx, FlowNode node, Particle particle) {
+        Location min = location(ctx, node, "min_location");
+        Location max = location(ctx, node, "max_location");
+        if (!sameWorld(min, max)) return;
+        boolean filled = bool(ctx, node, "filled", bool(ctx, node, "is_filled", false));
+        double step = Math.max(0.1, decimal(ctx, node, "step", filled ? 0.5 : 1.0));
+        double minX = Math.min(min.getX(), max.getX());
+        double maxX = Math.max(min.getX(), max.getX());
+        double minY = Math.min(min.getY(), max.getY());
+        double maxY = Math.max(min.getY(), max.getY());
+        double minZ = Math.min(min.getZ(), max.getZ());
+        double maxZ = Math.max(min.getZ(), max.getZ());
+        run(min, () -> {
+            for (double x = minX; x <= maxX; x += step) {
+                for (double y = minY; y <= maxY; y += step) {
+                    for (double z = minZ; z <= maxZ; z += step) {
+                        boolean onEdge = Math.abs(x - minX) < step || Math.abs(x - maxX) < step || Math.abs(y - minY) < step || Math.abs(y - maxY) < step || Math.abs(z - minZ) < step || Math.abs(z - maxZ) < step;
+                        if (filled || onEdge) {
+                            min.getWorld().spawnParticle(particle, new Location(min.getWorld(), x, y, z), 1, 0, 0, 0, 0);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    private void spawnWave(FlowContext ctx, FlowNode node, Particle particle) {
+        Location start = location(ctx, node, "start_location");
+        if (!valid(start)) return;
+        Vector direction = ctx.getInputValue(node, "direction", Vector.class, new Vector(1, 0, 0));
+        double amplitude = decimal(ctx, node, "amplitude", 1.0);
+        double frequency = decimal(ctx, node, "frequency", 0.5);
+        double length = decimal(ctx, node, "length", 10.0);
+        int steps = Math.max(1, (int) (length * 10));
+        Vector dir = direction.clone().normalize();
+        run(start, () -> {
+            for (int i = 0; i <= steps; i++) {
+                double distance = (length * i) / steps;
+                double waveOffset = Math.sin(distance * frequency) * amplitude;
+                Vector forward = dir.clone().multiply(distance);
+                Vector waveDir = dir.clone().getCrossProduct(new Vector(0, 1, 0)).normalize();
+                if (waveDir.length() < 0.1) waveDir = new Vector(0, 0, 1);
+                Location loc = start.clone().add(forward).add(waveDir.multiply(waveOffset));
+                start.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void spawnText(FlowContext ctx, FlowNode node, Particle particle) {
+        Location location = location(ctx, node, "location");
+        String text = text(ctx, node, "text", "A");
+        double size = decimal(ctx, node, "size", 0.3);
+        if (!valid(location) || text.isEmpty()) return;
+        run(location, () -> {
+            Font font = new Font("Arial", Font.BOLD, 100);
+            BufferedImage image = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = image.createGraphics();
+            g2d.setFont(font);
+            g2d.setColor(Color.WHITE);
+            FontMetrics fm = g2d.getFontMetrics();
+            int width = fm.stringWidth(text);
+            int height = fm.getHeight();
+            g2d.drawString(text, (256 - width) / 2, (128 + height) / 2 - fm.getDescent());
+            g2d.dispose();
+            AtomicInteger particleCount = new AtomicInteger();
+            int minPixelX = 256;
+            int maxPixelX = 0;
+            int minPixelY = 128;
+            int maxPixelY = 0;
+            for (int y = 0; y < 128; y += 2) {
+                for (int x = 0; x < 256; x += 2) {
+                    int rgb = image.getRGB(x, y);
+                    if ((rgb & 0xFF000000) != 0) {
+                        minPixelX = Math.min(minPixelX, x);
+                        maxPixelX = Math.max(maxPixelX, x);
+                        minPixelY = Math.min(minPixelY, y);
+                        maxPixelY = Math.max(maxPixelY, y);
+                    }
+                }
+            }
+            if (minPixelX > maxPixelX || minPixelY > maxPixelY) {
+                return;
+            }
+            double centerPixelX = (minPixelX + maxPixelX) / 2.0;
+            double bottomPixelY = maxPixelY;
+            double baseYOffset = 1.05;
+            for (int y = 0; y < 128 && particleCount.get() < 500; y += 2) {
+                for (int x = 0; x < 256 && particleCount.get() < 500; x += 2) {
+                    int rgb = image.getRGB(x, y);
+                    if ((rgb & 0xFF000000) != 0) {
+                        Location loc = location.clone().add((x - centerPixelX) * size, (bottomPixelY - y) * size + baseYOffset, 0);
+                        location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+                        particleCount.incrementAndGet();
+                    }
+                }
+            }
+        });
+    }
+
+    private void spawnBlockDust(FlowContext ctx, FlowNode node) {
+        Location location = location(ctx, node, "location");
+        if (!valid(location)) return;
+        Material blockType = Material.getMaterial(text(ctx, node, "block_type", "STONE").toUpperCase(Locale.ROOT));
+        if (blockType == null || !blockType.isBlock()) return;
+        int count = integer(ctx, node, "count", 10);
+        BlockData blockData = blockType.createBlockData();
+        run(location, () -> location.getWorld().spawnParticle(Particle.BLOCK, location, count, blockData));
+    }
+
+    private void spawnItemBreak(FlowContext ctx, FlowNode node) {
+        Location location = location(ctx, node, "location");
+        if (!valid(location)) return;
+        Material itemType = Material.getMaterial(text(ctx, node, "item_type", "STONE").toUpperCase(Locale.ROOT));
+        if (itemType == null || !itemType.isItem()) return;
+        run(location, () -> location.getWorld().spawnParticle(Particle.ITEM, location, 1, 0, 0, 0, 0, new ItemStack(itemType)));
+    }
+
+    private void spawnExplosion(FlowContext ctx, FlowNode node) {
+        Location location = location(ctx, node, "location");
+        if (!valid(location)) return;
+        boolean large = bool(ctx, node, "large", false);
+        run(location, () -> {
+            if (large) {
+                location.getWorld().spawnParticle(Particle.LAVA, location, 20, 1.0, 1.0, 1.0, 0.1);
+            } else {
+                location.getWorld().spawnParticle(Particle.FLAME, location, 30, 0.5, 0.5, 0.5, 0.05);
+            }
+        });
+    }
+
+    private Particle parseParticle(String name) {
+        try {
+            return Particle.valueOf((name == null || name.isBlank() ? "FLAME" : name).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return Particle.FLAME;
+        }
+    }
+
+    private void run(Location location, Runnable task) {
+        if (!valid(location) || task == null) return;
+        Runnable safeTask = () -> {
+            try {
+                task.run();
+            } catch (Exception ignored) {
+            }
+        };
+        if (Bukkit.isPrimaryThread()) {
+            safeTask.run();
+        } else {
+            Bukkit.getScheduler().runTask(ReSync.getInstance(), safeTask);
+        }
+    }
+
+    private boolean valid(Location location) {
+        return location != null && location.getWorld() != null;
+    }
+
+    private boolean sameWorld(Location first, Location second) {
+        return valid(first) && valid(second) && first.getWorld().equals(second.getWorld());
+    }
+
+    private Location location(FlowContext ctx, FlowNode node, String pin) {
+        return ctx.getInputValue(node, pin, Location.class, null);
+    }
+
+    private String text(FlowContext ctx, FlowNode node, String pin, String fallback) {
+        String value = ctx.getInputValue(node, pin, String.class, fallback);
+        return value != null ? value : fallback;
+    }
+
+    private int integer(FlowContext ctx, FlowNode node, String pin, int fallback) {
+        Object value = ctx.getInputValue(node, pin);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return (int) Double.parseDouble(text);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    private double decimal(FlowContext ctx, FlowNode node, String pin, double fallback) {
+        Object value = ctx.getInputValue(node, pin);
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Double.parseDouble(text);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    private boolean bool(FlowContext ctx, FlowNode node, String pin, boolean fallback) {
+        Boolean value = ctx.getInputValue(node, pin, Boolean.class, fallback);
+        return value != null ? value : fallback;
     }
 
     public void registerTo(HandlerRegistry registry) {

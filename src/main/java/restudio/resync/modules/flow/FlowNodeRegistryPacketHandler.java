@@ -204,6 +204,7 @@ public class FlowNodeRegistryPacketHandler {
         list.add(new FlowOptionSourceMetadata("client:minecraft:entity_type", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("client:minecraft:gamemode", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("client:minecraft:material", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("client:minecraft:particle", "minecraft", "SEARCHABLE_LIST", true));
         list.add(new FlowOptionSourceMetadata("client:minecraft:potion_effect", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("client:minecraft:sound", "minecraft", "SEARCHABLE_LIST", true));
         if (pluginRegistry != null) {

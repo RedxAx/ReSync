@@ -67,6 +67,14 @@ public class WorldGenModule implements Module {
         this.runtimeListener = new WorldGenRuntimeListener(context.getPlugin());
         this.runtimeListener.start();
         WorldGenNodeDefinitions.registerDefaults(WorldGenNodeRegistry.getInstance());
+        previewManager.cleanupOrphanedPreviews();
+    }
+
+    @Override
+    public void stop(ModuleContext context) {
+        if (previewManager != null) {
+            previewManager.stopAllPreviews();
+        }
     }
 
     @Override
@@ -118,6 +126,11 @@ public class WorldGenModule implements Module {
                 project.setId(UUID.randomUUID().toString());
             }
             project.rebuildIndices();
+            WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project);
+            sendJsonPacket(session, (byte) 0x38, gson.toJson(diagnostics));
+            if (!diagnostics.isSuccess()) {
+                throw new IllegalArgumentException("WorldGen Compile Failed");
+            }
             projectStorage.saveProject(project);
             sendJsonPacket(session, (byte) 0x37, project.getId());
         }
@@ -186,9 +199,18 @@ public class WorldGenModule implements Module {
             project,
             environment,
             request.seed(),
-            preview -> sendStatus(session, request.previewId(), "ready", "Ready " + Math.max(1L, (System.nanoTime() - started) / 1_000_000L) + "ms"),
+            preview -> sendStatus(session, request.previewId(), "ready", previewReadyMessage(preview, started)),
             throwable -> sendStatus(session, request.previewId(), "error", throwable.getMessage())
         );
+    }
+
+    private String previewReadyMessage(WorldGenPreviewManager.PreviewWorld preview, long started) {
+        long elapsed = Math.max(1L, (System.nanoTime() - started) / 1_000_000L);
+        if (preview == null || preview.datapackBuild() == null) {
+            return "Ready " + elapsed + "ms";
+        }
+        String suffix = preview.datapackBuild().getWarnings().isEmpty() ? "" : " · " + preview.datapackBuild().getWarnings().size() + " Warnings";
+        return "Ready " + elapsed + "ms · Datapack " + preview.datapackBuild().getFileCount() + " Files" + suffix;
     }
 
     private void handlePreviewStop(ByteBuffer buffer) {
@@ -197,7 +219,20 @@ public class WorldGenModule implements Module {
     }
 
     private void sendRegistrySnapshot(Session session) {
-        sendJsonPacket(session, (byte) 0x25, gson.toJson(WorldGenNodeRegistry.getInstance().getAllDefinitions()));
+        sendJsonPacket(session, (byte) 0x25, gson.toJson(Map.of(
+            "nodes", WorldGenNodeRegistry.getInstance().getAllDefinitions(),
+            "capabilities", Map.of(
+                "backend", "datapack",
+                "legacyBackend", "bukkit",
+                "datapackBiomes", true,
+                "datapackFeatures", false,
+                "datapackStructures", false,
+                "datapackSpawns", true,
+                "liveDatapackActivation", false,
+                "previewDatapackCompile", true,
+                "minecraftVersion", org.bukkit.Bukkit.getMinecraftVersion()
+            )
+        )));
     }
 
     private void sendStatus(Session session, String previewId, String status, String message) {

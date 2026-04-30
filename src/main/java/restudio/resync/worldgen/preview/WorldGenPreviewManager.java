@@ -9,9 +9,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
+import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
+import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
-import restudio.resync.worldgen.generator.WorldGenFeaturePopulator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
 import restudio.resync.worldgen.pipeline.TerrainPipelineHolder;
@@ -20,7 +22,9 @@ import restudio.resync.worldgen.runtime.WorldGenRuntimeRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,10 +34,15 @@ import java.util.function.Consumer;
 public class WorldGenPreviewManager {
     private final Plugin plugin;
     private final Map<String, PreviewWorld> activePreviews = new ConcurrentHashMap<>();
+    private final Map<String, Long> activeRequests = new ConcurrentHashMap<>();
     private final AtomicLong previewRevision = new AtomicLong();
+    private final WorldGenDatapackCompiler datapackCompiler;
+    private final WorldGenDatapackInstaller datapackInstaller;
 
     public WorldGenPreviewManager(Plugin plugin) {
         this.plugin = plugin;
+        this.datapackCompiler = new WorldGenDatapackCompiler(plugin);
+        this.datapackInstaller = new WorldGenDatapackInstaller(plugin);
     }
 
     public void createPreview(String previewId, String playerUuid, WorldGenGraph graph, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
@@ -43,24 +52,42 @@ public class WorldGenPreviewManager {
 
     public void createPreview(String previewId, String playerUuid, WorldGenProject project, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
         TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
-        createPreview(previewId, playerUuid, pipeline, environment, seed, onSuccess, onError);
+        createPreview(previewId, playerUuid, project, pipeline, environment, seed, onSuccess, onError);
     }
 
     private void createPreview(String previewId, String playerUuid, TerrainPipeline pipeline, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
+        createPreview(previewId, playerUuid, null, pipeline, environment, seed, onSuccess, onError);
+    }
+
+    private void createPreview(String previewId, String playerUuid, WorldGenProject project, TerrainPipeline pipeline, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
         String normalizedPreviewId = normalizePreviewId(previewId);
-        PreviewWorld previous = activePreviews.remove(normalizedPreviewId);
-        String worldName = "resync_preview_" + normalizedPreviewId + "_" + previewRevision.incrementAndGet();
+        long revision = previewRevision.incrementAndGet();
+        activeRequests.put(normalizedPreviewId, revision);
+        PreviewWorld previous = activePreviews.get(normalizedPreviewId);
+        String worldName = "resync_preview_" + normalizedPreviewId + "_" + revision;
+        WorldGenDatapackBuild datapackBuild = project == null ? null : datapackCompiler.compile(project, datapackCompiler.generatedRoot(), revision);
         Bukkit.getScheduler().runTask(plugin, () -> {
+            PreviewWorld previewWorld = null;
             try {
                 Map<String, Location> previousLocations = capturePreviewPlayerLocations(previous);
-                PreviewWorld previewWorld = createWorldSync(normalizedPreviewId, playerUuid, pipeline, worldName, environment, seed, previousLocations);
-                if (previous != null) {
-                    deletePreviewWorld(previous.worldName());
+                previewWorld = createWorldSync(playerUuid, pipeline, datapackBuild, worldName, environment, seed, previousLocations);
+                if (!Long.valueOf(revision).equals(activeRequests.get(normalizedPreviewId))) {
+                    deletePreviewWorld(previewWorld.worldName());
+                    return;
+                }
+                PreviewWorld replaced = activePreviews.put(normalizedPreviewId, previewWorld);
+                if (replaced != null && !replaced.worldName().equals(previewWorld.worldName())) {
+                    deletePreviewWorld(replaced.worldName());
                 }
                 if (onSuccess != null) {
                     onSuccess.accept(previewWorld);
                 }
             } catch (Throwable throwable) {
+                if (previewWorld != null) {
+                    deletePreviewWorld(previewWorld.worldName());
+                } else {
+                    deletePreviewWorld(worldName);
+                }
                 if (onError != null) {
                     onError.accept(throwable);
                 }
@@ -75,7 +102,9 @@ public class WorldGenPreviewManager {
     }
 
     public void stopPreview(String previewId, Runnable onComplete, Consumer<Throwable> onError) {
-        PreviewWorld current = activePreviews.remove(normalizePreviewId(previewId));
+        String normalizedPreviewId = normalizePreviewId(previewId);
+        activeRequests.remove(normalizedPreviewId);
+        PreviewWorld current = activePreviews.remove(normalizedPreviewId);
         if (current == null) {
             if (onComplete != null) {
                 onComplete.run();
@@ -96,7 +125,35 @@ public class WorldGenPreviewManager {
         });
     }
 
-    private PreviewWorld createWorldSync(String previewId, String playerUuid, TerrainPipeline pipeline, String worldName, World.Environment environment, long seed, Map<String, Location> previousLocations) {
+    public void cleanupOrphanedPreviews() {
+        datapackInstaller.cleanupInstalledPacks();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            for (World world : new ArrayList<>(Bukkit.getWorlds())) {
+                if (isPreviewWorldName(world.getName())) {
+                    deletePreviewWorld(world.getName());
+                }
+            }
+            Path root = resolveWorldRoot();
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                try (var stream = Files.list(root)) {
+                    stream
+                        .filter(Files::isDirectory)
+                        .filter(path -> isPreviewWorldName(path.getFileName().toString()))
+                        .forEach(path -> deleteWorldFolder(root, path.toAbsolutePath().normalize()));
+                } catch (IOException ignored) {
+                }
+            });
+        });
+    }
+
+    public void stopAllPreviews() {
+        activeRequests.clear();
+        List<PreviewWorld> previews = new ArrayList<>(activePreviews.values());
+        activePreviews.clear();
+        Bukkit.getScheduler().runTask(plugin, () -> previews.forEach(preview -> deletePreviewWorld(preview.worldName())));
+    }
+
+    private PreviewWorld createWorldSync(String playerUuid, TerrainPipeline pipeline, WorldGenDatapackBuild datapackBuild, String worldName, World.Environment environment, long seed, Map<String, Location> previousLocations) {
         TerrainPipelineHolder pipelineHolder = new TerrainPipelineHolder(pipeline);
         WorldCreator creator = new WorldCreator(worldName);
         creator.generator(new NodeGraphChunkGenerator(pipelineHolder));
@@ -107,34 +164,31 @@ public class WorldGenPreviewManager {
         creator.generateStructures(pipeline.hasAnyVanillaStructuresEnabled());
         World world = creator.createWorld();
         if (world == null) throw new IllegalStateException("Preview World Failed");
+        configurePreviewWorld(world);
         WorldGenRuntimeRegistry.register(world, pipelineHolder);
         Player player = resolvePreviewPlayer(playerUuid);
         restorePreviewPlayers(world, previousLocations, player);
         if (player != null && !previousLocations.containsKey(player.getUniqueId().toString())) {
             player.teleport(world.getSpawnLocation());
         }
-        schedulePreviewFeaturePass(world, pipelineHolder);
-        PreviewWorld previewWorld = new PreviewWorld(worldName, player != null ? player.getUniqueId().toString() : playerUuid, pipelineHolder, world);
-        activePreviews.put(previewId, previewWorld);
-        return previewWorld;
+        return new PreviewWorld(worldName, player != null ? player.getUniqueId().toString() : playerUuid, pipelineHolder, world, datapackBuild);
     }
 
-    private void placeLoadedPreviewFeatures(World world, TerrainPipelineHolder pipelineHolder) {
-        if (world == null || pipelineHolder == null) {
-            return;
-        }
-        WorldGenFeaturePopulator populator = new WorldGenFeaturePopulator(pipelineHolder);
-        for (org.bukkit.Chunk chunk : world.getLoadedChunks()) {
-            populator.placeFeatures(world, new java.util.Random(chunk.getChunkKey() ^ world.getSeed()), chunk);
-        }
-    }
-
-    private void schedulePreviewFeaturePass(World world, TerrainPipelineHolder pipelineHolder) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> placeLoadedPreviewFeatures(world, pipelineHolder), 20L);
+    private void configurePreviewWorld(World world) {
+        world.setAutoSave(false);
+        world.setKeepSpawnInMemory(false);
+        world.setViewDistance(4);
+        world.setSimulationDistance(4);
     }
 
     private String normalizePreviewId(String previewId) {
-        return "worldgen";
+        String value = previewId == null || previewId.isBlank() ? "worldgen" : previewId.trim().toLowerCase(java.util.Locale.ROOT);
+        value = value.replaceAll("[^a-z0-9_\\-]+", "_");
+        return value.isBlank() ? "worldgen" : value;
+    }
+
+    private boolean isPreviewWorldName(String worldName) {
+        return worldName != null && worldName.startsWith("resync_preview_");
     }
 
     private Map<String, Location> capturePreviewPlayerLocations(PreviewWorld previous) {
@@ -185,8 +239,24 @@ public class WorldGenPreviewManager {
     private void unloadWorldSync(String worldName) {
         World world = Bukkit.getWorld(worldName);
         if (world != null) {
+            World fallbackWorld = findFallbackWorld(worldName);
+            if (fallbackWorld != null) {
+                Location fallbackLocation = fallbackWorld.getSpawnLocation();
+                for (Player player : new ArrayList<>(world.getPlayers())) {
+                    player.teleport(fallbackLocation);
+                }
+            }
             Bukkit.unloadWorld(world, true);
         }
+    }
+
+    private World findFallbackWorld(String excludedWorldName) {
+        for (World world : Bukkit.getWorlds()) {
+            if (!world.getName().equals(excludedWorldName) && !isPreviewWorldName(world.getName())) {
+                return world;
+            }
+        }
+        return null;
     }
 
     private void deletePreviewWorld(String worldName) {
@@ -217,6 +287,6 @@ public class WorldGenPreviewManager {
         }
     }
 
-    public record PreviewWorld(String worldName, String creatorPlayerUuid, TerrainPipelineHolder pipelineHolder, World world) {
+    public record PreviewWorld(String worldName, String creatorPlayerUuid, TerrainPipelineHolder pipelineHolder, World world, WorldGenDatapackBuild datapackBuild) {
     }
 }

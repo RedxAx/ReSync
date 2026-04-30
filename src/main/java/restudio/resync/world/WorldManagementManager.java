@@ -49,6 +49,9 @@ import restudio.resync.ReSync;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.worldgen.WorldGenProjectStorage;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
+import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
+import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
@@ -82,6 +85,8 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private final PlayerTrackingService trackingService;
     private final WorldStateStorage storage;
     private final WorldGenProjectStorage worldGenProjectStorage;
+    private final WorldGenDatapackCompiler worldGenDatapackCompiler;
+    private final WorldGenDatapackInstaller worldGenDatapackInstaller;
     private final WorldMapService mapService;
     private final Map<String, WorldRegistryEntry> worlds = new ConcurrentHashMap<>();
     private final Map<String, WorldPortal> portals = new ConcurrentHashMap<>();
@@ -100,6 +105,8 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         this.trackingService = trackingService;
         this.storage = new WorldStateStorage(plugin);
         this.worldGenProjectStorage = new WorldGenProjectStorage(plugin);
+        this.worldGenDatapackCompiler = new WorldGenDatapackCompiler(plugin);
+        this.worldGenDatapackInstaller = new WorldGenDatapackInstaller(plugin);
         this.mapService = new DefaultWorldMapService();
         for (WorldRegistryEntry entry : storage.loadWorlds()) {
             if (entry == null || entry.getWorldName() == null || entry.getWorldName().isBlank()) {
@@ -719,6 +726,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (parsedSeed != null) {
             creator.seed(parsedSeed);
         }
+        compileWorldGenDatapack(generator, generatorConfig, normalizedName);
         ChunkGenerator chunkGenerator = createGenerator(generator, generatorConfig);
         if (chunkGenerator != null) {
             creator.generator(chunkGenerator);
@@ -1973,6 +1981,17 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         }
         ChunkGenerator builtIn = ReSyncBuiltInGenerators.createGenerator(generator, generatorConfig);
         return builtIn;
+    }
+
+    private WorldGenDatapackBuild compileWorldGenDatapack(String generator, String generatorConfig, String worldName) {
+        if (!"worldgen_project".equalsIgnoreCase(generator) && !"WORLDGEN_PROJECT".equalsIgnoreCase(generator)) {
+            return null;
+        }
+        WorldGenProject project = worldGenProjectStorage.getProject(generatorConfig);
+        if (project == null) {
+            throw new IllegalArgumentException("WorldGen Project Missing");
+        }
+        return null;
     }
 
     private void applyProfileState(WorldRegistryEntry entry, World world) {

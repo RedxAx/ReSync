@@ -113,6 +113,11 @@ public class WorldGenNodeDefinition {
             return this;
         }
 
+        public Builder hidden(boolean hidden) {
+            this.hidden = hidden;
+            return this;
+        }
+
         public WorldGenNodeDefinition build() {
             if ("World Gen".equals(category)) {
                 category = inferCategory(id);

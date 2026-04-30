@@ -13,26 +13,29 @@ import java.util.Map;
 public class TerrainPipeline {
     public static final String ANY_POLICY_KEY = "worldgen:any";
     private final Map<String, PipelineNode> nodes;
+    private final Map<PipelineNode, String> nodeIds;
     private final Map<String, Map<String, PipelineNode>> upstreams;
     private final List<PipelineNode> outputNodes;
     private final PipelineNode heightOutput;
+    private final PipelineNode densityOutput;
+    private final PipelineNode continentalnessOutput;
+    private final PipelineNode erosionOutput;
+    private final PipelineNode weirdnessOutput;
+    private final PipelineNode depthOutput;
+    private final PipelineNode temperatureOutput;
+    private final PipelineNode humidityOutput;
     private final PipelineNode biomeOutput;
     private final PipelineNode blockOutput;
     private final PipelineNode caveOutput;
     private final PipelineNode featureOutput;
     private final PipelineNode structureOutput;
     private final PipelineNode spawnOutput;
-    private final boolean vanillaFeaturesEnabled;
-    private final boolean vanillaStructuresEnabled;
-    private final boolean vanillaSpawnsEnabled;
-    private final Map<String, Boolean> biomeVanillaFeatureOverrides;
-    private final Map<String, Boolean> biomeVanillaStructureOverrides;
-    private final Map<String, Boolean> biomeVanillaSpawnOverrides;
+    private final CompiledBiomePolicy biomePolicy;
     private final List<WorldGenSpawnRule> spawnRules;
 
     public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
                            PipelineNode heightOutput, PipelineNode biomeOutput, PipelineNode blockOutput) {
-        this(nodes, upstreams, outputNodes, heightOutput, biomeOutput, blockOutput, null, null, null, null, true, true, true, Map.of(), Map.of(), Map.of(), List.of());
+        this(nodes, upstreams, outputNodes, heightOutput, null, null, null, null, null, null, null, biomeOutput, blockOutput, null, null, null, null, true, true, true, 63, Material.STONE, Material.WATER, Map.of(), Map.of(), Map.of(), List.of());
     }
 
     public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
@@ -40,8 +43,8 @@ public class TerrainPipeline {
                            PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
                            boolean vanillaFeaturesEnabled, boolean vanillaStructuresEnabled, boolean vanillaSpawnsEnabled,
                            Map<String, Boolean> biomeVanillaFeatureOverrides) {
-        this(nodes, upstreams, outputNodes, heightOutput, biomeOutput, blockOutput, caveOutput, featureOutput, structureOutput, spawnOutput,
-            vanillaFeaturesEnabled, vanillaStructuresEnabled, vanillaSpawnsEnabled, biomeVanillaFeatureOverrides, Map.of(), Map.of(), List.of());
+        this(nodes, upstreams, outputNodes, heightOutput, null, null, null, null, null, null, null, biomeOutput, blockOutput, caveOutput, featureOutput, structureOutput, spawnOutput,
+            new CompiledBiomePolicy(vanillaFeaturesEnabled, vanillaStructuresEnabled, vanillaSpawnsEnabled, biomeVanillaFeatureOverrides, Map.of(), Map.of()), 63, Material.STONE, Material.WATER, List.of());
     }
 
     public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
@@ -50,31 +53,123 @@ public class TerrainPipeline {
                            boolean vanillaFeaturesEnabled, boolean vanillaStructuresEnabled, boolean vanillaSpawnsEnabled,
                            Map<String, Boolean> biomeVanillaFeatureOverrides, Map<String, Boolean> biomeVanillaStructureOverrides,
                            Map<String, Boolean> biomeVanillaSpawnOverrides, List<WorldGenSpawnRule> spawnRules) {
+        this(nodes, upstreams, outputNodes, heightOutput, null, null, null, null, null, null, null, biomeOutput, blockOutput, caveOutput, featureOutput, structureOutput, spawnOutput,
+            new CompiledBiomePolicy(vanillaFeaturesEnabled, vanillaStructuresEnabled, vanillaSpawnsEnabled, biomeVanillaFeatureOverrides, biomeVanillaStructureOverrides, biomeVanillaSpawnOverrides), 63, Material.STONE, Material.WATER, spawnRules);
+    }
+
+    public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
+                           PipelineNode heightOutput, PipelineNode densityOutput, PipelineNode continentalnessOutput, PipelineNode erosionOutput,
+                           PipelineNode weirdnessOutput, PipelineNode depthOutput, PipelineNode temperatureOutput, PipelineNode humidityOutput,
+                           PipelineNode biomeOutput, PipelineNode blockOutput, PipelineNode caveOutput,
+                           PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
+                           boolean vanillaFeaturesEnabled, boolean vanillaStructuresEnabled, boolean vanillaSpawnsEnabled,
+                           int seaLevel, Material defaultBlock, Material defaultFluid,
+                           Map<String, Boolean> biomeVanillaFeatureOverrides, Map<String, Boolean> biomeVanillaStructureOverrides,
+                           Map<String, Boolean> biomeVanillaSpawnOverrides, List<WorldGenSpawnRule> spawnRules) {
+        this(nodes, upstreams, outputNodes, heightOutput, densityOutput, continentalnessOutput, erosionOutput, weirdnessOutput, depthOutput, temperatureOutput,
+            humidityOutput, biomeOutput, blockOutput, caveOutput, featureOutput, structureOutput, spawnOutput,
+            new CompiledBiomePolicy(vanillaFeaturesEnabled, vanillaStructuresEnabled, vanillaSpawnsEnabled, biomeVanillaFeatureOverrides, biomeVanillaStructureOverrides, biomeVanillaSpawnOverrides),
+            seaLevel, defaultBlock, defaultFluid, spawnRules);
+    }
+
+    public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
+                           PipelineNode heightOutput, PipelineNode densityOutput, PipelineNode continentalnessOutput, PipelineNode erosionOutput,
+                           PipelineNode weirdnessOutput, PipelineNode depthOutput, PipelineNode temperatureOutput, PipelineNode humidityOutput,
+                           PipelineNode biomeOutput, PipelineNode blockOutput, PipelineNode caveOutput,
+                           PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
+                           CompiledBiomePolicy biomePolicy, int seaLevel, Material defaultBlock, Material defaultFluid,
+                           List<WorldGenSpawnRule> spawnRules) {
         this.nodes = Map.copyOf(nodes);
+        this.nodeIds = indexNodeIds(this.nodes);
         this.upstreams = copyUpstreams(upstreams);
         this.outputNodes = List.copyOf(outputNodes);
         this.heightOutput = heightOutput;
+        this.densityOutput = densityOutput;
+        this.continentalnessOutput = continentalnessOutput;
+        this.erosionOutput = erosionOutput;
+        this.weirdnessOutput = weirdnessOutput;
+        this.depthOutput = depthOutput;
+        this.temperatureOutput = temperatureOutput;
+        this.humidityOutput = humidityOutput;
         this.biomeOutput = biomeOutput;
         this.blockOutput = blockOutput;
         this.caveOutput = caveOutput;
         this.featureOutput = featureOutput;
         this.structureOutput = structureOutput;
         this.spawnOutput = spawnOutput;
-        this.vanillaFeaturesEnabled = vanillaFeaturesEnabled;
-        this.vanillaStructuresEnabled = vanillaStructuresEnabled;
-        this.vanillaSpawnsEnabled = vanillaSpawnsEnabled;
-        this.biomeVanillaFeatureOverrides = biomeVanillaFeatureOverrides != null ? Map.copyOf(biomeVanillaFeatureOverrides) : Map.of();
-        this.biomeVanillaStructureOverrides = biomeVanillaStructureOverrides != null ? Map.copyOf(biomeVanillaStructureOverrides) : Map.of();
-        this.biomeVanillaSpawnOverrides = biomeVanillaSpawnOverrides != null ? Map.copyOf(biomeVanillaSpawnOverrides) : Map.of();
+        this.biomePolicy = biomePolicy != null ? biomePolicy : new CompiledBiomePolicy(false, false, false, Map.of(), Map.of(), Map.of());
+        this.seaLevel = seaLevel;
+        this.defaultBlock = defaultBlock == null ? Material.STONE : defaultBlock;
+        this.defaultFluid = defaultFluid == null ? Material.WATER : defaultFluid;
         this.spawnRules = spawnRules != null ? List.copyOf(spawnRules) : List.of();
     }
 
-    public float getHeight(float x, float z, int seed, WorldInfo worldInfo) {
+    private final int seaLevel;
+    private final Material defaultBlock;
+    private final Material defaultFluid;
+
+    public float getHeight(float x, float z, long seed, WorldInfo worldInfo) {
+        if (heightOutput == null) {
+            return deriveHeight(x, z, seed, worldInfo);
+        }
         Object value = evaluate(heightOutput, new EvalContext(x, 0f, z, seed, worldInfo), new HashMap<>());
         return asFloat(value, 64f);
     }
 
-    public Biome getBiome(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public boolean hasDensityOutput() {
+        return densityOutput != null;
+    }
+
+    public float getDensity(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        if (densityOutput != null) {
+            return asFloat(evaluate(densityOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>()), 0f);
+        }
+        return (getHeight(x, z, seed, worldInfo) - y) / 12f;
+    }
+
+    public float getContinentalness(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(continentalnessOutput, x, y, z, seed, worldInfo, 0f);
+    }
+
+    public float getErosion(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(erosionOutput, x, y, z, seed, worldInfo, 0f);
+    }
+
+    public float getWeirdness(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(weirdnessOutput, x, y, z, seed, worldInfo, 0f);
+    }
+
+    public float getDepth(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(depthOutput, x, y, z, seed, worldInfo, 0f);
+    }
+
+    public float getTemperature(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(temperatureOutput, x, y, z, seed, worldInfo, 0.5f);
+    }
+
+    public float getHumidity(float x, float y, float z, long seed, WorldInfo worldInfo) {
+        return field(humidityOutput, x, y, z, seed, worldInfo, 0.5f);
+    }
+
+    private float field(PipelineNode output, float x, float y, float z, long seed, WorldInfo worldInfo, float fallback) {
+        if (output == null) {
+            return fallback;
+        }
+        return asFloat(evaluate(output, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>()), fallback);
+    }
+
+    private float deriveHeight(float x, float z, long seed, WorldInfo worldInfo) {
+        int min = worldInfo == null ? -64 : worldInfo.getMinHeight();
+        int max = worldInfo == null ? 320 : worldInfo.getMaxHeight();
+        for (int y = max - 1; y >= min; y--) {
+            if (getDensity(x, y, z, seed, worldInfo) > 0f) {
+                return y;
+            }
+        }
+        return seaLevel;
+    }
+
+    public Biome getBiome(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (biomeOutput == null) return Biome.PLAINS;
         Object raw = evaluate(biomeOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         if (raw instanceof BiomeChoice choice) return biome(choice.biomeId(), Biome.PLAINS);
@@ -86,9 +181,9 @@ public class TerrainPipeline {
         return biomes[index];
     }
 
-    public BiomeChoice getBiomeChoice(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public BiomeChoice getBiomeChoice(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (biomeOutput == null) {
-            return new BiomeChoice("minecraft:plains", vanillaFeaturesEnabled, vanillaStructuresEnabled, vanillaSpawnsEnabled);
+            return new BiomeChoice("minecraft:plains", biomePolicy.defaultFeatures(), biomePolicy.defaultStructures(), biomePolicy.defaultSpawns());
         }
         Object raw = evaluate(biomeOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         if (raw instanceof BiomeChoice choice) {
@@ -107,88 +202,104 @@ public class TerrainPipeline {
         return new BiomeChoice(biomeId, isVanillaFeaturesEnabled(biome), isVanillaStructuresEnabled(biome), isVanillaSpawnsEnabled(biome));
     }
 
-    public Material getBlock(float x, float y, float z, int seed, float height, WorldInfo worldInfo) {
-        if (blockOutput == null) return y >= height ? Material.GRASS_BLOCK : Material.STONE;
+    public Material getBlock(float x, float y, float z, long seed, float height, WorldInfo worldInfo) {
+        if (blockOutput == null) return defaultSurfaceBlock(y, height);
         Object value = evaluate(blockOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         if (value instanceof Material material) return material;
-        if (value instanceof String id) return material(id, y >= height ? Material.GRASS_BLOCK : Material.STONE);
-        return y >= height ? Material.GRASS_BLOCK : Material.STONE;
+        if (value instanceof String id) return material(id, defaultSurfaceBlock(y, height));
+        return defaultSurfaceBlock(y, height);
     }
 
-    public float getCaveDensity(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public Material getDefaultBlock() {
+        return defaultBlock;
+    }
+
+    public Material getDefaultFluid() {
+        return defaultFluid;
+    }
+
+    public int getSeaLevel() {
+        return seaLevel;
+    }
+
+    private Material defaultSurfaceBlock(float y, float height) {
+        if (y >= height) {
+            return height <= seaLevel + 1 ? Material.SAND : Material.GRASS_BLOCK;
+        }
+        if (y >= height - 4) {
+            return height <= seaLevel + 1 ? Material.SANDSTONE : Material.DIRT;
+        }
+        return defaultBlock;
+    }
+
+    public float getCaveDensity(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (caveOutput == null) return 1f;
         return asFloat(evaluate(caveOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>()), 1f);
     }
 
-    public String getFeaturePlacement(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public String getFeaturePlacement(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (featureOutput == null) return "";
         Object value = evaluate(featureOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         return value == null ? "" : String.valueOf(value);
     }
 
-    public String getStructurePlacement(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public String getStructurePlacement(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (structureOutput == null) return "";
         Object value = evaluate(structureOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         return value == null ? "" : String.valueOf(value);
     }
 
-    public String getSpawnTable(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public String getSpawnTable(float x, float y, float z, long seed, WorldInfo worldInfo) {
         if (spawnOutput == null) return "";
         Object value = evaluate(spawnOutput, new EvalContext(x, y, z, seed, worldInfo), new HashMap<>());
         return value == null ? "" : String.valueOf(value);
     }
 
     public boolean isVanillaFeaturesEnabled() {
-        return vanillaFeaturesEnabled;
+        return biomePolicy.defaultFeatures();
     }
 
     public boolean hasAnyVanillaFeaturesEnabled() {
-        return vanillaFeaturesEnabled || biomeVanillaFeatureOverrides.containsValue(true);
+        return biomePolicy.hasAnyFeatures();
     }
 
     public boolean isVanillaFeaturesEnabled(Biome biome) {
-        if (biome == null) return vanillaFeaturesEnabled;
-        String key = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
-        return biomeVanillaFeatureOverrides.getOrDefault(key, vanillaFeaturesEnabled);
+        return biomePolicy.features(biome);
     }
 
-    public boolean isVanillaFeaturesEnabled(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public boolean isVanillaFeaturesEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {
         return getBiomeChoice(x, y, z, seed, worldInfo).keepVanillaFeatures();
     }
 
     public boolean isVanillaStructuresEnabled() {
-        return vanillaStructuresEnabled;
+        return biomePolicy.defaultStructures();
     }
 
     public boolean hasAnyVanillaStructuresEnabled() {
-        return vanillaStructuresEnabled || biomeVanillaStructureOverrides.containsValue(true);
+        return biomePolicy.hasAnyStructures();
     }
 
     public boolean isVanillaStructuresEnabled(Biome biome) {
-        if (biome == null) return vanillaStructuresEnabled;
-        String key = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
-        return biomeVanillaStructureOverrides.getOrDefault(key, vanillaStructuresEnabled);
+        return biomePolicy.structures(biome);
     }
 
-    public boolean isVanillaStructuresEnabled(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public boolean isVanillaStructuresEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {
         return getBiomeChoice(x, y, z, seed, worldInfo).keepVanillaStructures();
     }
 
     public boolean isVanillaSpawnsEnabled() {
-        return vanillaSpawnsEnabled;
+        return biomePolicy.defaultSpawns();
     }
 
     public boolean hasAnyVanillaSpawnsEnabled() {
-        return vanillaSpawnsEnabled || biomeVanillaSpawnOverrides.containsValue(true);
+        return biomePolicy.hasAnySpawns();
     }
 
     public boolean isVanillaSpawnsEnabled(Biome biome) {
-        if (biome == null) return vanillaSpawnsEnabled;
-        String key = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
-        return biomeVanillaSpawnOverrides.getOrDefault(key, vanillaSpawnsEnabled);
+        return biomePolicy.spawns(biome);
     }
 
-    public boolean isVanillaSpawnsEnabled(float x, float y, float z, int seed, WorldInfo worldInfo) {
+    public boolean isVanillaSpawnsEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {
         return getBiomeChoice(x, y, z, seed, worldInfo).keepVanillaSpawns();
     }
 
@@ -216,10 +327,7 @@ public class TerrainPipeline {
     }
 
     private String findNodeId(PipelineNode node) {
-        for (Map.Entry<String, PipelineNode> entry : nodes.entrySet()) {
-            if (entry.getValue() == node) return entry.getKey();
-        }
-        return "";
+        return nodeIds.getOrDefault(node, "");
     }
 
     private static float asFloat(Object value, float fallback) {
@@ -256,6 +364,12 @@ public class TerrainPipeline {
         Map<String, Map<String, PipelineNode>> copy = new HashMap<>();
         upstreams.forEach((key, value) -> copy.put(key, Map.copyOf(value)));
         return Map.copyOf(copy);
+    }
+
+    private static Map<PipelineNode, String> indexNodeIds(Map<String, PipelineNode> nodes) {
+        Map<PipelineNode, String> ids = new HashMap<>();
+        nodes.forEach((id, node) -> ids.put(node, id));
+        return Map.copyOf(ids);
     }
 
     private class MemoizingUpstreamMap extends HashMap<String, PipelineNode> {

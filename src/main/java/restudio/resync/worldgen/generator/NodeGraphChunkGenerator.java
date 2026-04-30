@@ -1,6 +1,8 @@
 package restudio.resync.worldgen.generator;
 
 import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.WorldInfo;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
@@ -33,27 +35,63 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
         TerrainPipeline pipeline = pipelineHolder.get();
         int minHeight = worldInfo.getMinHeight();
         int maxHeight = worldInfo.getMaxHeight();
-        int seed = (int) worldInfo.getSeed();
+        long seed = worldInfo.getSeed();
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
                 int worldX = chunkX * 16 + localX;
                 int worldZ = chunkZ * 16 + localZ;
-                int height = Math.max(minHeight, Math.min(maxHeight - 1, Math.round(pipeline.getHeight(worldX, worldZ, seed, worldInfo))));
-                for (int y = minHeight; y <= height; y++) {
-                    Material material = y == height ? pipeline.getBlock(worldX, y, worldZ, seed, height, worldInfo) : Material.STONE;
-                    if (y < height - 3 && pipeline.getCaveDensity(worldX, y, worldZ, seed, worldInfo) < -0.38f) {
-                        material = Material.AIR;
+                if (pipeline.hasDensityOutput()) {
+                    generateDensityColumn(worldInfo, pipeline, seed, chunkData, localX, localZ, worldX, worldZ, minHeight, maxHeight);
+                } else {
+                    int height = Math.max(minHeight, Math.min(maxHeight - 1, Math.round(pipeline.getHeight(worldX, worldZ, seed, worldInfo))));
+                    for (int y = minHeight; y <= height; y++) {
+                        Material material = y == height ? pipeline.getBlock(worldX, y, worldZ, seed, height, worldInfo) : pipeline.getDefaultBlock();
+                        if (y < height - 3 && pipeline.getCaveDensity(worldX, y, worldZ, seed, worldInfo) < -0.38f) {
+                            material = Material.AIR;
+                        }
+                        chunkData.setBlock(localX, y, localZ, material);
                     }
-                    chunkData.setBlock(localX, y, localZ, material);
+                    fillSea(pipeline, chunkData, localX, localZ, height + 1, minHeight, maxHeight);
                 }
             }
+        }
+    }
+
+    private void generateDensityColumn(WorldInfo worldInfo, TerrainPipeline pipeline, long seed, ChunkData chunkData, int localX, int localZ, int worldX, int worldZ, int minHeight, int maxHeight) {
+        boolean[] solid = new boolean[maxHeight - minHeight];
+        int surface = minHeight - 1;
+        for (int y = minHeight; y < maxHeight; y++) {
+            float density = pipeline.getDensity(worldX, y, worldZ, seed, worldInfo);
+            boolean isSolid = density > 0f && pipeline.getCaveDensity(worldX, y, worldZ, seed, worldInfo) >= -0.38f;
+            solid[y - minHeight] = isSolid;
+            if (isSolid) {
+                surface = y;
+            }
+        }
+        for (int y = minHeight; y < maxHeight; y++) {
+            if (solid[y - minHeight]) {
+                Material material = y >= surface - 4 ? pipeline.getBlock(worldX, y, worldZ, seed, surface, worldInfo) : pipeline.getDefaultBlock();
+                chunkData.setBlock(localX, y, localZ, material);
+            } else if (y <= pipeline.getSeaLevel() && y >= surface) {
+                chunkData.setBlock(localX, y, localZ, pipeline.getDefaultFluid());
+            }
+        }
+    }
+
+    private void fillSea(TerrainPipeline pipeline, ChunkData chunkData, int localX, int localZ, int startY, int minHeight, int maxHeight) {
+        int seaLevel = Math.min(pipeline.getSeaLevel(), maxHeight - 1);
+        for (int y = Math.max(startY, minHeight); y <= seaLevel; y++) {
+            chunkData.setBlock(localX, y, localZ, pipeline.getDefaultFluid());
         }
     }
 
     @Override
     public void generateSurface(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
         TerrainPipeline pipeline = pipelineHolder.get();
-        int seed = (int) worldInfo.getSeed();
+        if (pipeline.hasDensityOutput()) {
+            return;
+        }
+        long seed = worldInfo.getSeed();
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
                 int worldX = chunkX * 16 + localX;
@@ -89,15 +127,15 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
 
     @Override
     public boolean shouldGenerateDecorations() {
-        return pipelineHolder.get().hasAnyVanillaStructuresEnabled();
+        return pipelineHolder.get().hasAnyVanillaFeaturesEnabled();
     }
 
     @Override
     public boolean shouldGenerateDecorations(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
         TerrainPipeline pipeline = pipelineHolder.get();
-        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        long seed = worldInfo != null ? worldInfo.getSeed() : 0L;
         int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
-        return pipeline.isVanillaStructuresEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
+        return pipeline.isVanillaFeaturesEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
     }
 
     @Override
@@ -108,7 +146,7 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
     @Override
     public boolean shouldGenerateMobs(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
         TerrainPipeline pipeline = pipelineHolder.get();
-        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        long seed = worldInfo != null ? worldInfo.getSeed() : 0L;
         int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
         return pipeline.isVanillaSpawnsEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
     }
@@ -121,14 +159,14 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
     @Override
     public boolean shouldGenerateStructures(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
         TerrainPipeline pipeline = pipelineHolder.get();
-        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        long seed = worldInfo != null ? worldInfo.getSeed() : 0L;
         int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
         return pipeline.isVanillaStructuresEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
     }
 
     @Override
-    public List<org.bukkit.generator.BlockPopulator> getDefaultPopulators(org.bukkit.World world) {
-        return List.of(new WorldGenFeaturePopulator(pipelineHolder));
+    public List<BlockPopulator> getDefaultPopulators(World world) {
+        return List.of();
     }
 
 }

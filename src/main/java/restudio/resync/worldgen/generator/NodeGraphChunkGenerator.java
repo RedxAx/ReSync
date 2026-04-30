@@ -4,18 +4,33 @@ import org.bukkit.Material;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.WorldInfo;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
+import restudio.resync.worldgen.pipeline.TerrainPipelineHolder;
 
+import java.util.List;
 import java.util.Random;
 
 public class NodeGraphChunkGenerator extends ChunkGenerator {
-    private final TerrainPipeline pipeline;
+    private final TerrainPipelineHolder pipelineHolder;
 
     public NodeGraphChunkGenerator(TerrainPipeline pipeline) {
-        this.pipeline = pipeline;
+        this(new TerrainPipelineHolder(pipeline));
+    }
+
+    public NodeGraphChunkGenerator(TerrainPipelineHolder pipelineHolder) {
+        this.pipelineHolder = pipelineHolder;
+    }
+
+    public TerrainPipeline getPipeline() {
+        return pipelineHolder.get();
+    }
+
+    public TerrainPipelineHolder getPipelineHolder() {
+        return pipelineHolder;
     }
 
     @Override
     public void generateNoise(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
+        TerrainPipeline pipeline = pipelineHolder.get();
         int minHeight = worldInfo.getMinHeight();
         int maxHeight = worldInfo.getMaxHeight();
         int seed = (int) worldInfo.getSeed();
@@ -37,6 +52,7 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
 
     @Override
     public void generateSurface(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
+        TerrainPipeline pipeline = pipelineHolder.get();
         int seed = (int) worldInfo.getSeed();
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
@@ -73,16 +89,46 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
 
     @Override
     public boolean shouldGenerateDecorations() {
-        return pipeline.isVanillaFeaturesEnabled();
+        return pipelineHolder.get().hasAnyVanillaStructuresEnabled();
+    }
+
+    @Override
+    public boolean shouldGenerateDecorations(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
+        TerrainPipeline pipeline = pipelineHolder.get();
+        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
+        return pipeline.isVanillaStructuresEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
     }
 
     @Override
     public boolean shouldGenerateMobs() {
-        return pipeline.isVanillaSpawnsEnabled();
+        return pipelineHolder.get().hasAnyVanillaSpawnsEnabled();
+    }
+
+    @Override
+    public boolean shouldGenerateMobs(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
+        TerrainPipeline pipeline = pipelineHolder.get();
+        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
+        return pipeline.isVanillaSpawnsEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
     }
 
     @Override
     public boolean shouldGenerateStructures() {
-        return pipeline.isVanillaStructuresEnabled();
+        return pipelineHolder.get().hasAnyVanillaStructuresEnabled();
     }
+
+    @Override
+    public boolean shouldGenerateStructures(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
+        TerrainPipeline pipeline = pipelineHolder.get();
+        int seed = worldInfo != null ? (int) worldInfo.getSeed() : 0;
+        int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
+        return pipeline.isVanillaStructuresEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
+    }
+
+    @Override
+    public List<org.bukkit.generator.BlockPopulator> getDefaultPopulators(org.bukkit.World world) {
+        return List.of(new WorldGenFeaturePopulator(pipelineHolder));
+    }
+
 }

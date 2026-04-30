@@ -1,6 +1,7 @@
 package restudio.resync.worldgen.preview;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
@@ -10,8 +11,11 @@ import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
+import restudio.resync.worldgen.generator.WorldGenFeaturePopulator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
+import restudio.resync.worldgen.pipeline.TerrainPipelineHolder;
+import restudio.resync.worldgen.runtime.WorldGenRuntimeRegistry;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,15 +47,16 @@ public class WorldGenPreviewManager {
     }
 
     private void createPreview(String previewId, String playerUuid, TerrainPipeline pipeline, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
-        PreviewWorld previous = activePreviews.remove(previewId);
-        String worldName = "resync_preview_" + previewId.replaceAll("[^A-Za-z0-9_-]", "_") + "_" + previewRevision.incrementAndGet();
+        String normalizedPreviewId = normalizePreviewId(previewId);
+        PreviewWorld previous = activePreviews.remove(normalizedPreviewId);
+        String worldName = "resync_preview_" + normalizedPreviewId + "_" + previewRevision.incrementAndGet();
         Bukkit.getScheduler().runTask(plugin, () -> {
             try {
+                Map<String, Location> previousLocations = capturePreviewPlayerLocations(previous);
+                PreviewWorld previewWorld = createWorldSync(normalizedPreviewId, playerUuid, pipeline, worldName, environment, seed, previousLocations);
                 if (previous != null) {
-                    unloadWorldSync(previous.worldName());
-                    deleteWorldFolderLater(previous.worldName(), 200L);
+                    deletePreviewWorld(previous.worldName());
                 }
-                PreviewWorld previewWorld = createWorldSync(previewId, playerUuid, pipeline, worldName, environment, seed);
                 if (onSuccess != null) {
                     onSuccess.accept(previewWorld);
                 }
@@ -64,13 +69,13 @@ public class WorldGenPreviewManager {
     }
 
     public void updatePreview(String previewId, WorldGenGraph graph, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
-        PreviewWorld current = activePreviews.get(previewId);
+        PreviewWorld current = activePreviews.get(normalizePreviewId(previewId));
         if (current == null) throw new IllegalArgumentException("Preview Missing");
         createPreview(previewId, current.creatorPlayerUuid(), graph, current.world().getEnvironment(), current.world().getSeed(), onSuccess, onError);
     }
 
     public void stopPreview(String previewId, Runnable onComplete, Consumer<Throwable> onError) {
-        PreviewWorld current = activePreviews.remove(previewId);
+        PreviewWorld current = activePreviews.remove(normalizePreviewId(previewId));
         if (current == null) {
             if (onComplete != null) {
                 onComplete.run();
@@ -79,8 +84,7 @@ public class WorldGenPreviewManager {
         }
         Bukkit.getScheduler().runTask(plugin, () -> {
             try {
-                unloadWorldSync(current.worldName());
-                deleteWorldFolderLater(current.worldName(), 200L);
+                deletePreviewWorld(current.worldName());
                 if (onComplete != null) {
                     onComplete.run();
                 }
@@ -92,22 +96,74 @@ public class WorldGenPreviewManager {
         });
     }
 
-    private PreviewWorld createWorldSync(String previewId, String playerUuid, TerrainPipeline pipeline, String worldName, World.Environment environment, long seed) {
+    private PreviewWorld createWorldSync(String previewId, String playerUuid, TerrainPipeline pipeline, String worldName, World.Environment environment, long seed, Map<String, Location> previousLocations) {
+        TerrainPipelineHolder pipelineHolder = new TerrainPipelineHolder(pipeline);
         WorldCreator creator = new WorldCreator(worldName);
-        creator.generator(new NodeGraphChunkGenerator(pipeline));
-        creator.biomeProvider(new NodeGraphBiomeProvider(pipeline));
+        creator.generator(new NodeGraphChunkGenerator(pipelineHolder));
+        creator.biomeProvider(new NodeGraphBiomeProvider(pipelineHolder));
         creator.environment(environment);
         creator.seed(seed);
         creator.type(WorldType.NORMAL);
+        creator.generateStructures(pipeline.hasAnyVanillaStructuresEnabled());
         World world = creator.createWorld();
         if (world == null) throw new IllegalStateException("Preview World Failed");
+        WorldGenRuntimeRegistry.register(world, pipelineHolder);
         Player player = resolvePreviewPlayer(playerUuid);
-        if (player != null) {
+        restorePreviewPlayers(world, previousLocations, player);
+        if (player != null && !previousLocations.containsKey(player.getUniqueId().toString())) {
             player.teleport(world.getSpawnLocation());
         }
-        PreviewWorld previewWorld = new PreviewWorld(worldName, player != null ? player.getUniqueId().toString() : playerUuid, pipeline, world);
+        schedulePreviewFeaturePass(world, pipelineHolder);
+        PreviewWorld previewWorld = new PreviewWorld(worldName, player != null ? player.getUniqueId().toString() : playerUuid, pipelineHolder, world);
         activePreviews.put(previewId, previewWorld);
         return previewWorld;
+    }
+
+    private void placeLoadedPreviewFeatures(World world, TerrainPipelineHolder pipelineHolder) {
+        if (world == null || pipelineHolder == null) {
+            return;
+        }
+        WorldGenFeaturePopulator populator = new WorldGenFeaturePopulator(pipelineHolder);
+        for (org.bukkit.Chunk chunk : world.getLoadedChunks()) {
+            populator.placeFeatures(world, new java.util.Random(chunk.getChunkKey() ^ world.getSeed()), chunk);
+        }
+    }
+
+    private void schedulePreviewFeaturePass(World world, TerrainPipelineHolder pipelineHolder) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> placeLoadedPreviewFeatures(world, pipelineHolder), 20L);
+    }
+
+    private String normalizePreviewId(String previewId) {
+        return "worldgen";
+    }
+
+    private Map<String, Location> capturePreviewPlayerLocations(PreviewWorld previous) {
+        Map<String, Location> locations = new ConcurrentHashMap<>();
+        if (previous == null || previous.world() == null) {
+            return locations;
+        }
+        for (Player player : previous.world().getPlayers()) {
+            locations.put(player.getUniqueId().toString(), player.getLocation().clone());
+        }
+        return locations;
+    }
+
+    private void restorePreviewPlayers(World world, Map<String, Location> previousLocations, Player fallbackPlayer) {
+        for (Map.Entry<String, Location> entry : previousLocations.entrySet()) {
+            try {
+                Player player = Bukkit.getPlayer(UUID.fromString(entry.getKey()));
+                if (player == null) {
+                    continue;
+                }
+                Location previousLocation = entry.getValue();
+                Location target = new Location(world, previousLocation.getX(), previousLocation.getY(), previousLocation.getZ(), previousLocation.getYaw(), previousLocation.getPitch());
+                player.teleport(target);
+            } catch (Exception ignored) {
+            }
+        }
+        if (previousLocations.isEmpty() && fallbackPlayer != null) {
+            fallbackPlayer.teleport(world.getSpawnLocation());
+        }
     }
 
     private Player resolvePreviewPlayer(String playerUuid) {
@@ -133,12 +189,11 @@ public class WorldGenPreviewManager {
         }
     }
 
-    private void deleteWorldFolderLater(String worldName, long delayTicks) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Path root = resolveWorldRoot();
-            Path folder = resolveWorldFolder(root, worldName);
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> deleteWorldFolder(root, folder));
-        }, delayTicks);
+    private void deletePreviewWorld(String worldName) {
+        unloadWorldSync(worldName);
+        Path root = resolveWorldRoot();
+        Path folder = resolveWorldFolder(root, worldName);
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> deleteWorldFolder(root, folder));
     }
 
     private Path resolveWorldRoot() {
@@ -162,6 +217,6 @@ public class WorldGenPreviewManager {
         }
     }
 
-    public record PreviewWorld(String worldName, String creatorPlayerUuid, TerrainPipeline pipeline, World world) {
+    public record PreviewWorld(String worldName, String creatorPlayerUuid, TerrainPipelineHolder pipelineHolder, World world) {
     }
 }

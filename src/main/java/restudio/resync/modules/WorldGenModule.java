@@ -12,18 +12,23 @@ import restudio.resync.core.Session;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
+import restudio.resync.worldgen.WorldGenProjectStorage;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
 import restudio.resync.worldgen.preview.WorldGenPreviewManager;
+import restudio.resync.worldgen.pipeline.PipelineCompiler;
+import restudio.resync.worldgen.pipeline.WorldGenCompileDiagnostics;
 import restudio.resync.worldgen.registry.WorldGenNodeDefinitions;
 import restudio.resync.worldgen.registry.WorldGenNodeRegistry;
+import restudio.resync.worldgen.runtime.WorldGenRuntimeListener;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WorldGenModule implements Module {
@@ -45,6 +50,8 @@ public class WorldGenModule implements Module {
     private Codec codec;
     private int channelId;
     private WorldGenPreviewManager previewManager;
+    private WorldGenProjectStorage projectStorage;
+    private WorldGenRuntimeListener runtimeListener;
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -56,6 +63,9 @@ public class WorldGenModule implements Module {
         this.codec = context.getCodec();
         this.channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         this.previewManager = new WorldGenPreviewManager(context.getPlugin());
+        this.projectStorage = new WorldGenProjectStorage(context.getPlugin());
+        this.runtimeListener = new WorldGenRuntimeListener(context.getPlugin());
+        this.runtimeListener.start();
         WorldGenNodeDefinitions.registerDefaults(WorldGenNodeRegistry.getInstance());
     }
 
@@ -81,8 +91,11 @@ public class WorldGenModule implements Module {
                 case 0x21 -> handlePreviewCreate(session, buffer);
                 case 0x22 -> handlePreviewStop(buffer);
                 case 0x24 -> sendRegistrySnapshot(session);
-                case 0x30 -> handleSaveProject(buffer);
+                case 0x30 -> handleSaveProject(session, buffer);
                 case 0x31 -> handlePreviewApply(session, buffer);
+                case 0x32 -> handleProjectRequest(session, buffer);
+                case 0x33 -> handleProjectDelete(buffer);
+                case 0x34 -> sendProjectList(session);
                 default -> Log.warn("Unknown worldgen packet: 0x" + String.format("%02X", packetId));
             }
         } catch (Exception e) {
@@ -98,11 +111,34 @@ public class WorldGenModule implements Module {
         }
     }
 
-    private void handleSaveProject(ByteBuffer buffer) {
+    private void handleSaveProject(Session session, ByteBuffer buffer) {
         WorldGenProject project = WorldGenSerializer.deserializeProject(readJson(buffer));
         if (project != null) {
+            if (project.getId() == null || project.getId().isBlank()) {
+                project.setId(UUID.randomUUID().toString());
+            }
             project.rebuildIndices();
+            projectStorage.saveProject(project);
+            sendJsonPacket(session, (byte) 0x37, project.getId());
         }
+    }
+
+    private void handleProjectRequest(Session session, ByteBuffer buffer) {
+        String projectId = readJson(buffer);
+        WorldGenProject project = projectStorage.getProject(projectId);
+        if (project != null) {
+            sendJsonPacket(session, (byte) 0x35, WorldGenSerializer.serializeProject(project));
+        } else {
+            sendStatus(session, "", "error", "WorldGen Project Missing");
+        }
+    }
+
+    private void handleProjectDelete(ByteBuffer buffer) {
+        projectStorage.deleteProject(readJson(buffer));
+    }
+
+    private void sendProjectList(Session session) {
+        sendJsonPacket(session, (byte) 0x36, gson.toJson(projectStorage.listProjectIds()));
     }
 
     private void handlePreviewCreate(Session session, ByteBuffer buffer) {
@@ -123,11 +159,25 @@ public class WorldGenModule implements Module {
 
     private void handlePreviewApply(Session session, ByteBuffer buffer) {
         PreviewApplyRequest request = gson.fromJson(readJson(buffer), PreviewApplyRequest.class);
-        WorldGenProject project = gson.fromJson(gson.toJson(request.project()), WorldGenProject.class);
+        WorldGenProject project = null;
+        if (request.draftProject() != null) {
+            project = gson.fromJson(gson.toJson(request.draftProject()), WorldGenProject.class);
+        }
+        if (project == null && request.project() != null) {
+            project = gson.fromJson(gson.toJson(request.project()), WorldGenProject.class);
+        }
+        if (project == null && request.projectId() != null && !request.projectId().isBlank()) {
+            project = projectStorage.getProject(request.projectId());
+        }
         if (project == null || project.getTerrainGraph() == null) {
             throw new IllegalArgumentException("Terrain Graph Missing");
         }
         project.rebuildIndices();
+        WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project);
+        sendJsonPacket(session, (byte) 0x38, gson.toJson(diagnostics));
+        if (!diagnostics.isSuccess()) {
+            throw new IllegalArgumentException("WorldGen Compile Failed");
+        }
         long started = System.nanoTime();
         World.Environment environment = parseEnvironment(request.environment());
         previewManager.createPreview(
@@ -185,7 +235,7 @@ public class WorldGenModule implements Module {
     private record PreviewCreateRequest(WorldGenGraph graph, String previewId, String environment, long seed, String playerUuid) {
     }
 
-    private record PreviewApplyRequest(WorldGenProject project, String previewId, String environment, long seed, String playerUuid) {
+    private record PreviewApplyRequest(String projectId, WorldGenProject draftProject, WorldGenProject project, String previewId, String environment, long seed, String playerUuid) {
     }
 
     private record PreviewStopRequest(String previewId) {

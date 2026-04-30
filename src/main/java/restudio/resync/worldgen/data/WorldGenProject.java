@@ -1,5 +1,7 @@
 package restudio.resync.worldgen.data;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class WorldGenProject {
@@ -14,6 +16,7 @@ public class WorldGenProject {
     private WorldGenGraph structureGraph;
     private WorldGenGraph spawnGraph;
     private WorldGenProjectSettings settings;
+    private List<WorldGenBiomeProfile> biomeProfiles;
 
     public WorldGenProject() {
         this.id = UUID.randomUUID().toString();
@@ -26,6 +29,7 @@ public class WorldGenProject {
         this.structureGraph = new WorldGenGraph();
         this.spawnGraph = new WorldGenGraph();
         this.settings = new WorldGenProjectSettings();
+        this.biomeProfiles = new ArrayList<>();
     }
 
     public void rebuildIndices() {
@@ -70,4 +74,18 @@ public class WorldGenProject {
     public void setSpawnGraph(WorldGenGraph spawnGraph) { this.spawnGraph = spawnGraph; }
     public WorldGenProjectSettings getSettings() { return settings; }
     public void setSettings(WorldGenProjectSettings settings) { this.settings = settings; }
+    public List<WorldGenBiomeProfile> getBiomeProfiles() { return biomeProfiles; }
+    public void setBiomeProfiles(List<WorldGenBiomeProfile> biomeProfiles) { this.biomeProfiles = biomeProfiles != null ? biomeProfiles : new ArrayList<>(); }
+
+    public void setGraph(WorldGenStage stage, WorldGenGraph graph) {
+        switch (stage) {
+            case TERRAIN -> terrainGraph = graph != null ? graph : new WorldGenGraph();
+            case BIOME -> biomeGraph = graph != null ? graph : new WorldGenGraph();
+            case SURFACE -> surfaceGraph = graph != null ? graph : new WorldGenGraph();
+            case CAVE -> caveGraph = graph != null ? graph : new WorldGenGraph();
+            case FEATURE -> featureGraph = graph != null ? graph : new WorldGenGraph();
+            case STRUCTURE -> structureGraph = graph != null ? graph : new WorldGenGraph();
+            case SPAWN -> spawnGraph = graph != null ? graph : new WorldGenGraph();
+        }
+    }
 }

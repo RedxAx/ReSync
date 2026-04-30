@@ -40,7 +40,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -82,7 +82,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -108,7 +108,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -138,7 +138,7 @@
         "name": "sound",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       }
     ],
     "outputs": []
@@ -176,7 +176,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "category",
@@ -258,7 +258,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -316,7 +316,7 @@
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -334,3 +334,4 @@
     "outputs": []
   }
 ]
+

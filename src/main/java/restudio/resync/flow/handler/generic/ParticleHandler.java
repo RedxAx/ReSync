@@ -693,7 +693,7 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private void applyParticle(FlowContext ctx, FlowNode node) {
-        String spawnType = text(ctx, node, "spawn_type", "point").toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        String spawnType = text(ctx, node, "mode", text(ctx, node, "spawn_type", "point")).toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
         String particleName = text(ctx, node, "particle", text(ctx, node, "particle_type", "FLAME"));
         Particle particle = parseParticle(particleName);
 
@@ -1048,8 +1048,19 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private Particle parseParticle(String name) {
+        String value = name == null || name.isBlank() ? "FLAME" : name.trim();
+        if (value.contains(":")) {
+            String key = value.toLowerCase(Locale.ROOT);
+            for (Particle particle : org.bukkit.Registry.PARTICLE_TYPE) {
+                if (particle.getKey().toString().equalsIgnoreCase(key)) {
+                    return particle;
+                }
+            }
+            value = value.substring(value.indexOf(':') + 1);
+        }
+        value = value.replace('.', '_').replace('-', '_');
         try {
-            return Particle.valueOf((name == null || name.isBlank() ? "FLAME" : name).toUpperCase(Locale.ROOT));
+            return Particle.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
             return Particle.FLAME;
         }

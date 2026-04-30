@@ -31,6 +31,9 @@ public class FlowEventRegistry {
             }
             String eventClassName = def.getEventType();
             if (eventClassName == null || eventClassName.isBlank()) {
+                if ("event.custom_content".equals(def.getId())) {
+                    continue;
+                }
                 Log.warn("[FlowEventRegistry] Trigger node missing eventType: " + def.getId());
                 continue;
             }

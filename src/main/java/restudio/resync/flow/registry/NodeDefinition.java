@@ -147,6 +147,11 @@ public class NodeDefinition {
     private final String canonicalId;
     private final List<String> legacyIds;
     private final boolean deprecated;
+    private final List<String> tags;
+    private final List<String> examples;
+    private final String family;
+    private final boolean recommended;
+    private final String replacementFor;
 
     private NodeDefinition(Builder builder) {
         this.id = builder.id;
@@ -170,6 +175,11 @@ public class NodeDefinition {
         this.canonicalId = builder.canonicalId;
         this.legacyIds = builder.legacyIds;
         this.deprecated = builder.deprecated;
+        this.tags = builder.tags;
+        this.examples = builder.examples;
+        this.family = builder.family;
+        this.recommended = builder.recommended;
+        this.replacementFor = builder.replacementFor;
     }
 
     public String getId() {
@@ -254,6 +264,26 @@ public class NodeDefinition {
 
     public boolean isDeprecated() {
         return deprecated;
+    }
+
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public List<String> getExamples() {
+        return examples;
+    }
+
+    public String getFamily() {
+        return family;
+    }
+
+    public boolean isRecommended() {
+        return recommended;
+    }
+
+    public String getReplacementFor() {
+        return replacementFor;
     }
 
     public record PinMapping(String source, String target) {
@@ -407,6 +437,11 @@ public class NodeDefinition {
         private String canonicalId;
         private List<String> legacyIds = Collections.emptyList();
         private boolean deprecated;
+        private List<String> tags = Collections.emptyList();
+        private List<String> examples = Collections.emptyList();
+        private String family;
+        private boolean recommended;
+        private String replacementFor;
 
         public Builder(String id, String displayName, NodeCategory category) {
             this.id = id;
@@ -518,6 +553,31 @@ public class NodeDefinition {
 
         public Builder deprecated(boolean deprecated) {
             this.deprecated = deprecated;
+            return this;
+        }
+
+        public Builder tags(List<String> tags) {
+            this.tags = tags != null ? tags : Collections.emptyList();
+            return this;
+        }
+
+        public Builder examples(List<String> examples) {
+            this.examples = examples != null ? examples : Collections.emptyList();
+            return this;
+        }
+
+        public Builder family(String family) {
+            this.family = family;
+            return this;
+        }
+
+        public Builder recommended(boolean recommended) {
+            this.recommended = recommended;
+            return this;
+        }
+
+        public Builder replacementFor(String replacementFor) {
+            this.replacementFor = replacementFor;
             return this;
         }
 

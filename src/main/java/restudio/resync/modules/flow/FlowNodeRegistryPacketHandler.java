@@ -197,16 +197,18 @@ public class FlowNodeRegistryPacketHandler {
 
     private List<FlowOptionSourceMetadata> buildOptionSourceMetadata() {
         List<FlowOptionSourceMetadata> list = new ArrayList<>();
-        list.add(new FlowOptionSourceMetadata("client:minecraft:advancement", "minecraft", "SEARCHABLE_LIST", true));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:biome", "minecraft", "DROPDOWN", false));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:difficulty", "minecraft", "DROPDOWN", false));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:enchantment", "minecraft", "SEARCHABLE_LIST", true));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:entity_type", "minecraft", "DROPDOWN", false));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:gamemode", "minecraft", "DROPDOWN", false));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:material", "minecraft", "SEARCHABLE_LIST", true));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:particle", "minecraft", "SEARCHABLE_LIST", true));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:potion_effect", "minecraft", "DROPDOWN", false));
-        list.add(new FlowOptionSourceMetadata("client:minecraft:sound", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:advancement", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:biome", "minecraft", "DROPDOWN", false));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:difficulty", "minecraft", "DROPDOWN", false));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:enchantment", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:entity_type", "minecraft", "DROPDOWN", false));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:gamemode", "minecraft", "DROPDOWN", false));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:material", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:block", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:particle", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:potion_effect", "minecraft", "DROPDOWN", false));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:sound", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:world", "minecraft", "SEARCHABLE_LIST", false));
         if (pluginRegistry != null) {
             list.addAll(pluginRegistry.getAllCustomOptionSources());
         }

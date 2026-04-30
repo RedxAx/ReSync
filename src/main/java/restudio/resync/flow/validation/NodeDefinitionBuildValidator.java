@@ -30,9 +30,11 @@ public final class NodeDefinitionBuildValidator {
         "entity_type",
         "gamemode",
         "material",
+        "block",
         "particle",
         "potion_effect",
-        "sound"
+        "sound",
+        "world"
     );
     private static final Set<String> KNOWN_DATA_TYPES = Set.of("execution", "any", "string", "number", "boolean");
     private static final Pattern FLOW_DATA_TYPE_ID = Pattern.compile("new\\s+FlowDataType\\s*\\(\\s*\"([^\"]+)\"");
@@ -202,6 +204,9 @@ public final class NodeDefinitionBuildValidator {
             if ("ALIAS".equalsIgnoreCase(kind) && (canonicalId == null || canonicalId.isBlank())) {
                 errors.add(id + " is an alias without canonicalId");
             }
+            if ("FAMILY".equalsIgnoreCase(kind) && !hasModeOrActionInput(definition)) {
+                errors.add(id + " is a family node without mode/action input");
+            }
 
             validateHandlerOperation(id, definition, handler, handlerOperations, errors);
             validatePins(id, definition, "inputs", dataTypes, errors);
@@ -287,7 +292,9 @@ public final class NodeDefinitionBuildValidator {
 
     private static void validateOptionSource(String id, String pinName, String optionsSource, List<String> errors) {
         String prefix;
-        if (optionsSource.startsWith("client:minecraft:")) {
+        if (optionsSource.startsWith("server:minecraft:")) {
+            prefix = "server:minecraft:";
+        } else if (optionsSource.startsWith("client:minecraft:")) {
             prefix = "client:minecraft:";
         } else if (optionsSource.startsWith("minecraft:")) {
             prefix = "minecraft:";
@@ -310,5 +317,21 @@ public final class NodeDefinitionBuildValidator {
 
     private static boolean bool(JsonObject object, String key) {
         return object.has(key) && !object.get(key).isJsonNull() && object.get(key).getAsBoolean();
+    }
+
+    private static boolean hasModeOrActionInput(JsonObject definition) {
+        if (!definition.has("inputs") || !definition.get("inputs").isJsonArray()) {
+            return false;
+        }
+        for (JsonElement element : definition.getAsJsonArray("inputs")) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            String name = string(element.getAsJsonObject(), "name");
+            if ("mode".equalsIgnoreCase(name) || "action".equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

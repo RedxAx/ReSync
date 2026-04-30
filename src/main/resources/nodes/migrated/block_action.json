@@ -1,4 +1,4 @@
-﻿[
+[
   {
     "id": "block.block_set",
     "displayName": "Block Set",
@@ -583,7 +583,7 @@
         "name": "type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -1217,3 +1217,4 @@
     ]
   }
 ]
+

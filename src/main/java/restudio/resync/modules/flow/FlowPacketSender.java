@@ -20,6 +20,7 @@ import restudio.resync.protocol.messages.DataMessage;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class FlowPacketSender {
@@ -151,6 +152,19 @@ public class FlowPacketSender {
         byte packetId = snapshot.isFullSync() ? (byte) 0x0B : (byte) 0x0D;
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
         buffer.put(packetId);
+        buffer.put(jsonBytes);
+        sendRaw(session, buffer.array(), true);
+    }
+
+    public void sendOptionCatalog(Session session, String sourceId, List<String> values, String revision) {
+        String json = gson.toJson(Map.of(
+            "sourceId", sourceId != null ? sourceId : "",
+            "revision", revision != null ? revision : "",
+            "values", values != null ? values : List.of()
+        ));
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put((byte) 0x38);
         buffer.put(jsonBytes);
         sendRaw(session, buffer.array(), true);
     }

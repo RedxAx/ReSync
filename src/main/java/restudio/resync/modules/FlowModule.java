@@ -21,6 +21,7 @@ import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
 import restudio.resync.modules.flow.FlowCustomContentPacketHandler;
 import restudio.resync.modules.flow.FlowGuiPacketHandler;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
+import restudio.resync.modules.flow.FlowOptionCatalogPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
 import restudio.resync.modules.flow.FlowScoreboardPacketHandler;
@@ -46,6 +47,7 @@ public class FlowModule implements Module {
     private final FlowScoreboardPacketHandler scoreboardHandler;
     private final FlowTabPacketHandler tabHandler;
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
+    private final FlowOptionCatalogPacketHandler optionCatalogHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
     private final FlowCustomContentPacketHandler customContentHandler;
     private final NodeDefinitionRegistry definitionRegistry;
@@ -63,6 +65,7 @@ public class FlowModule implements Module {
         this.scoreboardHandler = new FlowScoreboardPacketHandler(storage, sender);
         this.tabHandler = new FlowTabPacketHandler(storage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
+        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry);
         this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
     }
@@ -137,6 +140,7 @@ public class FlowModule implements Module {
                 case 0x33 -> customContentHandler.handleSave(session, buffer);
                 case 0x34 -> customContentHandler.handleDelete(session, buffer);
                 case 0x36 -> customContentHandler.handleListRequest(session);
+                case 0x37 -> optionCatalogHandler.handle(session, buffer);
                 default -> Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
             }
         } catch (Exception e) {

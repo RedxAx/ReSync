@@ -1758,6 +1758,7 @@
     "id": "entity.kill",
     "displayName": "Entity Kill",
     "category": "ENTITY",
+    "kind": "ACTION",
     "handler": "entity",
     "handlerConfig": {
       "property": "kill",
@@ -4354,3 +4355,4 @@
     ]
   }
 ]
+

@@ -939,7 +939,7 @@
         "name": "effect_type",
         "dataType": "potion_effect",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:potion_effect"
+        "optionsSource": "server:minecraft:potion_effect"
       },
       {
         "name": "duration_ticks",
@@ -1003,7 +1003,7 @@
         "name": "advancement_key",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:advancement"
+        "optionsSource": "server:minecraft:advancement"
       }
     ],
     "outputs": [
@@ -1199,7 +1199,7 @@
         "name": "sound",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       },
       {
         "name": "volume",
@@ -2206,3 +2206,4 @@
     ]
   }
 ]
+

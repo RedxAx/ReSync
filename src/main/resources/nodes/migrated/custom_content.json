@@ -3,6 +3,7 @@
     "id": "custom_content.current",
     "displayName": "Current Content",
     "category": "UTILITY",
+    "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
       "operation": "current_content"
@@ -132,6 +133,7 @@
     "id": "custom_content.item",
     "displayName": "Item",
     "category": "ITEM",
+    "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
       "operation": "content_start"
@@ -139,7 +141,7 @@
     "inputs": [
       {"name": "content_id", "dataType": "string", "defaultValue": "new_item"},
       {"name": "name", "dataType": "string", "defaultValue": "New Item"},
-      {"name": "material", "dataType": "string", "optionsSource": "client:minecraft:material", "defaultValue": "STICK"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "STICK"},
       {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "options": ["vanilla", "oraxen", "itemsadder", "nexo"], "defaultValue": "vanilla"},
       {"name": "external_id", "dataType": "string"},
       {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "global"], "defaultValue": "player"},
@@ -181,6 +183,7 @@
     "id": "custom_content.armor",
     "displayName": "Armor",
     "category": "ITEM",
+    "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
       "operation": "content_start"
@@ -188,7 +191,7 @@
     "inputs": [
       {"name": "content_id", "dataType": "string", "defaultValue": "new_armor"},
       {"name": "name", "dataType": "string", "defaultValue": "New Armor"},
-      {"name": "material", "dataType": "string", "optionsSource": "client:minecraft:material", "defaultValue": "IRON_CHESTPLATE"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "IRON_CHESTPLATE"},
       {"name": "armor_slot", "dataType": "string", "widget": "DROPDOWN", "options": ["head", "chest", "legs", "feet"], "defaultValue": "chest"},
       {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "options": ["vanilla", "oraxen", "itemsadder", "nexo"], "defaultValue": "vanilla"},
       {"name": "external_id", "dataType": "string"},
@@ -226,6 +229,7 @@
     "id": "custom_content.block",
     "displayName": "Block",
     "category": "BLOCK",
+    "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
       "operation": "content_start"
@@ -233,7 +237,7 @@
     "inputs": [
       {"name": "content_id", "dataType": "string", "defaultValue": "new_block"},
       {"name": "name", "dataType": "string", "defaultValue": "New Block"},
-      {"name": "material", "dataType": "string", "optionsSource": "client:minecraft:material", "defaultValue": "STONE"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
       {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "options": ["vanilla", "oraxen", "itemsadder", "nexo"], "defaultValue": "vanilla"},
       {"name": "external_id", "dataType": "string"},
       {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player"},
@@ -269,3 +273,4 @@
     ]
   }
 ]
+

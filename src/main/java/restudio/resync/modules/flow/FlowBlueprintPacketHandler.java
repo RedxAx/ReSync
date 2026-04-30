@@ -3,8 +3,12 @@ package restudio.resync.modules.flow;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
+import restudio.flow.data.CustomContentDefinition;
+import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
+import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
@@ -78,6 +82,15 @@ public class FlowBlueprintPacketHandler {
                 graph.setId(UUID.randomUUID().toString());
             }
             storage.saveGraph(graph);
+            CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
+            if (customContentStorage != null) {
+                CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
+                if (content != null) {
+                    customContentStorage.save(content);
+                } else if (!graph.isFunction()) {
+                    ensureDefaultContentGraphs(graph.getId(), customContentStorage);
+                }
+            }
             updateEventBindings(graph);
             Log.fine("Flow saved: " + graph.getId());
             sender.sendFlowSaveAck(session, graph.getId());
@@ -95,6 +108,12 @@ public class FlowBlueprintPacketHandler {
         buffer.get(idBytes);
         String flowId = new String(idBytes, StandardCharsets.UTF_8);
         storage.deleteGraph(flowId);
+        CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
+        if (customContentStorage != null) {
+            for (CustomContentDefinition definition : customContentStorage.getByFlow(flowId)) {
+                customContentStorage.delete(definition.getId());
+            }
+        }
         if (triggerRegistry != null) {
             triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
         }
@@ -154,6 +173,24 @@ public class FlowBlueprintPacketHandler {
         }
         triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, bindings);
         globalTriggers.refreshBindings();
+    }
+
+    private void ensureDefaultContentGraphs(String flowId, CustomContentStorage customContentStorage) {
+        ensureDefaultContentGraph(flowId + "_default_item", "item", "Default Item", customContentStorage);
+        ensureDefaultContentGraph(flowId + "_default_block", "block", "Default Block", customContentStorage);
+        ensureDefaultContentGraph(flowId + "_default_armor", "armor", "Default Armor", customContentStorage);
+    }
+
+    private void ensureDefaultContentGraph(String graphId, String type, String name, CustomContentStorage customContentStorage) {
+        if (storage.getGraph(graphId) != null) {
+            return;
+        }
+        FlowGraph contentGraph = CustomContentGraphAdapter.createContentGraph(graphId, type, name);
+        storage.saveGraph(contentGraph);
+        CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(contentGraph);
+        if (content != null) {
+            customContentStorage.save(content);
+        }
     }
 
     private String mapEventContext(String nodeType) {

@@ -1,0 +1,392 @@
+[
+  {
+    "id": "ability.strike_lightning",
+    "displayName": "Strike Lightning",
+    "category": "VISUAL",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": {
+      "operation": "strike_lightning"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "ability.damage_area",
+    "displayName": "Damage Area",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": {
+      "operation": "damage_area"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "radius",
+        "dataType": "number",
+        "defaultValue": 5
+      },
+      {
+        "name": "damage",
+        "dataType": "number",
+        "defaultValue": 4
+      },
+      {
+        "name": "target_filter",
+        "dataType": "string",
+        "defaultValue": "living_entity"
+      },
+      {
+        "name": "exclude_caster",
+        "dataType": "boolean",
+        "defaultValue": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "ability.particle_burst",
+    "displayName": "Particle Burst",
+    "category": "VISUAL",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": {
+      "operation": "particle_burst"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "particle",
+        "dataType": "string",
+        "defaultValue": "FLAME"
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "defaultValue": 24
+      },
+      {
+        "name": "spread",
+        "dataType": "number",
+        "defaultValue": 0.6
+      },
+      {
+        "name": "speed",
+        "dataType": "number",
+        "defaultValue": 0.02
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "ability.spawn_particle_burst",
+    "displayName": "Spawn Particle Burst",
+    "category": "VISUAL",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": {
+      "operation": "particle_burst"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "particle",
+        "dataType": "string",
+        "defaultValue": "FLAME"
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "defaultValue": 24
+      },
+      {
+        "name": "spread",
+        "dataType": "number",
+        "defaultValue": 0.6
+      },
+      {
+        "name": "speed",
+        "dataType": "number",
+        "defaultValue": 0.02
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "ability.fake_lightning",
+    "displayName": "Fake Lightning",
+    "category": "VISUAL",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "fake_lightning" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.heal_area",
+    "displayName": "Heal Area",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "heal_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "defaultValue": 5 },
+      { "name": "amount", "dataType": "number", "defaultValue": 4 },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "defaultValue": false }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.knockback_area",
+    "displayName": "Knockback Area",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "knockback_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "defaultValue": 1.2 },
+      { "name": "upward_strength", "dataType": "number", "defaultValue": 0.2 },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.find_entities_radius",
+    "displayName": "Find Entities Radius",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "find_entities_radius" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "defaultValue": 5 },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "defaultValue": false }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list" }
+    ]
+  },
+  {
+    "id": "ability.raycast",
+    "displayName": "Raycast",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "raycast" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "distance", "dataType": "number", "defaultValue": 20 },
+      { "name": "stop_on_block", "dataType": "boolean", "defaultValue": true },
+      { "name": "stop_on_entity", "dataType": "boolean", "defaultValue": true },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "block", "dataType": "block" },
+      { "name": "location", "dataType": "location" },
+      { "name": "hit", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.play_sound",
+    "displayName": "Play Sound",
+    "category": "VISUAL",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "play_sound" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "sound", "dataType": "sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP" },
+      { "name": "volume", "dataType": "number", "defaultValue": 1 },
+      { "name": "pitch", "dataType": "number", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.potion_effect",
+    "displayName": "Potion Effect",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "potion_effect" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "effect", "dataType": "potion_effect", "defaultValue": "SPEED" },
+      { "name": "duration_ticks", "dataType": "number", "defaultValue": 100 },
+      { "name": "amplifier", "dataType": "number", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.launch_projectile",
+    "displayName": "Launch Projectile",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "launch_projectile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "speed", "dataType": "number", "defaultValue": 2 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "projectile", "dataType": "entity" }
+    ]
+  },
+  {
+    "id": "ability.pull_entities",
+    "displayName": "Pull Entities",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "pull_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "defaultValue": 1 },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.push_entities",
+    "displayName": "Push Entities",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "push_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "defaultValue": 1 },
+      { "name": "target_filter", "dataType": "string", "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.ignite_target",
+    "displayName": "Ignite Target",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "ignite_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "ticks", "dataType": "number", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.freeze_target",
+    "displayName": "Freeze Target",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "freeze_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "ticks", "dataType": "number", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.set_velocity",
+    "displayName": "Set Velocity",
+    "category": "ACTION",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "set_velocity" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "x", "dataType": "number", "defaultValue": 0 },
+      { "name": "y", "dataType": "number", "defaultValue": 0 },
+      { "name": "z", "dataType": "number", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  }
+]

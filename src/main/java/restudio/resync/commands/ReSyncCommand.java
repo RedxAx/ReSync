@@ -8,9 +8,13 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.ReSync;
+import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
@@ -57,6 +61,7 @@ public class ReSyncCommand implements TabExecutor {
             case "world" -> handleWorld(sender, args);
             case "portal" -> handlePortal(sender, args);
             case "flow" -> handleFlow(sender, args);
+            case "item" -> handleItem(sender, args);
             default -> {
                 sendUsage(sender);
                 yield true;
@@ -67,7 +72,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("scoreboard", "tab", "world", "portal", "flow"), args[0]);
+            return filter(List.of("scoreboard", "tab", "world", "portal", "flow", "item"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -76,8 +81,91 @@ public class ReSyncCommand implements TabExecutor {
             case "world" -> tabCompleteWorld(args);
             case "portal" -> tabCompletePortal(args);
             case "flow" -> tabCompleteFlow(args);
+            case "item" -> tabCompleteItem(args);
             default -> List.of();
         };
+    }
+
+    private boolean handleItem(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync item list");
+            sendUsageLine(sender, "/resync item give <player> <itemId> [amount]");
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        if ("list".equals(action)) {
+            CustomContentStorage storage = getCustomContentStorage();
+            if (storage == null) {
+                sendError(sender, "Content Storage Unavailable");
+                return true;
+            }
+            List<CustomContentDefinition> items = storage.getAll().stream()
+                .filter(definition -> definition != null && List.of("item", "armor", "block").contains(safeText(definition.getType()).toLowerCase(Locale.ROOT)))
+                .sorted(Comparator.comparing(CustomContentDefinition::getId, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+            if (items.isEmpty()) {
+                sendInfo(sender, "No Custom Items Found");
+                return true;
+            }
+            for (CustomContentDefinition item : items) {
+                sendInfo(sender, item.getId(), safeText(item.getType()) + " · " + safeText(item.getMaterial()) + " · " + safeText(item.getDisplayName()));
+            }
+            return true;
+        }
+        if (!"give".equals(action) || args.length < 4) {
+            sendUsageLine(sender, "/resync item give <player> <itemId> [amount]");
+            return true;
+        }
+        Player target = findPlayer(args[2]);
+        if (target == null) {
+            sendError(sender, "Player Not Found", args[2]);
+            return true;
+        }
+        String itemId = args[3];
+        int amount = 1;
+        if (args.length >= 5) {
+            Integer parsed = parseInt(args[4]);
+            if (parsed == null || parsed < 1) {
+                sendError(sender, "Invalid Amount", args[4]);
+                return true;
+            }
+            amount = parsed;
+        }
+        CustomContentStorage storage = getCustomContentStorage();
+        CustomContentService service = getCustomContentService();
+        if (storage == null || service == null) {
+            sendError(sender, "Content System Unavailable");
+            return true;
+        }
+        CustomContentDefinition definition = storage.get(itemId);
+        if (definition == null) {
+            sendError(sender, "Item Not Found", itemId);
+            return true;
+        }
+        ItemStack item = service.createItem(itemId, amount);
+        if (item == null) {
+            sendError(sender, "Item Create Failed", itemId);
+            return true;
+        }
+        target.getInventory().addItem(item);
+        sendSuccess(sender, "Item Given", itemId + " -> " + target.getName() + " x" + amount);
+        return true;
+    }
+
+    private List<String> tabCompleteItem(String[] args) {
+        if (args.length == 2) {
+            return filter(List.of("list", "give"), args[1]);
+        }
+        if (args.length == 3 && "give".equalsIgnoreCase(args[1])) {
+            return filter(onlinePlayers(), args[2]);
+        }
+        if (args.length == 4 && "give".equalsIgnoreCase(args[1])) {
+            return filter(customContentIds(), args[3]);
+        }
+        if (args.length == 5 && "give".equalsIgnoreCase(args[1])) {
+            return filter(List.of("1", "8", "16", "32", "64"), args[4]);
+        }
+        return List.of();
     }
 
     private boolean handleFlow(CommandSender sender, String[] args) {
@@ -1565,6 +1653,20 @@ public class ReSyncCommand implements TabExecutor {
         return plugin.getReSyncServer().getFlowStorage();
     }
 
+    private CustomContentStorage getCustomContentStorage() {
+        if (plugin.getReSyncServer() == null || plugin.getReSyncServer().getModuleContext() == null) {
+            return null;
+        }
+        return plugin.getReSyncServer().getModuleContext().getService(CustomContentStorage.class);
+    }
+
+    private CustomContentService getCustomContentService() {
+        if (plugin.getReSyncServer() == null || plugin.getReSyncServer().getModuleContext() == null) {
+            return null;
+        }
+        return plugin.getReSyncServer().getModuleContext().getService(CustomContentService.class);
+    }
+
     private WorldRegistryEntry findWorldEntry(WorldManagementService service, String worldName) {
         if (service == null || worldName == null) {
             return null;
@@ -1712,6 +1814,14 @@ public class ReSyncCommand implements TabExecutor {
         }
         names.sort(String.CASE_INSENSITIVE_ORDER);
         return names;
+    }
+
+    private List<String> customContentIds() {
+        CustomContentStorage storage = getCustomContentStorage();
+        if (storage == null) {
+            return List.of();
+        }
+        return storage.listIds();
     }
 
     private List<String> filter(List<String> values, String input) {
@@ -2318,6 +2428,8 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync tab clear [player]");
         sendUsageLine(sender, "/resync tab default [<tabId|none> [usePapi]]");
         sendUsageLine(sender, "/resync tab interval [ticks]");
+        sendUsageLine(sender, "/resync item list");
+        sendUsageLine(sender, "/resync item give <player> <itemId> [amount]");
         sendUsageLine(sender, "/resync world list");
         sendUsageLine(sender, "/resync world info <world>");
         sendUsageLine(sender, "/resync world create <world> [seed] [environment] [generator]");

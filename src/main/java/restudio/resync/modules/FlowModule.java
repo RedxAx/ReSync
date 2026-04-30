@@ -7,6 +7,7 @@ import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
+import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
@@ -17,6 +18,7 @@ import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
+import restudio.resync.modules.flow.FlowCustomContentPacketHandler;
 import restudio.resync.modules.flow.FlowGuiPacketHandler;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
@@ -45,12 +47,13 @@ public class FlowModule implements Module {
     private final FlowTabPacketHandler tabHandler;
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
+    private final FlowCustomContentPacketHandler customContentHandler;
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowNodePluginRegistry pluginRegistry;
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
-                      PropertyRegistry propertyRegistry) {
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage) {
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
         this.pluginRegistry = pluginRegistry;
@@ -61,6 +64,7 @@ public class FlowModule implements Module {
         this.tabHandler = new FlowTabPacketHandler(storage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry);
+        this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
     }
 
     @Override
@@ -129,6 +133,10 @@ public class FlowModule implements Module {
                 case 0x22 -> tabHandler.handleListRequest(session);
                 case 0x23 -> tabHandler.handleDelete(session, buffer);
                 case 0x27 -> placeholderPreviewHandler.handle(session, buffer);
+                case 0x30 -> customContentHandler.handleRequest(session, buffer);
+                case 0x33 -> customContentHandler.handleSave(session, buffer);
+                case 0x34 -> customContentHandler.handleDelete(session, buffer);
+                case 0x36 -> customContentHandler.handleListRequest(session);
                 default -> Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
             }
         } catch (Exception e) {

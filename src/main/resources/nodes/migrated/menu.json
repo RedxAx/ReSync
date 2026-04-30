@@ -268,7 +268,7 @@
         "name": "sound",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
-        "optionsSource": "client:minecraft:sound"
+        "optionsSource": "server:minecraft:sound"
       }
     ],
     "outputs": [
@@ -808,3 +808,4 @@
     ]
   }
 ]
+

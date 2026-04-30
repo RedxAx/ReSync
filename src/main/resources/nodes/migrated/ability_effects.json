@@ -130,7 +130,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "location", "dataType": "location" },
-      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "client:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
       { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 },
       { "name": "spread", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6 },
       { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02 }
@@ -150,7 +150,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "location", "dataType": "location" },
-      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "client:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
       { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 },
       { "name": "spread", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6 },
       { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02 }
@@ -168,7 +168,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "location", "dataType": "location" },
-      { "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "client:minecraft:sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP" },
+      { "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP" },
       { "name": "volume", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
       { "name": "pitch", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
     ],
@@ -185,7 +185,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "target", "dataType": "entity" },
-      { "name": "effect", "dataType": "potion_effect", "widget": "DROPDOWN", "optionsSource": "client:minecraft:potion_effect", "defaultValue": "SPEED" },
+      { "name": "effect", "dataType": "potion_effect", "widget": "DROPDOWN", "optionsSource": "server:minecraft:potion_effect", "defaultValue": "SPEED" },
       { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 },
       { "name": "amplifier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 }
     ],
@@ -344,7 +344,7 @@
       { "name": "start", "dataType": "location" },
       { "name": "end", "dataType": "location" },
       { "name": "location", "dataType": "location" },
-      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "client:minecraft:particle", "defaultValue": "ELECTRIC_SPARK" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "ELECTRIC_SPARK" },
       { "name": "steps", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 }
     ],
     "outputs": [
@@ -360,7 +360,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "location", "dataType": "location" },
-      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "client:minecraft:material", "defaultValue": "ICE" },
+      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "ICE" },
       { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 }
     ],
     "outputs": [
@@ -499,3 +499,4 @@
     ]
   }
 ]
+

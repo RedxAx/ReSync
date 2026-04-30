@@ -161,6 +161,9 @@ public class NodeDefinitionValidator {
                 if (!hasFlowOutput) {
                     warnings.add(def.getKind() + " nodes should expose a flow output");
                 }
+                if (def.getKind() == NodeDefinition.NodeKind.FAMILY && !hasModeOrActionInput(def)) {
+                    errors.add("Family nodes must expose a mode or action input");
+                }
             }
             case QUERY, PURE -> {
                 if (hasFlowInput) {
@@ -183,6 +186,16 @@ public class NodeDefinitionValidator {
             return false;
         }
         return pins.stream().anyMatch(pin -> pin.getType() == pinType);
+    }
+
+    private boolean hasModeOrActionInput(NodeDefinition def) {
+        if (def.getInputs() == null) {
+            return false;
+        }
+        return def.getInputs().stream().anyMatch(pin ->
+            pin.getType() == NodeDefinition.PinType.DATA
+                && ("mode".equalsIgnoreCase(pin.getName()) || "action".equalsIgnoreCase(pin.getName()))
+        );
     }
 
     private void validatePin(NodeDefinition.PinDefinition pin, NodeDefinition.PinDirection expectedDirection, List<String> errors, List<String> warnings) {
@@ -218,8 +231,10 @@ public class NodeDefinitionValidator {
     }
 
     private boolean isKnownOptionsSource(String source) {
-        if (source.startsWith("client:minecraft:") || source.startsWith("minecraft:")) {
-            String category = source.startsWith("client:minecraft:") ? source.substring("client:minecraft:".length()) : source.substring("minecraft:".length());
+        if (source.startsWith("server:minecraft:") || source.startsWith("client:minecraft:") || source.startsWith("minecraft:")) {
+            String category = source.startsWith("server:minecraft:")
+                ? source.substring("server:minecraft:".length())
+                : source.startsWith("client:minecraft:") ? source.substring("client:minecraft:".length()) : source.substring("minecraft:".length());
             return Set.of(
                 "advancement",
                 "biome",
@@ -228,9 +243,11 @@ public class NodeDefinitionValidator {
                 "entity_type",
                 "gamemode",
                 "material",
+                "block",
                 "particle",
                 "potion_effect",
-                "sound"
+                "sound",
+                "world"
             ).contains(category);
         }
         return false;

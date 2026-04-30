@@ -1,0 +1,36 @@
+package restudio.resync.worldgen.datapack;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+public class WorldGenDatapackBuild {
+    private String projectId = "";
+    private String namespace = "resync_worldgen";
+    private String packName = "";
+    private String minecraftVersion = "";
+    private int packFormat;
+    private long revision;
+    private Path folder;
+    private int fileCount;
+    private List<String> warnings = new ArrayList<>();
+
+    public String getProjectId() { return projectId; }
+    public void setProjectId(String projectId) { this.projectId = projectId; }
+    public String getNamespace() { return namespace; }
+    public void setNamespace(String namespace) { this.namespace = namespace; }
+    public String getPackName() { return packName; }
+    public void setPackName(String packName) { this.packName = packName; }
+    public String getMinecraftVersion() { return minecraftVersion; }
+    public void setMinecraftVersion(String minecraftVersion) { this.minecraftVersion = minecraftVersion; }
+    public int getPackFormat() { return packFormat; }
+    public void setPackFormat(int packFormat) { this.packFormat = packFormat; }
+    public long getRevision() { return revision; }
+    public void setRevision(long revision) { this.revision = revision; }
+    public Path getFolder() { return folder; }
+    public void setFolder(Path folder) { this.folder = folder; }
+    public int getFileCount() { return fileCount; }
+    public void setFileCount(int fileCount) { this.fileCount = fileCount; }
+    public List<String> getWarnings() { return warnings; }
+    public void setWarnings(List<String> warnings) { this.warnings = warnings != null ? warnings : new ArrayList<>(); }
+}

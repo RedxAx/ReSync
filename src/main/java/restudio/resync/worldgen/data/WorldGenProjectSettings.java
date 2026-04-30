@@ -10,6 +10,10 @@ public class WorldGenProjectSettings {
     private int seaLevel = 63;
     private String defaultBlock = "minecraft:stone";
     private String defaultFluid = "minecraft:water";
+    private String datapackNamespace = "resync_worldgen";
+    private String generatorBackend = "datapack";
+    private String worldPreset = "overworld";
+    private String terrainTemplate = "continental";
     private boolean vanillaBiomesEnabled;
     private boolean vanillaFeaturesEnabled;
     private boolean vanillaStructuresEnabled;
@@ -30,6 +34,14 @@ public class WorldGenProjectSettings {
     public void setDefaultBlock(String defaultBlock) { this.defaultBlock = defaultBlock; }
     public String getDefaultFluid() { return defaultFluid; }
     public void setDefaultFluid(String defaultFluid) { this.defaultFluid = defaultFluid; }
+    public String getDatapackNamespace() { return datapackNamespace; }
+    public void setDatapackNamespace(String datapackNamespace) { this.datapackNamespace = datapackNamespace; }
+    public String getGeneratorBackend() { return generatorBackend; }
+    public void setGeneratorBackend(String generatorBackend) { this.generatorBackend = generatorBackend; }
+    public String getWorldPreset() { return worldPreset; }
+    public void setWorldPreset(String worldPreset) { this.worldPreset = worldPreset; }
+    public String getTerrainTemplate() { return terrainTemplate; }
+    public void setTerrainTemplate(String terrainTemplate) { this.terrainTemplate = terrainTemplate; }
     public boolean isVanillaBiomesEnabled() { return vanillaBiomesEnabled; }
     public void setVanillaBiomesEnabled(boolean vanillaBiomesEnabled) { this.vanillaBiomesEnabled = vanillaBiomesEnabled; }
     public boolean isVanillaFeaturesEnabled() { return vanillaFeaturesEnabled; }

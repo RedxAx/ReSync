@@ -21,11 +21,13 @@ public class NodeGraphBiomeProvider extends BiomeProvider {
 
     @Override
     public Biome getBiome(WorldInfo worldInfo, int x, int y, int z) {
-        return pipelineHolder.get().getBiome(x, y, z, (int) worldInfo.getSeed(), worldInfo);
+        return pipelineHolder.get().getBiome(x, y, z, worldInfo.getSeed(), worldInfo);
     }
 
     @Override
     public List<Biome> getBiomes(WorldInfo worldInfo) {
-        return List.of(Biome.PLAINS, Biome.DESERT, Biome.FOREST, Biome.SAVANNA, Biome.TAIGA, Biome.SNOWY_PLAINS);
+        return List.of(Biome.PLAINS, Biome.DESERT, Biome.FOREST, Biome.SAVANNA, Biome.TAIGA, Biome.SNOWY_PLAINS,
+            Biome.OCEAN, Biome.FROZEN_OCEAN, Biome.RIVER, Biome.STONY_PEAKS, Biome.WINDSWEPT_HILLS,
+            Biome.OLD_GROWTH_PINE_TAIGA, Biome.JUNGLE);
     }
 }

@@ -9,6 +9,7 @@ import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
+import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.flow.registry.NodeDefinition;
@@ -65,6 +66,10 @@ public class FlowPacketSender {
         sendJsonPacket(session, (byte) 0x24, FlowSerializer.serializeTab(tab), "TAB_TOO_LARGE", "Tab data exceeds maximum size");
     }
 
+    public void sendCustomContentData(Session session, CustomContentDefinition content) {
+        sendJsonPacket(session, (byte) 0x32, gson.toJson(content), "CONTENT_TOO_LARGE", "Custom content data exceeds maximum size");
+    }
+
     public void sendFlowSaveAck(Session session, String flowId) {
         sendIdAck(session, (byte) 0x07, flowId);
     }
@@ -81,6 +86,10 @@ public class FlowPacketSender {
         sendIdAck(session, (byte) 0x26, tabId);
     }
 
+    public void sendCustomContentSaveAck(Session session, String contentId) {
+        sendIdAck(session, (byte) 0x35, contentId);
+    }
+
     public void sendFlowList(Session session, List<String> flowIds) {
         sendStringList(session, (byte) 0x0A, flowIds);
     }
@@ -95,6 +104,10 @@ public class FlowPacketSender {
 
     public void sendTabList(Session session, List<String> tabIds) {
         sendStringList(session, (byte) 0x25, tabIds);
+    }
+
+    public void sendCustomContentList(Session session, List<String> contentIds) {
+        sendStringList(session, (byte) 0x31, contentIds);
     }
 
     public void sendGuiState(Session session, boolean editable, String guiId, String flowId) {

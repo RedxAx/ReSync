@@ -3,6 +3,10 @@ package restudio.resync.modules;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.scheduler.BukkitTask;
+import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentListener;
+import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
@@ -19,10 +23,12 @@ import restudio.flow.data.TypeRegistry;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.BlockActionHandler;
+import restudio.resync.flow.handler.generic.AbilityEffectHandler;
 import restudio.resync.flow.handler.generic.ColorHandler;
 import restudio.resync.flow.handler.generic.ConversionHandler;
 import restudio.resync.flow.migration.FlowGraphMigrator;
 import restudio.resync.flow.handler.generic.CustomEventHandler;
+import restudio.resync.flow.handler.generic.CustomContentHandler;
 import restudio.resync.flow.handler.generic.DebugHandler;
 import restudio.resync.flow.handler.generic.DiscordHandler;
 import restudio.resync.flow.handler.generic.EconomyHandler;
@@ -86,6 +92,9 @@ public class FlowRuntimeModule implements Module {
     private FlowNodePluginRegistry nodePluginRegistry;
     private ScoreboardRuntimeListener scoreboardRuntimeListener;
     private PropertyRegistry propertyRegistry;
+    private CustomContentStorage customContentStorage;
+    private CustomContentService customContentService;
+    private CustomContentListener customContentListener;
     private BukkitTask tickTask;
     private ModuleContext moduleContext;
 
@@ -98,6 +107,8 @@ public class FlowRuntimeModule implements Module {
     public void initialize(ModuleContext context) {
         this.moduleContext = context;
         storage = new FlowStorage(context.getPlugin());
+        customContentStorage = new CustomContentStorage(context.getPlugin());
+        customContentStorage.preloadAll();
         new FlowGraphMigrator(storage).migrateStoredFlows();
         storage.preloadAll();
         TypeAdapterRegistry typeAdapterRegistry = new TypeAdapterRegistry();
@@ -105,6 +116,7 @@ public class FlowRuntimeModule implements Module {
         FlowRegistry flowRegistry = new FlowRegistry();
         flowRegistry.setHandlerRegistry(handlerRegistry);
         propertyRegistry = new PropertyRegistry();
+        new AbilityEffectHandler().registerTo(handlerRegistry);
         new GenericMathHandler().registerTo(handlerRegistry);
         new GenericStringHandler().registerTo(handlerRegistry);
         new GenericListHandler().registerTo(handlerRegistry);
@@ -143,6 +155,7 @@ public class FlowRuntimeModule implements Module {
         new UuidHandler().registerTo(handlerRegistry);
         new ColorHandler().registerTo(handlerRegistry);
         new CustomEventHandler().registerTo(handlerRegistry);
+        new CustomContentHandler().registerTo(handlerRegistry);
         new VariableScopeHandler().registerTo(handlerRegistry);
         new FunctionHandler().registerTo(handlerRegistry);
         new PlayerActionHandler().registerTo(handlerRegistry);
@@ -174,16 +187,20 @@ public class FlowRuntimeModule implements Module {
         );
         nodePluginRegistry.loadInitialPlugins();
         executor = new FlowExecutor(handlerRegistry, nodeDefinitionRegistry, typeAdapterRegistry, new HashMap<>());
+        customContentService = new CustomContentService(customContentStorage, storage, executor);
+        customContentListener = new CustomContentListener(customContentStorage, customContentService);
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
         globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry);
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher());
         flowEventRegistry.registerFromJson(new java.util.ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry);
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry, customContentStorage);
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         guiManager = new GuiManager(context.getServer(), storage, executor, delegate);
         context.registerService(FlowStorage.class, storage);
+        context.registerService(CustomContentStorage.class, customContentStorage);
+        context.registerService(CustomContentService.class, customContentService);
         context.registerService(HandlerRegistry.class, handlerRegistry);
         context.registerService(TypeRegistry.class, typeRegistry);
         context.registerService(FlowRegistry.class, flowRegistry);
@@ -195,6 +212,7 @@ public class FlowRuntimeModule implements Module {
         context.registerService(GuiManager.class, guiManager);
         context.registerService(FlowRuntimeModule.class, this);
         FlowRuntimeAccess.configure(context.getPlugin(), () -> storage, () -> executor != null ? executor.getGlobalVariables() : null);
+        CustomContentAccess.configure(customContentStorage, customContentService);
     }
 
     public void reloadNodeDefinitions() {
@@ -212,6 +230,7 @@ public class FlowRuntimeModule implements Module {
         nodeDefinitionRegistry.clear();
         handlerRegistry.clear();
         propertyRegistry.clear();
+        new AbilityEffectHandler().registerTo(handlerRegistry);
         new GenericMathHandler().registerTo(handlerRegistry);
         new GenericStringHandler().registerTo(handlerRegistry);
         new GenericListHandler().registerTo(handlerRegistry);
@@ -250,6 +269,7 @@ public class FlowRuntimeModule implements Module {
         new UuidHandler().registerTo(handlerRegistry);
         new ColorHandler().registerTo(handlerRegistry);
         new CustomEventHandler().registerTo(handlerRegistry);
+        new CustomContentHandler().registerTo(handlerRegistry);
         new VariableScopeHandler().registerTo(handlerRegistry);
         new FunctionHandler().registerTo(handlerRegistry);
         new PlayerActionHandler().registerTo(handlerRegistry);
@@ -298,10 +318,17 @@ public class FlowRuntimeModule implements Module {
         scoreboardRuntimeListener = new ScoreboardRuntimeListener();
         Bukkit.getPluginManager().registerEvents(scoreboardRuntimeListener, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(guiManager, context.getPlugin());
+        Bukkit.getPluginManager().registerEvents(customContentListener, context.getPlugin());
         TabListService.startUpdater();
         tickTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
             systemEventListener.tick();
             CustomEventManager.getInstance().tick();
+            if (customContentService != null) {
+                customContentService.tick();
+            }
+            if (customContentListener != null) {
+                customContentListener.tick();
+            }
         }, 1L, 1L);
     }
 
@@ -333,7 +360,11 @@ public class FlowRuntimeModule implements Module {
         if (guiManager != null) {
             HandlerList.unregisterAll(guiManager);
         }
+        if (customContentListener != null) {
+            HandlerList.unregisterAll(customContentListener);
+        }
         FlowRuntimeAccess.clear();
+        CustomContentAccess.clear();
     }
 
     @Override

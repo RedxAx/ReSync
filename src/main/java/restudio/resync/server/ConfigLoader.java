@@ -26,10 +26,11 @@ public class ConfigLoader {
         }
 
         ensureDefault(props, "enabled", "true");
-        ensureDefault(props, "port", "8080");
+        ensureDefault(props, "port", "12441");
         ensureDefault(props, "bind-host", "127.0.0.1");
+        ensureDefault(props, "public-bind-enabled", "false");
         config.setEnabled(Boolean.parseBoolean(props.getProperty("enabled", "true")));
-        config.setPort(Integer.parseInt(props.getProperty("port", "8080")));
+        config.setPort(Integer.parseInt(props.getProperty("port", "12441")));
 
         String apiKey = System.getenv("RESYNC_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
@@ -76,6 +77,7 @@ public class ConfigLoader {
         playerTracking.setCaptureChatText(Boolean.parseBoolean(props.getProperty("playerTracking.captureChatText", "false")));
         playerTracking.setCaptureCommandArguments(Boolean.parseBoolean(props.getProperty("playerTracking.captureCommandArguments", "false")));
         config.setPlayerTracking(playerTracking);
+        validateProductionConfig(config, props);
 
         saveConfig(configFile, props);
 
@@ -98,5 +100,30 @@ public class ConfigLoader {
         if (!props.containsKey(key)) {
             props.setProperty(key, value);
         }
+    }
+
+    private static void validateProductionConfig(ReSyncConfig config, Properties props) {
+        if (config.getApiKey() == null || config.getApiKey().isBlank()) {
+            Log.error("ReSync API key is empty. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+        String bindHost = config.getBindHost() == null ? "" : config.getBindHost().trim();
+        boolean publicBindEnabled = Boolean.parseBoolean(props.getProperty("public-bind-enabled", "false"));
+        if (!isLoopbackBind(bindHost) && !publicBindEnabled) {
+            Log.error("ReSync public bind requires public-bind-enabled=true. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+        if (config.getMaxEncodedFrameBytes() <= 0 || config.getMaxDecompressedPayloadBytes() <= 0 || config.getMaxDecompressedPayloadBytes() < config.getMaxEncodedFrameBytes()) {
+            Log.error("ReSync protocol frame limits are invalid. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+        if (config.getQueue().getMaxGlobalRequests() <= 0 || config.getQueue().getMaxRequestsPerClient() <= 0) {
+            Log.error("ReSync queue limits are invalid. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+    }
+
+    private static boolean isLoopbackBind(String bindHost) {
+        return bindHost.isBlank() || "127.0.0.1".equals(bindHost) || "localhost".equalsIgnoreCase(bindHost) || "::1".equals(bindHost);
     }
 }

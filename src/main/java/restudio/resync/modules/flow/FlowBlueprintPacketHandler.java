@@ -23,8 +23,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class FlowBlueprintPacketHandler {
     private static final Set<String> DIRECT_DISPATCH_EVENT_NODES = Set.of("resync_command", "click");
@@ -71,10 +74,16 @@ public class FlowBlueprintPacketHandler {
             sender.sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
             return;
         }
-        byte[] jsonBytes = new byte[buffer.remaining()];
-        buffer.get(jsonBytes);
-        String json = new String(jsonBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "saveFlow", "");
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String json = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "saveFlow", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
+        FlowGraph previousGraph = null;
+        Map<String, CustomContentDefinition> previousContent = Map.of();
+        List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
+        String rollbackFlowId = null;
         try {
             FlowGraph graph = FlowSerializer.deserialize(json);
             if (graph == null) {
@@ -85,21 +94,27 @@ public class FlowBlueprintPacketHandler {
             if (graph.getId() == null) {
                 graph.setId(UUID.randomUUID().toString());
             }
+            String flowId = graph.getId().toString();
+            rollbackFlowId = flowId;
+            previousGraph = storage.getGraph(flowId);
             storage.saveGraph(graph);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             if (customContentStorage != null) {
+                previousContent = customContentStorage.getByFlow(flowId).stream()
+                    .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
                 CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
                 if (content != null) {
                     customContentStorage.save(content);
                 } else if (!graph.isFunction()) {
-                    ensureDefaultContentGraphs(graph.getId(), customContentStorage);
+                    ensureDefaultContentGraphs(flowId, customContentStorage);
                 }
             }
             updateEventBindings(graph);
-            Log.fine("Flow saved: " + graph.getId());
-            sender.sendFlowSaveAck(session, graph.getId());
-            sender.succeedJob(job, graph.getId().toString(), "Saved");
+            Log.fine("Flow saved: " + flowId);
+            sender.sendFlowSaveAck(session, flowId);
+            sender.succeedJob(job, flowId, "Saved");
         } catch (Exception e) {
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);
             sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "SAVE_FAILED", "Failed to save flow: " + e.getMessage());
             Log.error("Flow save error: " + e.getMessage());
@@ -112,15 +127,25 @@ public class FlowBlueprintPacketHandler {
             return;
         }
         JobRecord<String> job = null;
+        FlowGraph previousGraph = null;
+        Map<String, CustomContentDefinition> previousContent = Map.of();
+        List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
+        String rollbackFlowId = null;
 
         try {
-            byte[] idBytes = new byte[buffer.remaining()];
-            buffer.get(idBytes);
-            String flowId = new String(idBytes, StandardCharsets.UTF_8);
-            job = sender.beginJob(session, "deleteFlow", flowId);
+            FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+            String flowId = payload.payload();
+            rollbackFlowId = flowId;
+            job = sender.beginJob(session, "deleteFlow", flowId, payload.requestId());
+            if (job == null) {
+                return;
+            }
+            previousGraph = storage.getGraph(flowId);
             storage.deleteGraph(flowId);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             if (customContentStorage != null) {
+                previousContent = customContentStorage.getByFlow(flowId).stream()
+                    .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
                 for (CustomContentDefinition definition : customContentStorage.getByFlow(flowId)) {
                     customContentStorage.delete(definition.getId());
                 }
@@ -134,6 +159,7 @@ public class FlowBlueprintPacketHandler {
             Log.fine("Flow deleted: " + flowId);
             sender.succeedJob(job, flowId, "Deleted");
         } catch (Exception e) {
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);
             sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "DELETE_FAILED", "Failed to delete flow: " + e.getMessage());
             Log.error("Flow delete error: " + e.getMessage());
@@ -148,10 +174,12 @@ public class FlowBlueprintPacketHandler {
         if (!buffer.hasRemaining() || triggerRegistry == null) {
             return;
         }
-        JobRecord<String> job = sender.beginJob(session, "updateTriggers", "");
-        byte[] jsonBytes = new byte[buffer.remaining()];
-        buffer.get(jsonBytes);
-        String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        JobRecord<String> job = sender.beginJob(session, "updateTriggers", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
+        String json = payload.payload();
         try {
             List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
             }.getType());
@@ -214,6 +242,35 @@ public class FlowBlueprintPacketHandler {
         CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(contentGraph);
         if (content != null) {
             customContentStorage.save(content);
+        }
+    }
+
+    private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousTriggers) {
+        try {
+            if (previousGraph != null && previousGraph.getId() != null) {
+                storage.saveGraph(previousGraph);
+            } else if (flowId != null && !flowId.isBlank()) {
+                storage.deleteGraph(flowId);
+            }
+            CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
+            if (customContentStorage != null && previousContent != null) {
+                for (CustomContentDefinition current : customContentStorage.getByFlow(flowId)) {
+                    if (current != null && current.getId() != null && !previousContent.containsKey(current.getId())) {
+                        customContentStorage.delete(current.getId());
+                    }
+                }
+                for (CustomContentDefinition definition : previousContent.values()) {
+                    customContentStorage.save(definition);
+                }
+            }
+            if (triggerRegistry != null && previousTriggers != null) {
+                triggerRegistry.setBindings(previousTriggers);
+            }
+            if (globalTriggers != null) {
+                globalTriggers.refreshBindings();
+            }
+        } catch (Exception restoreError) {
+            Log.error("Flow rollback failed: " + restoreError.getMessage());
         }
     }
 

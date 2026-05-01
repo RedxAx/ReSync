@@ -43,11 +43,15 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.queue.RateLimiter;
 import restudio.resync.queue.RequestQueue;
+import restudio.resync.security.ClientAuthorizer;
+import restudio.resync.security.ClientIdentity;
 import restudio.resync.server.ReSyncConfig;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +71,7 @@ public class ReSyncServer {
     private final ScheduledExecutorService scheduler;
     private final MemoryMonitor memoryMonitor;
     private final ModuleContext moduleContext;
+    private final ClientAuthorizer clientAuthorizer;
     private final AtomicInteger openConnections = new AtomicInteger();
 
     public ReSyncServer(ReSync plugin, ReSyncConfig config) {
@@ -85,6 +90,7 @@ public class ReSyncServer {
         this.memoryMonitor = new MemoryMonitor(config.getMemory().getSessionMemoryRatio());
         this.sessionManager = new SessionManager(memoryMonitor, 300, config.getMemory().getMaxMemoryPerSession());
         this.rateLimiter = new RateLimiter(1000, 10, 1000);
+        this.clientAuthorizer = new ClientAuthorizer(config);
         this.scheduler = Executors.newScheduledThreadPool(2);
         this.moduleContext = new ModuleContext(
             plugin,
@@ -203,15 +209,18 @@ public class ReSyncServer {
     }
 
     private void handleHandshake(WebSocket conn, ConnectionInfo info, HandshakeRequest req) {
-        if (!config.getApiKey().equals(req.getApiKey())) {
-            sendError(conn, 401, "Invalid API key");
-            conn.close(1008, "Invalid API key");
-            return;
-        }
-
         if (req.getProtocolVersion() != 2) {
             sendError(conn, 400, "Unsupported protocol version");
             conn.close(1003, "Unsupported protocol version");
+            return;
+        }
+
+        ClientIdentity identity;
+        try {
+            identity = clientAuthorizer.authorize(req.getApiKey(), req.getClientId(), req.getClientVersion());
+        } catch (SecurityException exception) {
+            sendError(conn, 401, exception.getMessage());
+            conn.close(1008, exception.getMessage());
             return;
         }
 
@@ -221,10 +230,15 @@ public class ReSyncServer {
             sessionManager.removeSession(conn);
         }
 
+        Session duplicate = sessionManager.getSessionByClientId(identity.clientId());
+        if (duplicate != null && duplicate.getConnection() != info) {
+            duplicate.getConnection().getWebSocket().close(1000, "Duplicate client replaced");
+        }
+
         info.setClientId(req.getClientId());
         info.setClientVersion(req.getClientVersion());
         info.setState(ConnectionState.AUTHENTICATED);
-        sessionManager.createSession(info, req.getClientId());
+        sessionManager.createSession(info, identity);
 
         HandshakeResponse response = new HandshakeResponse();
         response.setSuccess(true);
@@ -351,6 +365,25 @@ public class ReSyncServer {
 
     public ModuleContext getModuleContext() {
         return moduleContext;
+    }
+
+    public ReSyncConfig getConfig() {
+        return config;
+    }
+
+    public Map<String, Object> readinessSnapshot() {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("apiEnabled", config.isEnabled());
+        snapshot.put("bindHost", config.getBindHost());
+        snapshot.put("connectedClients", sessionManager.getSessionCount());
+        snapshot.put("maxConnections", config.getMaxConnections());
+        snapshot.put("queueMaxGlobalRequests", config.getQueue().getMaxGlobalRequests());
+        snapshot.put("queueMaxRequestsPerClient", config.getQueue().getMaxRequestsPerClient());
+        snapshot.put("sessionMemoryBytes", sessionManager.getTotalSessionMemory());
+        snapshot.put("sessionMemoryLimitBytes", memoryMonitor.getMaxMemoryForSessions());
+        snapshot.put("authMode", "adminApiKey");
+        snapshot.put("openConnections", openConnections.get());
+        return snapshot;
     }
 
     public FlowModule getFlowModule() {

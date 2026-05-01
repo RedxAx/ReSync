@@ -46,8 +46,12 @@ public class FlowCustomContentPacketHandler {
             sender.sendError(session, "INVALID_CONTENT_SAVE", "No custom content data provided");
             return;
         }
-        String json = readRemaining(buffer);
-        JobRecord<String> job = sender.beginJob(session, "saveCustomContent", "");
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String json = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "saveCustomContent", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             CustomContentDefinition definition = gson.fromJson(json, CustomContentDefinition.class);
             if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
@@ -75,8 +79,12 @@ public class FlowCustomContentPacketHandler {
         if (!buffer.hasRemaining()) {
             return;
         }
-        String id = readRemaining(buffer);
-        JobRecord<String> job = sender.beginJob(session, "deleteCustomContent", id);
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String id = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "deleteCustomContent", id, payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             storage.delete(id);
             sender.succeedJob(job, id, "Deleted");

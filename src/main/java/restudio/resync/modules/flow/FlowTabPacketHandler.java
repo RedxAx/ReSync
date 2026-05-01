@@ -49,10 +49,12 @@ public class FlowTabPacketHandler {
             sender.sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
             return;
         }
-        byte[] jsonBytes = new byte[buffer.remaining()];
-        buffer.get(jsonBytes);
-        String json = new String(jsonBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "saveTab", "");
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String json = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "saveTab", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             TabDefinition tab = FlowSerializer.deserializeTab(json);
             if (tab == null || tab.getId() == null || tab.getId().isBlank()) {
@@ -75,10 +77,12 @@ public class FlowTabPacketHandler {
         if (!buffer.hasRemaining()) {
             return;
         }
-        byte[] idBytes = new byte[buffer.remaining()];
-        buffer.get(idBytes);
-        String tabId = new String(idBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "deleteTab", tabId);
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String tabId = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "deleteTab", tabId, payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             storage.deleteTab(tabId);
             TabListService.clearActiveTabReferences(tabId, true);

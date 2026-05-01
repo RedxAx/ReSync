@@ -97,9 +97,15 @@ public class FlowPacketSender {
     }
 
     public JobRecord<String> beginJob(Session session, String action, String target) {
-        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target);
+        return beginJob(session, action, target, null);
+    }
+
+    public JobRecord<String> beginJob(Session session, String action, String target, String requestId) {
+        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target, requestId);
         sendJob(session, "jobAccepted", job.snapshot());
-        job.markRunning();
+        if (!job.markRunning()) {
+            return null;
+        }
         jobManager.publish(job);
         return job;
     }

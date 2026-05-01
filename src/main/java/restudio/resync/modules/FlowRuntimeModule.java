@@ -199,7 +199,7 @@ public class FlowRuntimeModule implements Module {
         flowEventRegistry.registerFromJson(new java.util.ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry, customContentStorage);
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry, customContentStorage, customContentService);
         delegate.setTraceService(traceService);
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         guiManager = new GuiManager(context.getServer(), storage, executor, delegate);

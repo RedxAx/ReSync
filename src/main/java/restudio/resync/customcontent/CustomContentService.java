@@ -1,5 +1,6 @@
 package restudio.resync.customcontent;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -38,15 +39,48 @@ public class CustomContentService {
         this.executor = executor;
         this.vanillaProvider = new VanillaContentProvider();
         registerProvider(vanillaProvider);
-        registerProvider(new ExternalContentProvider("oraxen", "Oraxen", vanillaProvider));
-        registerProvider(new ExternalContentProvider("itemsadder", "ItemsAdder", vanillaProvider));
-        registerProvider(new ExternalContentProvider("nexo", "Nexo", vanillaProvider));
+        if (Bukkit.getPluginManager().getPlugin("Nexo") != null) {
+            registerProvider(new NexoContentProvider(contentStorage, vanillaProvider));
+        }
     }
 
     public void registerProvider(CustomContentProvider provider) {
         if (provider != null && provider.getId() != null) {
             providers.put(provider.getId().toLowerCase(Locale.ROOT), provider);
         }
+    }
+
+    public List<String> getAvailableProviderIds() {
+        return providers.values().stream()
+            .filter(CustomContentProvider::isAvailable)
+            .map(CustomContentProvider::getId)
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .toList();
+    }
+
+    public boolean isProviderAvailable(String providerId) {
+        if (providerId == null) {
+            return false;
+        }
+        CustomContentProvider provider = providers.get(providerId.toLowerCase(Locale.ROOT));
+        return provider != null && provider.isAvailable();
+    }
+
+    public List<String> getProviderOptionIds(String providerId, String catalog) {
+        if (providerId == null || catalog == null) {
+            return List.of();
+        }
+        CustomContentProvider provider = providers.get(providerId.toLowerCase(Locale.ROOT));
+        if (!(provider instanceof NexoContentProvider nexoProvider) || !nexoProvider.isAvailable()) {
+            return List.of();
+        }
+        return switch (catalog.toLowerCase(Locale.ROOT)) {
+            case "item", "items" -> nexoProvider.itemIds();
+            case "block", "blocks" -> nexoProvider.blockContentIds();
+            case "furniture" -> nexoProvider.furnitureIds();
+            case "armor" -> nexoProvider.armorIds();
+            default -> List.of();
+        };
     }
 
     public CustomContentProvider providerFor(CustomContentDefinition definition) {

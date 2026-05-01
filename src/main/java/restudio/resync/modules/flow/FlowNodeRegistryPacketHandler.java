@@ -3,6 +3,7 @@ package restudio.resync.modules.flow;
 import com.google.gson.Gson;
 import restudio.flow.data.FlowDataType;
 import restudio.resync.Log;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.property.PropertyRegistry;
@@ -30,13 +31,15 @@ public class FlowNodeRegistryPacketHandler {
     private final FlowNodePluginRegistry pluginRegistry;
     private final FlowPacketSender sender;
     private final PropertyRegistry propertyRegistry;
+    private final CustomContentService customContentService;
     private final Gson gson = new Gson();
 
-    public FlowNodeRegistryPacketHandler(NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry, FlowPacketSender sender, PropertyRegistry propertyRegistry) {
+    public FlowNodeRegistryPacketHandler(NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry, FlowPacketSender sender, PropertyRegistry propertyRegistry, CustomContentService customContentService) {
         this.definitionRegistry = definitionRegistry;
         this.pluginRegistry = pluginRegistry;
         this.sender = sender;
         this.propertyRegistry = propertyRegistry;
+        this.customContentService = customContentService;
         if (pluginRegistry != null) {
             pluginRegistry.addListener(new FlowNodePluginRegistry.PluginChangeListener() {
                 @Override
@@ -209,6 +212,15 @@ public class FlowNodeRegistryPacketHandler {
         list.add(new FlowOptionSourceMetadata("server:minecraft:potion_effect", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("server:minecraft:sound", "minecraft", "SEARCHABLE_LIST", true));
         list.add(new FlowOptionSourceMetadata("server:minecraft:world", "minecraft", "SEARCHABLE_LIST", false));
+        if (customContentService != null) {
+            list.add(new FlowOptionSourceMetadata("server:custom_content:provider", "custom_content", "DROPDOWN", false));
+            if (customContentService.isProviderAvailable("nexo")) {
+                list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_item", "custom_content", "SEARCHABLE_LIST", true));
+                list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_block", "custom_content", "SEARCHABLE_LIST", true));
+                list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_furniture", "custom_content", "SEARCHABLE_LIST", true));
+                list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_armor", "custom_content", "SEARCHABLE_LIST", true));
+            }
+        }
         if (pluginRegistry != null) {
             list.addAll(pluginRegistry.getAllCustomOptionSources());
         }

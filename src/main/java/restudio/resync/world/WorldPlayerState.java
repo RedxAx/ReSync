@@ -13,6 +13,7 @@ public class WorldPlayerState {
     private String inventory;
     private String armor;
     private String offhand;
+    private String enderChest;
     private String extra;
     private long updatedAt;
 
@@ -30,6 +31,7 @@ public class WorldPlayerState {
         copy.inventory = inventory;
         copy.armor = armor;
         copy.offhand = offhand;
+        copy.enderChest = enderChest;
         copy.extra = extra;
         copy.updatedAt = updatedAt;
         return copy;
@@ -129,6 +131,14 @@ public class WorldPlayerState {
 
     public void setOffhand(String offhand) {
         this.offhand = offhand;
+    }
+
+    public String getEnderChest() {
+        return enderChest;
+    }
+
+    public void setEnderChest(String enderChest) {
+        this.enderChest = enderChest;
     }
 
     public String getExtra() {

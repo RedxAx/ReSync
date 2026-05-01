@@ -7,10 +7,13 @@ import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowSerializer;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.diagnostics.FlowTraceRecord;
+import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.migration.IdCompatibilityLayer;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -36,6 +39,7 @@ public class FlowExecutor {
     private final Map<String, Object> eventVariables = new java.util.concurrent.ConcurrentHashMap<>();
     private Map<String, BukkitTask> pendingTasks = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
+    private FlowTraceService traceService;
 
     public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
         this(handlerRegistry, null, typeAdapter, globalVariables, 10000, false);
@@ -94,6 +98,10 @@ public class FlowExecutor {
         executionListeners.remove(listener);
     }
 
+    public void setTraceService(FlowTraceService traceService) {
+        this.traceService = traceService;
+    }
+
     private CompletableFuture<Void> execute(FlowRuntime runtime, String startNodeId, Player player, Event event, int steps) {
         if (steps >= maxExecutionSteps) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
@@ -118,6 +126,8 @@ public class FlowExecutor {
         }
 
         runtime.consumeTriggeredOutput();
+        long traceStarted = System.nanoTime();
+        trace(startTraceRecord(graph, node, startNodeId, steps, "started", 0L, null));
 
         FlowContext context = new FlowContext(
                 runtime,
@@ -187,9 +197,11 @@ public class FlowExecutor {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
             runtime.endFlowExecution(startNodeId);
+            trace(startTraceRecord(graph, node, startNodeId, steps, "success", System.nanoTime() - traceStarted, null));
             return result;
         } catch (Exception e) {
             runtime.endFlowExecution(startNodeId);
+            trace(startTraceRecord(graph, node, startNodeId, steps, "failure", System.nanoTime() - traceStarted, e));
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "Error executing node '" + node.getType() + "' (ID: " + startNodeId + ")", 
                 e, 
@@ -290,6 +302,7 @@ public class FlowExecutor {
         if (functionGraph == null || !functionGraph.isFunction()) {
             return findNextAndExecute(runtime, node, "flow", player, event, steps);
         }
+        functionGraph = FlowSerializer.deserialize(FlowSerializer.serialize(functionGraph));
 
         Map<String, Object> callInputs = new HashMap<>();
         if (functionGraph.getFunctionInputs() != null) {
@@ -638,9 +651,6 @@ public class FlowExecutor {
             return null;
         }
         String mappedType = idCompatibility.mapToNew(node.getType());
-        if (!mappedType.equals(node.getType())) {
-            node.setType(mappedType);
-        }
         NodeDefinition definition = nodeDefinitionRegistry.get(mappedType);
         return definition != null && definition.isTrigger() ? definition : null;
     }
@@ -820,14 +830,12 @@ public class FlowExecutor {
         }
 
         String mappedType = idCompatibility.mapToNew(nodeType);
-        if (!mappedType.equals(nodeType)) {
-            node.setType(mappedType);
-            nodeType = mappedType;
-        }
+        nodeType = mappedType;
 
         if (nodeDefinitionRegistry != null) {
             NodeDefinition definition = nodeDefinitionRegistry.get(nodeType);
             if (definition != null) {
+                node.setType(nodeType);
                 node.setHandlerConfig(definition.getHandlerConfig());
                 String handlerName = definition.getHandler();
                 if (handlerName != null && !handlerName.isBlank()) {
@@ -840,6 +848,52 @@ public class FlowExecutor {
         }
 
         return handlerRegistry.getHandler(nodeType);
+    }
+
+    private FlowTraceRecord startTraceRecord(FlowGraph graph, FlowNode node, String nodeId, int steps, String status, long durationNanos, Throwable error) {
+        FlowTraceRecord record = new FlowTraceRecord();
+        record.setGraphId(graph != null ? graph.getId() : "");
+        record.setNodeId(nodeId);
+        record.setNodeType(node != null ? node.getType() : "");
+        record.setStatus(status);
+        record.setExecutionDepth(steps);
+        record.setDurationNanos(durationNanos);
+        record.setErrorText(error != null ? error.getMessage() : "");
+        record.setInputSummary(summarizeInputs(node));
+        record.setOutputSummary("");
+        return record;
+    }
+
+    private String summarizeInputs(FlowNode node) {
+        if (node == null || node.getInputValues() == null || node.getInputValues().isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : node.getInputValues().entrySet()) {
+            if (!builder.isEmpty()) {
+                builder.append(", ");
+            }
+            builder.append(entry.getKey()).append('=').append(summarizeValue(entry.getValue()));
+            if (builder.length() > 240) {
+                return builder.substring(0, 240);
+            }
+        }
+        return builder.toString();
+    }
+
+    private String summarizeValue(Object value) {
+        if (value == null) {
+            return "null";
+        }
+        String text = String.valueOf(value).replace('\n', ' ').replace('\r', ' ');
+        return text.length() > 48 ? text.substring(0, 48) + "..." : text;
+    }
+
+    private void trace(FlowTraceRecord record) {
+        FlowTraceService service = traceService;
+        if (service != null) {
+            service.record(record);
+        }
     }
 
     public static class FlowExecutionException extends Exception {

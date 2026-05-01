@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
+import restudio.resync.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -29,6 +30,7 @@ public final class WorldPlayerStateCodec {
         state.setInventory(encodeItemStacks(player.getInventory().getStorageContents()));
         state.setArmor(encodeItemStacks(player.getInventory().getArmorContents()));
         state.setOffhand(encodeItemStacks(new ItemStack[]{player.getInventory().getItemInOffHand()}));
+        state.setEnderChest(encodeItemStacks(player.getEnderChest().getContents()));
         state.setUpdatedAt(System.currentTimeMillis());
         return state;
     }
@@ -61,6 +63,7 @@ public final class WorldPlayerStateCodec {
         player.getInventory().setArmorContents(decodeItemStacks(state.getArmor(), 4));
         ItemStack[] offhand = decodeItemStacks(state.getOffhand(), 1);
         player.getInventory().setItemInOffHand(offhand.length > 0 ? offhand[0] : null);
+        player.getEnderChest().setContents(decodeItemStacks(state.getEnderChest(), player.getEnderChest().getSize()));
         player.updateInventory();
     }
 
@@ -77,7 +80,8 @@ public final class WorldPlayerStateCodec {
             }
             data.close();
             return Base64.getEncoder().encodeToString(output.toByteArray());
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            Log.warn("Failed to encode world player inventory: " + e.getMessage());
             return "";
         }
     }
@@ -90,14 +94,20 @@ public final class WorldPlayerStateCodec {
             byte[] raw = Base64.getDecoder().decode(encoded);
             BukkitObjectInputStream data = new BukkitObjectInputStream(new ByteArrayInputStream(raw));
             int size = data.readInt();
-            ItemStack[] items = new ItemStack[Math.max(0, size)];
+            if (size < 0 || size > fallbackSize) {
+                Log.warn("Rejected world player inventory with invalid size: " + size);
+                data.close();
+                return new ItemStack[fallbackSize];
+            }
+            ItemStack[] items = new ItemStack[size];
             for (int index = 0; index < items.length; index++) {
                 Object value = data.readObject();
                 items[index] = value instanceof ItemStack item ? item : null;
             }
             data.close();
             return items;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            Log.warn("Failed to decode world player inventory: " + e.getMessage());
             return new ItemStack[fallbackSize];
         }
     }

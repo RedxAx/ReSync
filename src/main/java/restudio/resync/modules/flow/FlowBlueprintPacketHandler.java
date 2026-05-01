@@ -15,12 +15,14 @@ import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.jobs.JobRecord;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -72,9 +74,11 @@ public class FlowBlueprintPacketHandler {
         byte[] jsonBytes = new byte[buffer.remaining()];
         buffer.get(jsonBytes);
         String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        JobRecord<String> job = sender.beginJob(session, "saveFlow", "");
         try {
             FlowGraph graph = FlowSerializer.deserialize(json);
             if (graph == null) {
+                sender.failJob(job, "Failed to parse flow graph", null);
                 sender.sendError(session, "INVALID_GRAPH", "Failed to parse flow graph");
                 return;
             }
@@ -94,7 +98,9 @@ public class FlowBlueprintPacketHandler {
             updateEventBindings(graph);
             Log.fine("Flow saved: " + graph.getId());
             sender.sendFlowSaveAck(session, graph.getId());
+            sender.succeedJob(job, graph.getId().toString(), "Saved");
         } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "SAVE_FAILED", "Failed to save flow: " + e.getMessage());
             Log.error("Flow save error: " + e.getMessage());
         }
@@ -102,43 +108,61 @@ public class FlowBlueprintPacketHandler {
 
     public void handleDelete(Session session, ByteBuffer buffer) {
         if (!buffer.hasRemaining()) {
+            sender.sendError(session, "INVALID_DELETE", "Flow ID not provided");
             return;
         }
-        byte[] idBytes = new byte[buffer.remaining()];
-        buffer.get(idBytes);
-        String flowId = new String(idBytes, StandardCharsets.UTF_8);
-        storage.deleteGraph(flowId);
-        CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
-        if (customContentStorage != null) {
-            for (CustomContentDefinition definition : customContentStorage.getByFlow(flowId)) {
-                customContentStorage.delete(definition.getId());
+        JobRecord<String> job = null;
+
+        try {
+            byte[] idBytes = new byte[buffer.remaining()];
+            buffer.get(idBytes);
+            String flowId = new String(idBytes, StandardCharsets.UTF_8);
+            job = sender.beginJob(session, "deleteFlow", flowId);
+            storage.deleteGraph(flowId);
+            CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
+            if (customContentStorage != null) {
+                for (CustomContentDefinition definition : customContentStorage.getByFlow(flowId)) {
+                    customContentStorage.delete(definition.getId());
+                }
             }
+            if (triggerRegistry != null) {
+                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
+            }
+            if (globalTriggers != null) {
+                globalTriggers.refreshBindings();
+            }
+            Log.fine("Flow deleted: " + flowId);
+            sender.succeedJob(job, flowId, "Deleted");
+        } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
+            sender.sendError(session, "DELETE_FAILED", "Failed to delete flow: " + e.getMessage());
+            Log.error("Flow delete error: " + e.getMessage());
         }
-        if (triggerRegistry != null) {
-            triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
-        }
-        if (globalTriggers != null) {
-            globalTriggers.refreshBindings();
-        }
-        Log.fine("Flow deleted: " + flowId);
     }
 
     public void handleListRequest(Session session) {
         sender.sendFlowList(session, storage.listFlowIds());
     }
 
-    public void handleTriggerUpdate(ByteBuffer buffer) {
+    public void handleTriggerUpdate(Session session, ByteBuffer buffer) {
         if (!buffer.hasRemaining() || triggerRegistry == null) {
             return;
         }
+        JobRecord<String> job = sender.beginJob(session, "updateTriggers", "");
         byte[] jsonBytes = new byte[buffer.remaining()];
         buffer.get(jsonBytes);
         String json = new String(jsonBytes, StandardCharsets.UTF_8);
-        List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
-        }.getType());
-        triggerRegistry.setBindingsPreservingType(bindings, TriggerType.EVENT);
-        if (globalTriggers != null) {
-            globalTriggers.refreshBindings();
+        try {
+            List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
+            }.getType());
+            triggerRegistry.setBindingsPreservingType(bindings, TriggerType.EVENT);
+            if (globalTriggers != null) {
+                globalTriggers.refreshBindings();
+            }
+            sender.succeedJob(job, "triggers", "Saved");
+        } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
+            sender.sendError(session, "TRIGGER_UPDATE_FAILED", "Failed to update triggers: " + e.getMessage());
         }
     }
 
@@ -197,7 +221,7 @@ public class FlowBlueprintPacketHandler {
         if (nodeType == null) {
             return null;
         }
-        String normalized = nodeType.trim().toLowerCase(java.util.Locale.ROOT);
+        String normalized = nodeType.trim().toLowerCase(Locale.ROOT);
         if (normalized.startsWith("event:")) {
             normalized = normalized.substring(6);
         } else if (normalized.startsWith("event.")) {

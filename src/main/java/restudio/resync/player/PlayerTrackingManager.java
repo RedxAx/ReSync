@@ -5,9 +5,9 @@ import com.google.gson.GsonBuilder;
 import org.bukkit.entity.Player;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.storage.StorageSafety;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 public class PlayerTrackingManager implements PlayerTrackingService {
     private static final int MAX_RECENT_EVENTS = 250;
@@ -166,7 +167,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         listeners.remove(listener);
     }
 
-    private void update(UUID playerId, String playerName, java.util.function.Consumer<PlayerDossier> mutator, String reason) {
+    private void update(UUID playerId, String playerName, Consumer<PlayerDossier> mutator, String reason) {
         PlayerDossier dossier = dossiers.computeIfAbsent(playerId, this::createDossier);
         PlayerDossier snapshot;
         synchronized (dossier) {
@@ -217,25 +218,68 @@ public class PlayerTrackingManager implements PlayerTrackingService {
 
     private void load(Path path) {
         try {
-            String json = Files.readString(path, StandardCharsets.UTF_8);
+            String fileName = path.getFileName().toString();
+            if (!fileName.endsWith(".json") || StorageSafety.validateId(fileName.substring(0, fileName.length() - 5)) == null) {
+                return;
+            }
+            String json = StorageSafety.readUtf8(path);
             PlayerDossier dossier = gson.fromJson(json, PlayerDossier.class);
             if (dossier == null || dossier.getPlayerId() == null || dossier.getPlayerId().isBlank()) {
                 return;
             }
+            StorageSafety.validateId(dossier.getPlayerId());
+            normalizeLoadedDossier(dossier);
             dossier.setOnline(false);
-            dossier.setActiveSession(null);
+            closeStaleSession(dossier);
             dossiers.put(UUID.fromString(dossier.getPlayerId()), dossier);
+            save(dossier);
         } catch (Exception e) {
             Log.warn("Failed to load dossier " + path.getFileName() + ": " + e.getMessage());
         }
     }
 
+    private void normalizeLoadedDossier(PlayerDossier dossier) {
+        if (dossier.getPlayerName() == null || dossier.getPlayerName().isBlank()) {
+            dossier.setPlayerName(dossier.getPlayerId());
+        }
+        if (dossier.getSessions() == null) {
+            dossier.setSessions(new ArrayList<>());
+        }
+        if (dossier.getRecentEvents() == null) {
+            dossier.setRecentEvents(new ArrayList<>());
+        }
+        if (dossier.getFacets() == null) {
+            dossier.setFacets(new LinkedHashMap<>());
+        }
+    }
+
+    private void closeStaleSession(PlayerDossier dossier) {
+        PlayerSessionRecord session = dossier.getActiveSession();
+        if (session == null || session.getEndedAt() > 0) {
+            dossier.setActiveSession(null);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        session.setEndedAt(now);
+        session.setDurationMs(Math.max(0L, now - session.getStartedAt()));
+        if (session.getSource() == null || session.getSource().isBlank()) {
+            session.setSource("startupRecovery");
+        }
+        dossier.setLastSeenAt(now);
+        dossier.setTotalPlayTimeMs(dossier.getTotalPlayTimeMs() + session.getDurationMs());
+        dossier.getSessions().add(0, session.copy());
+        trimSessions(dossier);
+        dossier.setActiveSession(null);
+    }
+
     private void save(PlayerDossier dossier) {
         try {
-            Path path = dossierDirectory.resolve(dossier.getPlayerId() + ".json");
-            Files.writeString(path, gson.toJson(dossier), StandardCharsets.UTF_8);
+            Path path = StorageSafety.jsonFile(dossierDirectory, dossier.getPlayerId());
+            StorageSafety.writeUtf8Atomic(path, gson.toJson(dossier));
         } catch (IOException e) {
             Log.warn("Failed to save dossier " + dossier.getPlayerId() + ": " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            Log.warn("Rejected unsafe dossier id " + dossier.getPlayerId() + ": " + e.getMessage());
         }
     }
 

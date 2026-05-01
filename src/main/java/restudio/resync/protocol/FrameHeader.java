@@ -77,6 +77,9 @@ public class FrameHeader {
     }
 
     public void setMessageType(MessageType messageType) {
+        if (messageType == null) {
+            throw new IllegalArgumentException("Message type is required");
+        }
         this.messageType = messageType;
     }
 
@@ -85,6 +88,9 @@ public class FrameHeader {
     }
 
     public void setChannel(int channel) {
+        if (channel < 0 || channel > 0xFFFF) {
+            throw new IllegalArgumentException("Invalid channel: " + channel);
+        }
         this.channel = channel;
     }
 
@@ -101,6 +107,9 @@ public class FrameHeader {
     }
 
     public void setPayloadLength(int payloadLength) {
+        if (payloadLength < 0) {
+            throw new IllegalArgumentException("Negative payload length");
+        }
         this.payloadLength = payloadLength;
     }
 

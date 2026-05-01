@@ -28,6 +28,7 @@ public class CustomContentService {
     private final Map<String, CustomContentProvider> providers = new ConcurrentHashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> tickActivations = new ConcurrentHashMap<>();
+    private final Map<String, CompiledContentDefinition> compiledDefinitions = new ConcurrentHashMap<>();
     private final VanillaContentProvider vanillaProvider;
     private long currentTick;
 
@@ -111,14 +112,7 @@ public class CustomContentService {
         if (definition == null || trigger == null) {
             return;
         }
-        if (definition.getFlowId() != null && !definition.getFlowId().isBlank()) {
-            FlowGraph sourceGraph = flowStorage.getGraph(definition.getFlowId());
-            CustomContentDefinition graphDefinition = CustomContentGraphAdapter.toDefinition(sourceGraph);
-            if (graphDefinition != null && contentId.equals(graphDefinition.getId())) {
-                definition = graphDefinition;
-                contentStorage.save(definition);
-            }
-        }
+        definition = compiledDefinition(contentId, definition);
         List<CustomAbilityBinding> bindings = new ArrayList<>(definition.getAbilities());
         bindings.sort(Comparator.comparingInt((CustomAbilityBinding binding) -> binding.getRule() != null ? binding.getRule().getPriority() : 0).reversed());
         for (CustomAbilityBinding binding : bindings) {
@@ -147,6 +141,32 @@ public class CustomContentService {
             }
             executor.execute(graph, findStartNode(graph), player, event, vars);
         }
+    }
+
+    private CustomContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition) {
+        String flowId = storedDefinition.getFlowId();
+        if (flowId == null || flowId.isBlank()) {
+            compiledDefinitions.remove(contentId);
+            return storedDefinition;
+        }
+        FlowGraph sourceGraph = flowStorage.getGraph(flowId);
+        if (sourceGraph == null) {
+            compiledDefinitions.remove(contentId);
+            return storedDefinition;
+        }
+        int graphIdentity = System.identityHashCode(sourceGraph);
+        int graphVersion = sourceGraph.getVersion();
+        CompiledContentDefinition cached = compiledDefinitions.get(contentId);
+        if (cached != null && cached.graphIdentity == graphIdentity && cached.graphVersion == graphVersion) {
+            return cached.definition;
+        }
+        CustomContentDefinition graphDefinition = CustomContentGraphAdapter.toDefinition(sourceGraph);
+        if (graphDefinition == null || !contentId.equals(graphDefinition.getId())) {
+            compiledDefinitions.remove(contentId);
+            return storedDefinition;
+        }
+        compiledDefinitions.put(contentId, new CompiledContentDefinition(graphDefinition, graphIdentity, graphVersion));
+        return graphDefinition;
     }
 
     private boolean passes(CustomContentDefinition definition, CustomAbilityBinding binding, Player player, Event event, Map<String, Object> vars) {
@@ -254,5 +274,8 @@ public class CustomContentService {
 
     public VanillaContentProvider getVanillaProvider() {
         return vanillaProvider;
+    }
+
+    private record CompiledContentDefinition(CustomContentDefinition definition, int graphIdentity, int graphVersion) {
     }
 }

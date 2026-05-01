@@ -11,12 +11,11 @@ import org.bukkit.persistence.PersistentDataType;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,7 +126,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             return;
         }
         try {
-            Map<String, String> loaded = gson.fromJson(Files.readString(blockFile.toPath(), StandardCharsets.UTF_8), mapType);
+            Map<String, String> loaded = gson.fromJson(StorageSafety.readUtf8(blockFile.toPath()), mapType);
             if (loaded != null) {
                 blocks.putAll(loaded);
             }
@@ -138,7 +137,7 @@ public class VanillaContentProvider implements CustomContentProvider {
 
     private void saveBlocks() {
         try {
-            Files.writeString(blockFile.toPath(), gson.toJson(blocks), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(blockFile.toPath(), gson.toJson(blocks));
         } catch (IOException e) {
             Log.warn("Failed to save custom blocks: " + e.getMessage());
         }

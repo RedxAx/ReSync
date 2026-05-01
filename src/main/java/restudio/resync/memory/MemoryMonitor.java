@@ -14,6 +14,7 @@ public class MemoryMonitor {
     private final long maxMemoryForSessions;
     private final long jvmMaxMemory;
     private volatile boolean memoryPressure;
+    private Thread monitorThread;
 
     public MemoryMonitor(double sessionMemoryRatio) {
         this.memoryMXBean = ManagementFactory.getMemoryMXBean();
@@ -59,7 +60,7 @@ public class MemoryMonitor {
     }
 
     private void startMonitoring() {
-        Thread monitorThread = new Thread(() -> {
+        monitorThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     checkMemory();
@@ -72,6 +73,14 @@ public class MemoryMonitor {
         }, "ReSync-MemoryMonitor");
         monitorThread.setDaemon(true);
         monitorThread.start();
+    }
+
+    public void shutdown() {
+        if (monitorThread != null) {
+            monitorThread.interrupt();
+            monitorThread = null;
+        }
+        trackedSessions.clear();
     }
 
     private void checkMemory() {

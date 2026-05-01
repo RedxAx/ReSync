@@ -3,6 +3,7 @@ package restudio.resync.modules;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
+import restudio.resync.ReSync;
 import restudio.resync.cache.LRUCache;
 import restudio.resync.core.Session;
 import restudio.resync.protocol.Codec;
@@ -222,28 +223,42 @@ public class ChunkModule implements Module {
         }
 
         world.getChunkAtAsync(request.chunkX(), request.chunkZ())
-            .thenApply(this::encodeChunk)
-            .whenComplete((chunkData, throwable) -> {
-                activeLoads.remove(key);
-
-                if (throwable != null || chunkData == null) {
+            .whenComplete((chunk, throwable) -> {
+                if (throwable != null || chunk == null) {
+                    activeLoads.remove(key);
                     String error = throwable != null ? throwable.getMessage() : "Unknown chunk load failure";
                     notifyError(key, "Failed to load chunk: " + error);
                     return;
                 }
-
-                chunkCache.put(key, chunkData);
-                Set<Session> waitingSessions = pendingLoads.remove(key);
-                if (waitingSessions == null) {
+                ReSync plugin = ReSync.getInstance();
+                if (plugin == null || !plugin.isEnabled()) {
+                    activeLoads.remove(key);
+                    notifyError(key, "Failed to load chunk: Plugin not enabled");
                     return;
                 }
-
-                for (Session waitingSession : waitingSessions) {
-                    if (waitingSession.getConnection().getWebSocket().isOpen()) {
-                        sendChunkData(waitingSession, chunkData);
-                    }
-                }
+                Bukkit.getScheduler().runTask(plugin, () -> finishChunkLoad(key, chunk));
             });
+    }
+
+    private void finishChunkLoad(ChunkKey key, Chunk chunk) {
+        try {
+            byte[] chunkData = encodeChunk(chunk);
+            activeLoads.remove(key);
+
+            chunkCache.put(key, chunkData);
+            Set<Session> waitingSessions = pendingLoads.remove(key);
+            if (waitingSessions == null) {
+                return;
+            }
+
+            for (Session waitingSession : waitingSessions) {
+                if (waitingSession.getConnection().getWebSocket().isOpen()) {
+                    sendChunkData(waitingSession, chunkData);
+                }
+            }
+        } catch (Exception e) {
+            notifyError(key, "Failed to encode chunk: " + e.getMessage());
+        }
     }
 
     private void notifyError(ChunkKey key, String error) {
@@ -335,10 +350,11 @@ public class ChunkModule implements Module {
             return;
         }
 
-        ByteBuffer payloadBuffer = ByteBuffer.allocate(8 + batch.payloadBytes);
+        ByteBuffer payloadBuffer = ByteBuffer.allocate(8 + batch.payloadBytes + batch.chunks.size() * Integer.BYTES);
         payloadBuffer.putInt(RESPONSE_BATCH_MAGIC);
         payloadBuffer.putInt(batch.chunks.size());
         for (byte[] chunk : batch.chunks) {
+            payloadBuffer.putInt(chunk.length);
             payloadBuffer.put(chunk);
         }
 

@@ -16,6 +16,9 @@ import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
+import restudio.resync.flow.diagnostics.FlowTraceRecord;
+import restudio.resync.flow.diagnostics.FlowTraceService;
+import restudio.resync.flow.diagnostics.FlowTraceSink;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
 import restudio.resync.modules.flow.FlowCustomContentPacketHandler;
@@ -52,6 +55,8 @@ public class FlowModule implements Module {
     private final FlowCustomContentPacketHandler customContentHandler;
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowNodePluginRegistry pluginRegistry;
+    private FlowTraceService traceService;
+    private FlowTraceSink traceSink;
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
@@ -98,7 +103,7 @@ public class FlowModule implements Module {
     @Override
     public void onData(Session session, DataMessage req) {
         byte[] payload = req.getPayload();
-        if (payload.length < 1) {
+        if (payload == null || payload.length < 1) {
             sender.sendError(session, "EMPTY_PACKET", "Packet payload is empty");
             return;
         }
@@ -119,7 +124,7 @@ public class FlowModule implements Module {
                 case 0x03 -> blueprintHandler.handleSave(session, buffer);
                 case 0x04 -> {
                 }
-                case 0x06 -> blueprintHandler.handleTriggerUpdate(buffer);
+                case 0x06 -> blueprintHandler.handleTriggerUpdate(session, buffer);
                 case 0x08 -> blueprintHandler.handleDelete(session, buffer);
                 case 0x09 -> blueprintHandler.handleListRequest(session);
                 case 0x0C -> nodeRegistryHandler.handleRequest(session, buffer);
@@ -141,7 +146,13 @@ public class FlowModule implements Module {
                 case 0x34 -> customContentHandler.handleDelete(session, buffer);
                 case 0x36 -> customContentHandler.handleListRequest(session);
                 case 0x37 -> optionCatalogHandler.handle(session, buffer);
-                default -> Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
+                case 0x40 -> handleTraceToggle(session, buffer);
+                case 0x43 -> handleTraceClear(session);
+                case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
+                default -> {
+                    Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
+                    sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
+                }
             }
         } catch (Exception e) {
             Log.error("Error handling flow packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
@@ -199,5 +210,34 @@ public class FlowModule implements Module {
 
     public void sendGuiState(Session session, boolean editable, String guiId, String flowId) {
         sender.sendGuiState(session, editable, guiId, flowId);
+    }
+
+    public void setTraceService(FlowTraceService traceService) {
+        this.traceService = traceService;
+    }
+
+    private void handleTraceToggle(Session session, ByteBuffer buffer) {
+        if (traceService == null) {
+            sender.sendTraceSnapshot(session, List.of());
+            return;
+        }
+        boolean enabled = buffer.remaining() <= 0 || buffer.get() != 0;
+        traceService.setEnabled(enabled);
+        if (enabled && traceSink == null) {
+            traceSink = record -> {
+                for (Session subscribedSession : subscribedSessions) {
+                    sender.sendTraceEvent(subscribedSession, record);
+                }
+            };
+            traceService.addSink(traceSink);
+        }
+        sender.sendTraceSnapshot(session, traceService.snapshot());
+    }
+
+    private void handleTraceClear(Session session) {
+        if (traceService != null) {
+            traceService.clear();
+        }
+        sender.sendTraceSnapshot(session, List.of());
     }
 }

@@ -13,7 +13,10 @@ import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.diagnostics.FlowTraceRecord;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
+import restudio.resync.jobs.JobManager;
+import restudio.resync.jobs.JobRecord;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 
@@ -29,6 +32,7 @@ public class FlowPacketSender {
     private final Codec codec;
     private final int channelId;
     private final Set<Session> subscribedSessions;
+    private final JobManager jobManager;
     private final Gson gson = new GsonBuilder()
             .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
             .registerTypeAdapter(NodeDefinition.NodeCategory.class, new com.google.gson.TypeAdapter<NodeDefinition.NodeCategory>() {
@@ -49,6 +53,7 @@ public class FlowPacketSender {
         this.codec = codec;
         this.channelId = channelId;
         this.subscribedSessions = subscribedSessions;
+        this.jobManager = new JobManager(job -> broadcastJob("jobStatus", job.snapshot()));
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {
@@ -89,6 +94,30 @@ public class FlowPacketSender {
 
     public void sendCustomContentSaveAck(Session session, String contentId) {
         sendIdAck(session, (byte) 0x35, contentId);
+    }
+
+    public JobRecord<String> beginJob(Session session, String action, String target) {
+        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target);
+        sendJob(session, "jobAccepted", job.snapshot());
+        job.markRunning();
+        jobManager.publish(job);
+        return job;
+    }
+
+    public void succeedJob(JobRecord<String> job, String result, String message) {
+        if (job != null && job.markSucceeded(result, message == null || message.isBlank() ? "Succeeded" : message)) {
+            jobManager.publish(job);
+        }
+    }
+
+    public void failJob(JobRecord<String> job, String message, Throwable throwable) {
+        if (job != null && job.markFailed(message == null || message.isBlank() ? "Failed" : message, throwable)) {
+            jobManager.publish(job);
+        }
+    }
+
+    public void sendJobSnapshot(Session session, String actorClientId) {
+        sendJob(session, "jobSnapshot", jobManager.activeOrRecentSnapshot(actorClientId, 300000));
     }
 
     public void sendFlowList(Session session, List<String> flowIds) {
@@ -169,6 +198,23 @@ public class FlowPacketSender {
         sendRaw(session, buffer.array(), true);
     }
 
+    public void sendTraceSnapshot(Session session, List<FlowTraceRecord> records) {
+        sendTracePacket(session, (byte) 0x41, records == null ? List.of() : records);
+    }
+
+    public void sendTraceEvent(Session session, FlowTraceRecord record) {
+        sendTracePacket(session, (byte) 0x42, record);
+    }
+
+    private void sendTracePacket(Session session, byte packetId, Object payload) {
+        String json = gson.toJson(payload);
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put(packetId);
+        buffer.put(jsonBytes);
+        sendRaw(session, buffer.array(), true);
+    }
+
     public void broadcastNodeRegistry(NodeRegistrySnapshot snapshot) {
         if (snapshot == null) {
             return;
@@ -176,6 +222,26 @@ public class FlowPacketSender {
         for (Session session : subscribedSessions) {
             sendNodeRegistrySnapshot(session, snapshot);
         }
+    }
+
+    private void broadcastJob(String action, Object data) {
+        for (Session session : subscribedSessions) {
+            sendJob(session, action, data);
+        }
+    }
+
+    private void sendJob(Session session, String action, Object data) {
+        String json = gson.toJson(Map.of(
+            "type", "job",
+            "action", action,
+            "data", data == null ? Map.of() : data,
+            "timestamp", System.currentTimeMillis()
+        ));
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
+        buffer.put((byte) 0x44);
+        buffer.put(jsonBytes);
+        sendRaw(session, buffer.array(), false);
     }
 
     public void sendError(Session session, String errorCode, String message) {

@@ -5,6 +5,7 @@ import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.jobs.JobRecord;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -50,16 +51,20 @@ public class FlowGuiPacketHandler {
         byte[] jsonBytes = new byte[buffer.remaining()];
         buffer.get(jsonBytes);
         String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        JobRecord<String> job = sender.beginJob(session, "saveGui", "");
         try {
             GuiDefinition gui = FlowSerializer.deserializeGui(json);
             if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
+                sender.failJob(job, "GUI ID is missing", null);
                 sender.sendError(session, "INVALID_GUI", "GUI ID is missing");
                 return;
             }
             storage.saveGui(gui);
             Log.fine("GUI saved: " + gui.getId());
             sender.sendGuiSaveAck(session, gui.getId());
+            sender.succeedJob(job, gui.getId(), "Saved");
         } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "SAVE_FAILED", "Failed to save GUI: " + e.getMessage());
         }
     }
@@ -71,8 +76,15 @@ public class FlowGuiPacketHandler {
         byte[] idBytes = new byte[buffer.remaining()];
         buffer.get(idBytes);
         String guiId = new String(idBytes, StandardCharsets.UTF_8);
-        storage.deleteGui(guiId);
-        Log.fine("GUI deleted: " + guiId);
+        JobRecord<String> job = sender.beginJob(session, "deleteGui", guiId);
+        try {
+            storage.deleteGui(guiId);
+            Log.fine("GUI deleted: " + guiId);
+            sender.succeedJob(job, guiId, "Deleted");
+        } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
+            sender.sendError(session, "DELETE_FAILED", "Failed to delete GUI: " + e.getMessage());
+        }
     }
 
     public void handleListRequest(Session session) {

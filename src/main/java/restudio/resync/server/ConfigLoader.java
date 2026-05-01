@@ -1,12 +1,14 @@
 package restudio.resync.server;
 
 import restudio.resync.Log;
+import restudio.resync.protocol.Codec;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.UUID;
 
 public class ConfigLoader {
     public static ReSyncConfig load(String configPath) {
@@ -23,6 +25,9 @@ public class ConfigLoader {
             }
         }
 
+        ensureDefault(props, "enabled", "true");
+        ensureDefault(props, "port", "8080");
+        ensureDefault(props, "bind-host", "127.0.0.1");
         config.setEnabled(Boolean.parseBoolean(props.getProperty("enabled", "true")));
         config.setPort(Integer.parseInt(props.getProperty("port", "8080")));
 
@@ -37,6 +42,9 @@ public class ConfigLoader {
         config.setApiKey(apiKey);
 
         config.setMaxConnections(Integer.parseInt(props.getProperty("maxConnections", "10")));
+        config.setBindHost(props.getProperty("bind-host", "127.0.0.1"));
+        config.setMaxEncodedFrameBytes(Integer.parseInt(props.getProperty("protocol.maxEncodedFrameBytes", String.valueOf(Codec.DEFAULT_MAX_ENCODED_FRAME_BYTES))));
+        config.setMaxDecompressedPayloadBytes(Integer.parseInt(props.getProperty("protocol.maxDecompressedPayloadBytes", String.valueOf(Codec.DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES))));
         config.setLogLevel(props.getProperty("log-level", "info"));
 
         ReSyncConfig.CompressionConfig compression = new ReSyncConfig.CompressionConfig();
@@ -64,6 +72,11 @@ public class ConfigLoader {
         memory.setSessionMemoryRatio(Double.parseDouble(props.getProperty("memory.sessionMemoryRatio", "0.3")));
         config.setMemory(memory);
 
+        ReSyncConfig.PlayerTrackingConfig playerTracking = new ReSyncConfig.PlayerTrackingConfig();
+        playerTracking.setCaptureChatText(Boolean.parseBoolean(props.getProperty("playerTracking.captureChatText", "false")));
+        playerTracking.setCaptureCommandArguments(Boolean.parseBoolean(props.getProperty("playerTracking.captureCommandArguments", "false")));
+        config.setPlayerTracking(playerTracking);
+
         saveConfig(configFile, props);
 
         return config;
@@ -78,6 +91,12 @@ public class ConfigLoader {
     }
 
     private static String generateApiKey() {
-        return java.util.UUID.randomUUID().toString().replace("-", "");
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static void ensureDefault(Properties props, String key, String value) {
+        if (!props.containsKey(key)) {
+            props.setProperty(key, value);
+        }
     }
 }

@@ -6,7 +6,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class HandshakeResponse extends Message {
 
@@ -16,6 +18,7 @@ public class HandshakeResponse extends Message {
     private String serverVersion;
     private List<String> worlds;
     private int[] supportedTileSizes;
+    private Map<String, Integer> channels = new LinkedHashMap<>();
 
     @Override
     public MessageType getType() {
@@ -38,7 +41,8 @@ public class HandshakeResponse extends Message {
             1 + 4 + messageBytes.length +
             4 + 4 + serverVersionBytes.length +
             4 + worldsBytesLength +
-            4 + (supportedTileSizes != null ? supportedTileSizes.length * 4 : 0)
+            4 + (supportedTileSizes != null ? supportedTileSizes.length * 4 : 0) +
+            4 + channelsBytesLength()
         );
 
         buffer.put((byte) (success ? 1 : 0));
@@ -64,6 +68,16 @@ public class HandshakeResponse extends Message {
         if (supportedTileSizes != null) {
             for (int tileSize : supportedTileSizes) {
                 buffer.putInt(tileSize);
+            }
+        }
+
+        buffer.putInt(channels != null ? channels.size() : 0);
+        if (channels != null) {
+            for (Map.Entry<String, Integer> entry : channels.entrySet()) {
+                byte[] channelBytes = entry.getKey().getBytes(StandardCharsets.UTF_8);
+                buffer.putInt(channelBytes.length);
+                buffer.put(channelBytes);
+                buffer.putInt(entry.getValue());
             }
         }
 
@@ -105,6 +119,31 @@ public class HandshakeResponse extends Message {
                 supportedTileSizes[i] = buffer.getInt();
             }
         }
+
+        if (buffer.remaining() >= 4) {
+            int channelCount = buffer.getInt();
+            channels = new LinkedHashMap<>();
+            for (int i = 0; i < channelCount && buffer.remaining() >= 8; i++) {
+                int channelLen = buffer.getInt();
+                if (channelLen < 0 || buffer.remaining() < channelLen + 4) {
+                    break;
+                }
+                byte[] channelBytes = new byte[channelLen];
+                buffer.get(channelBytes);
+                channels.put(new String(channelBytes, StandardCharsets.UTF_8), buffer.getInt());
+            }
+        }
+    }
+
+    private int channelsBytesLength() {
+        if (channels == null || channels.isEmpty()) {
+            return 0;
+        }
+        int length = 0;
+        for (String channel : channels.keySet()) {
+            length += 4 + channel.getBytes(StandardCharsets.UTF_8).length + 4;
+        }
+        return length;
     }
 
     public boolean isSuccess() {
@@ -153,5 +192,13 @@ public class HandshakeResponse extends Message {
 
     public void setSupportedTileSizes(int[] supportedTileSizes) {
         this.supportedTileSizes = supportedTileSizes;
+    }
+
+    public Map<String, Integer> getChannels() {
+        return channels;
+    }
+
+    public void setChannels(Map<String, Integer> channels) {
+        this.channels = channels == null ? new LinkedHashMap<>() : new LinkedHashMap<>(channels);
     }
 }

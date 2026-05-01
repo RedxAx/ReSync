@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
 import org.bukkit.plugin.java.JavaPlugin;
+import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +23,11 @@ public class TriggerRegistry {
 
     public TriggerRegistry(JavaPlugin plugin) {
         this.file = new File(plugin.getDataFolder(), "triggers.json");
+        load();
+    }
+
+    TriggerRegistry(File file) {
+        this.file = file;
         load();
     }
 
@@ -122,7 +128,7 @@ public class TriggerRegistry {
     private void save() {
         try {
             String json = gson.toJson(getBindings());
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(file.toPath(), json);
         } catch (IOException e) {
             Log.warn("Failed to save trigger bindings: " + e.getMessage());
         }

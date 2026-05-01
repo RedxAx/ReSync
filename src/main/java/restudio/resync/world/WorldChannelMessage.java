@@ -33,6 +33,17 @@ public class WorldChannelMessage {
         return output;
     }
 
+    public static WorldChannelMessage job(String action, Object data) {
+        WorldChannelMessage output = new WorldChannelMessage();
+        output.type = "job";
+        output.action = action;
+        output.success = false;
+        output.message = action;
+        output.data = data;
+        output.timestamp = System.currentTimeMillis();
+        return output;
+    }
+
     public static WorldChannelMessage error(String action, String message) {
         WorldChannelMessage output = new WorldChannelMessage();
         output.type = "error";

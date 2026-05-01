@@ -5,12 +5,16 @@ public class ReSyncConfig {
     private int port;
     private String apiKey;
     private int maxConnections;
+    private String bindHost;
+    private int maxEncodedFrameBytes;
+    private int maxDecompressedPayloadBytes;
     private String logLevel;
 
     private CompressionConfig compression;
     private BatchingConfig batching;
     private QueueConfig queue;
     private MemoryConfig memory;
+    private PlayerTrackingConfig playerTracking;
 
     public static class CompressionConfig {
         private boolean enabled;
@@ -141,6 +145,27 @@ public class ReSyncConfig {
         }
     }
 
+    public static class PlayerTrackingConfig {
+        private boolean captureChatText;
+        private boolean captureCommandArguments;
+
+        public boolean isCaptureChatText() {
+            return captureChatText;
+        }
+
+        public void setCaptureChatText(boolean captureChatText) {
+            this.captureChatText = captureChatText;
+        }
+
+        public boolean isCaptureCommandArguments() {
+            return captureCommandArguments;
+        }
+
+        public void setCaptureCommandArguments(boolean captureCommandArguments) {
+            this.captureCommandArguments = captureCommandArguments;
+        }
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -171,6 +196,30 @@ public class ReSyncConfig {
 
     public void setMaxConnections(int maxConnections) {
         this.maxConnections = maxConnections;
+    }
+
+    public String getBindHost() {
+        return bindHost;
+    }
+
+    public void setBindHost(String bindHost) {
+        this.bindHost = bindHost;
+    }
+
+    public int getMaxEncodedFrameBytes() {
+        return maxEncodedFrameBytes;
+    }
+
+    public void setMaxEncodedFrameBytes(int maxEncodedFrameBytes) {
+        this.maxEncodedFrameBytes = maxEncodedFrameBytes;
+    }
+
+    public int getMaxDecompressedPayloadBytes() {
+        return maxDecompressedPayloadBytes;
+    }
+
+    public void setMaxDecompressedPayloadBytes(int maxDecompressedPayloadBytes) {
+        this.maxDecompressedPayloadBytes = maxDecompressedPayloadBytes;
     }
 
     public String getLogLevel() {
@@ -211,5 +260,13 @@ public class ReSyncConfig {
 
     public void setMemory(MemoryConfig memory) {
         this.memory = memory;
+    }
+
+    public PlayerTrackingConfig getPlayerTracking() {
+        return playerTracking;
+    }
+
+    public void setPlayerTracking(PlayerTrackingConfig playerTracking) {
+        this.playerTracking = playerTracking;
     }
 }

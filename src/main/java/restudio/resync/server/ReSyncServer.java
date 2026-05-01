@@ -32,6 +32,7 @@ import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameHeader;
+import restudio.resync.protocol.MessageType;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.ErrorMessage;
 import restudio.resync.protocol.messages.HandshakeRequest;
@@ -50,6 +51,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReSyncServer {
     private final ReSync plugin;
@@ -65,13 +67,14 @@ public class ReSyncServer {
     private final ScheduledExecutorService scheduler;
     private final MemoryMonitor memoryMonitor;
     private final ModuleContext moduleContext;
+    private final AtomicInteger openConnections = new AtomicInteger();
 
     public ReSyncServer(ReSync plugin, ReSyncConfig config) {
         this.plugin = plugin;
         this.config = config;
         this.connectionManager = new ConnectionManager(30, 60);
         this.compressionPool = new CompressionPool(config.getCompression().getLevel(), 10);
-        this.codec = new Codec(compressionPool);
+        this.codec = new Codec(compressionPool, config.getMaxEncodedFrameBytes(), config.getMaxDecompressedPayloadBytes());
         this.channelMuxer = new ChannelMuxer();
         this.moduleRegistry = new ModuleRegistry();
         this.requestQueue = new RequestQueue(
@@ -120,15 +123,28 @@ public class ReSyncServer {
     }
 
     private void startScheduler() {
-        scheduler.scheduleWithFixedDelay(moduleRegistry::tickAll, 100, 100, TimeUnit.MILLISECONDS);
+        scheduler.scheduleWithFixedDelay(() -> {
+            try {
+                moduleRegistry.tickAll();
+            } catch (Exception e) {
+                Log.warn("Module tick failed: " + e.getMessage());
+            }
+        }, 100, 100, TimeUnit.MILLISECONDS);
     }
 
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        int current = openConnections.incrementAndGet();
+        if (config.getMaxConnections() > 0 && current > config.getMaxConnections()) {
+            openConnections.decrementAndGet();
+            conn.close(1013, "Max connections reached");
+            return;
+        }
         connectionManager.createConnection(conn);
         Log.fine("Client connected: " + conn.getRemoteSocketAddress());
     }
 
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
+        openConnections.updateAndGet(value -> Math.max(0, value - 1));
         Session session = sessionManager.getSession(conn);
         if (session != null) {
             moduleRegistry.cleanupSession(session);
@@ -149,7 +165,20 @@ public class ReSyncServer {
         message.get(data);
 
         try {
+            String clientId = info.getClientId() != null ? info.getClientId() : conn.getRemoteSocketAddress().toString();
+            if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
+                sendError(conn, 429, "Global rate limit exceeded");
+                return;
+            }
+            if (!rateLimiter.tryConsume(clientId, 1, config.getQueue().getMaxRequestsPerClient(), config.getQueue().getMaxRequestsPerClient(), 1000)) {
+                sendError(conn, 429, "Rate limit exceeded");
+                return;
+            }
             Codec.Frame frame = codec.decodeFrame(data);
+            if (frame.header.getMessageType() == MessageType.DATA && !info.acceptInboundDataSequence(frame.header.getSequence())) {
+                sendError(conn, 409, "Stale data frame");
+                return;
+            }
             Message payload = codec.decodePayload(frame);
             handlePayload(conn, info, payload, frame.header);
         } catch (Exception e) {
@@ -158,6 +187,11 @@ public class ReSyncServer {
     }
 
     private void handlePayload(WebSocket conn, ConnectionInfo info, Message payload, FrameHeader header) {
+        if (info.getState() != ConnectionState.AUTHENTICATED && payload.getType() != MessageType.HANDSHAKE_REQUEST) {
+            sendError(conn, 401, "Handshake required");
+            conn.close(1008, "Handshake required");
+            return;
+        }
         switch (payload.getType()) {
             case HANDSHAKE_REQUEST -> handleHandshake(conn, info, (HandshakeRequest) payload);
             case SUBSCRIBE -> handleSubscribe(conn, info, (SubscribeRequest) payload);
@@ -169,7 +203,7 @@ public class ReSyncServer {
     }
 
     private void handleHandshake(WebSocket conn, ConnectionInfo info, HandshakeRequest req) {
-        if (!req.getApiKey().equals(config.getApiKey())) {
+        if (!config.getApiKey().equals(req.getApiKey())) {
             sendError(conn, 401, "Invalid API key");
             conn.close(1008, "Invalid API key");
             return;
@@ -179,6 +213,12 @@ public class ReSyncServer {
             sendError(conn, 400, "Unsupported protocol version");
             conn.close(1003, "Unsupported protocol version");
             return;
+        }
+
+        Session oldSession = sessionManager.getSession(info);
+        if (oldSession != null) {
+            moduleRegistry.cleanupSession(oldSession);
+            sessionManager.removeSession(conn);
         }
 
         info.setClientId(req.getClientId());
@@ -196,6 +236,7 @@ public class ReSyncServer {
         Bukkit.getWorlds().forEach(world -> worlds.add(world.getName()));
         response.setWorlds(worlds);
         response.setSupportedTileSizes(new int[]{32, 64, 128, 256});
+        response.setChannels(channelMuxer.getNumericChannels());
 
         codec.sendMessage(conn, response, 0, false);
         Log.info("Client authenticated: " + req.getClientId());
@@ -261,6 +302,10 @@ public class ReSyncServer {
         if (module == null) {
             return;
         }
+        if (!session.getSubscribedChannels().contains(channel.getId())) {
+            sendError(info.getWebSocket(), 403, "Channel subscription required");
+            return;
+        }
 
         session.updateActivity();
         module.onData(session, req);
@@ -285,6 +330,7 @@ public class ReSyncServer {
         requestQueue.shutdown();
         compressionPool.close();
         rateLimiter.resetAll();
+        memoryMonitor.shutdown();
     }
 
     public ConnectionManager getConnectionManager() {

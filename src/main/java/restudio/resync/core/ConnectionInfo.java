@@ -3,6 +3,7 @@ package restudio.resync.core;
 import org.java_websocket.WebSocket;
 
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConnectionInfo {
     private final WebSocket webSocket;
@@ -11,6 +12,7 @@ public class ConnectionInfo {
     private final AtomicLong lastHeartbeat;
     private final AtomicLong bytesSent;
     private final AtomicLong bytesReceived;
+    private final AtomicInteger lastInboundDataSequence;
     private volatile ConnectionState state;
     private String clientId;
     private String clientVersion;
@@ -22,6 +24,7 @@ public class ConnectionInfo {
         this.lastHeartbeat = new AtomicLong(System.currentTimeMillis());
         this.bytesSent = new AtomicLong(0);
         this.bytesReceived = new AtomicLong(0);
+        this.lastInboundDataSequence = new AtomicInteger(-1);
         this.state = ConnectionState.CONNECTING;
     }
 
@@ -87,5 +90,17 @@ public class ConnectionInfo {
 
     public long getConnectedDuration() {
         return System.currentTimeMillis() - connectionTime;
+    }
+
+    public boolean acceptInboundDataSequence(int sequence) {
+        while (true) {
+            int current = lastInboundDataSequence.get();
+            if (sequence <= current) {
+                return false;
+            }
+            if (lastInboundDataSequence.compareAndSet(current, sequence)) {
+                return true;
+            }
+        }
     }
 }

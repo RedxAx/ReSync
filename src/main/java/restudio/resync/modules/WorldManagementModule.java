@@ -207,8 +207,12 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         String action = request.action;
         String actorClientId = actor(session);
         Map<String, Object> parameters = request.parameters();
-        JobRecord<WorldOperationResult> job = jobManager.create(action, actorClientId, request.targetWorldName());
+        JobRecord<WorldOperationResult> job = jobManager.create(action, actorClientId, request.targetWorldName(), request.requestId);
         String operationId = job.getJobId();
+        if (job.getStatus().terminal() || job.getStatus().name().equals("RUNNING")) {
+            send(session, WorldChannelMessage.job("jobAccepted", job.snapshot()));
+            return;
+        }
         var auditRecord = safetyService.begin(operationId, action, actorClientId, request.targetWorldName(), parameters);
         send(session, WorldChannelMessage.job("jobAccepted", job.snapshot()));
         scheduler.execute(() -> {
@@ -338,6 +342,7 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         private WorldInventoryGroup inventoryGroup;
         private String groupId;
         private String operationId;
+        private String requestId;
         private String confirmationToken;
         private int limit;
         private boolean purgeMonsters;

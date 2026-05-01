@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.java_websocket.WebSocket;
 import restudio.resync.memory.MemoryMonitor;
+import restudio.resync.security.ClientIdentity;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SessionManager {
     private final ConcurrentHashMap<WebSocket, Session> sessionsByConnection;
     private final ConcurrentHashMap<String, Session> sessionsById;
+    private final ConcurrentHashMap<String, Session> sessionsByClientId;
     private final ConcurrentHashMap<ConnectionInfo, Session> sessionsByConnectionInfo;
     private final ConcurrentHashMap<UUID, Session> sessionsByPlayer;
     private final MemoryMonitor memoryMonitor;
@@ -26,6 +28,7 @@ public class SessionManager {
     public SessionManager(MemoryMonitor memoryMonitor, long sessionTimeoutSec, long maxMemoryPerSessionBytes) {
         this.sessionsByConnection = new ConcurrentHashMap<>();
         this.sessionsById = new ConcurrentHashMap<>();
+        this.sessionsByClientId = new ConcurrentHashMap<>();
         this.sessionsByConnectionInfo = new ConcurrentHashMap<>();
         this.sessionsByPlayer = new ConcurrentHashMap<>();
         this.memoryMonitor = memoryMonitor;
@@ -42,12 +45,17 @@ public class SessionManager {
     }
 
     public Session createSession(ConnectionInfo connection, String clientId) {
+        return createSession(connection, new ClientIdentity(clientId, connection.getClientVersion()));
+    }
+
+    public Session createSession(ConnectionInfo connection, ClientIdentity identity) {
         String sessionId = UUID.randomUUID().toString();
-        Session session = new Session(sessionId, clientId, connection);
+        Session session = new Session(sessionId, identity.clientId(), connection, identity);
 
         sessionsByConnection.put(connection.getWebSocket(), session);
         sessionsById.put(sessionId, session);
         sessionsByConnectionInfo.put(connection, session);
+        sessionsByClientId.put(identity.clientId(), session);
 
         memoryMonitor.trackSession(session);
 
@@ -55,6 +63,10 @@ public class SessionManager {
         connection.setState(ConnectionState.AUTHENTICATED);
 
         return session;
+    }
+
+    public Session getSessionByClientId(String clientId) {
+        return sessionsByClientId.get(clientId);
     }
 
     public Session getSession(WebSocket conn) {
@@ -85,6 +97,7 @@ public class SessionManager {
         Session session = sessionsByConnection.remove(conn);
         if (session != null) {
             sessionsById.remove(session.getSessionId());
+            sessionsByClientId.remove(session.getClientId(), session);
             sessionsByConnectionInfo.remove(session.getConnection());
             sessionsByPlayer.entrySet().removeIf(entry -> entry.getValue() == session);
             memoryMonitor.untrackSession(session);

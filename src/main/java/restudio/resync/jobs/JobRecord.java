@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class JobRecord<T> {
     private final String jobId;
+    private final String requestId;
     private final String action;
     private final String actorClientId;
     private final String target;
@@ -20,7 +21,12 @@ public class JobRecord<T> {
     private volatile Object result;
 
     public JobRecord(String jobId, String action, String actorClientId, String target) {
+        this(jobId, jobId, action, actorClientId, target);
+    }
+
+    public JobRecord(String jobId, String requestId, String action, String actorClientId, String target) {
         this.jobId = jobId;
+        this.requestId = requestId;
         this.action = action;
         this.actorClientId = actorClientId;
         this.target = target;
@@ -79,7 +85,8 @@ public class JobRecord<T> {
     public Map<String, Object> snapshot() {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("jobId", jobId);
-        data.put("operationId", jobId);
+        data.put("operationId", requestId == null || requestId.isBlank() ? jobId : requestId);
+        data.put("requestId", requestId);
         data.put("action", action);
         data.put("actorClientId", actorClientId);
         data.put("target", target);
@@ -97,6 +104,10 @@ public class JobRecord<T> {
 
     public String getJobId() {
         return jobId;
+    }
+
+    public String getRequestId() {
+        return requestId;
     }
 
     public String getActorClientId() {

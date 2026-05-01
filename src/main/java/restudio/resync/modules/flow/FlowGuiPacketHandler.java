@@ -48,10 +48,12 @@ public class FlowGuiPacketHandler {
             sender.sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
             return;
         }
-        byte[] jsonBytes = new byte[buffer.remaining()];
-        buffer.get(jsonBytes);
-        String json = new String(jsonBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "saveGui", "");
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String json = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "saveGui", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             GuiDefinition gui = FlowSerializer.deserializeGui(json);
             if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
@@ -73,10 +75,12 @@ public class FlowGuiPacketHandler {
         if (!buffer.hasRemaining()) {
             return;
         }
-        byte[] idBytes = new byte[buffer.remaining()];
-        buffer.get(idBytes);
-        String guiId = new String(idBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "deleteGui", guiId);
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String guiId = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "deleteGui", guiId, payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             storage.deleteGui(guiId);
             Log.fine("GUI deleted: " + guiId);

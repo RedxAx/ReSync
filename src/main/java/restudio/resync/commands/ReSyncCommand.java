@@ -56,6 +56,7 @@ public class ReSyncCommand implements TabExecutor {
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
+            case "status" -> handleStatus(sender);
             case "scoreboard" -> handleScoreboard(sender, args);
             case "tab" -> handleTab(sender, args);
             case "world" -> handleWorld(sender, args);
@@ -72,7 +73,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("scoreboard", "tab", "world", "portal", "flow", "item"), args[0]);
+            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -84,6 +85,24 @@ public class ReSyncCommand implements TabExecutor {
             case "item" -> tabCompleteItem(args);
             default -> List.of();
         };
+    }
+
+    private boolean handleStatus(CommandSender sender) {
+        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server Not Initialized");
+            return true;
+        }
+        Map<String, Object> status = server.readinessSnapshot();
+        sendInfo(sender, "ReSync Status");
+        sendInfo(sender, "API", Boolean.TRUE.equals(status.get("apiEnabled")) ? "Enabled" : "Disabled");
+        sendInfo(sender, "Bind", String.valueOf(status.get("bindHost")));
+        sendInfo(sender, "Clients", status.get("connectedClients") + "/" + status.get("maxConnections"));
+        sendInfo(sender, "Auth", String.valueOf(status.get("authMode")));
+        sendInfo(sender, "Open Connections", String.valueOf(status.get("openConnections")));
+        sendInfo(sender, "Queue", status.get("queueMaxGlobalRequests") + " global / " + status.get("queueMaxRequestsPerClient") + " per client");
+        sendInfo(sender, "Memory", status.get("sessionMemoryBytes") + "/" + status.get("sessionMemoryLimitBytes"));
+        return true;
     }
 
     private boolean handleItem(CommandSender sender, String[] args) {
@@ -2417,6 +2436,7 @@ public class ReSyncCommand implements TabExecutor {
 
     private void sendUsage(CommandSender sender) {
         sendInfo(sender, "Commands");
+        sendUsageLine(sender, "/resync status");
         sendUsageLine(sender, "/resync portal create <target> <name>");
         sendUsageLine(sender, "/resync portal cancel");
         sendUsageLine(sender, "/resync scoreboard list");

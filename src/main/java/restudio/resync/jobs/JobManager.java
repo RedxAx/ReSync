@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 
 public class JobManager {
     private final Map<String, JobRecord<?>> jobs = new ConcurrentHashMap<>();
+    private final Map<String, JobRecord<?>> jobsByRequest = new ConcurrentHashMap<>();
     private final Consumer<JobRecord<?>> listener;
 
     public JobManager(Consumer<JobRecord<?>> listener) {
@@ -15,8 +16,31 @@ public class JobManager {
     }
 
     public <T> JobRecord<T> create(String action, String actorClientId, String target) {
+        return create(action, actorClientId, target, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> JobRecord<T> create(String action, String actorClientId, String target, String requestId) {
+        String normalizedRequestId = requestId == null || requestId.isBlank() ? null : requestId;
+        String requestKey = requestKey(actorClientId, normalizedRequestId);
+        if (requestKey != null) {
+            JobRecord<?> existing = jobsByRequest.get(requestKey);
+            if (existing != null) {
+                return (JobRecord<T>) existing;
+            }
+        }
         JobRecord<T> job = new JobRecord<>(UUID.randomUUID().toString(), action, actorClientId, target);
+        if (normalizedRequestId != null) {
+            job = new JobRecord<>(UUID.randomUUID().toString(), normalizedRequestId, action, actorClientId, target);
+        }
         jobs.put(job.getJobId(), job);
+        if (requestKey != null) {
+            JobRecord<?> existing = jobsByRequest.putIfAbsent(requestKey, job);
+            if (existing != null) {
+                jobs.remove(job.getJobId());
+                return (JobRecord<T>) existing;
+            }
+        }
         publish(job);
         return job;
     }
@@ -47,5 +71,13 @@ public class JobManager {
         if (listener != null && job != null) {
             listener.accept(job);
         }
+    }
+
+    private String requestKey(String actorClientId, String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        String actor = actorClientId == null || actorClientId.isBlank() ? "unknown" : actorClientId;
+        return actor + '\n' + requestId;
     }
 }

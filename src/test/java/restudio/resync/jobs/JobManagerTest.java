@@ -38,4 +38,25 @@ class JobManagerTest {
         assertTrue(snapshot.stream().anyMatch(job -> running.getJobId().equals(job.get("jobId"))));
         assertTrue(snapshot.stream().anyMatch(job -> succeeded.getJobId().equals(job.get("jobId"))));
     }
+
+    @Test
+    void duplicateRequestIdReturnsExistingJob() {
+        JobManager manager = new JobManager(null);
+        JobRecord<String> first = manager.create("saveFlow", "client", "flow", "request-1");
+        first.markRunning();
+
+        JobRecord<String> retry = manager.create("saveFlow", "client", "flow", "request-1");
+
+        assertEquals(first.getJobId(), retry.getJobId());
+        assertEquals("request-1", retry.getRequestId());
+    }
+
+    @Test
+    void requestIdsAreScopedPerClient() {
+        JobManager manager = new JobManager(null);
+        JobRecord<String> first = manager.create("saveFlow", "client-a", "flow", "request-1");
+        JobRecord<String> second = manager.create("saveFlow", "client-b", "flow", "request-1");
+
+        assertTrue(!first.getJobId().equals(second.getJobId()));
+    }
 }

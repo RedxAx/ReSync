@@ -270,7 +270,22 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public WorldOperationResult cloneWorldAsync(String sourceWorld, String targetWorld, boolean loadAfterClone) {
-        return callSync(() -> cloneWorldAsyncSync(sourceWorld, targetWorld, loadAfterClone));
+        ClonePreparation preparation = callSync(() -> prepareCloneWorld(sourceWorld, targetWorld));
+        if (preparation.failure() != null) {
+            return preparation.failure();
+        }
+        try {
+            WorldFileUtil.copyDirectory(preparation.sourceFolder(), preparation.targetFolder());
+            Files.deleteIfExists(preparation.targetFolder().resolve("uid.dat"));
+            Files.deleteIfExists(preparation.targetFolder().resolve("session.lock"));
+        } catch (Exception exception) {
+            try {
+                WorldFileUtil.deleteDirectory(preparation.targetFolder());
+            } catch (Exception ignored) {
+            }
+            return WorldOperationResult.failure("cloneWorld", preparation.target(), "CloneFailed:" + exception.getMessage());
+        }
+        return callSync(() -> finishCloneWorld(preparation, loadAfterClone));
     }
 
     @Override
@@ -803,71 +818,62 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             .withData("count", imported.size());
     }
 
-    private WorldOperationResult cloneWorldAsyncSync(String sourceWorld, String targetWorld, boolean loadAfterClone) {
+    private ClonePreparation prepareCloneWorld(String sourceWorld, String targetWorld) {
         String source = sanitizeWorldName(sourceWorld);
         String target = sanitizeWorldName(targetWorld);
         if (source == null || target == null) {
-            return WorldOperationResult.failure("cloneWorld", targetWorld, "InvalidWorldName");
+            return new ClonePreparation(source, target, null, null, null, WorldOperationResult.failure("cloneWorld", targetWorld, "InvalidWorldName"));
         }
         if (source.equalsIgnoreCase(target)) {
-            return WorldOperationResult.failure("cloneWorld", target, "SourceAndTargetMustDiffer");
+            return new ClonePreparation(source, target, null, null, null, WorldOperationResult.failure("cloneWorld", target, "SourceAndTargetMustDiffer"));
         }
         Path sourceFolder = Bukkit.getWorldContainer().toPath().resolve(source);
         Path targetFolder = Bukkit.getWorldContainer().toPath().resolve(target);
         if (!Files.exists(sourceFolder)) {
-            return WorldOperationResult.failure("cloneWorld", target, "SourceWorldMissing");
+            return new ClonePreparation(source, target, sourceFolder, targetFolder, null, WorldOperationResult.failure("cloneWorld", target, "SourceWorldMissing"));
         }
         if (Files.exists(targetFolder) || worlds.containsKey(worldKey(target)) || Bukkit.getWorld(target) != null) {
-            return WorldOperationResult.failure("cloneWorld", target, "TargetWorldAlreadyExists");
+            return new ClonePreparation(source, target, sourceFolder, targetFolder, null, WorldOperationResult.failure("cloneWorld", target, "TargetWorldAlreadyExists"));
         }
         World sourceLoaded = Bukkit.getWorld(source);
         if (sourceLoaded != null) {
             sourceLoaded.save();
         }
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                WorldFileUtil.copyDirectory(sourceFolder, targetFolder);
-                Files.deleteIfExists(targetFolder.resolve("uid.dat"));
-                Files.deleteIfExists(targetFolder.resolve("session.lock"));
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    WorldRegistryEntry sourceEntry = worlds.get(worldKey(source));
-                    WorldRegistryEntry targetEntry = getOrCreateEntry(target);
-                    targetEntry.setWorldName(target);
-                    if (sourceEntry != null) {
-                        targetEntry.setEnvironment(sourceEntry.getEnvironment());
-                        targetEntry.setDifficulty(sourceEntry.getDifficulty());
-                        targetEntry.setGenerator(sourceEntry.getGenerator());
-                        targetEntry.setGeneratorConfig(sourceEntry.getGeneratorConfig());
-                        targetEntry.setProfileSettings(sourceEntry.getProfileSettings());
-                        targetEntry.setGameRules(sourceEntry.getGameRules());
-                        targetEntry.setTimeLockEnabled(sourceEntry.isTimeLockEnabled());
-                        targetEntry.setLockedTime(sourceEntry.getLockedTime());
-                        targetEntry.setWeatherLockEnabled(sourceEntry.isWeatherLockEnabled());
-                        targetEntry.setLockedStorm(sourceEntry.isLockedStorm());
-                        targetEntry.setLockedThundering(sourceEntry.isLockedThundering());
-                        targetEntry.setIsolatedPlayerState(sourceEntry.isIsolatedPlayerState());
-                    }
-                    targetEntry.setLoaded(false);
-                    targetEntry.setUpdatedAt(System.currentTimeMillis());
-                    persistWorlds();
-                    publishMessage(WorldChannelMessage.event("worldCloned", buildWorldStatePayload(targetEntry)));
-                    if (loadAfterClone) {
-                        loadWorldSync(target);
-                    } else {
-                        publishSnapshotEvent();
-                    }
-                });
-            } catch (Exception exception) {
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    try {
-                        WorldFileUtil.deleteDirectory(targetFolder);
-                    } catch (Exception ignored) {
-                    }
-                    publishMessage(WorldChannelMessage.error("cloneWorld", "CloneFailed:" + exception.getMessage()));
-                });
+        WorldRegistryEntry sourceEntry = worlds.get(worldKey(source));
+        return new ClonePreparation(source, target, sourceFolder, targetFolder, sourceEntry != null ? sourceEntry.copy() : null, null);
+    }
+
+    private WorldOperationResult finishCloneWorld(ClonePreparation preparation, boolean loadAfterClone) {
+        WorldRegistryEntry targetEntry = getOrCreateEntry(preparation.target());
+        targetEntry.setWorldName(preparation.target());
+        WorldRegistryEntry sourceEntry = preparation.sourceEntry();
+        if (sourceEntry != null) {
+            targetEntry.setEnvironment(sourceEntry.getEnvironment());
+            targetEntry.setDifficulty(sourceEntry.getDifficulty());
+            targetEntry.setGenerator(sourceEntry.getGenerator());
+            targetEntry.setGeneratorConfig(sourceEntry.getGeneratorConfig());
+            targetEntry.setProfileSettings(sourceEntry.getProfileSettings());
+            targetEntry.setGameRules(sourceEntry.getGameRules());
+            targetEntry.setTimeLockEnabled(sourceEntry.isTimeLockEnabled());
+            targetEntry.setLockedTime(sourceEntry.getLockedTime());
+            targetEntry.setWeatherLockEnabled(sourceEntry.isWeatherLockEnabled());
+            targetEntry.setLockedStorm(sourceEntry.isLockedStorm());
+            targetEntry.setLockedThundering(sourceEntry.isLockedThundering());
+            targetEntry.setIsolatedPlayerState(sourceEntry.isIsolatedPlayerState());
+        }
+        targetEntry.setLoaded(false);
+        targetEntry.setUpdatedAt(System.currentTimeMillis());
+        persistWorlds();
+        publishMessage(WorldChannelMessage.event("worldCloned", buildWorldStatePayload(targetEntry)));
+        if (loadAfterClone) {
+            WorldOperationResult loadResult = loadWorldSync(preparation.target());
+            if (!loadResult.isSuccess()) {
+                return WorldOperationResult.failure("cloneWorld", preparation.target(), "CloneLoadFailed:" + loadResult.getMessage()).withData("world", targetEntry.copy());
             }
-        });
-        return WorldOperationResult.success("cloneWorld", target, "CloneStarted");
+        } else {
+            publishSnapshotEvent();
+        }
+        return WorldOperationResult.success("cloneWorld", preparation.target(), "WorldCloned").withData("world", targetEntry.copy());
     }
 
     private WorldOperationResult deleteWorldSync(String worldName, boolean deleteFiles, String fallbackWorld) {
@@ -888,6 +894,17 @@ public class WorldManagementManager implements WorldManagementService, Listener 
                 return WorldOperationResult.failure("deleteWorld", normalizedName, "WorldUnloadFailed");
             }
         }
+        if (deleteFiles) {
+            Path targetFolder = Bukkit.getWorldContainer().toPath().resolve(normalizedName);
+            try {
+                WorldFileUtil.deleteDirectory(targetFolder);
+                LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+                data.put("worldName", normalizedName);
+                publishMessage(WorldChannelMessage.event("worldFilesDeleted", data));
+            } catch (Exception exception) {
+                return WorldOperationResult.failure("deleteWorld", normalizedName, "DeleteFilesFailed:" + exception.getMessage());
+            }
+        }
         worlds.remove(worldKey(normalizedName));
         for (Map<String, WorldPlayerState> states : playerStates.values()) {
             if (states != null) {
@@ -904,19 +921,6 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         rebuildPortalIndex();
         persistWorlds();
         persistPortals();
-        if (deleteFiles) {
-            Path targetFolder = Bukkit.getWorldContainer().toPath().resolve(normalizedName);
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                try {
-                    WorldFileUtil.deleteDirectory(targetFolder);
-                    LinkedHashMap<String, Object> data = new LinkedHashMap<>();
-                    data.put("worldName", normalizedName);
-                    publishMessage(WorldChannelMessage.event("worldFilesDeleted", data));
-                } catch (Exception exception) {
-                    publishMessage(WorldChannelMessage.error("deleteWorldFiles", "DeleteFilesFailed:" + exception.getMessage()));
-                }
-            });
-        }
         LinkedHashMap<String, Object> deletedData = new LinkedHashMap<>();
         deletedData.put("worldName", normalizedName);
         deletedData.put("removedPortals", removedPortals);
@@ -2817,6 +2821,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     }
 
     private record PortalLookupResult(WorldPortal portal, String errorMessage) {
+    }
+
+    private record ClonePreparation(String source, String target, Path sourceFolder, Path targetFolder, WorldRegistryEntry sourceEntry, WorldOperationResult failure) {
     }
 
     private void publishSnapshotEvent() {

@@ -49,10 +49,12 @@ public class FlowScoreboardPacketHandler {
             sender.sendError(session, "SAVE_TOO_LARGE", "Save data exceeds maximum size");
             return;
         }
-        byte[] jsonBytes = new byte[buffer.remaining()];
-        buffer.get(jsonBytes);
-        String json = new String(jsonBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "saveScoreboard", "");
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String json = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "saveScoreboard", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             ScoreboardDefinition scoreboard = FlowSerializer.deserializeScoreboard(json);
             if (scoreboard == null || scoreboard.getId() == null || scoreboard.getId().isBlank()) {
@@ -75,10 +77,12 @@ public class FlowScoreboardPacketHandler {
         if (!buffer.hasRemaining()) {
             return;
         }
-        byte[] idBytes = new byte[buffer.remaining()];
-        buffer.get(idBytes);
-        String scoreboardId = new String(idBytes, StandardCharsets.UTF_8);
-        JobRecord<String> job = sender.beginJob(session, "deleteScoreboard", scoreboardId);
+        FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        String scoreboardId = payload.payload();
+        JobRecord<String> job = sender.beginJob(session, "deleteScoreboard", scoreboardId, payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             storage.deleteScoreboard(scoreboardId);
             ScoreboardTemplateManager.clearActiveTemplateReferences(scoreboardId, true);

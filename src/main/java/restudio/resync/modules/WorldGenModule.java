@@ -125,16 +125,21 @@ public class WorldGenModule implements Module {
     }
 
     private void handleSave(ByteBuffer buffer) {
-        WorldGenGraph graph = WorldGenSerializer.deserialize(readJson(buffer));
+        MutationJson payload = readMutationJson(buffer);
+        WorldGenGraph graph = WorldGenSerializer.deserialize(payload.json());
         if (graph != null) {
             graph.rebuildIndices();
         }
     }
 
     private void handleSaveProject(Session session, ByteBuffer buffer) {
-        JobRecord<String> job = beginJob(session, "saveWorldGenProject", "");
+        MutationJson payload = readMutationJson(buffer);
+        JobRecord<String> job = beginJob(session, "saveWorldGenProject", "", payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
-            WorldGenProject project = WorldGenSerializer.deserializeProject(readJson(buffer));
+            WorldGenProject project = WorldGenSerializer.deserializeProject(payload.json());
             if (project != null) {
                 if (project.getId() == null || project.getId().isBlank()) {
                     project.setId(UUID.randomUUID().toString());
@@ -168,8 +173,12 @@ public class WorldGenModule implements Module {
     }
 
     private void handleProjectDelete(Session session, ByteBuffer buffer) {
-        String projectId = readJson(buffer);
-        JobRecord<String> job = beginJob(session, "deleteWorldGenProject", projectId);
+        MutationJson payload = readMutationJson(buffer);
+        String projectId = payload.json();
+        JobRecord<String> job = beginJob(session, "deleteWorldGenProject", projectId, payload.requestId());
+        if (job == null) {
+            return;
+        }
         try {
             projectStorage.deleteProject(projectId);
             succeedJob(job, projectId, "Deleted");
@@ -184,7 +193,12 @@ public class WorldGenModule implements Module {
     }
 
     private void handlePreviewCreate(Session session, ByteBuffer buffer) {
-        PreviewCreateRequest request = gson.fromJson(readJson(buffer), PreviewCreateRequest.class);
+        MutationJson payload = readMutationJson(buffer);
+        PreviewCreateRequest request = gson.fromJson(payload.json(), PreviewCreateRequest.class);
+        JobRecord<String> job = beginJob(session, "createWorldGenPreview", request.previewId(), payload.requestId());
+        if (job == null) {
+            return;
+        }
         WorldGenGraph graph = gson.fromJson(gson.toJson(request.graph()), WorldGenGraph.class);
         graph.rebuildIndices();
         World.Environment environment = parseEnvironment(request.environment());
@@ -194,13 +208,25 @@ public class WorldGenModule implements Module {
             graph,
             environment,
             request.seed(),
-            preview -> sendStatus(session, request.previewId(), "ready", "Ready"),
-            throwable -> sendStatus(session, request.previewId(), "error", throwable.getMessage())
+            preview -> {
+                sendStatus(session, request.previewId(), "ready", "Ready");
+                succeedJob(job, request.previewId(), "Ready");
+            },
+            throwable -> {
+                String message = throwable != null ? throwable.getMessage() : "Preview Failed";
+                sendStatus(session, request.previewId(), "error", message);
+                failJob(job, message, throwable);
+            }
         );
     }
 
     private void handlePreviewApply(Session session, ByteBuffer buffer) {
-        PreviewApplyRequest request = gson.fromJson(readJson(buffer), PreviewApplyRequest.class);
+        MutationJson payload = readMutationJson(buffer);
+        PreviewApplyRequest request = gson.fromJson(payload.json(), PreviewApplyRequest.class);
+        JobRecord<String> job = beginJob(session, "applyWorldGenPreview", request.previewId(), payload.requestId());
+        if (job == null) {
+            return;
+        }
         WorldGenProject project = null;
         if (request.draftProject() != null) {
             project = gson.fromJson(gson.toJson(request.draftProject()), WorldGenProject.class);
@@ -218,6 +244,7 @@ public class WorldGenModule implements Module {
         WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project);
         sendJsonPacket(session, (byte) 0x38, gson.toJson(diagnostics));
         if (!diagnostics.isSuccess()) {
+            failJob(job, "WorldGen Compile Failed", null);
             throw new IllegalArgumentException("WorldGen Compile Failed");
         }
         long started = System.nanoTime();
@@ -228,8 +255,16 @@ public class WorldGenModule implements Module {
             project,
             environment,
             request.seed(),
-            preview -> sendStatus(session, request.previewId(), "ready", previewReadyMessage(preview, started)),
-            throwable -> sendStatus(session, request.previewId(), "error", throwable.getMessage())
+            preview -> {
+                String message = previewReadyMessage(preview, started);
+                sendStatus(session, request.previewId(), "ready", message);
+                succeedJob(job, request.previewId(), message);
+            },
+            throwable -> {
+                String message = throwable != null ? throwable.getMessage() : "Preview Failed";
+                sendStatus(session, request.previewId(), "error", message);
+                failJob(job, message, throwable);
+            }
         );
     }
 
@@ -243,8 +278,17 @@ public class WorldGenModule implements Module {
     }
 
     private void handlePreviewStop(Session session, ByteBuffer buffer) {
-        PreviewStopRequest request = gson.fromJson(readJson(buffer), PreviewStopRequest.class);
-        previewManager.stopPreview(request.previewId(), null, throwable -> Log.error("Error stopping worldgen preview: " + throwable.getMessage()));
+        MutationJson payload = readMutationJson(buffer);
+        PreviewStopRequest request = gson.fromJson(payload.json(), PreviewStopRequest.class);
+        JobRecord<String> job = beginJob(session, "stopWorldGenPreview", request.previewId(), payload.requestId());
+        if (job == null) {
+            return;
+        }
+        previewManager.stopPreview(request.previewId(), () -> succeedJob(job, request.previewId(), "Stopped"), throwable -> {
+            String message = throwable != null ? throwable.getMessage() : "Stop Failed";
+            Log.error("Error stopping worldgen preview: " + message);
+            failJob(job, message, throwable);
+        });
     }
 
     private void sendRegistrySnapshot(Session session) {
@@ -269,9 +313,15 @@ public class WorldGenModule implements Module {
     }
 
     private JobRecord<String> beginJob(Session session, String action, String target) {
-        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target);
+        return beginJob(session, action, target, null);
+    }
+
+    private JobRecord<String> beginJob(Session session, String action, String target, String requestId) {
+        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target, requestId);
         sendJob(session, "jobAccepted", job.snapshot());
-        job.markRunning();
+        if (!job.markRunning()) {
+            return null;
+        }
         jobManager.publish(job);
         return job;
     }
@@ -324,6 +374,28 @@ public class WorldGenModule implements Module {
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
+    private MutationJson readMutationJson(ByteBuffer buffer) {
+        if (buffer == null || !buffer.hasRemaining()) {
+            return new MutationJson(null, "");
+        }
+        byte first = buffer.get(buffer.position());
+        if (first == '{' || first == '[' || first == '"' || first == '-' || Character.isDigit((char) first)) {
+            return new MutationJson(null, readJson(buffer));
+        }
+        if (buffer.remaining() < Integer.BYTES) {
+            return new MutationJson(null, readJson(buffer));
+        }
+        int start = buffer.position();
+        int requestIdLength = buffer.getInt();
+        if (requestIdLength <= 0 || requestIdLength > 256 || requestIdLength > buffer.remaining()) {
+            buffer.position(start);
+            return new MutationJson(null, readJson(buffer));
+        }
+        byte[] requestBytes = new byte[requestIdLength];
+        buffer.get(requestBytes);
+        return new MutationJson(new String(requestBytes, StandardCharsets.UTF_8), readJson(buffer));
+    }
+
     private void sendJsonPacket(Session session, byte packetId, String json) {
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
@@ -342,5 +414,8 @@ public class WorldGenModule implements Module {
     }
 
     private record PreviewStopRequest(String previewId) {
+    }
+
+    private record MutationJson(String requestId, String json) {
     }
 }

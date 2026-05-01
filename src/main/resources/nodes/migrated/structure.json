@@ -1,0 +1,187 @@
+[
+  {
+    "id": "structure.save",
+    "displayName": "Structure Save",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_save"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "structure_id",
+        "dataType": "string"
+      },
+      {
+        "name": "display_name",
+        "dataType": "string"
+      },
+      {
+        "name": "tags",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "structure.load",
+    "displayName": "Structure Load",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_load"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "structure_id",
+        "dataType": "string"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "structure.paste",
+    "displayName": "Structure Paste",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_paste"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "structure_id",
+        "dataType": "string"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "ignore_air",
+        "dataType": "boolean",
+        "defaultValue": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "structure.list",
+    "displayName": "Structure List",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_list"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "structures",
+        "dataType": "list"
+      }
+    ]
+  },
+  {
+    "id": "structure.exists",
+    "displayName": "Structure Exists",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_exists"
+    },
+    "inputs": [
+      {
+        "name": "structure_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "exists",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "structure.delete",
+    "displayName": "Structure Delete",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_delete"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "structure_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "deleted",
+        "dataType": "boolean"
+      }
+    ]
+  }
+]

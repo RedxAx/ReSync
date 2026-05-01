@@ -146,6 +146,116 @@
     }
   },
   {
+    "id": "math.vector_create_int",
+    "displayName": "Vector Create Int",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "x",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": "0"
+      },
+      {
+        "name": "y",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": "0"
+      },
+      {
+        "name": "z",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": "0"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_create_int"
+    }
+  },
+  {
+    "id": "math.vector_split",
+    "displayName": "Vector Split",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      },
+      {
+        "name": "block_x",
+        "dataType": "number"
+      },
+      {
+        "name": "block_y",
+        "dataType": "number"
+      },
+      {
+        "name": "block_z",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_split"
+    }
+  },
+  {
+    "id": "math.vector_set",
+    "displayName": "Vector Set",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      },
+      {
+        "name": "component",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": ["x", "y", "z"],
+        "defaultValue": "x"
+      },
+      {
+        "name": "value",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": "0"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_set"
+    }
+  },
+  {
     "id": "math.vector_subtract",
     "displayName": "Vector Subtract",
     "category": "DATA",
@@ -243,6 +353,169 @@
     "handler": "GenericMathHandler",
     "handlerConfig": {
       "operation": "vector_dot"
+    }
+  },
+  {
+    "id": "math.vector_multiply_components",
+    "displayName": "Vector Multiply Components",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "vector"
+      },
+      {
+        "name": "vector2",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_multiply_components"
+    }
+  },
+  {
+    "id": "math.vector_divide_components",
+    "displayName": "Vector Divide Components",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "vector"
+      },
+      {
+        "name": "vector2",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_divide_components"
+    }
+  },
+  {
+    "id": "math.vector_min",
+    "displayName": "Vector Min",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "vector"
+      },
+      {
+        "name": "vector2",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_min"
+    }
+  },
+  {
+    "id": "math.vector_max",
+    "displayName": "Vector Max",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector1",
+        "dataType": "vector"
+      },
+      {
+        "name": "vector2",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_max"
+    }
+  },
+  {
+    "id": "math.vector_floor",
+    "displayName": "Vector Floor",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_floor"
+    }
+  },
+  {
+    "id": "math.vector_ceil",
+    "displayName": "Vector Ceil",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_ceil"
+    }
+  },
+  {
+    "id": "math.vector_round",
+    "displayName": "Vector Round",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "vector",
+        "dataType": "vector"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result_vector",
+        "dataType": "vector"
+      }
+    ],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {
+      "operation": "vector_round"
     }
   },
   {

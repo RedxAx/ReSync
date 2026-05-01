@@ -166,7 +166,7 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
 
     @Override
     public List<BlockPopulator> getDefaultPopulators(World world) {
-        return List.of();
+        return List.of(new StructurePopulator(pipelineHolder));
     }
 
 }

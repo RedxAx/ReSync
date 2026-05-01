@@ -22,10 +22,13 @@ import java.awt.image.BufferedImage;
 import java.util.Map;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 public class ParticleHandler implements NodeHandler {
+    private static final int MAX_TEXT_LENGTH = 80;
+    private static final int MAX_TEXT_IMAGE_WIDTH = 512;
+    private static final int MAX_TEXT_IMAGE_HEIGHT = 160;
+    private static final int MAX_TEXT_PARTICLES = 500;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public ParticleHandler() {
@@ -615,7 +618,7 @@ public class ParticleHandler implements NodeHandler {
 
         operations.put("particle_text", (ctx, node) -> {
             Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String text = ctx.getInputValue(node, "text", String.class, "A");
+            String text = clampText(ctx.getInputValue(node, "text", String.class, "A"));
             String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
             Double size = ctx.getInputValue(node, "size", Double.class, 0.3);
 
@@ -623,24 +626,28 @@ public class ParticleHandler implements NodeHandler {
                 try {
                     Particle particle = Particle.valueOf(particleName.toUpperCase());
                     Font font = new Font("Arial", Font.BOLD, 100);
-                    BufferedImage image = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+                    BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D measureGraphics = measure.createGraphics();
+                    measureGraphics.setFont(font);
+                    FontMetrics fm = measureGraphics.getFontMetrics();
+                    int textWidth = fm.stringWidth(text);
+                    int textHeight = fm.getHeight();
+                    int imageWidth = Math.min(MAX_TEXT_IMAGE_WIDTH, Math.max(64, textWidth + 24));
+                    int imageHeight = Math.min(MAX_TEXT_IMAGE_HEIGHT, Math.max(64, textHeight + 24));
+                    measureGraphics.dispose();
+                    BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
                     Graphics2D g2d = image.createGraphics();
                     g2d.setFont(font);
                     g2d.setColor(Color.WHITE);
-                    FontMetrics fm = g2d.getFontMetrics();
-                    int width = fm.stringWidth(text);
-                    int height = fm.getHeight();
-                    g2d.drawString(text, (256 - width) / 2, (128 + height) / 2 - fm.getDescent());
+                    g2d.drawString(text, 12, 12 + fm.getAscent());
                     g2d.dispose();
 
-                    AtomicInteger particleCount = new AtomicInteger(0);
-                    int maxParticles = 500;
-                    int minPixelX = 256;
+                    int minPixelX = imageWidth;
                     int maxPixelX = 0;
-                    int minPixelY = 128;
+                    int minPixelY = imageHeight;
                     int maxPixelY = 0;
-                    for (int y = 0; y < 128; y += 2) {
-                        for (int x = 0; x < 256; x += 2) {
+                    for (int y = 0; y < imageHeight; y += 2) {
+                        for (int x = 0; x < imageWidth; x += 2) {
                             int rgb = image.getRGB(x, y);
                             if ((rgb & 0xFF000000) != 0) {
                                 minPixelX = Math.min(minPixelX, x);
@@ -654,37 +661,13 @@ public class ParticleHandler implements NodeHandler {
                         return;
                     }
                     double centerPixelX = (minPixelX + maxPixelX) / 2.0;
-                    double bottomPixelY = maxPixelY;
-                    double baseYOffset = 1.05;
+                    double centerPixelY = (minPixelY + maxPixelY) / 2.0;
+                    double particleScale = Math.max(0.005, size) / 10.0;
 
                     if (Bukkit.isPrimaryThread()) {
-                        for (int y = 0; y < 128 && particleCount.get() < maxParticles; y += 2) {
-                            for (int x = 0; x < 256 && particleCount.get() < maxParticles; x += 2) {
-                                int rgb = image.getRGB(x, y);
-                                if ((rgb & 0xFF000000) != 0) {
-                                    double px = (x - centerPixelX) * size;
-                                    double py = (bottomPixelY - y) * size + baseYOffset;
-                                    Location loc = location.clone().add(px, py, 0);
-                                    location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                    particleCount.incrementAndGet();
-                                }
-                            }
-                        }
+                        emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale);
                     } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int y = 0; y < 128 && particleCount.get() < maxParticles; y += 2) {
-                                for (int x = 0; x < 256 && particleCount.get() < maxParticles; x += 2) {
-                                    int rgb = image.getRGB(x, y);
-                                    if ((rgb & 0xFF000000) != 0) {
-                                        double px = (x - centerPixelX) * size;
-                                        double py = (bottomPixelY - y) * size + baseYOffset;
-                                        Location loc = location.clone().add(px, py, 0);
-                                        location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                        particleCount.incrementAndGet();
-                                    }
-                                }
-                            }
-                        });
+                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale));
                     }
                 } catch (IllegalArgumentException ignored) {
                 }
@@ -967,27 +950,32 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnText(FlowContext ctx, FlowNode node, Particle particle) {
         Location location = location(ctx, node, "location");
-        String text = text(ctx, node, "text", "A");
+        String text = clampText(text(ctx, node, "text", "A"));
         double size = decimal(ctx, node, "size", 0.3);
         if (!valid(location) || text.isEmpty()) return;
         run(location, () -> {
             Font font = new Font("Arial", Font.BOLD, 100);
-            BufferedImage image = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+            BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D measureGraphics = measure.createGraphics();
+            measureGraphics.setFont(font);
+            FontMetrics fm = measureGraphics.getFontMetrics();
+            int textWidth = fm.stringWidth(text);
+            int textHeight = fm.getHeight();
+            int imageWidth = Math.min(MAX_TEXT_IMAGE_WIDTH, Math.max(64, textWidth + 24));
+            int imageHeight = Math.min(MAX_TEXT_IMAGE_HEIGHT, Math.max(64, textHeight + 24));
+            measureGraphics.dispose();
+            BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = image.createGraphics();
             g2d.setFont(font);
             g2d.setColor(Color.WHITE);
-            FontMetrics fm = g2d.getFontMetrics();
-            int width = fm.stringWidth(text);
-            int height = fm.getHeight();
-            g2d.drawString(text, (256 - width) / 2, (128 + height) / 2 - fm.getDescent());
+            g2d.drawString(text, 12, 12 + fm.getAscent());
             g2d.dispose();
-            AtomicInteger particleCount = new AtomicInteger();
-            int minPixelX = 256;
+            int minPixelX = imageWidth;
             int maxPixelX = 0;
-            int minPixelY = 128;
+            int minPixelY = imageHeight;
             int maxPixelY = 0;
-            for (int y = 0; y < 128; y += 2) {
-                for (int x = 0; x < 256; x += 2) {
+            for (int y = 0; y < imageHeight; y += 2) {
+                for (int x = 0; x < imageWidth; x += 2) {
                     int rgb = image.getRGB(x, y);
                     if ((rgb & 0xFF000000) != 0) {
                         minPixelX = Math.min(minPixelX, x);
@@ -1001,19 +989,29 @@ public class ParticleHandler implements NodeHandler {
                 return;
             }
             double centerPixelX = (minPixelX + maxPixelX) / 2.0;
-            double bottomPixelY = maxPixelY;
-            double baseYOffset = 1.05;
-            for (int y = 0; y < 128 && particleCount.get() < 500; y += 2) {
-                for (int x = 0; x < 256 && particleCount.get() < 500; x += 2) {
-                    int rgb = image.getRGB(x, y);
-                    if ((rgb & 0xFF000000) != 0) {
-                        Location loc = location.clone().add((x - centerPixelX) * size, (bottomPixelY - y) * size + baseYOffset, 0);
-                        location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        particleCount.incrementAndGet();
-                    }
+            double centerPixelY = (minPixelY + maxPixelY) / 2.0;
+            double particleScale = Math.max(0.005, size) / 10.0;
+            emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale);
+        });
+    }
+
+    private String clampText(String text) {
+        String value = text != null ? text : "";
+        return value.length() > MAX_TEXT_LENGTH ? value.substring(0, MAX_TEXT_LENGTH) : value;
+    }
+
+    private void emitTextParticles(Location location, Particle particle, BufferedImage image, int imageWidth, int imageHeight, double centerPixelX, double centerPixelY, double particleScale) {
+        int emitted = 0;
+        for (int y = 0; y < imageHeight && emitted < MAX_TEXT_PARTICLES; y += 2) {
+            for (int x = 0; x < imageWidth && emitted < MAX_TEXT_PARTICLES; x += 2) {
+                int rgb = image.getRGB(x, y);
+                if ((rgb & 0xFF000000) != 0) {
+                    Location loc = location.clone().add((x - centerPixelX) * particleScale, (centerPixelY - y) * particleScale, 0);
+                    location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+                    emitted++;
                 }
             }
-        });
+        }
     }
 
     private void spawnBlockDust(FlowContext ctx, FlowNode node) {

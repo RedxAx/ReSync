@@ -1,29 +1,53 @@
 package restudio.resync.flow.handler.generic;
 
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.Material;
 import org.bukkit.entity.Animals;
+import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Egg;
+import org.bukkit.entity.Fireball;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.entity.SmallFireball;
+import org.bukkit.entity.Snowball;
+import org.bukkit.entity.Trident;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowNode;
+import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +59,8 @@ import java.util.function.BiConsumer;
 public class AbilityEffectHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private static final Map<String, Long> MARKS = new ConcurrentHashMap<>();
+    private static final Map<UUID, ItemStack> DISARMED_ITEMS = new ConcurrentHashMap<>();
+    private static final Map<String, Long> COOLDOWNS = new ConcurrentHashMap<>();
 
     public AbilityEffectHandler() {
         operations.put("strike_lightning", (ctx, node) -> {
@@ -121,16 +147,21 @@ public class AbilityEffectHandler implements NodeHandler {
             double distance = number(ctx, node, "distance", 20.0);
             boolean stopOnBlock = bool(ctx, node, "stop_on_block", true);
             boolean stopOnEntity = bool(ctx, node, "stop_on_entity", true);
+            String hitMode = string(ctx, node, "hit_mode", "any").toLowerCase(Locale.ROOT);
             String targetFilter = string(ctx, node, "target_filter", "any");
+            String blockFilter = string(ctx, node, "block_filter", "any");
             if (player != null) {
                 Location eye = player.getEyeLocation();
                 Vector direction = eye.getDirection();
-                RayTraceResult entityResult = stopOnEntity
+                RayTraceResult entityResult = stopOnEntity && !"block".equals(hitMode)
                     ? player.getWorld().rayTraceEntities(eye, direction, distance, 0.25, entity -> entity != player && acceptsTarget(entity, targetFilter))
                     : null;
-                RayTraceResult blockResult = stopOnBlock
+                RayTraceResult blockResult = stopOnBlock && !"entity".equals(hitMode)
                     ? player.getWorld().rayTraceBlocks(eye, direction, distance, FluidCollisionMode.NEVER, true)
                     : null;
+                if (blockResult != null && !acceptsBlock(blockResult.getHitBlock(), blockFilter)) {
+                    blockResult = null;
+                }
                 RayTraceResult result = nearest(eye, entityResult, blockResult);
                 Entity target = result != null ? result.getHitEntity() : null;
                 Block block = result != null ? result.getHitBlock() : null;
@@ -180,10 +211,175 @@ public class AbilityEffectHandler implements NodeHandler {
         operations.put("launch_projectile", (ctx, node) -> {
             Player player = ctx.getPlayer();
             double speed = number(ctx, node, "speed", 2.0);
+            String projectileType = string(ctx, node, "projectile_type", "ARROW");
+            boolean gravity = bool(ctx, node, "gravity", true);
+            int fireTicks = integer(ctx, node, "fire_ticks", 0);
+            double damage = number(ctx, node, "damage", 0.0);
+            int pierce = integer(ctx, node, "pierce", 0);
+            String pickupMode = string(ctx, node, "pickup_mode", "allowed");
+            String markKey = string(ctx, node, "mark_key", "");
             if (player != null) {
-                Arrow arrow = player.launchProjectile(Arrow.class);
-                arrow.setVelocity(player.getEyeLocation().getDirection().multiply(speed));
-                ctx.setOutput(node, "projectile", arrow);
+                Projectile projectile = launchProjectile(player, projectileType);
+                projectile.setVelocity(player.getEyeLocation().getDirection().multiply(speed));
+                projectile.setGravity(gravity);
+                projectile.setFireTicks(Math.max(0, fireTicks));
+                if (projectile instanceof AbstractArrow arrow) {
+                    if (damage > 0.0) {
+                        arrow.setDamage(damage);
+                    }
+                    arrow.setPierceLevel(Math.max(0, pierce));
+                    arrow.setPickupStatus(pickupStatus(pickupMode));
+                }
+                if (!markKey.isBlank()) {
+                    projectile.addScoreboardTag("resync:" + markKey);
+                }
+                if (projectile instanceof Fireball fireball) {
+                    fireball.setDirection(player.getEyeLocation().getDirection().multiply(speed));
+                }
+                ctx.setOutput(node, "projectile", projectile);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("damage_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            double amount = number(ctx, node, "amount", 4.0);
+            boolean useSource = bool(ctx, node, "use_source", true);
+            if (target instanceof LivingEntity living) {
+                if (useSource && ctx.getPlayer() != null) {
+                    living.damage(amount, ctx.getPlayer());
+                } else {
+                    living.damage(amount);
+                }
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("heal_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            double amount = number(ctx, node, "amount", 4.0);
+            if (target instanceof LivingEntity living) {
+                living.setHealth(Math.min(living.getMaxHealth(), living.getHealth() + amount));
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("set_health", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            double health = number(ctx, node, "health", 20.0);
+            if (target instanceof LivingEntity living) {
+                living.setHealth(Math.max(0.0, Math.min(living.getMaxHealth(), health)));
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("cancel_damage", (ctx, node) -> {
+            boolean cancelled = bool(ctx, node, "cancelled", true);
+            if (ctx.getEvent() instanceof Cancellable cancellable) {
+                cancellable.setCancelled(cancelled);
+            }
+            if (ctx.getEvent() instanceof EntityDamageEvent damageEvent && cancelled) {
+                damageEvent.setDamage(0.0);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("shield_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            double amount = number(ctx, node, "amount", 4.0);
+            int duration = integer(ctx, node, "duration_ticks", 100);
+            if (target instanceof LivingEntity living) {
+                double previous = living.getAbsorptionAmount();
+                living.setAbsorptionAmount(Math.max(previous, amount));
+                ctx.runLater(() -> {
+                    if (living.isValid()) {
+                        living.setAbsorptionAmount(Math.min(living.getAbsorptionAmount(), previous));
+                    }
+                }, Math.max(1, duration));
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("reflect_damage", (ctx, node) -> {
+            double percent = number(ctx, node, "percent", 100.0);
+            if (ctx.getEvent() instanceof EntityDamageByEntityEvent damageEvent && damageEvent.getDamager() instanceof LivingEntity damager) {
+                damager.damage(damageEvent.getDamage() * Math.max(0.0, percent) / 100.0, damageEvent.getEntity());
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("launch_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            if (target != null) {
+                double strength = number(ctx, node, "strength", 1.0);
+                double upwardStrength = number(ctx, node, "upward_strength", 0.5);
+                Vector vector = direction(ctx, node).normalize().multiply(strength);
+                vector.setY(vector.getY() + upwardStrength);
+                target.setVelocity(vector);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("pull_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            Location location = location(ctx, node);
+            double strength = number(ctx, node, "strength", 1.0);
+            if (target != null && location != null) {
+                target.setVelocity(location.toVector().subtract(target.getLocation().toVector()).normalize().multiply(strength));
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("leap_to_location", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            Location location = location(ctx, node);
+            double strength = number(ctx, node, "strength", 1.0);
+            double upwardStrength = number(ctx, node, "upward_strength", 0.2);
+            if (target != null && location != null) {
+                Vector vector = location.toVector().subtract(target.getLocation().toVector()).normalize().multiply(strength);
+                vector.setY(vector.getY() + upwardStrength);
+                target.setVelocity(vector);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("stun_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            int duration = integer(ctx, node, "duration_ticks", 60);
+            if (target instanceof LivingEntity living) {
+                addEffect(living, "SLOW", duration, 10);
+                addEffect(living, "JUMP", duration, 250);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("root_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            int duration = integer(ctx, node, "duration_ticks", 60);
+            if (target instanceof LivingEntity living) {
+                addEffect(living, "SLOW", duration, 10);
+                addEffect(living, "JUMP", duration, 250);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("silence_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            int duration = integer(ctx, node, "duration_ticks", 100);
+            if (target != null) {
+                MARKS.put(markKey(target.getUniqueId(), "silenced"), System.currentTimeMillis() + duration * 50L);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("disarm_target", (ctx, node) -> {
+            Entity target = target(ctx, node);
+            int duration = integer(ctx, node, "duration_ticks", 60);
+            if (target instanceof Player player) {
+                PlayerInventory inventory = player.getInventory();
+                ItemStack item = inventory.getItemInMainHand();
+                if (item != null && !item.getType().isAir()) {
+                    DISARMED_ITEMS.put(player.getUniqueId(), item.clone());
+                    inventory.setItemInMainHand(new ItemStack(Material.AIR));
+                    ctx.runLater(() -> {
+                        ItemStack stored = DISARMED_ITEMS.remove(player.getUniqueId());
+                        if (stored != null && player.isOnline()) {
+                            ItemStack current = inventory.getItemInMainHand();
+                            if (current == null || current.getType().isAir()) {
+                                inventory.setItemInMainHand(stored);
+                            } else {
+                                inventory.addItem(stored);
+                            }
+                        }
+                    }, Math.max(1, duration));
+                }
             }
             ctx.triggerOutput("flow");
         });
@@ -353,6 +549,265 @@ public class AbilityEffectHandler implements NodeHandler {
                 }, duration);
             }
             ctx.triggerOutput("flow");
+        });
+        operations.put("find_blocks", (ctx, node) -> {
+            Location center = location(ctx, node);
+            int radius = integer(ctx, node, "radius", 5);
+            String materialName = string(ctx, node, "material", "any");
+            List<Block> blocks = new ArrayList<>();
+            if (center != null && center.getWorld() != null) {
+                Material material = parseMaterial(materialName, null);
+                forEachBlock(center, radius, "cube", block -> {
+                    if (material == null || block.getType() == material) {
+                        blocks.add(block);
+                    }
+                });
+            }
+            ctx.setOutput(node, "blocks", blocks);
+            ctx.setOutput(node, "count", blocks.size());
+            ctx.triggerOutput("flow");
+        });
+        operations.put("break_blocks", (ctx, node) -> {
+            Location center = location(ctx, node);
+            int radius = integer(ctx, node, "radius", 3);
+            String materialName = string(ctx, node, "material", "any");
+            boolean drops = bool(ctx, node, "drops", true);
+            int maxBlocks = integer(ctx, node, "max_blocks", 128);
+            int[] count = {0};
+            if (center != null && center.getWorld() != null) {
+                Material material = parseMaterial(materialName, null);
+                forEachBlock(center, radius, "sphere", block -> {
+                    if (count[0] >= maxBlocks || material != null && block.getType() != material || block.getType().isAir()) {
+                        return;
+                    }
+                    if (drops) {
+                        block.breakNaturally();
+                    } else {
+                        block.setType(Material.AIR, false);
+                    }
+                    count[0]++;
+                });
+            }
+            ctx.setOutput(node, "count", count[0]);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("replace_blocks", (ctx, node) -> {
+            Location center = location(ctx, node);
+            int radius = integer(ctx, node, "radius", 3);
+            Material from = parseMaterial(string(ctx, node, "from", "any"), null);
+            Material to = parseMaterial(string(ctx, node, "to", "STONE"), Material.STONE);
+            int maxBlocks = integer(ctx, node, "max_blocks", 128);
+            int[] count = {0};
+            if (center != null && center.getWorld() != null && to != null) {
+                forEachBlock(center, radius, "sphere", block -> {
+                    if (count[0] >= maxBlocks || from != null && block.getType() != from) {
+                        return;
+                    }
+                    block.setType(to, false);
+                    count[0]++;
+                });
+            }
+            ctx.setOutput(node, "count", count[0]);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("place_shape", (ctx, node) -> {
+            Location center = location(ctx, node);
+            int radius = integer(ctx, node, "radius", 3);
+            String shape = string(ctx, node, "shape", "sphere");
+            Material material = parseMaterial(string(ctx, node, "material", "STONE"), Material.STONE);
+            int maxBlocks = integer(ctx, node, "max_blocks", 128);
+            boolean replaceAirOnly = bool(ctx, node, "air_only", true);
+            int[] count = {0};
+            if (center != null && center.getWorld() != null && material != null) {
+                forEachBlock(center, radius, shape, block -> {
+                    if (count[0] >= maxBlocks || replaceAirOnly && !block.getType().isAir()) {
+                        return;
+                    }
+                    block.setType(material, false);
+                    count[0]++;
+                });
+            }
+            ctx.setOutput(node, "count", count[0]);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("extinguish_area", (ctx, node) -> {
+            Location center = location(ctx, node);
+            int radius = integer(ctx, node, "radius", 5);
+            int[] count = {0};
+            if (center != null && center.getWorld() != null) {
+                forEachBlock(center, radius, "sphere", block -> {
+                    if (block.getType() == Material.FIRE || block.getType() == Material.SOUL_FIRE) {
+                        block.setType(Material.AIR, false);
+                        count[0]++;
+                    }
+                });
+            }
+            ctx.setOutput(node, "count", count[0]);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("grow_block", (ctx, node) -> {
+            Location location = location(ctx, node);
+            int attempts = integer(ctx, node, "attempts", 1);
+            boolean success = false;
+            if (location != null && location.getWorld() != null) {
+                for (int i = 0; i < Math.max(1, attempts); i++) {
+                    success |= location.getBlock().applyBoneMeal(BlockFace.UP);
+                }
+            }
+            ctx.setOutput(node, "success", success);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("particle_shape", (ctx, node) -> {
+            Location center = location(ctx, node);
+            String mode = string(ctx, node, "mode", "ring");
+            Particle particle = parseParticle(string(ctx, node, "particle", "FLAME"));
+            int count = Math.max(1, integer(ctx, node, "count", 32));
+            double radius = number(ctx, node, "radius", 2.0);
+            double speed = number(ctx, node, "speed", 0.0);
+            if (center != null && center.getWorld() != null) {
+                spawnParticleShape(center, particle, mode, count, radius, speed);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("filter_entities", (ctx, node) -> {
+            List<Entity> entities = entityList(ctx, node);
+            String targetFilter = string(ctx, node, "target_filter", "any");
+            boolean excludeCaster = bool(ctx, node, "exclude_caster", false);
+            List<Entity> filtered = entities.stream()
+                .filter(entity -> acceptsTarget(entity, targetFilter))
+                .filter(entity -> !excludeCaster || entity != ctx.getPlayer())
+                .toList();
+            ctx.setOutput(node, "entities", filtered);
+            ctx.setOutput(node, "count", filtered.size());
+            ctx.triggerOutput("flow");
+        });
+        operations.put("sort_entities", (ctx, node) -> {
+            List<Entity> entities = new ArrayList<>(entityList(ctx, node));
+            Location origin = location(ctx, node);
+            String mode = string(ctx, node, "mode", "nearest");
+            if (origin != null) {
+                entities.sort(Comparator.comparingDouble(entity -> entity.getLocation().distanceSquared(origin)));
+                if ("farthest".equalsIgnoreCase(mode)) {
+                    java.util.Collections.reverse(entities);
+                }
+            }
+            ctx.setOutput(node, "entities", entities);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("limit_entities", (ctx, node) -> {
+            List<Entity> entities = entityList(ctx, node);
+            int limit = Math.max(0, integer(ctx, node, "limit", 1));
+            List<Entity> limited = entities.stream().limit(limit).toList();
+            ctx.setOutput(node, "entities", limited);
+            ctx.setOutput(node, "count", limited.size());
+            ctx.triggerOutput("flow");
+        });
+        operations.put("is_holding_content", (ctx, node) -> {
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            String contentId = string(ctx, node, "content_id", "");
+            String hand = string(ctx, node, "hand", "any");
+            ItemStack item = matchingHeldItem(player, contentId, hand);
+            boolean matches = item != null;
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "matches", matches);
+            ctx.triggerOutput(matches ? "true" : "false");
+        });
+        operations.put("is_wearing_content", (ctx, node) -> {
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            String contentId = string(ctx, node, "content_id", "");
+            String slot = string(ctx, node, "slot", "any");
+            ItemStack item = matchingArmorItem(player, contentId, slot);
+            boolean matches = item != null;
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "matches", matches);
+            ctx.triggerOutput(matches ? "true" : "false");
+        });
+        operations.put("has_content_set", (ctx, node) -> {
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            String prefix = string(ctx, node, "content_prefix", "");
+            boolean matches = hasContentSet(player, prefix);
+            ctx.setOutput(node, "matches", matches);
+            ctx.triggerOutput(matches ? "true" : "false");
+        });
+        operations.put("custom_block_at", (ctx, node) -> {
+            Location location = location(ctx, node);
+            CustomContentService service = CustomContentAccess.getService();
+            String contentId = service != null ? service.identifyBlock(location) : null;
+            CustomContentDefinition definition = definition(contentId);
+            ctx.setOutput(node, "content_id", contentId);
+            ctx.setOutput(node, "content_type", definition != null ? definition.getType() : "");
+            ctx.setOutput(node, "exists", contentId != null);
+            ctx.triggerOutput(contentId != null ? "true" : "false");
+        });
+        operations.put("trigger_content_ability", (ctx, node) -> {
+            CustomContentService service = CustomContentAccess.getService();
+            String contentId = string(ctx, node, "content_id", "");
+            String trigger = string(ctx, node, "trigger", "item.use");
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            if (service != null && !contentId.isBlank() && !trigger.isBlank()) {
+                Map<String, Object> vars = new HashMap<>(ctx.getRuntime().getEventVariables());
+                vars.put("event.location", location(ctx, node));
+                vars.put("event.target", target(ctx, node));
+                service.dispatch(contentId, trigger, player, ctx.getEvent(), vars);
+                ctx.setOutput(node, "success", true);
+            } else {
+                ctx.setOutput(node, "success", false);
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("cooldown_remaining", (ctx, node) -> {
+            String key = cooldownKey(ctx, node);
+            long remaining = Math.max(0L, COOLDOWNS.getOrDefault(key, 0L) - System.currentTimeMillis());
+            int ticks = (int) Math.ceil(remaining / 50.0);
+            ctx.setOutput(node, "ticks", ticks);
+            ctx.setOutput(node, "is_ready", ticks <= 0);
+            ctx.triggerOutput(ticks <= 0 ? "ready" : "cooldown");
+        });
+        operations.put("set_cooldown", (ctx, node) -> {
+            String key = cooldownKey(ctx, node);
+            int ticks = integer(ctx, node, "ticks", 100);
+            COOLDOWNS.put(key, System.currentTimeMillis() + Math.max(0, ticks) * 50L);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("get_charge", (ctx, node) -> {
+            ItemStack item = item(ctx, node);
+            String key = string(ctx, node, "key", "charge");
+            double value = getCharge(item, key);
+            ctx.setOutput(node, "value", value);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("set_charge", (ctx, node) -> {
+            ItemStack item = item(ctx, node);
+            String key = string(ctx, node, "key", "charge");
+            double value = number(ctx, node, "value", 0.0);
+            setCharge(item, key, value);
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "value", value);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("add_charge", (ctx, node) -> {
+            ItemStack item = item(ctx, node);
+            String key = string(ctx, node, "key", "charge");
+            double value = getCharge(item, key) + number(ctx, node, "amount", 1.0);
+            setCharge(item, key, value);
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "value", value);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("consume_charge", (ctx, node) -> {
+            ItemStack item = item(ctx, node);
+            String key = string(ctx, node, "key", "charge");
+            double amount = number(ctx, node, "amount", 1.0);
+            double value = getCharge(item, key);
+            boolean success = value >= amount;
+            if (success) {
+                value -= amount;
+                setCharge(item, key, value);
+            }
+            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "value", value);
+            ctx.setOutput(node, "succeeded", success);
+            ctx.triggerOutput(success ? "success" : "fail");
         });
         operations.put("mark_target", (ctx, node) -> {
             Entity target = target(ctx, node);
@@ -532,6 +987,224 @@ public class AbilityEffectHandler implements NodeHandler {
         } catch (Exception ignored) {
             return fallback;
         }
+    }
+
+    private void addEffect(LivingEntity living, String name, int duration, int amplifier) {
+        PotionEffectType type = PotionEffectType.getByName(name);
+        if (type != null) {
+            living.addPotionEffect(new PotionEffect(type, duration, amplifier, false, false, false));
+        }
+    }
+
+    private Projectile launchProjectile(Player player, String projectileType) {
+        String normalized = projectileType == null ? "ARROW" : projectileType.toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "SNOWBALL" -> player.launchProjectile(Snowball.class);
+            case "EGG" -> player.launchProjectile(Egg.class);
+            case "TRIDENT" -> player.launchProjectile(Trident.class);
+            case "FIREBALL", "SMALL_FIREBALL" -> player.launchProjectile(SmallFireball.class);
+            default -> player.launchProjectile(Arrow.class);
+        };
+    }
+
+    private AbstractArrow.PickupStatus pickupStatus(String pickupMode) {
+        String normalized = pickupMode == null ? "allowed" : pickupMode.toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "creative_only", "creative only" -> AbstractArrow.PickupStatus.CREATIVE_ONLY;
+            case "disallowed", "none" -> AbstractArrow.PickupStatus.DISALLOWED;
+            default -> AbstractArrow.PickupStatus.ALLOWED;
+        };
+    }
+
+    private boolean acceptsBlock(Block block, String filter) {
+        if (block == null) {
+            return false;
+        }
+        Material material = parseMaterial(filter, null);
+        return material == null || block.getType() == material;
+    }
+
+    private void forEachBlock(Location center, int radius, String shape, java.util.function.Consumer<Block> consumer) {
+        World world = center.getWorld();
+        int safeRadius = Math.max(0, radius);
+        String normalized = shape == null ? "cube" : shape.toLowerCase(Locale.ROOT);
+        for (int x = -safeRadius; x <= safeRadius; x++) {
+            for (int y = -safeRadius; y <= safeRadius; y++) {
+                for (int z = -safeRadius; z <= safeRadius; z++) {
+                    if (("sphere".equals(normalized) || "cylinder".equals(normalized)) && x * x + z * z + ("sphere".equals(normalized) ? y * y : 0) > safeRadius * safeRadius) {
+                        continue;
+                    }
+                    consumer.accept(world.getBlockAt(center.getBlockX() + x, center.getBlockY() + y, center.getBlockZ() + z));
+                }
+            }
+        }
+    }
+
+    private void spawnParticleShape(Location center, Particle particle, String mode, int count, double radius, double speed) {
+        World world = center.getWorld();
+        String normalized = mode == null ? "ring" : mode.toLowerCase(Locale.ROOT);
+        if ("burst".equals(normalized)) {
+            world.spawnParticle(particle, center, count, radius, radius, radius, speed);
+            return;
+        }
+        if ("line".equals(normalized)) {
+            Vector direction = center.getDirection().normalize().multiply(radius * 2.0 / count);
+            Location point = center.clone().subtract(direction.clone().multiply(count / 2.0));
+            for (int i = 0; i < count; i++) {
+                world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
+                point.add(direction);
+            }
+            return;
+        }
+        for (int i = 0; i < count; i++) {
+            double angle = Math.PI * 2.0 * i / count;
+            double y = "orbit".equals(normalized) ? Math.sin(angle * 2.0) * radius * 0.5 : 0.0;
+            Location point = center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+            world.spawnParticle(particle, point, 1, 0, 0, 0, speed);
+        }
+    }
+
+    private List<Entity> entityList(FlowContext ctx, FlowNode node) {
+        Object value = ctx.getInputValue(node, "entities");
+        if (value instanceof Collection<?> collection) {
+            List<Entity> entities = new ArrayList<>();
+            for (Object entry : collection) {
+                if (entry instanceof Entity entity) {
+                    entities.add(entity);
+                }
+            }
+            return entities;
+        }
+        Entity target = target(ctx, node);
+        return target != null ? List.of(target) : List.of();
+    }
+
+    private ItemStack item(FlowContext ctx, FlowNode node) {
+        ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
+        if (item != null) {
+            return item;
+        }
+        Object eventItem = ctx.getRuntime().getEventVariables().get("event.item");
+        if (eventItem instanceof ItemStack stack) {
+            return stack;
+        }
+        Player player = ctx.getPlayer();
+        return player != null ? player.getInventory().getItemInMainHand() : null;
+    }
+
+    private ItemStack matchingHeldItem(Player player, String contentId, String hand) {
+        if (player == null) {
+            return null;
+        }
+        CustomContentService service = CustomContentAccess.getService();
+        if (service == null) {
+            return null;
+        }
+        String normalized = hand == null ? "any" : hand.toLowerCase(Locale.ROOT);
+        if (!"offhand".equals(normalized)) {
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (matchesContent(service, item, contentId)) {
+                return item;
+            }
+        }
+        if (!"main hand".equals(normalized) && !"main_hand".equals(normalized)) {
+            ItemStack item = player.getInventory().getItemInOffHand();
+            if (matchesContent(service, item, contentId)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private ItemStack matchingArmorItem(Player player, String contentId, String slot) {
+        if (player == null) {
+            return null;
+        }
+        CustomContentService service = CustomContentAccess.getService();
+        if (service == null) {
+            return null;
+        }
+        PlayerInventory inventory = player.getInventory();
+        String normalized = slot == null ? "any" : slot.toLowerCase(Locale.ROOT);
+        Map<String, ItemStack> armor = Map.of(
+            "head", inventory.getHelmet() != null ? inventory.getHelmet() : new ItemStack(Material.AIR),
+            "chest", inventory.getChestplate() != null ? inventory.getChestplate() : new ItemStack(Material.AIR),
+            "legs", inventory.getLeggings() != null ? inventory.getLeggings() : new ItemStack(Material.AIR),
+            "feet", inventory.getBoots() != null ? inventory.getBoots() : new ItemStack(Material.AIR)
+        );
+        if (!"any".equals(normalized)) {
+            ItemStack item = armor.get(normalized);
+            return matchesContent(service, item, contentId) ? item : null;
+        }
+        for (ItemStack item : armor.values()) {
+            if (matchesContent(service, item, contentId)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasContentSet(Player player, String prefix) {
+        if (player == null) {
+            return false;
+        }
+        CustomContentService service = CustomContentAccess.getService();
+        if (service == null) {
+            return false;
+        }
+        for (ItemStack armor : player.getInventory().getArmorContents()) {
+            String id = service.identifyItem(armor);
+            if (id == null || !prefix.isBlank() && !id.startsWith(prefix)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesContent(CustomContentService service, ItemStack item, String contentId) {
+        String id = service.identifyItem(item);
+        return id != null && (contentId == null || contentId.isBlank() || id.equalsIgnoreCase(contentId));
+    }
+
+    private CustomContentDefinition definition(String contentId) {
+        CustomContentStorage storage = CustomContentAccess.getStorage();
+        return storage != null && contentId != null ? storage.get(contentId) : null;
+    }
+
+    private String cooldownKey(FlowContext ctx, FlowNode node) {
+        String key = string(ctx, node, "key", "ability");
+        String scope = string(ctx, node, "scope", "player").toLowerCase(Locale.ROOT);
+        return switch (scope) {
+            case "global" -> key + ":global";
+            case "content" -> key + ':' + string(ctx, node, "content_id", String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.content_id", "")));
+            default -> key + ':' + (ctx.getPlayer() != null ? ctx.getPlayer().getUniqueId() : "server");
+        };
+    }
+
+    private double getCharge(ItemStack item, String key) {
+        if (item == null || !item.hasItemMeta()) {
+            return 0.0;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null ? meta.getPersistentDataContainer().getOrDefault(chargeKey(key), PersistentDataType.DOUBLE, 0.0) : 0.0;
+    }
+
+    private void setCharge(ItemStack item, String key, double value) {
+        if (item == null) {
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        PersistentDataContainer container = meta.getPersistentDataContainer();
+        container.set(chargeKey(key), PersistentDataType.DOUBLE, value);
+        item.setItemMeta(meta);
+    }
+
+    private NamespacedKey chargeKey(String key) {
+        String safeKey = (key == null || key.isBlank() ? "charge" : key).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_");
+        return new NamespacedKey(ReSync.getInstance(), "ability_" + safeKey);
     }
 
     private String markKey(UUID uuid, String key) {

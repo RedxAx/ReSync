@@ -287,7 +287,7 @@ public class PipelineCompiler {
             case "biome_filter" -> (ctx, upstreams) -> true;
             case "height_filter" -> (ctx, upstreams) -> ctx.y() >= inputFloat(node, upstreams, "min", 0f) && ctx.y() <= inputFloat(node, upstreams, "max", 320f);
             case "chance_filter" -> (ctx, upstreams) -> deterministicChance(ctx.x(), ctx.z(), seed(node, upstreams, ctx), inputFloat(node, upstreams, "chance", 0.5f));
-            case "structure_placement" -> (ctx, upstreams) -> "structure:" + input(node, upstreams, "structure_id", "") + ":" + Math.round(inputFloat(node, upstreams, "spacing", 32f)) + ":" + Math.round(inputFloat(node, upstreams, "separation", 8f)) + ":" + seed(node, upstreams, ctx);
+            case "structure_placement" -> (ctx, upstreams) -> "structure:" + input(node, upstreams, "structure_id", "") + ":" + Math.round(inputFloat(node, upstreams, "spacing", 32f)) + ":" + Math.round(inputFloat(node, upstreams, "separation", 8f)) + ":" + seed(node, upstreams, ctx) + ":" + Math.round(inputFloat(node, upstreams, "y_offset", 0f));
             case "spawn_rule" -> (ctx, upstreams) -> "spawn:" + input(node, upstreams, "entity", "minecraft:zombie") + ":" + Math.round(inputFloat(node, upstreams, "weight", 10f)) + ":" + Math.round(inputFloat(node, upstreams, "min_group", 1f)) + ":" + Math.round(inputFloat(node, upstreams, "max_group", 4f));
             case "output_features" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");
             case "output_structures" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");

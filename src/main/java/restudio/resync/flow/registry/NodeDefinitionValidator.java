@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class NodeDefinitionValidator {
+    private static final Set<String> RESERVED_VISIBLE_WHEN_KEYS = Set.of("__flow_branches");
 
     public record ValidationResult(boolean valid, List<String> errors, List<String> warnings) {
         public boolean hasErrors() {
@@ -132,7 +133,7 @@ public class NodeDefinitionValidator {
         }
         for (NodeDefinition.PinDefinition pin : pins) {
             for (Map.Entry<String, String> condition : pin.getVisibleWhen().entrySet()) {
-                if (!inputNames.contains(condition.getKey())) {
+                if (!inputNames.contains(condition.getKey()) && !RESERVED_VISIBLE_WHEN_KEYS.contains(condition.getKey())) {
                     errors.add("Pin " + pin.getName() + " visibleWhen references unknown input: " + condition.getKey());
                 }
                 if (condition.getValue() == null || condition.getValue().isBlank()) {
@@ -249,6 +250,9 @@ public class NodeDefinitionValidator {
                 "sound",
                 "world"
             ).contains(category);
+        }
+        if (source.startsWith("server:custom_content:")) {
+            return Set.of("provider", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(source.substring("server:custom_content:".length()));
         }
         return false;
     }

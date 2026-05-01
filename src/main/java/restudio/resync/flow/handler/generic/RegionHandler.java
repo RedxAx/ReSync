@@ -12,6 +12,8 @@ import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.structure.ReSyncStructure;
+import restudio.resync.structure.StructureLibrary;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,6 +22,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -450,6 +453,43 @@ public class RegionHandler implements NodeHandler {
             } else {
                 task.run();
             }
+        });
+
+        operations.put("structure_save", (ctx, node) -> {
+            String clipboardId = ctx.getInputValue(node, "clipboard_id", String.class, "default");
+            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
+            String displayName = ctx.getInputValue(node, "display_name", String.class, structureId);
+            String tags = ctx.getInputValue(node, "tags", String.class, "");
+            ClipboardData data = clipboards.get(clipboardId);
+            if (data == null || structureId.isBlank()) return;
+            StructureLibrary.get(ReSync.getInstance()).save(toStructure(data, structureId, displayName, tags));
+        });
+
+        operations.put("structure_load", (ctx, node) -> {
+            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
+            String clipboardId = ctx.getInputValue(node, "clipboard_id", String.class, "loaded");
+            if (structureId.isBlank()) return;
+            StructureLibrary.get(ReSync.getInstance()).load(structureId).ifPresent(structure -> clipboards.put(clipboardId, fromStructure(structure)));
+        });
+
+        operations.put("structure_paste", (ctx, node) -> {
+            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
+            Location pasteLoc = ctx.getInputValue(node, "location", Location.class, null);
+            Boolean ignoreAir = ctx.getInputValue(node, "ignore_air", Boolean.class, true);
+            if (structureId.isBlank() || pasteLoc == null) return;
+            StructureLibrary.get(ReSync.getInstance()).load(structureId).ifPresent(structure -> pasteStructure(structure, pasteLoc, ignoreAir));
+        });
+
+        operations.put("structure_list", (ctx, node) -> ctx.setOutput(node, "structures", new ArrayList<>(StructureLibrary.get(ReSync.getInstance()).list())));
+
+        operations.put("structure_exists", (ctx, node) -> {
+            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
+            ctx.setOutput(node, "exists", StructureLibrary.get(ReSync.getInstance()).exists(structureId));
+        });
+
+        operations.put("structure_delete", (ctx, node) -> {
+            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
+            ctx.setOutput(node, "deleted", StructureLibrary.get(ReSync.getInstance()).delete(structureId));
         });
 
         operations.put("region_paste", (ctx, node) -> {
@@ -1251,6 +1291,67 @@ public class RegionHandler implements NodeHandler {
 
     public void registerTo(HandlerRegistry registry) {
         registry.register("RegionHandler", this);
+    }
+
+    private ReSyncStructure toStructure(ClipboardData data, String id, String displayName, String tags) {
+        ReSyncStructure structure = new ReSyncStructure();
+        structure.setId(id);
+        structure.setDisplayName(displayName);
+        structure.setTags(Arrays.stream(tags.split(",")).map(String::trim).filter(value -> !value.isBlank()).toList());
+        structure.setOriginX(0);
+        structure.setOriginY(0);
+        structure.setOriginZ(0);
+        structure.setSizeX(data.sizeX);
+        structure.setSizeY(data.sizeY);
+        structure.setSizeZ(data.sizeZ);
+        structure.setBlockTypes(copy(data.blockTypes));
+        structure.setBlockDataStrings(copy(data.blockDataStrings));
+        return structure;
+    }
+
+    private ClipboardData fromStructure(ReSyncStructure structure) {
+        return new ClipboardData(copy(structure.getBlockTypes()), copy(structure.getBlockDataStrings()), 0, 0, 0, structure.getSizeX(), structure.getSizeY(), structure.getSizeZ());
+    }
+
+    private void pasteStructure(ReSyncStructure structure, Location pasteLoc, boolean ignoreAir) {
+        World world = pasteLoc.getWorld();
+        if (world == null || structure.getBlockTypes() == null || structure.getBlockDataStrings() == null) return;
+        Runnable task = () -> {
+            for (int y = 0; y < structure.getSizeY(); y++) {
+                for (int x = 0; x < structure.getSizeX(); x++) {
+                    for (int z = 0; z < structure.getSizeZ(); z++) {
+                        String materialName = structure.getBlockTypes()[y][x][z];
+                        Material material = Material.matchMaterial(materialName);
+                        if (material == null || ignoreAir && material == Material.AIR) continue;
+                        Block target = world.getBlockAt(pasteLoc.getBlockX() + x - structure.getOriginX(), pasteLoc.getBlockY() + y - structure.getOriginY(), pasteLoc.getBlockZ() + z - structure.getOriginZ());
+                        target.setType(material);
+                        try {
+                            target.setBlockData(Bukkit.createBlockData(structure.getBlockDataStrings()[y][x][z]));
+                        } catch (IllegalArgumentException ignored) {
+                        }
+                    }
+                }
+            }
+        };
+        if (Bukkit.isPrimaryThread()) {
+            task.run();
+        } else {
+            Bukkit.getScheduler().runTask(ReSync.getInstance(), task);
+        }
+    }
+
+    private String[][][] copy(String[][][] source) {
+        if (source == null) {
+            return new String[0][][];
+        }
+        String[][][] copy = new String[source.length][][];
+        for (int y = 0; y < source.length; y++) {
+            copy[y] = new String[source[y].length][];
+            for (int x = 0; x < source[y].length; x++) {
+                copy[y][x] = Arrays.copyOf(source[y][x], source[y][x].length);
+            }
+        }
+        return copy;
     }
 
     @Override

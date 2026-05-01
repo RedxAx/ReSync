@@ -5,10 +5,10 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.storage.StorageSafety;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,7 +54,7 @@ public class WorldStateStorage {
             return new ArrayList<>();
         }
         try {
-            String raw = Files.readString(worldsFile, StandardCharsets.UTF_8);
+            String raw = StorageSafety.readUtf8(worldsFile);
             List<WorldRegistryEntry> worlds = gson.fromJson(raw, WORLD_LIST_TYPE);
             return worlds == null ? new ArrayList<>() : worlds;
         } catch (Exception exception) {
@@ -69,7 +69,7 @@ public class WorldStateStorage {
             payload.addAll(entries);
         }
         try {
-            Files.writeString(worldsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(worldsFile, gson.toJson(payload));
         } catch (IOException exception) {
             Log.warn("Failed to save world registry: " + exception.getMessage());
         }
@@ -80,7 +80,7 @@ public class WorldStateStorage {
             return new ArrayList<>();
         }
         try {
-            String raw = Files.readString(portalsFile, StandardCharsets.UTF_8);
+            String raw = StorageSafety.readUtf8(portalsFile);
             List<WorldPortal> portals = gson.fromJson(raw, PORTAL_LIST_TYPE);
             return portals == null ? new ArrayList<>() : portals;
         } catch (Exception exception) {
@@ -95,7 +95,7 @@ public class WorldStateStorage {
             payload.addAll(entries);
         }
         try {
-            Files.writeString(portalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(portalsFile, gson.toJson(payload));
         } catch (IOException exception) {
             Log.warn("Failed to save portals: " + exception.getMessage());
         }
@@ -106,7 +106,7 @@ public class WorldStateStorage {
             return new ArrayList<>();
         }
         try {
-            String raw = Files.readString(inventoryGroupsFile, StandardCharsets.UTF_8);
+            String raw = StorageSafety.readUtf8(inventoryGroupsFile);
             List<WorldInventoryGroup> groups = gson.fromJson(raw, INVENTORY_GROUP_LIST_TYPE);
             return groups == null ? new ArrayList<>() : groups;
         } catch (Exception exception) {
@@ -121,7 +121,7 @@ public class WorldStateStorage {
             payload.addAll(entries);
         }
         try {
-            Files.writeString(inventoryGroupsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(inventoryGroupsFile, gson.toJson(payload));
         } catch (IOException exception) {
             Log.warn("Failed to save inventory groups: " + exception.getMessage());
         }
@@ -132,7 +132,7 @@ public class WorldStateStorage {
             return new ArrayList<>();
         }
         try {
-            String raw = Files.readString(signPortalsFile, StandardCharsets.UTF_8);
+            String raw = StorageSafety.readUtf8(signPortalsFile);
             List<WorldSignPortal> portals = gson.fromJson(raw, SIGN_PORTAL_LIST_TYPE);
             return portals == null ? new ArrayList<>() : portals;
         } catch (Exception exception) {
@@ -147,7 +147,7 @@ public class WorldStateStorage {
             payload.addAll(entries);
         }
         try {
-            Files.writeString(signPortalsFile, gson.toJson(payload), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(signPortalsFile, gson.toJson(payload));
         } catch (IOException exception) {
             Log.warn("Failed to save sign portals: " + exception.getMessage());
         }
@@ -158,7 +158,7 @@ public class WorldStateStorage {
             return new LinkedHashMap<>();
         }
         try {
-            String raw = Files.readString(playerStatesFile, StandardCharsets.UTF_8);
+            String raw = StorageSafety.readUtf8(playerStatesFile);
             Map<String, Map<String, WorldPlayerState>> loaded = gson.fromJson(raw, PLAYER_STATES_TYPE);
             Map<UUID, Map<String, WorldPlayerState>> output = new LinkedHashMap<>();
             if (loaded == null) {
@@ -187,7 +187,7 @@ public class WorldStateStorage {
             }
         }
         try {
-            Files.writeString(playerStatesFile, gson.toJson(payload), StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(playerStatesFile, gson.toJson(payload));
         } catch (IOException exception) {
             Log.warn("Failed to save player world states: " + exception.getMessage());
         }

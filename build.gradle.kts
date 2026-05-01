@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id("java")
     id("com.gradleup.shadow") version "8.3.0"
@@ -26,15 +28,66 @@ dependencies {
     implementation("io.javalin:javalin:6.7.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
 }
 
 val targetJavaVersion = 21
+val generatedContractsDir = layout.buildDirectory.dir("generated/sources/resyncContracts/java")
+val protocolContractFile = layout.projectDirectory.file("../shared/generated-contracts/resync-protocol.json")
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(targetJavaVersion))
 }
 
+sourceSets {
+    main {
+        java.srcDir(generatedContractsDir)
+    }
+}
+
+val generateReSyncProtocolContract by tasks.registering {
+    inputs.file(protocolContractFile)
+    outputs.dir(generatedContractsDir)
+    doLast {
+        val root = JsonSlurper().parse(protocolContractFile.asFile) as Map<*, *>
+        val packageNames = root["packageNames"] as Map<*, *>
+        val constants = root["constants"] as Map<*, *>
+        val byteConstants = (root["byteConstants"] as List<*>).map { it.toString() }.toSet()
+        val shortConstants = (root["shortConstants"] as List<*>).map { it.toString() }.toSet()
+        val packageName = packageNames["resync"].toString()
+        val packageDir = generatedContractsDir.get().asFile.resolve(packageName.replace('.', '/'))
+        packageDir.mkdirs()
+        val output = packageDir.resolve("ReSyncProtocolContract.java")
+        output.writeText(buildString {
+            appendLine("package $packageName;")
+            appendLine()
+            appendLine("public final class ReSyncProtocolContract {")
+            constants.forEach { (rawName, rawValue) ->
+                val name = rawName.toString()
+                val value = rawValue ?: return@forEach
+                val line = when {
+                    value is String -> "    public static final String $name = \"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\";"
+                    byteConstants.contains(name) -> "    public static final byte $name = (byte) 0x${(value as Number).toInt().toString(16).uppercase().padStart(2, '0')};"
+                    shortConstants.contains(name) -> "    public static final short $name = ${(value as Number).toInt()};"
+                    else -> "    public static final int $name = ${(value as Number).toInt()};"
+                }
+                appendLine(line)
+            }
+            appendLine()
+            appendLine("    private ReSyncProtocolContract() {")
+            appendLine("    }")
+            appendLine("}")
+        })
+    }
+}
+
 tasks {
+    compileJava {
+        dependsOn(generateReSyncProtocolContract)
+    }
+
     build {
         dependsOn(shadowJar)
     }
@@ -61,6 +114,10 @@ tasks {
 
     runServer {
         minecraftVersion("1.21")
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     val validateNodeDefinitions by registering(JavaExec::class) {

@@ -5,10 +5,13 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import org.bukkit.Bukkit;
 import org.bukkit.World;
 import restudio.flow.data.FlowDataType;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
+import restudio.resync.jobs.JobManager;
+import restudio.resync.jobs.JobRecord;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
@@ -52,6 +55,7 @@ public class WorldGenModule implements Module {
     private WorldGenPreviewManager previewManager;
     private WorldGenProjectStorage projectStorage;
     private WorldGenRuntimeListener runtimeListener;
+    private JobManager jobManager;
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -65,6 +69,7 @@ public class WorldGenModule implements Module {
         this.previewManager = new WorldGenPreviewManager(context.getPlugin());
         this.projectStorage = new WorldGenProjectStorage(context.getPlugin());
         this.runtimeListener = new WorldGenRuntimeListener(context.getPlugin());
+        this.jobManager = new JobManager(job -> broadcastJob("jobStatus", job.snapshot()));
         this.runtimeListener.start();
         WorldGenNodeDefinitions.registerDefaults(WorldGenNodeRegistry.getInstance());
         previewManager.cleanupOrphanedPreviews();
@@ -90,21 +95,28 @@ public class WorldGenModule implements Module {
     @Override
     public void onData(Session session, DataMessage req) {
         byte[] payload = req.getPayload();
-        if (payload.length < 1) return;
+        if (payload == null || payload.length < 1) {
+            sendStatus(session, "", "error", "EmptyWorldGenPacket");
+            return;
+        }
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         byte packetId = buffer.get();
         try {
             switch (packetId) {
                 case 0x20 -> handleSave(buffer);
                 case 0x21 -> handlePreviewCreate(session, buffer);
-                case 0x22 -> handlePreviewStop(buffer);
+                case 0x22 -> handlePreviewStop(session, buffer);
                 case 0x24 -> sendRegistrySnapshot(session);
                 case 0x30 -> handleSaveProject(session, buffer);
                 case 0x31 -> handlePreviewApply(session, buffer);
                 case 0x32 -> handleProjectRequest(session, buffer);
-                case 0x33 -> handleProjectDelete(buffer);
+                case 0x33 -> handleProjectDelete(session, buffer);
                 case 0x34 -> sendProjectList(session);
-                default -> Log.warn("Unknown worldgen packet: 0x" + String.format("%02X", packetId));
+                case 0x3A -> sendJobSnapshot(session);
+                default -> {
+                    Log.warn("Unknown worldgen packet: 0x" + String.format("%02X", packetId));
+                    sendStatus(session, "", "error", "UnknownWorldGenPacket");
+                }
             }
         } catch (Exception e) {
             Log.error("Error handling worldgen packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
@@ -120,19 +132,28 @@ public class WorldGenModule implements Module {
     }
 
     private void handleSaveProject(Session session, ByteBuffer buffer) {
-        WorldGenProject project = WorldGenSerializer.deserializeProject(readJson(buffer));
-        if (project != null) {
-            if (project.getId() == null || project.getId().isBlank()) {
-                project.setId(UUID.randomUUID().toString());
+        JobRecord<String> job = beginJob(session, "saveWorldGenProject", "");
+        try {
+            WorldGenProject project = WorldGenSerializer.deserializeProject(readJson(buffer));
+            if (project != null) {
+                if (project.getId() == null || project.getId().isBlank()) {
+                    project.setId(UUID.randomUUID().toString());
+                }
+                project.rebuildIndices();
+                WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project);
+                sendJsonPacket(session, (byte) 0x38, gson.toJson(diagnostics));
+                if (!diagnostics.isSuccess()) {
+                    throw new IllegalArgumentException("WorldGen Compile Failed");
+                }
+                projectStorage.saveProject(project);
+                sendJsonPacket(session, (byte) 0x37, project.getId());
+                succeedJob(job, project.getId(), "Saved");
+            } else {
+                throw new IllegalArgumentException("Invalid WorldGen Project");
             }
-            project.rebuildIndices();
-            WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(project);
-            sendJsonPacket(session, (byte) 0x38, gson.toJson(diagnostics));
-            if (!diagnostics.isSuccess()) {
-                throw new IllegalArgumentException("WorldGen Compile Failed");
-            }
-            projectStorage.saveProject(project);
-            sendJsonPacket(session, (byte) 0x37, project.getId());
+        } catch (Exception exception) {
+            failJob(job, exception.getMessage(), exception);
+            throw exception;
         }
     }
 
@@ -146,8 +167,16 @@ public class WorldGenModule implements Module {
         }
     }
 
-    private void handleProjectDelete(ByteBuffer buffer) {
-        projectStorage.deleteProject(readJson(buffer));
+    private void handleProjectDelete(Session session, ByteBuffer buffer) {
+        String projectId = readJson(buffer);
+        JobRecord<String> job = beginJob(session, "deleteWorldGenProject", projectId);
+        try {
+            projectStorage.deleteProject(projectId);
+            succeedJob(job, projectId, "Deleted");
+        } catch (Exception exception) {
+            failJob(job, exception.getMessage(), exception);
+            throw exception;
+        }
     }
 
     private void sendProjectList(Session session) {
@@ -213,7 +242,7 @@ public class WorldGenModule implements Module {
         return "Ready " + elapsed + "ms · Datapack " + preview.datapackBuild().getFileCount() + " Files" + suffix;
     }
 
-    private void handlePreviewStop(ByteBuffer buffer) {
+    private void handlePreviewStop(Session session, ByteBuffer buffer) {
         PreviewStopRequest request = gson.fromJson(readJson(buffer), PreviewStopRequest.class);
         previewManager.stopPreview(request.previewId(), null, throwable -> Log.error("Error stopping worldgen preview: " + throwable.getMessage()));
     }
@@ -222,21 +251,60 @@ public class WorldGenModule implements Module {
         sendJsonPacket(session, (byte) 0x25, gson.toJson(Map.of(
             "nodes", WorldGenNodeRegistry.getInstance().getAllDefinitions(),
             "capabilities", Map.of(
-                "backend", "datapack",
-                "legacyBackend", "bukkit",
+                "backend", "bukkit",
+                "datapackBackend", "compile_only",
                 "datapackBiomes", true,
                 "datapackFeatures", false,
                 "datapackStructures", false,
                 "datapackSpawns", true,
                 "liveDatapackActivation", false,
                 "previewDatapackCompile", true,
-                "minecraftVersion", org.bukkit.Bukkit.getMinecraftVersion()
+                "minecraftVersion", Bukkit.getMinecraftVersion()
             )
         )));
     }
 
     private void sendStatus(Session session, String previewId, String status, String message) {
         sendJsonPacket(session, (byte) 0x23, gson.toJson(Map.of("previewId", previewId == null ? "" : previewId, "status", status == null ? "error" : status, "message", message == null ? "" : message)));
+    }
+
+    private JobRecord<String> beginJob(Session session, String action, String target) {
+        JobRecord<String> job = jobManager.create(action, session != null ? session.getClientId() : "unknown", target == null ? "" : target);
+        sendJob(session, "jobAccepted", job.snapshot());
+        job.markRunning();
+        jobManager.publish(job);
+        return job;
+    }
+
+    private void succeedJob(JobRecord<String> job, String result, String message) {
+        if (job != null && job.markSucceeded(result, message == null || message.isBlank() ? "Succeeded" : message)) {
+            jobManager.publish(job);
+        }
+    }
+
+    private void failJob(JobRecord<String> job, String message, Throwable throwable) {
+        if (job != null && job.markFailed(message == null || message.isBlank() ? "Failed" : message, throwable)) {
+            jobManager.publish(job);
+        }
+    }
+
+    private void broadcastJob(String action, Object data) {
+        for (Session session : subscribedSessions) {
+            sendJob(session, action, data);
+        }
+    }
+
+    private void sendJob(Session session, String action, Object data) {
+        sendJsonPacket(session, (byte) 0x39, gson.toJson(Map.of(
+            "type", "job",
+            "action", action == null ? "jobStatus" : action,
+            "data", data == null ? Map.of() : data,
+            "timestamp", System.currentTimeMillis()
+        )));
+    }
+
+    private void sendJobSnapshot(Session session) {
+        sendJob(session, "jobSnapshot", jobManager.activeOrRecentSnapshot(session != null ? session.getClientId() : "unknown", 300000));
     }
 
     private World.Environment parseEnvironment(String value) {

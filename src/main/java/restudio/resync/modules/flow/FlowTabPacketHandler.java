@@ -6,6 +6,7 @@ import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
+import restudio.resync.jobs.JobRecord;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -51,9 +52,11 @@ public class FlowTabPacketHandler {
         byte[] jsonBytes = new byte[buffer.remaining()];
         buffer.get(jsonBytes);
         String json = new String(jsonBytes, StandardCharsets.UTF_8);
+        JobRecord<String> job = sender.beginJob(session, "saveTab", "");
         try {
             TabDefinition tab = FlowSerializer.deserializeTab(json);
             if (tab == null || tab.getId() == null || tab.getId().isBlank()) {
+                sender.failJob(job, "Tab ID is missing", null);
                 sender.sendError(session, "INVALID_TAB", "Tab ID is missing");
                 return;
             }
@@ -61,7 +64,9 @@ public class FlowTabPacketHandler {
             TabListService.refreshActiveTabs(storage, tab.getId());
             Log.fine("Tab saved: " + tab.getId());
             sender.sendTabSaveAck(session, tab.getId());
+            sender.succeedJob(job, tab.getId(), "Saved");
         } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "SAVE_FAILED", "Failed to save tab: " + e.getMessage());
         }
     }
@@ -73,13 +78,20 @@ public class FlowTabPacketHandler {
         byte[] idBytes = new byte[buffer.remaining()];
         buffer.get(idBytes);
         String tabId = new String(idBytes, StandardCharsets.UTF_8);
-        storage.deleteTab(tabId);
-        TabListService.clearActiveTabReferences(tabId, true);
-        String defaultId = storage.getDefaultTabId();
-        if (defaultId != null && defaultId.equalsIgnoreCase(tabId)) {
-            storage.clearDefaultTab();
+        JobRecord<String> job = sender.beginJob(session, "deleteTab", tabId);
+        try {
+            storage.deleteTab(tabId);
+            TabListService.clearActiveTabReferences(tabId, true);
+            String defaultId = storage.getDefaultTabId();
+            if (defaultId != null && defaultId.equalsIgnoreCase(tabId)) {
+                storage.clearDefaultTab();
+            }
+            Log.fine("Tab deleted: " + tabId);
+            sender.succeedJob(job, tabId, "Deleted");
+        } catch (Exception e) {
+            sender.failJob(job, e.getMessage(), e);
+            sender.sendError(session, "DELETE_FAILED", "Failed to delete tab: " + e.getMessage());
         }
-        Log.fine("Tab deleted: " + tabId);
     }
 
     public void handleListRequest(Session session) {

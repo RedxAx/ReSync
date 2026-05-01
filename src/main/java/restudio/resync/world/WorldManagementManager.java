@@ -47,14 +47,17 @@ import org.bukkit.util.Vector;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.player.PlayerTrackingService;
+import restudio.resync.storage.AsyncStorageExecutor;
 import restudio.resync.worldgen.WorldGenProjectStorage;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
 import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
 import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
+import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.TerrainPipeline;
+import restudio.resync.worldgen.pipeline.TerrainPipelineHolder;
 import restudio.resync.worldgen.runtime.WorldGenRuntimeRegistry;
 
 import java.nio.file.Files;
@@ -84,6 +87,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private final ReSync plugin;
     private final PlayerTrackingService trackingService;
     private final WorldStateStorage storage;
+    private final AsyncStorageExecutor storageExecutor = new AsyncStorageExecutor();
     private final WorldGenProjectStorage worldGenProjectStorage;
     private final WorldGenDatapackCompiler worldGenDatapackCompiler;
     private final WorldGenDatapackInstaller worldGenDatapackInstaller;
@@ -423,6 +427,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
                 lockTask = null;
             }
             persistAll();
+            storageExecutor.shutdown();
             return null;
         });
     }
@@ -437,7 +442,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         WorldRegistryEntry entry = getOrCreateEntry(world.getName());
         syncEntryFromWorld(entry, world);
         applyEntryState(entry, world);
-        persistWorlds();
+        persistWorldsAsync();
         publishMessage(WorldChannelMessage.event("worldLoaded", buildWorldStatePayload(entry)));
         publishSnapshotEvent();
     }
@@ -448,7 +453,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         WorldRegistryEntry entry = getOrCreateEntry(worldName);
         entry.setLoaded(false);
         entry.setUpdatedAt(System.currentTimeMillis());
-        persistWorlds();
+        persistWorldsAsync();
         publishMessage(WorldChannelMessage.event("worldUnloaded", buildWorldStatePayload(entry)));
         publishSnapshotEvent();
     }
@@ -465,8 +470,8 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        captureState(player, stateKey(player.getWorld().getName()));
-        persistPlayerStates();
+        captureWorldState(player, player.getWorld().getName());
+        persistPlayerStatesAsync();
         portalCooldowns.remove(player.getUniqueId());
         facetUpdates.remove(player.getUniqueId());
         if (trackingService != null) {
@@ -727,8 +732,12 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             creator.seed(parsedSeed);
         }
         compileWorldGenDatapack(generator, generatorConfig, normalizedName);
-        ChunkGenerator chunkGenerator = createGenerator(generator, generatorConfig);
-        if (chunkGenerator != null) {
+        TerrainPipelineHolder worldGenPipeline = createWorldGenPipeline(generator, generatorConfig);
+        ChunkGenerator chunkGenerator = worldGenPipeline != null ? new NodeGraphChunkGenerator(worldGenPipeline) : createGenerator(generator, generatorConfig);
+        if (worldGenPipeline != null) {
+            creator.generator(chunkGenerator);
+            creator.biomeProvider(new NodeGraphBiomeProvider(worldGenPipeline));
+        } else if (chunkGenerator != null) {
             creator.generator(chunkGenerator);
         } else if (generator != null && !generator.isBlank()) {
             creator.generator(generator);
@@ -737,8 +746,10 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (world == null) {
             return WorldOperationResult.failure("createWorld", normalizedName, "WorldCreationFailed");
         }
-        if (chunkGenerator instanceof NodeGraphChunkGenerator nodeGraphChunkGenerator) {
-            WorldGenRuntimeRegistry.register(world, nodeGraphChunkGenerator.getPipeline());
+        if (worldGenPipeline != null) {
+            WorldGenRuntimeRegistry.register(world, worldGenPipeline);
+        } else if (chunkGenerator instanceof NodeGraphChunkGenerator nodeGraphChunkGenerator) {
+            WorldGenRuntimeRegistry.register(world, nodeGraphChunkGenerator.getPipelineHolder());
         }
         WorldRegistryEntry entry = getOrCreateEntry(world.getName());
         syncEntryFromWorld(entry, world);
@@ -1614,35 +1625,19 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     }
 
     private void handleWorldTransition(Player player, String fromWorld, String targetWorld) {
-        String sourceKey = stateKey(fromWorld);
-        String targetKey = stateKey(targetWorld);
-        if (sourceKey == null || targetKey == null) {
+        if (player == null || targetWorld == null || targetWorld.isBlank()) {
             return;
         }
-        captureState(player, sourceKey);
-        if (!sourceKey.equals(targetKey)) {
-            Map<String, WorldPlayerState> states = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
-            WorldPlayerState applyState = states.get(targetKey);
-            if (applyState == null) {
-                WorldPlayerState source = states.get(sourceKey);
-                if (source != null) {
-                    WorldPlayerState copy = source.copy();
-                    copy.setWorldName(targetKey);
-                    copy.setUpdatedAt(System.currentTimeMillis());
-                    states.put(targetKey, copy);
-                    applyState = copy;
-                }
-            }
-            if (applyState != null) {
-                WorldPlayerStateCodec.apply(player, applyState);
-            }
+        captureWorldState(player, fromWorld);
+        if (fromWorld == null || !fromWorld.equalsIgnoreCase(targetWorld)) {
+            WorldPlayerState applyState = stateForWorld(player, targetWorld);
+            WorldPlayerStateCodec.apply(player, applyState);
         }
         persistPlayerStates();
     }
 
     private void initializePlayerState(Player player, String worldName) {
-        String key = stateKey(worldName);
-        if (key == null) {
+        if (player == null || worldName == null || worldName.isBlank()) {
             return;
         }
         Map<String, WorldPlayerState> states = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
@@ -1651,15 +1646,15 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             globalState = WorldPlayerStateCodec.capture(player, GLOBAL_STATE_KEY);
             states.put(GLOBAL_STATE_KEY, globalState);
         }
-        WorldPlayerState targetState = states.get(key);
-        if (targetState == null) {
-            targetState = key.equals(GLOBAL_STATE_KEY) ? globalState.copy() : globalState.copy();
+        String key = worldStateKey(worldName);
+        if (!states.containsKey(key)) {
+            WorldPlayerState targetState = globalState.copy();
             targetState.setWorldName(key);
             targetState.setUpdatedAt(System.currentTimeMillis());
             states.put(key, targetState);
         }
-        if (!GLOBAL_STATE_KEY.equals(key)) {
-            WorldPlayerStateCodec.apply(player, targetState);
+        if (!GLOBAL_STATE_KEY.equals(stateKey(worldName))) {
+            WorldPlayerStateCodec.apply(player, stateForWorld(player, worldName));
         }
         persistPlayerStates();
     }
@@ -1715,6 +1710,91 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         }
         Map<String, WorldPlayerState> perWorld = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
         perWorld.put(stateKey, WorldPlayerStateCodec.capture(player, stateKey));
+    }
+
+    private void captureWorldState(Player player, String worldName) {
+        if (player == null) {
+            return;
+        }
+        String key = worldStateKey(worldName);
+        Map<String, WorldPlayerState> perWorld = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
+        WorldPlayerState captured = WorldPlayerStateCodec.capture(player, key);
+        perWorld.put(key, captured);
+        WorldInventoryGroup group = inventoryGroupForWorld(worldName);
+        if (group != null) {
+            String groupStateKey = "group:" + group.getGroupId();
+            WorldPlayerState groupState = perWorld.getOrDefault(groupStateKey, captured.copy());
+            mergeSharedState(groupState, captured, group);
+            groupState.setWorldName(groupStateKey);
+            groupState.setUpdatedAt(System.currentTimeMillis());
+            perWorld.put(groupStateKey, groupState);
+        }
+    }
+
+    private WorldPlayerState stateForWorld(Player player, String worldName) {
+        Map<String, WorldPlayerState> perWorld = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
+        String key = worldStateKey(worldName);
+        WorldPlayerState state = perWorld.get(key);
+        if (state == null) {
+            WorldPlayerState fallback = perWorld.getOrDefault(GLOBAL_STATE_KEY, WorldPlayerStateCodec.capture(player, GLOBAL_STATE_KEY));
+            state = fallback.copy();
+            state.setWorldName(key);
+            state.setUpdatedAt(System.currentTimeMillis());
+            perWorld.put(key, state);
+        } else {
+            state = state.copy();
+        }
+        WorldInventoryGroup group = inventoryGroupForWorld(worldName);
+        if (group != null) {
+            WorldPlayerState groupState = perWorld.get("group:" + group.getGroupId());
+            if (groupState != null) {
+                mergeSharedState(state, groupState, group);
+            }
+        }
+        return state;
+    }
+
+    private void mergeSharedState(WorldPlayerState target, WorldPlayerState source, WorldInventoryGroup group) {
+        if (target == null || source == null || group == null) {
+            return;
+        }
+        if (group.isShareInventory()) {
+            target.setInventory(source.getInventory());
+        }
+        if (group.isShareArmor()) {
+            target.setArmor(source.getArmor());
+        }
+        if (group.isShareOffhand()) {
+            target.setOffhand(source.getOffhand());
+        }
+        if (group.isShareEnderChest()) {
+            target.setEnderChest(source.getEnderChest());
+        }
+        if (group.isShareHealth()) {
+            target.setHealth(source.getHealth());
+            target.setFoodLevel(source.getFoodLevel());
+            target.setSaturation(source.getSaturation());
+            target.setExhaustion(source.getExhaustion());
+        }
+        if (group.isShareExperience()) {
+            target.setExpProgress(source.getExpProgress());
+            target.setExpLevel(source.getExpLevel());
+            target.setTotalExp(source.getTotalExp());
+        }
+        if (group.isShareGameMode()) {
+            target.setGameMode(source.getGameMode());
+        }
+    }
+
+    private String worldStateKey(String worldName) {
+        if (worldName == null || worldName.isBlank()) {
+            return GLOBAL_STATE_KEY;
+        }
+        WorldRegistryEntry entry = worlds.get(worldKey(worldName));
+        if (entry != null && entry.isIsolatedPlayerState()) {
+            return worldName;
+        }
+        return worldName;
     }
 
     private String stateKey(String worldName) {
@@ -1972,15 +2052,23 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     private ChunkGenerator createGenerator(String generator, String generatorConfig) {
         if ("worldgen_project".equalsIgnoreCase(generator) || "WORLDGEN_PROJECT".equalsIgnoreCase(generator)) {
-            WorldGenProject project = worldGenProjectStorage.getProject(generatorConfig);
-            if (project == null) {
-                throw new IllegalArgumentException("WorldGen Project Missing");
-            }
-            TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
-            return new NodeGraphChunkGenerator(pipeline);
+            TerrainPipelineHolder pipeline = createWorldGenPipeline(generator, generatorConfig);
+            return pipeline == null ? null : new NodeGraphChunkGenerator(pipeline);
         }
         ChunkGenerator builtIn = ReSyncBuiltInGenerators.createGenerator(generator, generatorConfig);
         return builtIn;
+    }
+
+    private TerrainPipelineHolder createWorldGenPipeline(String generator, String generatorConfig) {
+        if (!"worldgen_project".equalsIgnoreCase(generator) && !"WORLDGEN_PROJECT".equalsIgnoreCase(generator)) {
+            return null;
+        }
+        WorldGenProject project = worldGenProjectStorage.getProject(generatorConfig);
+        if (project == null) {
+            throw new IllegalArgumentException("WorldGen Project Missing");
+        }
+        TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
+        return new TerrainPipelineHolder(pipeline);
     }
 
     private WorldGenDatapackBuild compileWorldGenDatapack(String generator, String generatorConfig, String worldName) {
@@ -2753,6 +2841,15 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         storage.saveWorlds(entries);
     }
 
+    private void persistWorldsAsync() {
+        List<WorldRegistryEntry> entries = new ArrayList<>();
+        for (WorldRegistryEntry entry : worlds.values()) {
+            entries.add(entry.copy());
+        }
+        entries.sort(Comparator.comparing(WorldRegistryEntry::getWorldName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
+        storageExecutor.submit(() -> storage.saveWorlds(entries));
+    }
+
     private void persistPortals() {
         List<WorldPortal> entries = new ArrayList<>();
         for (WorldPortal portal : portals.values()) {
@@ -2798,6 +2895,22 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             copy.put(entry.getKey(), states);
         }
         storage.savePlayerStates(copy);
+    }
+
+    private void persistPlayerStatesAsync() {
+        Map<UUID, Map<String, WorldPlayerState>> copy = new LinkedHashMap<>();
+        for (Map.Entry<UUID, Map<String, WorldPlayerState>> entry : playerStates.entrySet()) {
+            Map<String, WorldPlayerState> states = new LinkedHashMap<>();
+            if (entry.getValue() != null) {
+                for (Map.Entry<String, WorldPlayerState> stateEntry : entry.getValue().entrySet()) {
+                    if (stateEntry.getValue() != null) {
+                        states.put(stateEntry.getKey(), stateEntry.getValue().copy());
+                    }
+                }
+            }
+            copy.put(entry.getKey(), states);
+        }
+        storageExecutor.submit(() -> storage.savePlayerStates(copy));
     }
 
     private void persistAll() {

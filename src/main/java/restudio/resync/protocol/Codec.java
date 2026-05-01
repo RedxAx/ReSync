@@ -8,14 +8,25 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Codec {
+    public static final int DEFAULT_MAX_ENCODED_FRAME_BYTES = 1_048_576;
+    public static final int DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES = 4_194_304;
     private final CompressionPool compressionPool;
     private final Map<Byte, Class<? extends Message>> messageTypes;
-    private int sequenceCounter = 0;
+    private final AtomicInteger sequenceCounter = new AtomicInteger();
+    private final int maxEncodedFrameBytes;
+    private final int maxDecompressedPayloadBytes;
 
     public Codec(CompressionPool compressionPool) {
+        this(compressionPool, DEFAULT_MAX_ENCODED_FRAME_BYTES, DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES);
+    }
+
+    public Codec(CompressionPool compressionPool, int maxEncodedFrameBytes, int maxDecompressedPayloadBytes) {
         this.compressionPool = compressionPool;
+        this.maxEncodedFrameBytes = Math.max(12, maxEncodedFrameBytes);
+        this.maxDecompressedPayloadBytes = Math.max(1, maxDecompressedPayloadBytes);
         this.messageTypes = new HashMap<>();
 
         messageTypes.put((byte) 0x00, HandshakeRequest.class);
@@ -47,10 +58,13 @@ public class Codec {
         header.setHasAck(false);
         header.setMessageType(message.getType());
         header.setChannel(channel);
-        header.setSequence(sequenceCounter++);
+        header.setSequence(sequenceCounter.getAndIncrement());
         header.setPayloadLength(payload.length);
 
         byte[] headerBytes = header.toBytes();
+        if (headerBytes.length + payload.length > maxEncodedFrameBytes) {
+            throw new IllegalArgumentException("Encoded frame too large");
+        }
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(headerBytes.length + payload.length);
         baos.writeBytes(headerBytes);
@@ -63,11 +77,20 @@ public class Codec {
         if (data.length < 12) {
             throw new IllegalArgumentException("Frame too short");
         }
+        if (data.length > maxEncodedFrameBytes) {
+            throw new IllegalArgumentException("Frame too large");
+        }
 
         FrameHeader header = new FrameHeader(data);
+        if (header.getPayloadLength() < 0) {
+            throw new IllegalArgumentException("Negative payload length");
+        }
+        if (header.getPayloadLength() > maxEncodedFrameBytes - 12) {
+            throw new IllegalArgumentException("Payload too large");
+        }
         byte[] payload = new byte[header.getPayloadLength()];
 
-        if (data.length < 12 + header.getPayloadLength()) {
+        if (header.getPayloadLength() > data.length - 12) {
             throw new IllegalArgumentException("Incomplete frame");
         }
 
@@ -75,6 +98,11 @@ public class Codec {
 
         if (header.isCompressed()) {
             payload = compressionPool.decompress(payload);
+            if (payload.length > maxDecompressedPayloadBytes) {
+                throw new IllegalArgumentException("Decompressed payload too large");
+            }
+        } else if (payload.length > maxDecompressedPayloadBytes) {
+            throw new IllegalArgumentException("Payload too large");
         }
 
         return new Frame(header, payload);
@@ -105,11 +133,11 @@ public class Codec {
     }
 
     public int getNextSequence() {
-        return sequenceCounter;
+        return sequenceCounter.get();
     }
 
     public void resetSequence() {
-        sequenceCounter = 0;
+        sequenceCounter.set(0);
     }
 
     public static class Frame {

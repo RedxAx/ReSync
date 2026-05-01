@@ -8,12 +8,14 @@ import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 
 import restudio.resync.Log;
+import restudio.resync.storage.StorageSafety;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,195 +68,243 @@ public class FlowStorage {
     }
 
     public FlowGraph getGraph(String id) {
-        FlowGraph cached = graphCache.get(id);
+        String safeId = safeId(id, "load flow");
+        if (safeId == null) {
+            return null;
+        }
+        FlowGraph cached = graphCache.get(safeId);
         if (cached != null) {
             return cached;
         }
         
-        File file = new File(flowDir, id + ".json");
-        if (file.exists()) {
+        Path file = jsonFile(flowDir, safeId, "load flow");
+        if (file != null && Files.exists(file)) {
             try {
-                String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                String json = StorageSafety.readUtf8(file);
                 FlowGraph graph = FlowSerializer.deserialize(json);
-                graphCache.put(id, graph);
+                graphCache.put(safeId, graph);
                 return graph;
             } catch (IOException e) {
-                Log.warn("Failed to load flow: " + id + " - " + e.getMessage());
+                Log.warn("Failed to load flow: " + safeId + " - " + e.getMessage());
             }
         }
         return null;
     }
 
     public void saveGraph(FlowGraph graph) {
-        graphCache.put(graph.getId(), graph);
-        File file = new File(flowDir, graph.getId() + ".json");
+        String safeId = graph != null ? safeId(graph.getId(), "save flow") : null;
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid flow id");
+        }
+        Path file = jsonFile(flowDir, safeId, "save flow");
+        if (file == null) {
+            throw new IllegalStateException("Failed to resolve flow file");
+        }
         try {
             String json = FlowSerializer.serialize(graph);
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(file, json);
+            graphCache.put(safeId, graph);
         } catch (IOException e) {
-            Log.warn("Failed to save flow: " + graph.getId() + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to save flow: " + safeId, e);
         }
     }
 
     public void deleteGraph(String id) {
-        if (id == null) {
-            return;
+        String safeId = safeId(id, "delete flow");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid flow id");
         }
         try {
-            graphCache.remove(id);
-            File file = new File(flowDir, id + ".json");
-            if (file.exists()) {
-                Files.delete(file.toPath());
+            Path file = jsonFile(flowDir, safeId, "delete flow");
+            if (file != null) {
+                StorageSafety.deleteIfExists(file);
             }
+            graphCache.remove(safeId);
         } catch (IOException e) {
-            Log.warn("Failed to delete flow: " + id + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to delete flow: " + safeId, e);
         }
     }
 
     public GuiDefinition getGui(String id) {
-        GuiDefinition cached = guiCache.get(id);
+        String safeId = safeId(id, "load GUI");
+        if (safeId == null) {
+            return null;
+        }
+        GuiDefinition cached = guiCache.get(safeId);
         if (cached != null) {
             return cached;
         }
         
-        File file = new File(guiDir, id + ".json");
-        if (file.exists()) {
+        Path file = jsonFile(guiDir, safeId, "load GUI");
+        if (file != null && Files.exists(file)) {
             try {
-                String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                String json = StorageSafety.readUtf8(file);
                 GuiDefinition gui = FlowSerializer.deserializeGui(json);
                 if (gui != null && (gui.getId() == null || gui.getId().isBlank())) {
-                    gui.setId(id);
+                    gui.setId(safeId);
                 }
-                guiCache.put(id, gui);
+                guiCache.put(safeId, gui);
                 return gui;
             } catch (IOException e) {
-                Log.warn("Failed to load GUI: " + id + " - " + e.getMessage());
+                Log.warn("Failed to load GUI: " + safeId + " - " + e.getMessage());
             }
         }
         return null;
     }
 
     public void saveGui(GuiDefinition gui) {
-        guiCache.put(gui.getId(), gui);
-        File file = new File(guiDir, gui.getId() + ".json");
+        String safeId = gui != null ? safeId(gui.getId(), "save GUI") : null;
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid GUI id");
+        }
+        Path file = jsonFile(guiDir, safeId, "save GUI");
+        if (file == null) {
+            throw new IllegalStateException("Failed to resolve GUI file");
+        }
         try {
             String json = FlowSerializer.serializeGui(gui);
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(file, json);
+            guiCache.put(safeId, gui);
         } catch (IOException e) {
-            Log.warn("Failed to save GUI: " + gui.getId() + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to save GUI: " + safeId, e);
         }
     }
 
     public void deleteGui(String id) {
-        if (id == null) {
-            return;
+        String safeId = safeId(id, "delete GUI");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid GUI id");
         }
         try {
-            guiCache.remove(id);
-            File file = new File(guiDir, id + ".json");
-            if (file.exists()) {
-                Files.delete(file.toPath());
+            Path file = jsonFile(guiDir, safeId, "delete GUI");
+            if (file != null) {
+                StorageSafety.deleteIfExists(file);
             }
+            guiCache.remove(safeId);
         } catch (IOException e) {
-            Log.warn("Failed to delete GUI: " + id + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to delete GUI: " + safeId, e);
         }
     }
 
     public ScoreboardDefinition getScoreboard(String id) {
-        ScoreboardDefinition cached = scoreboardCache.get(id);
+        String safeId = safeId(id, "load scoreboard");
+        if (safeId == null) {
+            return null;
+        }
+        ScoreboardDefinition cached = scoreboardCache.get(safeId);
         if (cached != null) {
             return cached;
         }
 
-        File file = new File(scoreboardDir, id + ".json");
-        if (file.exists()) {
+        Path file = jsonFile(scoreboardDir, safeId, "load scoreboard");
+        if (file != null && Files.exists(file)) {
             try {
-                String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                String json = StorageSafety.readUtf8(file);
                 ScoreboardDefinition scoreboard = FlowSerializer.deserializeScoreboard(json);
                 if (scoreboard != null && (scoreboard.getId() == null || scoreboard.getId().isBlank())) {
-                    scoreboard.setId(id);
+                    scoreboard.setId(safeId);
                 }
-                scoreboardCache.put(id, scoreboard);
+                scoreboardCache.put(safeId, scoreboard);
                 return scoreboard;
             } catch (IOException e) {
-                Log.warn("Failed to load scoreboard: " + id + " - " + e.getMessage());
+                Log.warn("Failed to load scoreboard: " + safeId + " - " + e.getMessage());
             }
         }
         return null;
     }
 
     public void saveScoreboard(ScoreboardDefinition scoreboard) {
-        scoreboardCache.put(scoreboard.getId(), scoreboard);
-        File file = new File(scoreboardDir, scoreboard.getId() + ".json");
+        String safeId = scoreboard != null ? safeId(scoreboard.getId(), "save scoreboard") : null;
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid scoreboard id");
+        }
+        Path file = jsonFile(scoreboardDir, safeId, "save scoreboard");
+        if (file == null) {
+            throw new IllegalStateException("Failed to resolve scoreboard file");
+        }
         try {
             String json = FlowSerializer.serializeScoreboard(scoreboard);
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(file, json);
+            scoreboardCache.put(safeId, scoreboard);
         } catch (IOException e) {
-            Log.warn("Failed to save scoreboard: " + scoreboard.getId() + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to save scoreboard: " + safeId, e);
         }
     }
 
     public void deleteScoreboard(String id) {
-        if (id == null) {
-            return;
+        String safeId = safeId(id, "delete scoreboard");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid scoreboard id");
         }
         try {
-            scoreboardCache.remove(id);
-            File file = new File(scoreboardDir, id + ".json");
-            if (file.exists()) {
-                Files.delete(file.toPath());
+            Path file = jsonFile(scoreboardDir, safeId, "delete scoreboard");
+            if (file != null) {
+                StorageSafety.deleteIfExists(file);
             }
+            scoreboardCache.remove(safeId);
         } catch (IOException e) {
-            Log.warn("Failed to delete scoreboard: " + id + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to delete scoreboard: " + safeId, e);
         }
     }
 
     public TabDefinition getTab(String id) {
-        TabDefinition cached = tabCache.get(id);
+        String safeId = safeId(id, "load tab");
+        if (safeId == null) {
+            return null;
+        }
+        TabDefinition cached = tabCache.get(safeId);
         if (cached != null) {
             return cached;
         }
 
-        File file = new File(tabDir, id + ".json");
-        if (file.exists()) {
+        Path file = jsonFile(tabDir, safeId, "load tab");
+        if (file != null && Files.exists(file)) {
             try {
-                String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+                String json = StorageSafety.readUtf8(file);
                 TabDefinition tab = FlowSerializer.deserializeTab(json);
                 if (tab != null && (tab.getId() == null || tab.getId().isBlank())) {
-                    tab.setId(id);
+                    tab.setId(safeId);
                 }
-                tabCache.put(id, tab);
+                tabCache.put(safeId, tab);
                 return tab;
             } catch (IOException e) {
-                Log.warn("Failed to load tab: " + id + " - " + e.getMessage());
+                Log.warn("Failed to load tab: " + safeId + " - " + e.getMessage());
             }
         }
         return null;
     }
 
     public void saveTab(TabDefinition tab) {
-        tabCache.put(tab.getId(), tab);
-        File file = new File(tabDir, tab.getId() + ".json");
+        String safeId = tab != null ? safeId(tab.getId(), "save tab") : null;
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid tab id");
+        }
+        Path file = jsonFile(tabDir, safeId, "save tab");
+        if (file == null) {
+            throw new IllegalStateException("Failed to resolve tab file");
+        }
         try {
             String json = FlowSerializer.serializeTab(tab);
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+            StorageSafety.writeUtf8Atomic(file, json);
+            tabCache.put(safeId, tab);
         } catch (IOException e) {
-            Log.warn("Failed to save tab: " + tab.getId() + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to save tab: " + safeId, e);
         }
     }
 
     public void deleteTab(String id) {
-        if (id == null) {
-            return;
+        String safeId = safeId(id, "delete tab");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid tab id");
         }
         try {
-            tabCache.remove(id);
-            File file = new File(tabDir, id + ".json");
-            if (file.exists()) {
-                Files.delete(file.toPath());
+            Path file = jsonFile(tabDir, safeId, "delete tab");
+            if (file != null) {
+                StorageSafety.deleteIfExists(file);
             }
+            tabCache.remove(safeId);
         } catch (IOException e) {
-            Log.warn("Failed to delete tab: " + id + " - " + e.getMessage());
+            throw new IllegalStateException("Failed to delete tab: " + safeId, e);
         }
     }
 
@@ -263,50 +313,29 @@ public class FlowStorage {
     }
 
     public List<String> listFlowIds() {
-        List<String> flowIds = new ArrayList<>();
-        File[] files = flowDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files == null) {
-            return flowIds;
-        }
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                flowIds.add(name.substring(0, name.length() - 5));
-            }
-        }
-        return flowIds;
+        return listSafeIds(flowDir);
     }
 
     public boolean hasStoredGraphVersion(String id) {
-        if (id == null) {
+        String safeId = safeId(id, "inspect flow version");
+        if (safeId == null) {
             return false;
         }
-        File file = new File(flowDir, id + ".json");
-        if (!file.exists()) {
+        Path file = jsonFile(flowDir, safeId, "inspect flow version");
+        if (file == null || !Files.exists(file)) {
             return false;
         }
         try {
-            String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            String json = StorageSafety.readUtf8(file);
             return json.contains("\"version\"");
         } catch (IOException e) {
-            Log.warn("Failed to inspect flow version: " + id + " - " + e.getMessage());
+            Log.warn("Failed to inspect flow version: " + safeId + " - " + e.getMessage());
             return false;
         }
     }
 
     public List<String> listGuiIds() {
-        List<String> guiIds = new ArrayList<>();
-        File[] files = guiDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files == null) {
-            return guiIds;
-        }
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                guiIds.add(name.substring(0, name.length() - 5));
-            }
-        }
-        return guiIds;
+        return listSafeIds(guiDir);
     }
 
     public Map<String, GuiDefinition> getGuiCache() {
@@ -314,18 +343,7 @@ public class FlowStorage {
     }
 
     public List<String> listScoreboardIds() {
-        List<String> scoreboardIds = new ArrayList<>();
-        File[] files = scoreboardDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files == null) {
-            return scoreboardIds;
-        }
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                scoreboardIds.add(name.substring(0, name.length() - 5));
-            }
-        }
-        return scoreboardIds;
+        return listSafeIds(scoreboardDir);
     }
 
     public Map<String, ScoreboardDefinition> getScoreboardCache() {
@@ -333,18 +351,7 @@ public class FlowStorage {
     }
 
     public List<String> listTabIds() {
-        List<String> tabIds = new ArrayList<>();
-        File[] files = tabDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files == null) {
-            return tabIds;
-        }
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                tabIds.add(name.substring(0, name.length() - 5));
-            }
-        }
-        return tabIds;
+        return listSafeIds(tabDir);
     }
 
     public Map<String, TabDefinition> getTabCache() {
@@ -595,5 +602,39 @@ public class FlowStorage {
         } catch (IOException e) {
             Log.warn("Failed to cleanup below-name data: " + e.getMessage());
         }
+    }
+
+    private Path jsonFile(File directory, String id, String action) {
+        try {
+            return StorageSafety.jsonFile(directory.toPath(), id);
+        } catch (IOException | IllegalArgumentException e) {
+            Log.warn("Failed to resolve " + action + ": " + id + " - " + e.getMessage());
+            return null;
+        }
+    }
+
+    private String safeId(String id, String action) {
+        try {
+            return StorageSafety.validateId(id);
+        } catch (IllegalArgumentException e) {
+            Log.warn("Rejected unsafe id during " + action + ": " + id);
+            return null;
+        }
+    }
+
+    private List<String> listSafeIds(File directory) {
+        List<String> ids = new ArrayList<>();
+        File[] files = directory.listFiles((dir, name) -> name.endsWith(".json"));
+        if (files == null) {
+            return ids;
+        }
+        for (File file : files) {
+            String name = file.getName();
+            String id = name.substring(0, name.length() - 5);
+            if (safeId(id, "list") != null) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 }

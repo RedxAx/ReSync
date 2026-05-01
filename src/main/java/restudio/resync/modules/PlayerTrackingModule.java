@@ -18,6 +18,7 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowExecutionListener;
 import restudio.resync.player.PlayerDossier;
 import restudio.resync.player.PlayerSessionLinkService;
+import restudio.resync.player.PlayerTrackingPrivacyPolicy;
 import restudio.resync.player.PlayerTrackingListener;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.player.PlayerTrackingUpdate;
@@ -44,6 +45,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private int channelId;
     private PlayerTrackingService trackingService;
     private PlayerSessionLinkService sessionLinkService;
+    private final PlayerTrackingPrivacyPolicy privacyPolicy = new PlayerTrackingPrivacyPolicy();
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -74,6 +76,10 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
 
     @Override
     public void stop(ModuleContext context) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            trackingService.markOffline(player.getUniqueId(), player.getName(), "shutdown");
+            sessionLinkService.unlinkPlayer(player.getUniqueId());
+        }
         trackingService.removeListener(this);
         FlowExecutor flowExecutor = context.getService(FlowExecutor.class);
         if (flowExecutor != null) {
@@ -162,14 +168,14 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     public void onAsyncPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
         trackingService.recordEvent(player.getUniqueId(), player.getName(), getModuleId(), "chat", "message",
-            Map.of("message", event.getMessage(), "format", event.getFormat()));
+            privacyPolicy.sanitizeChat(event.getMessage(), event.getFormat(), context.getConfig().getPlayerTracking().isCaptureChatText()));
     }
 
     @EventHandler
     public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
         trackingService.recordEvent(player.getUniqueId(), player.getName(), getModuleId(), "command", "execute",
-            Map.of("command", event.getMessage()));
+            privacyPolicy.sanitizeCommand(event.getMessage(), context.getConfig().getPlayerTracking().isCaptureCommandArguments()));
     }
 
     private void handleSubscribeBinding(Session session, String rawData) {
@@ -204,7 +210,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
 
     private void linkSession(Session session, String playerId) {
         UUID uuid = parsePlayerId(playerId);
-        if (uuid != null) {
+        if (uuid != null && uuid.equals(sessionLinkService.getLinkedPlayer(session))) {
             sessionLinkService.link(uuid, session);
         }
     }

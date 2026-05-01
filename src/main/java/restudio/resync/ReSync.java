@@ -38,7 +38,7 @@ public class ReSync extends JavaPlugin {
         interactiveSelectionManager = new InteractiveSelectionManager(this);
         interactiveSelectionManager.start();
 
-        wsServer = new WebSocketServer(new InetSocketAddress(config.getPort())) {
+        wsServer = new WebSocketServer(new InetSocketAddress(config.getBindHost(), config.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
                 server.onOpen(conn, handshake);
@@ -66,13 +66,13 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onStart() {
-                getLogger().info("[ReSync] Server started on port " + getPort());
+                getLogger().info("[ReSync] Server started on " + config.getBindHost() + ":" + getPort());
             }
         };
 
         try {
             wsServer.start();
-            Log.info("[ReSync] Server enabled on port " + config.getPort());
+            Log.info("[ReSync] Server enabled on " + config.getBindHost() + ":" + config.getPort());
         } catch (Exception e) {
             Log.error("[ReSync] Failed to start WebSocket server: " + e.getMessage(), e);
         }

@@ -10,18 +10,22 @@ public class RequestQueue {
     private final PriorityBlockingQueue<QueuedRequest> queue;
     private final ThreadPoolExecutor executor;
     private final AtomicInteger activeRequests;
+    private final AtomicInteger queuedRequests;
     private final int maxGlobalRequests;
     private final int maxClientRequests;
     private final ConcurrentHashMap<String, AtomicInteger> clientRequestCounts;
     private volatile boolean paused;
     private volatile double tpsThreshold;
     private volatile boolean tpsLimited;
+    private Thread queueWorker;
+    private Thread tpsMonitor;
 
     public RequestQueue(int maxGlobalRequests, int maxClientRequests, int threadPoolSize) {
         this.queue = new PriorityBlockingQueue<>();
         this.maxGlobalRequests = maxGlobalRequests;
         this.maxClientRequests = maxClientRequests;
         this.activeRequests = new AtomicInteger(0);
+        this.queuedRequests = new AtomicInteger(0);
         this.clientRequestCounts = new ConcurrentHashMap<>();
         this.paused = false;
         this.tpsThreshold = 18.0;
@@ -42,36 +46,41 @@ public class RequestQueue {
         startTPSMonitor();
     }
 
-    public Request submit(String requestId, String clientId, String channelId, Priority priority, Runnable task) {
+    public synchronized Request submit(String requestId, String clientId, String channelId, Priority priority, Runnable task) {
         if (paused) {
             throw new RejectedExecutionException("Queue is paused");
         }
 
-        AtomicInteger clientCount = clientRequestCounts.computeIfAbsent(clientId, k -> new AtomicInteger(0));
+        String ownerId = clientId == null || clientId.isBlank() ? "unknown" : clientId;
+        AtomicInteger clientCount = clientRequestCounts.computeIfAbsent(ownerId, k -> new AtomicInteger(0));
 
         if (clientCount.get() >= maxClientRequests) {
             throw new RejectedExecutionException("Client request limit exceeded: " + maxClientRequests);
         }
 
-        if (activeRequests.get() >= maxGlobalRequests) {
+        if (activeRequests.get() + queuedRequests.get() >= maxGlobalRequests) {
             throw new RejectedExecutionException("Global request limit exceeded: " + maxGlobalRequests);
         }
 
-        Request request = new Request(requestId, null, channelId, priority, task);
+        Request request = new Request(requestId, ownerId, null, channelId, priority, task);
         QueuedRequest queued = new QueuedRequest(request);
-        queue.put(queued);
-
         clientCount.incrementAndGet();
+        queuedRequests.incrementAndGet();
+        queue.put(queued);
 
         return request;
     }
 
     public void completeRequest(String clientId) {
-        AtomicInteger count = clientRequestCounts.get(clientId);
+        String ownerId = clientId == null || clientId.isBlank() ? "unknown" : clientId;
+        AtomicInteger count = clientRequestCounts.get(ownerId);
         if (count != null) {
-            count.decrementAndGet();
+            int remaining = count.updateAndGet(value -> Math.max(0, value - 1));
+            if (remaining == 0) {
+                clientRequestCounts.remove(ownerId, count);
+            }
         }
-        activeRequests.decrementAndGet();
+        activeRequests.updateAndGet(value -> Math.max(0, value - 1));
     }
 
     public void pause() {
@@ -87,7 +96,7 @@ public class RequestQueue {
     }
 
     public int getQueueSize() {
-        return queue.size();
+        return queuedRequests.get();
     }
 
     public int getActiveRequests() {
@@ -100,7 +109,7 @@ public class RequestQueue {
     }
 
     private void startWorker() {
-        Thread worker = new Thread(() -> {
+        queueWorker = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     if (paused || tpsLimited) {
@@ -110,6 +119,7 @@ public class RequestQueue {
 
                     QueuedRequest queued = queue.poll(100, TimeUnit.MILLISECONDS);
                     if (queued != null) {
+                        queuedRequests.updateAndGet(value -> Math.max(0, value - 1));
                         executeRequest(queued);
                     }
                 } catch (InterruptedException e) {
@@ -118,8 +128,8 @@ public class RequestQueue {
                 }
             }
         }, "ReSync-Queue-Worker");
-        worker.setDaemon(true);
-        worker.start();
+        queueWorker.setDaemon(true);
+        queueWorker.start();
     }
 
     private void executeRequest(QueuedRequest queued) {
@@ -128,23 +138,24 @@ public class RequestQueue {
 
         try {
             activeRequests.incrementAndGet();
+            if (!request.getJob().markRunning()) {
+                return;
+            }
             request.getTask().run();
+            request.getJob().markSucceeded(null, "Succeeded");
         } catch (Exception e) {
             Log.warn("Request execution failed: " + e.getMessage());
+            request.getJob().markFailed("Failed", e);
         } finally {
             long duration = System.currentTimeMillis() - startTime;
             request.setExecutionTime(duration);
 
-            if (request.getSession() != null) {
-                completeRequest(request.getSession().getClientId());
-            } else {
-                activeRequests.decrementAndGet();
-            }
+            completeRequest(request.getClientId());
         }
     }
 
     private void startTPSMonitor() {
-        Thread monitor = new Thread(() -> {
+        tpsMonitor = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     if (Bukkit.getServer() != null) {
@@ -158,8 +169,8 @@ public class RequestQueue {
                 }
             }
         }, "ReSync-TPS-Monitor");
-        monitor.setDaemon(true);
-        monitor.start();
+        tpsMonitor.setDaemon(true);
+        tpsMonitor.start();
     }
 
     public void setTpsThreshold(double threshold) {
@@ -167,13 +178,27 @@ public class RequestQueue {
     }
 
     public void shutdown() {
+        if (queueWorker != null) {
+            queueWorker.interrupt();
+        }
+        if (tpsMonitor != null) {
+            tpsMonitor.interrupt();
+        }
         executor.shutdown();
         try {
+            joinThread(queueWorker);
+            joinThread(tpsMonitor);
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
             }
         } catch (InterruptedException e) {
             executor.shutdownNow();
+        }
+    }
+
+    private void joinThread(Thread thread) throws InterruptedException {
+        if (thread != null) {
+            thread.join(5000);
         }
     }
 

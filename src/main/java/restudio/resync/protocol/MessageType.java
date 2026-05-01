@@ -28,6 +28,6 @@ public enum MessageType {
                 return type;
             }
         }
-        return ERROR;
+        throw new IllegalArgumentException("Unknown message type: " + (value & 0xFF));
     }
 }

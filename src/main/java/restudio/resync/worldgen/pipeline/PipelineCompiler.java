@@ -26,6 +26,7 @@ public class PipelineCompiler {
         try {
             compileProject(project);
             diagnostics.setSuccess(true);
+            addCapabilityWarnings(project, diagnostics);
         } catch (CompilationException exception) {
             diagnostics.setSuccess(false);
             diagnostics.add(stageFromMessage(exception.getMessage()), "error", exception.getMessage());
@@ -35,6 +36,22 @@ public class PipelineCompiler {
         }
         diagnostics.setElapsedMillis(Math.max(1L, (System.nanoTime() - started) / 1_000_000L));
         return diagnostics;
+    }
+
+    private static void addCapabilityWarnings(WorldGenProject project, WorldGenCompileDiagnostics diagnostics) {
+        if (project == null) {
+            return;
+        }
+        if (hasNodes(project.getFeatureGraph())) {
+            diagnostics.add("feature", "warning", "Datapack feature live activation is not supported yet");
+        }
+        if (hasNodes(project.getStructureGraph())) {
+            diagnostics.add("structure", "warning", "Datapack structure live activation is not supported yet");
+        }
+    }
+
+    private static boolean hasNodes(WorldGenGraph graph) {
+        return graph != null && graph.getNodes() != null && !graph.getNodes().isEmpty();
     }
 
     private static String stageFromMessage(String message) {

@@ -5,6 +5,7 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.customcontent.CustomContentStorage;
@@ -60,7 +61,7 @@ public class FlowModule implements Module {
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
-                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage) {
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService) {
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
         this.pluginRegistry = pluginRegistry;
@@ -70,8 +71,8 @@ public class FlowModule implements Module {
         this.scoreboardHandler = new FlowScoreboardPacketHandler(storage, sender);
         this.tabHandler = new FlowTabPacketHandler(storage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
-        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender);
-        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry);
+        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService);
+        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry, customContentService);
         this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
     }
 

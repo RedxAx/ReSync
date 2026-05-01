@@ -10,6 +10,7 @@ import org.bukkit.block.Biome;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.potion.PotionEffectType;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 
 import java.nio.ByteBuffer;
@@ -21,9 +22,11 @@ import java.util.Locale;
 
 public class FlowOptionCatalogPacketHandler {
     private final FlowPacketSender sender;
+    private final CustomContentService customContentService;
 
-    public FlowOptionCatalogPacketHandler(FlowPacketSender sender) {
+    public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
         this.sender = sender;
+        this.customContentService = customContentService;
     }
 
     public void handle(Session session, ByteBuffer buffer) {
@@ -54,6 +57,11 @@ public class FlowOptionCatalogPacketHandler {
             case "potion_effect" -> potionEffects();
             case "sound" -> registryKeys(Registry.SOUNDS);
             case "world" -> Bukkit.getWorlds().stream().map(World::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            case "custom_content_provider" -> customContentService != null ? customContentService.getAvailableProviderIds() : List.of("vanilla");
+            case "custom_content_nexo_item" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "item") : List.of();
+            case "custom_content_nexo_block" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "block") : List.of();
+            case "custom_content_nexo_furniture" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "furniture") : List.of();
+            case "custom_content_nexo_armor" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "armor") : List.of();
             default -> List.of();
         };
     }
@@ -72,6 +80,9 @@ public class FlowOptionCatalogPacketHandler {
         }
         if (value.startsWith("client:minecraft:")) {
             return value.substring("client:minecraft:".length());
+        }
+        if (value.startsWith("server:custom_content:")) {
+            return "custom_content_" + value.substring("server:custom_content:".length());
         }
         return value;
     }

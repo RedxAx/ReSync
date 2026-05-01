@@ -3,6 +3,8 @@ package restudio.resync.worldgen.registry;
 import org.bukkit.TreeType;
 import org.bukkit.block.Biome;
 import org.bukkit.entity.EntityType;
+import restudio.resync.ReSync;
+import restudio.resync.structure.StructureLibrary;
 import restudio.flow.data.FlowDataType;
 
 import java.util.Arrays;
@@ -86,10 +88,10 @@ public final class WorldGenNodeDefinitions {
         registry.register(WorldGenNodeDefinition.builder("biome_filter", "Biome Filter").input("biome", FlowDataType.BIOME, "minecraft:plains", "dropdown").output("mask", FlowDataType.BOOLEAN).build());
         registry.register(WorldGenNodeDefinition.builder("height_filter", "Height Filter").input("min", FlowDataType.FLOAT, 0f, "number").input("max", FlowDataType.FLOAT, 320f, "number").output("mask", FlowDataType.BOOLEAN).build());
         registry.register(WorldGenNodeDefinition.builder("chance_filter", "Chance Filter").input("chance", FlowDataType.FLOAT, 0.5f, "number").input("salt", FlowDataType.SEED, 0, "number").output("mask", FlowDataType.BOOLEAN).build());
-        registry.register(WorldGenNodeDefinition.builder("structure_placement", "Structure Placement").input("structure_id", FlowDataType.STRING, "", "searchable", structureOptions()).input("spacing", FlowDataType.FLOAT, 32f, "number").input("separation", FlowDataType.FLOAT, 8f, "number").input("salt", FlowDataType.SEED, 0, "number").output("structure", FlowDataType.STRING).hidden(true).build());
+        registry.register(WorldGenNodeDefinition.builder("structure_placement", "Structure Placement").input("structure_id", FlowDataType.STRING, "", "searchable", structureOptions()).input("spacing", FlowDataType.FLOAT, 32f, "number").input("separation", FlowDataType.FLOAT, 8f, "number").input("salt", FlowDataType.SEED, 0, "number").input("y_offset", FlowDataType.FLOAT, 0f, "number").output("structure", FlowDataType.STRING).build());
         registry.register(WorldGenNodeDefinition.builder("spawn_rule", "Spawn Rule").input("entity", FlowDataType.ENTITY_TYPE, "minecraft:zombie", "searchable", entityOptions()).input("weight", FlowDataType.FLOAT, 10f, "number").input("min_group", FlowDataType.FLOAT, 1f, "number").input("max_group", FlowDataType.FLOAT, 4f, "number").output("spawn", FlowDataType.STRING).build());
         registry.register(WorldGenNodeDefinition.builder("output_features", "Output Features").input("placements", FlowDataType.STRING, "", "text").hidden(true).build());
-        registry.register(WorldGenNodeDefinition.builder("output_structures", "Output Structures").input("placements", FlowDataType.STRING, "", "text").hidden(true).build());
+        registry.register(WorldGenNodeDefinition.builder("output_structures", "Output Structures").input("placements", FlowDataType.STRING, "", "text").build());
         registry.register(WorldGenNodeDefinition.builder("output_spawns", "Output Spawns").input("table", FlowDataType.STRING, "", "text").build());
     }
 
@@ -106,13 +108,14 @@ public final class WorldGenNodeDefinitions {
     }
 
     private static List<String> structureOptions() {
+        List<String> custom = ReSync.getInstance() == null ? List.of() : StructureLibrary.get(ReSync.getInstance()).list().stream().map(restudio.resync.structure.StructureSummary::id).toList();
         try {
             Class<?> type = Class.forName("org.bukkit.StructureType");
             Object[] values = type.getEnumConstants();
-            if (values == null) return List.of();
-            return Arrays.stream(values).map(value -> "minecraft:" + ((Enum<?>) value).name().toLowerCase()).sorted().toList();
+            if (values == null) return custom;
+            return java.util.stream.Stream.concat(custom.stream(), Arrays.stream(values).map(value -> "minecraft:" + ((Enum<?>) value).name().toLowerCase())).sorted().toList();
         } catch (Exception ignored) {
-            return List.of();
+            return custom;
         }
     }
 }

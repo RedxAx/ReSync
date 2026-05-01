@@ -60,12 +60,24 @@ public class VanillaContentProvider implements CustomContentProvider {
             if (definition.getCustomModelData() != null) {
                 meta.setCustomModelData(definition.getCustomModelData());
             }
-            meta.getPersistentDataContainer().set(contentTypeKey, PersistentDataType.STRING, definition.getType());
-            meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.getId());
-            meta.getPersistentDataContainer().set(contentVersionKey, PersistentDataType.INTEGER, definition.getVersion());
-            meta.getPersistentDataContainer().set(instanceIdKey, PersistentDataType.STRING, UUID.randomUUID().toString());
             item.setItemMeta(meta);
         }
+        return stampItem(item, definition);
+    }
+
+    public ItemStack stampItem(ItemStack item, CustomContentDefinition definition) {
+        if (item == null || definition == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        meta.getPersistentDataContainer().set(contentTypeKey, PersistentDataType.STRING, definition.getType());
+        meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.getId());
+        meta.getPersistentDataContainer().set(contentVersionKey, PersistentDataType.INTEGER, definition.getVersion());
+        meta.getPersistentDataContainer().set(instanceIdKey, PersistentDataType.STRING, UUID.randomUUID().toString());
+        item.setItemMeta(meta);
         return item;
     }
 

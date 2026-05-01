@@ -31,8 +31,8 @@ public class CustomContentValidator {
             errors.add("Type must be item, block, or armor");
         }
         String provider = lower(definition.getProvider());
-        if (!provider.isBlank() && !"vanilla".equals(provider)) {
-            errors.add("Provider is not available: " + definition.getProvider());
+        if (!provider.isBlank()) {
+            validateId(provider, "provider", errors);
         }
         if (Material.matchMaterial(definition.getMaterial() != null ? definition.getMaterial() : "") == null) {
             errors.add("Material does not exist: " + definition.getMaterial());

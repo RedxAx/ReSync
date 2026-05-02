@@ -142,31 +142,112 @@ public class FlowNodeRegistryPacketHandler {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             Map<String, NodeDefinition> definitions = definitionRegistry.getAllDefinitions();
             for (String nodeId : nodeIds) {
-                digest.update(nodeId.getBytes(StandardCharsets.UTF_8));
-                digest.update((byte) 0);
+                updateDigest(digest, nodeId);
                 NodeDefinition definition = definitions.get(nodeId);
                 if (definition != null) {
-                    digest.update(gson.toJson(definition).getBytes(StandardCharsets.UTF_8));
+                    updateDefinitionDigest(digest, definition);
                 }
-                digest.update((byte) 0);
             }
             if (pluginRegistry != null) {
                 List<String> pluginIds = new ArrayList<>(pluginRegistry.getPluginIds());
                 pluginIds.sort(String.CASE_INSENSITIVE_ORDER);
                 for (String pluginId : pluginIds) {
-                    digest.update(pluginId.getBytes(StandardCharsets.UTF_8));
-                    digest.update((byte) 0);
-                    String checksum = pluginRegistry.getChecksum(pluginId);
-                    if (checksum != null) {
-                        digest.update(checksum.getBytes(StandardCharsets.UTF_8));
-                    }
-                    digest.update((byte) 0);
+                    updateDigest(digest, pluginId);
+                    updateDigest(digest, pluginRegistry.getChecksum(pluginId));
                 }
             }
             return HexFormat.of().formatHex(digest.digest());
         } catch (Exception ignored) {
             return "";
         }
+    }
+
+    private void updateDefinitionDigest(MessageDigest digest, NodeDefinition definition) {
+        updateDigest(digest, definition.getId());
+        updateDigest(digest, definition.getDisplayName());
+        updateDigest(digest, definition.getCategory() != null ? definition.getCategory().getId() : "");
+        updateDigest(digest, definition.getColor());
+        updateDigest(digest, definition.getPriority());
+        updateDigest(digest, definition.isHidden());
+        updateDigest(digest, definition.getDescription());
+        updateDigest(digest, definition.getHandler());
+        updateDigest(digest, definition.getHandlerConfig());
+        updateDigest(digest, definition.isTrigger());
+        updateDigest(digest, definition.getEventType());
+        updateDigest(digest, definition.getAliases());
+        updateMappingsDigest(digest, definition.getOutputMappings());
+        updateDigest(digest, definition.getSchemaVersion());
+        updateDigest(digest, definition.getKind());
+        updateAvailabilityDigest(digest, definition.getAvailability());
+        updateDigest(digest, definition.getCanonicalId());
+        updateDigest(digest, definition.getLegacyIds());
+        updateDigest(digest, definition.isDeprecated());
+        updateDigest(digest, definition.getTags());
+        updateDigest(digest, definition.getExamples());
+        updateDigest(digest, definition.getFamily());
+        updateDigest(digest, definition.isRecommended());
+        updateDigest(digest, definition.getReplacementFor());
+        updatePinsDigest(digest, definition.getInputs());
+        updatePinsDigest(digest, definition.getOutputs());
+    }
+
+    private void updatePinsDigest(MessageDigest digest, List<NodeDefinition.PinDefinition> pins) {
+        if (pins == null) {
+            updateDigest(digest, 0);
+            return;
+        }
+        updateDigest(digest, pins.size());
+        for (NodeDefinition.PinDefinition pin : pins) {
+            updateDigest(digest, pin.getName());
+            updateDigest(digest, pin.getType());
+            updateDigest(digest, pin.getDirection());
+            FlowDataType dataType = pin.getDataType();
+            updateDigest(digest, dataType != null ? dataType.getId() : "");
+            updateDigest(digest, pin.getWidgetType());
+            updateDigest(digest, pin.getOptions());
+            updateDigest(digest, pin.getOptionsSource());
+            updateDigest(digest, pin.getDefaultValue());
+            updateConstraintsDigest(digest, pin.getConstraints());
+            updateDigest(digest, pin.getVisibleWhen());
+            updateDigest(digest, pin.getDescription());
+        }
+    }
+
+    private void updateMappingsDigest(MessageDigest digest, List<NodeDefinition.PinMapping> mappings) {
+        if (mappings == null) {
+            updateDigest(digest, 0);
+            return;
+        }
+        updateDigest(digest, mappings.size());
+        for (NodeDefinition.PinMapping mapping : mappings) {
+            updateDigest(digest, mapping.source());
+            updateDigest(digest, mapping.target());
+        }
+    }
+
+    private void updateAvailabilityDigest(MessageDigest digest, NodeDefinition.Availability availability) {
+        if (availability == null) {
+            updateDigest(digest, "");
+            return;
+        }
+        updateDigest(digest, availability.getPlugin());
+        updateDigest(digest, availability.getPlatform());
+        updateDigest(digest, availability.getMinVersion());
+    }
+
+    private void updateConstraintsDigest(MessageDigest digest, NodeDefinition.PinConstraints constraints) {
+        if (constraints == null) {
+            updateDigest(digest, "");
+            return;
+        }
+        updateDigest(digest, constraints.getMin());
+        updateDigest(digest, constraints.getMax());
+        updateDigest(digest, constraints.getStep());
+    }
+
+    private void updateDigest(MessageDigest digest, Object value) {
+        digest.update(String.valueOf(value).getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
     }
 
     private void populatePropertyMetadata(NodeRegistrySnapshot snapshot) {

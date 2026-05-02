@@ -1,7 +1,5 @@
 package restudio.resync.commands;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -201,11 +199,18 @@ public class ReSyncCommand implements TabExecutor {
                 return true;
             }
             Map<String, Object> diagnostics = module.nodeRegistryDiagnostics();
-            sendInfo(sender, "Node Registry");
-            sendInfo(sender, "Definitions", String.valueOf(diagnostics.get("definitions")));
-            sendInfo(sender, "Plugins", String.valueOf(diagnostics.get("plugins")));
-            sendInfo(sender, "Subscribers", String.valueOf(diagnostics.get("subscribers")));
-            sendInfo(sender, "Checksum", shortChecksum(String.valueOf(diagnostics.get("checksum"))));
+            String definitions = String.valueOf(diagnostics.getOrDefault("definitions", 0));
+            String definitionSets = String.valueOf(diagnostics.getOrDefault("definitionSets", 0));
+            String externalNodePlugins = String.valueOf(diagnostics.getOrDefault("externalNodePlugins", 0));
+            String flowClients = String.valueOf(diagnostics.getOrDefault("flowClients", 0));
+            sendInfo(sender, "Node Registry", definitions + " definitions · " + definitionSets + " definition sets · " + externalNodePlugins + " external node plugins · " + flowClients + " flow clients");
+            sendInfo(sender, "Definitions", definitions);
+            sendInfo(sender, "Definition Sets", definitionSets);
+            sendInfo(sender, "Definition Set Ids", joinedDiagnosticList(diagnostics.get("definitionSetIds")));
+            sendInfo(sender, "External Node Plugins", externalNodePlugins);
+            sendInfo(sender, "External Node Plugin Ids", joinedDiagnosticList(diagnostics.get("externalNodePluginIds")));
+            sendInfo(sender, "Flow Clients", flowClients);
+            sendInfo(sender, "Registry Checksum", shortChecksum(String.valueOf(diagnostics.get("checksum"))));
             return true;
         }
         if (!"reload".equals(sub)) {
@@ -253,6 +258,13 @@ public class ReSyncCommand implements TabExecutor {
             return "None";
         }
         return checksum.length() <= 12 ? checksum : checksum.substring(0, 12);
+    }
+
+    private String joinedDiagnosticList(Object value) {
+        if (value instanceof List<?> list && !list.isEmpty()) {
+            return list.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
+        }
+        return "None";
     }
 
     private List<String> tabCompleteScoreboard(String[] args) {
@@ -2400,33 +2412,27 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void sendInfo(CommandSender sender, String message) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY).append(Component.text(message, NamedTextColor.GRAY)));
+        sender.sendMessage("§8[ReSync] §7" + message);
     }
 
     private void sendInfo(CommandSender sender, String label, String value) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY)
-            .append(Component.text(label + " ", NamedTextColor.GRAY))
-            .append(Component.text(value, NamedTextColor.WHITE)));
+        sender.sendMessage("§8[ReSync] §7" + label + " §f" + value);
     }
 
     private void sendSuccess(CommandSender sender, String message) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY).append(Component.text(message, NamedTextColor.GREEN)));
+        sender.sendMessage("§8[ReSync] §a" + message);
     }
 
     private void sendSuccess(CommandSender sender, String label, String value) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY)
-            .append(Component.text(label + " ", NamedTextColor.GREEN))
-            .append(Component.text(value, NamedTextColor.WHITE)));
+        sender.sendMessage("§8[ReSync] §a" + label + " §f" + value);
     }
 
     private void sendError(CommandSender sender, String message) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY).append(Component.text(message, NamedTextColor.RED)));
+        sender.sendMessage("§8[ReSync] §c" + message);
     }
 
     private void sendError(CommandSender sender, String label, String value) {
-        sender.sendMessage(Component.text("[ReSync] ", NamedTextColor.DARK_GRAY)
-            .append(Component.text(label + " ", NamedTextColor.RED))
-            .append(Component.text(value, NamedTextColor.WHITE)));
+        sender.sendMessage("§8[ReSync] §c" + label + " §f" + value);
     }
 
     private String prettyAction(String action) {
@@ -2530,9 +2536,10 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync portal tp <player> <portal>");
         sendUsageLine(sender, "/resync portal delete <portal>");
         sendUsageLine(sender, "/resync flow reload nodes");
+        sendUsageLine(sender, "/resync flow registry");
     }
 
     private void sendUsageLine(CommandSender sender, String usage) {
-        sender.sendMessage(Component.text("  " + usage, NamedTextColor.WHITE));
+        sender.sendMessage("§f  " + usage);
     }
 }

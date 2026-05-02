@@ -9,7 +9,6 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.boss.BarColor;
@@ -34,6 +33,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.util.TextFormatter;
 
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +43,7 @@ import java.util.function.Supplier;
 
 public class PlayerActionHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final ParticleHandler particleHandler = new ParticleHandler();
     private static final Map<String, BossBar> BOSS_BARS = new ConcurrentHashMap<>();
 
     public PlayerActionHandler() {
@@ -688,22 +689,13 @@ public class PlayerActionHandler implements NodeHandler {
         operations.put("player_send_particle", (ctx, node) -> {
             Player target = ctx.getInputValue(node, "target", Player.class, null);
             if (target == null) return;
-            String particleName = ctx.getInputValue(node, "particle", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 10);
-            Double offsetX = ctx.getInputValue(node, "offset_x", Double.class, 0.0);
-            Double offsetY = ctx.getInputValue(node, "offset_y", Double.class, 0.0);
-            Double offsetZ = ctx.getInputValue(node, "offset_z", Double.class, 0.0);
-            Double speed = ctx.getInputValue(node, "speed", Double.class, 0.0);
-            try {
-                Particle particle = Particle.valueOf(particleName.toUpperCase());
-                if (Bukkit.isPrimaryThread()) {
-                    target.getWorld().spawnParticle(particle, target.getLocation().clone().add(0, 1, 0), count, offsetX, offsetY, offsetZ, speed, null);
-                } else {
-                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () ->
-                            target.getWorld().spawnParticle(particle, target.getLocation().clone().add(0, 1, 0), count, offsetX, offsetY, offsetZ, speed, null));
-                }
-            } catch (IllegalArgumentException ignored) {
-            }
+            Map<String, Object> inputs = new HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
+            inputs.put("mode", "player");
+            inputs.put("player", target);
+            inputs.put("location", target.getLocation().clone().add(0, 1, 0));
+            FlowNode particleNode = new FlowNode("particle.apply", node.getX(), node.getY(), inputs);
+            particleNode.setHandlerConfig(Map.of("operation", "particle_apply"));
+            particleHandler.execute(ctx, particleNode);
         });
 
         operations.put("player_send_book", (ctx, node) -> {

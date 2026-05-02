@@ -673,6 +673,41 @@ public class ParticleHandler implements NodeHandler {
                 }
             }
         });
+
+        operations.put("particle_spawn", (ctx, node) -> applyLegacyParticle(ctx, node, "point"));
+        operations.put("particle_area", (ctx, node) -> applyLegacyParticle(ctx, node, "area"));
+        operations.put("particle_player_spawn", (ctx, node) -> applyLegacyParticle(ctx, node, "player"));
+        operations.put("particle_line", (ctx, node) -> applyLegacyParticle(ctx, node, "line"));
+        operations.put("particle_circle", (ctx, node) -> applyLegacyParticle(ctx, node, "circle"));
+        operations.put("particle_sphere", (ctx, node) -> applyLegacyParticle(ctx, node, "sphere"));
+        operations.put("particle_ellipse", (ctx, node) -> applyLegacyParticle(ctx, node, "ellipse"));
+        operations.put("particle_spiral", (ctx, node) -> applyLegacyParticle(ctx, node, "spiral"));
+        operations.put("particle_cone", (ctx, node) -> applyLegacyParticle(ctx, node, "cone"));
+        operations.put("particle_ring", (ctx, node) -> applyLegacyParticle(ctx, node, "ring"));
+        operations.put("particle_cube", (ctx, node) -> applyLegacyParticle(ctx, node, "cube"));
+        operations.put("particle_wave", (ctx, node) -> applyLegacyParticle(ctx, node, "wave"));
+        operations.put("particle_text", (ctx, node) -> applyLegacyParticle(ctx, node, "text"));
+        operations.put("particle_block_dust", (ctx, node) -> applyLegacyParticle(ctx, node, "block_dust"));
+        operations.put("particle_item_break", (ctx, node) -> applyLegacyParticle(ctx, node, "item_break"));
+        operations.put("particle_explosion", (ctx, node) -> applyLegacyParticle(ctx, node, "explosion"));
+    }
+
+    private void applyLegacyParticle(FlowContext ctx, FlowNode node, String mode) {
+        Map<String, Object> inputs = new java.util.HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
+        inputs.put("mode", mode);
+        copyIfMissing(inputs, "particle", "particle_type");
+        copyIfMissing(inputs, "location", "center_location");
+        copyIfMissing(inputs, "filled", "is_filled");
+        copyIfMissing(inputs, "count", "points");
+        FlowNode particleNode = new FlowNode("particle.apply", node.getX(), node.getY(), inputs);
+        particleNode.setHandlerConfig(Map.of("operation", "particle_apply"));
+        applyParticle(ctx, particleNode);
+    }
+
+    private void copyIfMissing(Map<String, Object> inputs, String target, String source) {
+        if (!inputs.containsKey(target) && inputs.containsKey(source)) {
+            inputs.put(target, inputs.get(source));
+        }
     }
 
     private void applyParticle(FlowContext ctx, FlowNode node) {

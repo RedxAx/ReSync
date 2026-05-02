@@ -81,6 +81,7 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class FlowRuntimeModule implements Module {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("flow", "Flow", "flow");
@@ -307,6 +308,16 @@ public class FlowRuntimeModule implements Module {
         if (delegate != null) {
             delegate.refreshCustomFunctionDefinitions();
         }
+    }
+
+    public Map<String, Object> nodeRegistryDiagnostics() {
+        NodeDefinitionRegistry nodeDefinitionRegistry = moduleContext.getRequiredService(NodeDefinitionRegistry.class);
+        Map<String, Object> diagnostics = new HashMap<>();
+        diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
+        diagnostics.put("plugins", nodePluginRegistry != null ? nodePluginRegistry.getPluginIds().size() : 0);
+        diagnostics.put("checksum", delegate != null ? delegate.getNodeRegistryChecksum() : "");
+        diagnostics.put("subscribers", delegate != null ? delegate.getSubscribedSessionCount() : 0);
+        return diagnostics;
     }
 
     public FlowTraceService getTraceService() {

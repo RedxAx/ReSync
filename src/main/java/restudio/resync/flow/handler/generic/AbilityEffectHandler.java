@@ -58,6 +58,7 @@ import java.util.function.BiConsumer;
 
 public class AbilityEffectHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final ParticleHandler particleHandler = new ParticleHandler();
     private static final Map<String, Long> MARKS = new ConcurrentHashMap<>();
     private static final Map<UUID, ItemStack> DISARMED_ITEMS = new ConcurrentHashMap<>();
     private static final Map<String, Long> COOLDOWNS = new ConcurrentHashMap<>();
@@ -176,16 +177,7 @@ public class AbilityEffectHandler implements NodeHandler {
             ctx.triggerOutput("flow");
         });
         operations.put("particle_burst", (ctx, node) -> {
-            Location location = location(ctx, node);
-            String particleName = string(ctx, node, "particle", "FLAME");
-            int count = integer(ctx, node, "count", 24);
-            double spread = number(ctx, node, "spread", 0.6);
-            double speed = number(ctx, node, "speed", 0.02);
-            if (location != null && location.getWorld() != null) {
-                Particle particle = parseParticle(particleName);
-                location.getWorld().spawnParticle(particle, location, count, spread, spread, spread, speed);
-            }
-            ctx.triggerOutput("flow");
+            executeParticle(ctx, node, "burst", Map.of());
         });
         operations.put("play_sound", (ctx, node) -> {
             Location location = location(ctx, node);
@@ -658,16 +650,8 @@ public class AbilityEffectHandler implements NodeHandler {
             ctx.triggerOutput("flow");
         });
         operations.put("particle_shape", (ctx, node) -> {
-            Location center = location(ctx, node);
             String mode = string(ctx, node, "mode", "ring");
-            Particle particle = parseParticle(string(ctx, node, "particle", "FLAME"));
-            int count = Math.max(1, integer(ctx, node, "count", 32));
-            double radius = number(ctx, node, "radius", 2.0);
-            double speed = number(ctx, node, "speed", 0.0);
-            if (center != null && center.getWorld() != null) {
-                spawnParticleShape(center, particle, mode, count, radius, speed);
-            }
-            ctx.triggerOutput("flow");
+            executeParticle(ctx, node, "orbit".equalsIgnoreCase(mode) ? "circle" : mode, Map.of());
         });
         operations.put("filter_entities", (ctx, node) -> {
             List<Entity> entities = entityList(ctx, node);
@@ -962,6 +946,15 @@ public class AbilityEffectHandler implements NodeHandler {
     private int integer(FlowContext ctx, FlowNode node, String pin, int fallback) {
         Integer value = ctx.getInputValue(node, pin, Integer.class, fallback);
         return value != null ? value : fallback;
+    }
+
+    private void executeParticle(FlowContext ctx, FlowNode source, String mode, Map<String, Object> overrides) {
+        Map<String, Object> inputs = new HashMap<>(source.getInputValues() != null ? source.getInputValues() : Map.of());
+        inputs.put("mode", mode);
+        inputs.putAll(overrides);
+        FlowNode particleNode = new FlowNode("particle.apply", source.getX(), source.getY(), inputs);
+        particleNode.setHandlerConfig(Map.of("operation", "particle_apply"));
+        particleHandler.execute(ctx, particleNode);
     }
 
     private Particle parseParticle(String name) {

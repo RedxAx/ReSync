@@ -127,6 +127,9 @@
     "id": "ability.particle_burst",
     "displayName": "Particle Burst",
     "category": "ABILITY",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "particle_burst" },
     "inputs": [
@@ -146,7 +149,7 @@
     "displayName": "Particle Burst",
     "category": "ABILITY",
     "hidden": true,
-    "canonicalId": "ability.particle_burst",
+    "canonicalId": "particle.apply",
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "particle_burst" },
     "inputs": [
@@ -819,6 +822,9 @@
     "id": "ability.particle_shape",
     "displayName": "Particle Shape",
     "category": "ABILITY",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "particle_shape" },
     "inputs": [

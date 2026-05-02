@@ -20,7 +20,9 @@ import restudio.resync.flow.sync.NodeRegistrySnapshot;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +81,7 @@ public class FlowNodeRegistryPacketHandler {
         List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
         nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
         snapshot.setNodeIds(nodeIds);
+        stampRegistry(snapshot, nodeIds);
 
         List<NodePluginPayload> pluginPayloads = new ArrayList<>();
         if (pluginRegistry != null) {
@@ -115,11 +118,55 @@ public class FlowNodeRegistryPacketHandler {
         List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
         nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
         snapshot.setNodeIds(nodeIds);
+        stampRegistry(snapshot, nodeIds);
         snapshot.setPlugins(plugins);
         snapshot.setRemovedPlugins(removedPlugins);
         populatePropertyMetadata(snapshot);
         populateServerMetadata(snapshot);
         return snapshot;
+    }
+
+    private void stampRegistry(NodeRegistrySnapshot snapshot, List<String> nodeIds) {
+        snapshot.setGeneratedAt(System.currentTimeMillis());
+        snapshot.setRegistryChecksum(computeRegistryChecksum(nodeIds));
+    }
+
+    public String computeRegistryChecksum() {
+        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
+        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
+        return computeRegistryChecksum(nodeIds);
+    }
+
+    private String computeRegistryChecksum(List<String> nodeIds) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            Map<String, NodeDefinition> definitions = definitionRegistry.getAllDefinitions();
+            for (String nodeId : nodeIds) {
+                digest.update(nodeId.getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                NodeDefinition definition = definitions.get(nodeId);
+                if (definition != null) {
+                    digest.update(gson.toJson(definition).getBytes(StandardCharsets.UTF_8));
+                }
+                digest.update((byte) 0);
+            }
+            if (pluginRegistry != null) {
+                List<String> pluginIds = new ArrayList<>(pluginRegistry.getPluginIds());
+                pluginIds.sort(String.CASE_INSENSITIVE_ORDER);
+                for (String pluginId : pluginIds) {
+                    digest.update(pluginId.getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    String checksum = pluginRegistry.getChecksum(pluginId);
+                    if (checksum != null) {
+                        digest.update(checksum.getBytes(StandardCharsets.UTF_8));
+                    }
+                    digest.update((byte) 0);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private void populatePropertyMetadata(NodeRegistrySnapshot snapshot) {

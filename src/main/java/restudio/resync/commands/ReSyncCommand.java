@@ -190,9 +190,24 @@ public class ReSyncCommand implements TabExecutor {
     private boolean handleFlow(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sendUsageLine(sender, "/resync flow reload nodes");
+            sendUsageLine(sender, "/resync flow registry");
             return true;
         }
         String sub = args[1].toLowerCase(Locale.ROOT);
+        if ("registry".equals(sub)) {
+            restudio.resync.modules.FlowRuntimeModule module = flowRuntimeModule();
+            if (module == null) {
+                sendError(sender, "Flow Module Not Initialized");
+                return true;
+            }
+            Map<String, Object> diagnostics = module.nodeRegistryDiagnostics();
+            sendInfo(sender, "Node Registry");
+            sendInfo(sender, "Definitions", String.valueOf(diagnostics.get("definitions")));
+            sendInfo(sender, "Plugins", String.valueOf(diagnostics.get("plugins")));
+            sendInfo(sender, "Subscribers", String.valueOf(diagnostics.get("subscribers")));
+            sendInfo(sender, "Checksum", shortChecksum(String.valueOf(diagnostics.get("checksum"))));
+            return true;
+        }
         if (!"reload".equals(sub)) {
             sendError(sender, "Unknown flow subcommand: " + sub);
             return true;
@@ -201,12 +216,7 @@ public class ReSyncCommand implements TabExecutor {
             sendUsageLine(sender, "/resync flow reload nodes");
             return true;
         }
-        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
-        if (server == null) {
-            sendError(sender, "Server not initialized");
-            return true;
-        }
-        restudio.resync.modules.FlowRuntimeModule module = server.getModuleContext().getService(restudio.resync.modules.FlowRuntimeModule.class);
+        restudio.resync.modules.FlowRuntimeModule module = flowRuntimeModule();
         if (module == null) {
             sendError(sender, "Flow module not initialized");
             return true;
@@ -222,12 +232,27 @@ public class ReSyncCommand implements TabExecutor {
 
     private List<String> tabCompleteFlow(String[] args) {
         if (args.length == 2) {
-            return filter(List.of("reload"), args[1]);
+            return filter(List.of("reload", "registry"), args[1]);
         }
         if (args.length == 3 && "reload".equalsIgnoreCase(args[1])) {
             return filter(List.of("nodes"), args[2]);
         }
         return List.of();
+    }
+
+    private restudio.resync.modules.FlowRuntimeModule flowRuntimeModule() {
+        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
+        if (server == null || server.getModuleContext() == null) {
+            return null;
+        }
+        return server.getModuleContext().getService(restudio.resync.modules.FlowRuntimeModule.class);
+    }
+
+    private String shortChecksum(String checksum) {
+        if (checksum == null || checksum.isBlank()) {
+            return "None";
+        }
+        return checksum.length() <= 12 ? checksum : checksum.substring(0, 12);
     }
 
     private List<String> tabCompleteScoreboard(String[] args) {

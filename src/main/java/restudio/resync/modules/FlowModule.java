@@ -177,6 +177,8 @@ public class FlowModule implements Module {
         List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
         nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
         snapshot.setNodeIds(nodeIds);
+        snapshot.setGeneratedAt(System.currentTimeMillis());
+        snapshot.setRegistryChecksum(nodeRegistryHandler.computeRegistryChecksum());
 
         List<NodePluginPayload> payloads = new ArrayList<>();
         if (pluginRegistry != null) {
@@ -191,6 +193,14 @@ public class FlowModule implements Module {
         snapshot.setRemovedPlugins(List.of());
         nodeRegistryHandler.populateServerMetadata(snapshot);
         return snapshot;
+    }
+
+    public String getNodeRegistryChecksum() {
+        return nodeRegistryHandler.computeRegistryChecksum();
+    }
+
+    public int getSubscribedSessionCount() {
+        return subscribedSessions.size();
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {

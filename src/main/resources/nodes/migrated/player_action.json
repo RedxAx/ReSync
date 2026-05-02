@@ -1222,6 +1222,9 @@
     "id": "player.player_send_particle",
     "displayName": "Player Send Particle",
     "category": "PLAYER",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
     "handler": "PlayerActionHandler",
     "handlerConfig": {
       "operation": "player_send_particle"

@@ -81,6 +81,7 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class FlowRuntimeModule implements Module {
@@ -313,10 +314,16 @@ public class FlowRuntimeModule implements Module {
     public Map<String, Object> nodeRegistryDiagnostics() {
         NodeDefinitionRegistry nodeDefinitionRegistry = moduleContext.getRequiredService(NodeDefinitionRegistry.class);
         Map<String, Object> diagnostics = new HashMap<>();
+        List<String> definitionSets = nodePluginRegistry != null ? nodePluginRegistry.getDefinitionSetIds() : nodeDefinitionRegistry.getPluginIds();
+        List<String> externalPlugins = nodePluginRegistry != null ? new java.util.ArrayList<>(nodePluginRegistry.getExternalPluginIds()) : java.util.List.of();
+        externalPlugins.sort(String.CASE_INSENSITIVE_ORDER);
         diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
-        diagnostics.put("plugins", nodePluginRegistry != null ? nodePluginRegistry.getPluginIds().size() : 0);
+        diagnostics.put("definitionSets", definitionSets.size());
+        diagnostics.put("definitionSetIds", definitionSets);
+        diagnostics.put("externalNodePlugins", externalPlugins.size());
+        diagnostics.put("externalNodePluginIds", externalPlugins);
         diagnostics.put("checksum", delegate != null ? delegate.getNodeRegistryChecksum() : "");
-        diagnostics.put("subscribers", delegate != null ? delegate.getSubscribedSessionCount() : 0);
+        diagnostics.put("flowClients", delegate != null ? delegate.getSubscribedSessionCount() : 0);
         return diagnostics;
     }
 

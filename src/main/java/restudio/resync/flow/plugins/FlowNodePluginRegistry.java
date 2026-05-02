@@ -105,6 +105,16 @@ public class FlowNodePluginRegistry {
         return ids;
     }
 
+    public Set<String> getExternalPluginIds() {
+        return new HashSet<>(plugins.keySet());
+    }
+
+    public List<String> getDefinitionSetIds() {
+        List<String> ids = definitionRegistry.getPluginIds();
+        ids.sort(String.CASE_INSENSITIVE_ORDER);
+        return ids;
+    }
+
     public List<FlowTypeMetadata> getAllCustomTypes() {
         List<FlowTypeMetadata> list = new ArrayList<>();
         for (PluginState state : plugins.values()) {

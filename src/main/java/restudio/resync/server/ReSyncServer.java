@@ -188,7 +188,11 @@ public class ReSyncServer {
             Message payload = codec.decodePayload(frame);
             handlePayload(conn, info, payload, frame.header);
         } catch (Exception e) {
-            Log.warn("Error handling message: " + e.getMessage());
+            String reason = e.getMessage();
+            if (reason == null || reason.isBlank()) {
+                reason = e.getClass().getSimpleName();
+            }
+            Log.warn("Error handling message: " + reason);
         }
     }
 

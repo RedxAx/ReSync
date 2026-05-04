@@ -11,6 +11,7 @@ import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.FlowRuntimeAccess;
@@ -99,6 +100,7 @@ public class FlowRuntimeModule implements Module {
     private CustomContentService customContentService;
     private CustomContentListener customContentListener;
     private FlowTraceService traceService;
+    private FlowDebugService debugService;
     private BukkitTask tickTask;
     private ModuleContext moduleContext;
 
@@ -191,8 +193,10 @@ public class FlowRuntimeModule implements Module {
         );
         nodePluginRegistry.loadInitialPlugins();
         traceService = new FlowTraceService(500);
+        debugService = new FlowDebugService(traceService);
         executor = new FlowExecutor(handlerRegistry, nodeDefinitionRegistry, typeAdapterRegistry, new HashMap<>());
         executor.setTraceService(traceService);
+        executor.setDebugService(debugService);
         customContentService = new CustomContentService(customContentStorage, storage, executor);
         customContentListener = new CustomContentListener(customContentStorage, customContentService);
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
@@ -203,6 +207,8 @@ public class FlowRuntimeModule implements Module {
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry, customContentStorage, customContentService);
         delegate.setTraceService(traceService);
+        delegate.setDebugService(debugService);
+        delegate.setExecutor(executor);
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         guiManager = new GuiManager(context.getServer(), storage, executor, delegate);
         context.registerService(FlowStorage.class, storage);
@@ -216,6 +222,7 @@ public class FlowRuntimeModule implements Module {
         context.registerService(TriggerRegistry.class, triggerRegistry);
         context.registerService(FlowExecutor.class, executor);
         context.registerService(FlowTraceService.class, traceService);
+        context.registerService(FlowDebugService.class, debugService);
         context.registerService(FlowModule.class, delegate);
         context.registerService(GuiManager.class, guiManager);
         context.registerService(FlowRuntimeModule.class, this);

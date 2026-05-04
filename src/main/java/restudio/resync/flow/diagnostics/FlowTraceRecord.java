@@ -12,6 +12,13 @@ public class FlowTraceRecord {
     private int executionDepth;
     private String inputSummary;
     private String outputSummary;
+    private String debugSessionId;
+    private String eventType;
+    private String sourceNodeId;
+    private String sourcePin;
+    private String targetNodeId;
+    private String targetPin;
+    private String reason;
 
     public long getSequence() {
         return sequence;
@@ -99,5 +106,61 @@ public class FlowTraceRecord {
 
     public void setOutputSummary(String outputSummary) {
         this.outputSummary = outputSummary;
+    }
+
+    public String getDebugSessionId() {
+        return debugSessionId;
+    }
+
+    public void setDebugSessionId(String debugSessionId) {
+        this.debugSessionId = debugSessionId;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public void setEventType(String eventType) {
+        this.eventType = eventType;
+    }
+
+    public String getSourceNodeId() {
+        return sourceNodeId;
+    }
+
+    public void setSourceNodeId(String sourceNodeId) {
+        this.sourceNodeId = sourceNodeId;
+    }
+
+    public String getSourcePin() {
+        return sourcePin;
+    }
+
+    public void setSourcePin(String sourcePin) {
+        this.sourcePin = sourcePin;
+    }
+
+    public String getTargetNodeId() {
+        return targetNodeId;
+    }
+
+    public void setTargetNodeId(String targetNodeId) {
+        this.targetNodeId = targetNodeId;
+    }
+
+    public String getTargetPin() {
+        return targetPin;
+    }
+
+    public void setTargetPin(String targetPin) {
+        this.targetPin = targetPin;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
     }
 }

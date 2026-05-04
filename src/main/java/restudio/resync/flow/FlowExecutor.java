@@ -12,6 +12,7 @@ import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceRecord;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.migration.IdCompatibilityLayer;
@@ -40,6 +41,7 @@ public class FlowExecutor {
     private Map<String, BukkitTask> pendingTasks = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
     private FlowTraceService traceService;
+    private FlowDebugService debugService;
 
     public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
         this(handlerRegistry, null, typeAdapter, globalVariables, 10000, false);
@@ -102,6 +104,10 @@ public class FlowExecutor {
         this.traceService = traceService;
     }
 
+    public void setDebugService(FlowDebugService debugService) {
+        this.debugService = debugService;
+    }
+
     private CompletableFuture<Void> execute(FlowRuntime runtime, String startNodeId, Player player, Event event, int steps) {
         if (steps >= maxExecutionSteps) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
@@ -128,7 +134,21 @@ public class FlowExecutor {
         runtime.consumeTriggeredOutput();
         long traceStarted = System.nanoTime();
         trace(startTraceRecord(graph, node, startNodeId, steps, "started", 0L, null));
+        FlowDebugService debugger = debugService;
+        if (debugger != null && debugger.isEnabled()) {
+            return debugger.beforeNode(runtime, graph, node, startNodeId, steps, summarizeInputs(node))
+                .whenComplete((ignored, failure) -> {
+                    if (failure != null) {
+                        runtime.endFlowExecution(startNodeId);
+                    }
+                })
+                .thenCompose(ignored -> executePreparedNode(runtime, graph, node, startNodeId, player, event, steps, traceStarted));
+        }
+        return executePreparedNode(runtime, graph, node, startNodeId, player, event, steps, traceStarted);
+    }
 
+    private CompletableFuture<Void> executePreparedNode(FlowRuntime runtime, FlowGraph graph, FlowNode node, String startNodeId,
+                                                        Player player, Event event, int steps, long traceStarted) {
         FlowContext context = new FlowContext(
                 runtime,
                 player,
@@ -142,6 +162,7 @@ public class FlowExecutor {
             ensureInputNodesReady(runtime, node, player, event);
             CompletableFuture<Void> result = executeLoopNode(runtime, node, player, event, steps);
             runtime.endFlowExecution(startNodeId);
+            traceSuccess(runtime, graph, node, startNodeId, steps, traceStarted);
             return result;
         }
 
@@ -150,6 +171,7 @@ public class FlowExecutor {
         if (isCustomFunctionNode(type)) {
             CompletableFuture<Void> result = executeCustomFunctionNode(runtime, node, startNodeId, player, event, steps);
             runtime.endFlowExecution(startNodeId);
+            traceSuccess(runtime, graph, node, startNodeId, steps, traceStarted);
             return result;
         }
 
@@ -160,14 +182,17 @@ public class FlowExecutor {
                 publishTriggerOutputs(runtime, startNodeId, triggerDefinition);
                 CompletableFuture<Void> result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
                 runtime.endFlowExecution(startNodeId);
+                traceSuccess(runtime, graph, node, startNodeId, steps, traceStarted);
                 return result;
             }
             runtime.endFlowExecution(startNodeId);
-            return CompletableFuture.failedFuture(new FlowExecutionException(
+            FlowExecutionException exception = new FlowExecutionException(
                 "No handler registered for node type: " + node.getType(),
                 null,
                 startNodeId
-            ));
+            );
+            traceFailure(runtime, graph, node, startNodeId, steps, traceStarted, exception);
+            return CompletableFuture.failedFuture(exception);
         }
 
         try {
@@ -197,14 +222,14 @@ public class FlowExecutor {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
             runtime.endFlowExecution(startNodeId);
-            trace(startTraceRecord(graph, node, startNodeId, steps, "success", System.nanoTime() - traceStarted, null));
+            traceSuccess(runtime, graph, node, startNodeId, steps, traceStarted);
             return result;
         } catch (Exception e) {
             runtime.endFlowExecution(startNodeId);
-            trace(startTraceRecord(graph, node, startNodeId, steps, "failure", System.nanoTime() - traceStarted, e));
+            traceFailure(runtime, graph, node, startNodeId, steps, traceStarted, e);
             return CompletableFuture.failedFuture(new FlowExecutionException(
-                "Error executing node '" + node.getType() + "' (ID: " + startNodeId + ")", 
-                e, 
+                "Error executing node '" + node.getType() + "' (ID: " + startNodeId + ")",
+                e,
                 startNodeId
             ));
         }
@@ -274,16 +299,31 @@ public class FlowExecutor {
 
         FlowGraph graph = runtime.getGraph();
         List<String> nextNodeIds = findTargetNodes(graph, currentNodeId, outputPin);
+        traceTraversedConnections(runtime, graph, currentNodeId, outputPin, steps);
 
         if (nextNodeIds.isEmpty()) {
             if ("next".equals(outputPin)) {
                 nextNodeIds = findTargetNodes(graph, currentNodeId, "flow");
+                traceTraversedConnections(runtime, graph, currentNodeId, "flow", steps);
             } else if ("flow".equals(outputPin)) {
                 nextNodeIds = findTargetNodes(graph, currentNodeId, "next");
+                traceTraversedConnections(runtime, graph, currentNodeId, "next", steps);
             }
         }
 
         return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
+    }
+
+    private void traceTraversedConnections(FlowRuntime runtime, FlowGraph graph, String currentNodeId, String outputPin, int steps) {
+        FlowDebugService debugger = debugService;
+        if (debugger == null || !debugger.isEnabled() || graph == null || currentNodeId == null || outputPin == null) {
+            return;
+        }
+        for (FlowConnection connection : graph.getConnectionsFromSource(currentNodeId)) {
+            if (outputPin.equals(connection.getSourcePin())) {
+                debugger.connectionTraversed(runtime, graph, connection, steps);
+            }
+        }
     }
 
     private CompletableFuture<Void> executeCustomFunctionNode(FlowRuntime runtime, FlowNode node, String startNodeId,
@@ -893,6 +933,22 @@ public class FlowExecutor {
         FlowTraceService service = traceService;
         if (service != null) {
             service.record(record);
+        }
+    }
+
+    private void traceSuccess(FlowRuntime runtime, FlowGraph graph, FlowNode node, String nodeId, int steps, long traceStarted) {
+        trace(startTraceRecord(graph, node, nodeId, steps, "success", System.nanoTime() - traceStarted, null));
+        FlowDebugService debugger = debugService;
+        if (debugger != null && debugger.isEnabled()) {
+            debugger.afterNode(runtime, graph, node, nodeId, steps, "success", "", summarizeInputs(node), "");
+        }
+    }
+
+    private void traceFailure(FlowRuntime runtime, FlowGraph graph, FlowNode node, String nodeId, int steps, long traceStarted, Throwable error) {
+        trace(startTraceRecord(graph, node, nodeId, steps, "failure", System.nanoTime() - traceStarted, error));
+        FlowDebugService debugger = debugService;
+        if (debugger != null && debugger.isEnabled()) {
+            debugger.afterNode(runtime, graph, node, nodeId, steps, "failure", error != null ? error.getMessage() : "", summarizeInputs(node), "");
         }
     }
 

@@ -212,6 +212,10 @@ public class FlowPacketSender {
         sendTracePacket(session, (byte) 0x42, record);
     }
 
+    public void sendDebugSnapshot(Session session, Object payload) {
+        sendTracePacket(session, (byte) 0x47, payload);
+    }
+
     private void sendTracePacket(Session session, byte packetId, Object payload) {
         String json = gson.toJson(payload);
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);

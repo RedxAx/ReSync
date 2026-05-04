@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class FlowRuntime {
+    private static final String PASSTHROUGH_OUTPUT_PREFIX = "__passthrough:";
     private FlowGraph graph;
     private final Map<String, Object> nodeOutputs;
     private final Map<String, Object> localVariables;
@@ -32,6 +33,7 @@ public class FlowRuntime {
     private boolean continueLoopRequested = false;
     private boolean functionReturnRequested = false;
     private String returnedCallerNodeId;
+    private String debugSessionId;
 
     private static class Frame {
         final FlowGraph graph;
@@ -108,8 +110,7 @@ public class FlowRuntime {
 
         for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
             if (conn.getTargetPin().equals(pinName)) {
-                String sourceKey = conn.getSourceNodeId() + ":" + conn.getSourcePin();
-                return nodeOutputs.get(sourceKey);
+                return getNodeOutput(conn.getSourceNodeId(), conn.getSourcePin());
             }
         }
 
@@ -166,11 +167,43 @@ public class FlowRuntime {
     }
 
     public boolean hasNodeOutput(String nodeId, String pinName) {
+        if (isPassthroughOutputPin(pinName)) {
+            return nodeOutputs.containsKey(nodeId + ":" + pinName) || hasPassthroughInput(nodeId, passthroughInputPin(pinName));
+        }
         return nodeOutputs.containsKey(nodeId + ":" + pinName);
     }
 
     public Object getNodeOutput(String nodeId, String pinName) {
+        if (isPassthroughOutputPin(pinName)) {
+            String key = nodeId + ":" + pinName;
+            if (nodeOutputs.containsKey(key)) {
+                return nodeOutputs.get(key);
+            }
+            FlowNode node = graph != null && graph.getNodes() != null ? graph.getNodes().get(nodeId) : null;
+            return node != null ? resolveInputRaw(node, passthroughInputPin(pinName)) : null;
+        }
         return nodeOutputs.get(nodeId + ":" + pinName);
+    }
+
+    private boolean hasPassthroughInput(String nodeId, String inputPin) {
+        FlowNode node = graph != null && graph.getNodes() != null ? graph.getNodes().get(nodeId) : null;
+        if (node == null || inputPin == null || inputPin.isBlank()) {
+            return false;
+        }
+        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
+            if (inputPin.equals(conn.getTargetPin())) {
+                return true;
+            }
+        }
+        return node.getInputValues() != null && node.getInputValues().containsKey(inputPin);
+    }
+
+    private boolean isPassthroughOutputPin(String pinName) {
+        return pinName != null && pinName.startsWith(PASSTHROUGH_OUTPUT_PREFIX);
+    }
+
+    private String passthroughInputPin(String outputPin) {
+        return isPassthroughOutputPin(outputPin) ? outputPin.substring(PASSTHROUGH_OUTPUT_PREFIX.length()) : outputPin;
     }
 
     public boolean isEvaluating(String nodeId) {
@@ -273,6 +306,14 @@ public class FlowRuntime {
 
     public int getCallDepth() {
         return callStack.size();
+    }
+
+    public String getDebugSessionId() {
+        return debugSessionId;
+    }
+
+    public void setDebugSessionId(String debugSessionId) {
+        this.debugSessionId = debugSessionId;
     }
 
     public Object getFunctionInput(String name) {

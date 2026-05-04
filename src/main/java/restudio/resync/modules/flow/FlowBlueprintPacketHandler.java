@@ -105,8 +105,6 @@ public class FlowBlueprintPacketHandler {
                 CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
                 if (content != null) {
                     customContentStorage.save(content);
-                } else if (!graph.isFunction()) {
-                    ensureDefaultContentGraphs(flowId, customContentStorage);
                 }
             }
             updateEventBindings(graph);
@@ -195,7 +193,7 @@ public class FlowBlueprintPacketHandler {
     }
 
     private void refreshAllEventBindings() {
-        if (triggerRegistry == null || globalTriggers == null) {
+        if (triggerRegistry == null) {
             return;
         }
         for (String flowId : storage.listFlowIds()) {
@@ -204,11 +202,13 @@ public class FlowBlueprintPacketHandler {
                 updateEventBindings(graph);
             }
         }
-        globalTriggers.refreshBindings();
+        if (globalTriggers != null) {
+            globalTriggers.refreshBindings();
+        }
     }
 
     private void updateEventBindings(FlowGraph graph) {
-        if (triggerRegistry == null || globalTriggers == null || graph == null) {
+        if (triggerRegistry == null || graph == null) {
             return;
         }
         Set<String> contexts = new HashSet<>();
@@ -224,24 +224,8 @@ public class FlowBlueprintPacketHandler {
             bindings.add(new TriggerBinding(flowId + ':' + context, flowId, TriggerType.EVENT, context));
         }
         triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, bindings);
-        globalTriggers.refreshBindings();
-    }
-
-    private void ensureDefaultContentGraphs(String flowId, CustomContentStorage customContentStorage) {
-        ensureDefaultContentGraph(flowId + "_default_item", "item", "Default Item", customContentStorage);
-        ensureDefaultContentGraph(flowId + "_default_block", "block", "Default Block", customContentStorage);
-        ensureDefaultContentGraph(flowId + "_default_armor", "armor", "Default Armor", customContentStorage);
-    }
-
-    private void ensureDefaultContentGraph(String graphId, String type, String name, CustomContentStorage customContentStorage) {
-        if (storage.getGraph(graphId) != null) {
-            return;
-        }
-        FlowGraph contentGraph = CustomContentGraphAdapter.createContentGraph(graphId, type, name);
-        storage.saveGraph(contentGraph);
-        CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(contentGraph);
-        if (content != null) {
-            customContentStorage.save(content);
+        if (globalTriggers != null) {
+            globalTriggers.refreshBindings();
         }
     }
 

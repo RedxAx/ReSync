@@ -28,7 +28,11 @@ public class CustomContentStorage {
     private final CustomContentValidator validator = new CustomContentValidator();
 
     public CustomContentStorage(JavaPlugin plugin) {
-        this.contentDir = new File(plugin.getDataFolder(), "custom-content");
+        this(plugin.getDataFolder());
+    }
+
+    CustomContentStorage(File dataFolder) {
+        this.contentDir = new File(dataFolder, "custom-content");
         this.contentPath = contentDir.toPath();
         if (!contentDir.exists()) {
             contentDir.mkdirs();

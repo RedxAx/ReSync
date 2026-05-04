@@ -44,11 +44,15 @@ public class FlowStorage {
     private volatile int tabRefreshIntervalTicks = 20;
 
     public FlowStorage(JavaPlugin plugin) {
-        this.flowDir = new File(plugin.getDataFolder(), "flows");
-        this.guiDir = new File(plugin.getDataFolder(), "guis");
-        this.scoreboardDir = new File(plugin.getDataFolder(), "scoreboards");
-        this.tabDir = new File(plugin.getDataFolder(), "tabs");
-        this.configFile = new File(plugin.getDataFolder(), "config.properties");
+        this(plugin.getDataFolder());
+    }
+
+    FlowStorage(File dataFolder) {
+        this.flowDir = new File(dataFolder, "flows");
+        this.guiDir = new File(dataFolder, "guis");
+        this.scoreboardDir = new File(dataFolder, "scoreboards");
+        this.tabDir = new File(dataFolder, "tabs");
+        this.configFile = new File(dataFolder, "config.properties");
         if (!flowDir.exists()) {
             flowDir.mkdirs();
         }

@@ -290,7 +290,7 @@ public class SystemEventListener implements Listener {
     private String findStartNode(FlowGraph graph) {
         for (var entry : graph.getNodes().entrySet()) {
             String nodeType = entry.getValue().getType();
-            if (nodeType != null && nodeType.startsWith("event:")) {
+            if (nodeType != null && (nodeType.startsWith("event:") || nodeType.startsWith("event."))) {
                 return entry.getKey();
             }
         }

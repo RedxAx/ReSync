@@ -107,11 +107,12 @@ public class FlowEventRegistry {
             if (current == null) {
                 return null;
             }
-            String getterName = "get" + capitalize(part);
-            Method method = findMethod(current.getClass(), getterName);
+            Method method = findMethod(current.getClass(), part);
             if (method == null) {
-                getterName = "is" + capitalize(part);
-                method = findMethod(current.getClass(), getterName);
+                method = findMethod(current.getClass(), "get" + capitalize(part));
+            }
+            if (method == null && !part.startsWith("is")) {
+                method = findMethod(current.getClass(), "is" + capitalize(part));
             }
             if (method == null) {
                 return null;

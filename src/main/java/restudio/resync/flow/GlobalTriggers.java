@@ -495,7 +495,7 @@ public class GlobalTriggers implements Listener {
     private String findStartNode(FlowGraph graph) {
         for (var entry : graph.getNodes().entrySet()) {
             String type = entry.getValue().getType();
-            if (type != null && (type.startsWith("event:") || "start".equals(type))) {
+            if (type != null && (type.startsWith("event:") || type.startsWith("event.") || "start".equals(type))) {
                 return entry.getKey();
             }
         }

@@ -1,5 +1,8 @@
 package restudio.resync.modules;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import restudio.resync.Log;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.GuiDefinition;
@@ -9,6 +12,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
@@ -17,7 +21,7 @@ import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
-import restudio.resync.flow.diagnostics.FlowTraceRecord;
+import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
 import restudio.resync.flow.triggers.TriggerRegistry;
@@ -57,7 +61,10 @@ public class FlowModule implements Module {
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowNodePluginRegistry pluginRegistry;
     private FlowTraceService traceService;
+    private FlowDebugService debugService;
     private FlowTraceSink traceSink;
+    private FlowExecutor executor;
+    private final Gson gson = new Gson();
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
@@ -150,6 +157,7 @@ public class FlowModule implements Module {
                 case 0x40 -> handleTraceToggle(session, buffer);
                 case 0x43 -> handleTraceClear(session);
                 case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
+                case 0x46 -> handleDebugCommand(session, buffer);
                 default -> {
                     Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
                     sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
@@ -227,6 +235,14 @@ public class FlowModule implements Module {
         this.traceService = traceService;
     }
 
+    public void setDebugService(FlowDebugService debugService) {
+        this.debugService = debugService;
+    }
+
+    public void setExecutor(FlowExecutor executor) {
+        this.executor = executor;
+    }
+
     private void handleTraceToggle(Session session, ByteBuffer buffer) {
         if (traceService == null) {
             sender.sendTraceSnapshot(session, List.of());
@@ -234,13 +250,8 @@ public class FlowModule implements Module {
         }
         boolean enabled = buffer.remaining() <= 0 || buffer.get() != 0;
         traceService.setEnabled(enabled);
-        if (enabled && traceSink == null) {
-            traceSink = record -> {
-                for (Session subscribedSession : subscribedSessions) {
-                    sender.sendTraceEvent(subscribedSession, record);
-                }
-            };
-            traceService.addSink(traceSink);
+        if (enabled) {
+            ensureTraceSink();
         }
         sender.sendTraceSnapshot(session, traceService.snapshot());
     }
@@ -250,5 +261,105 @@ public class FlowModule implements Module {
             traceService.clear();
         }
         sender.sendTraceSnapshot(session, List.of());
+    }
+
+    private void handleDebugCommand(Session session, ByteBuffer buffer) {
+        if (debugService == null) {
+            sender.sendDebugSnapshot(session, Map.of("type", "snapshot", "enabled", false));
+            return;
+        }
+        String json = readRemaining(buffer);
+        JsonObject root = json == null || json.isBlank() ? new JsonObject() : gson.fromJson(json, JsonObject.class);
+        String action = string(root, "action");
+        switch (action) {
+            case "enable" -> {
+                ensureTraceSink();
+                debugService.setEnabled(true);
+            }
+            case "disable" -> debugService.setEnabled(false);
+            case "pause" -> debugService.pauseAll();
+            case "resume" -> debugService.resume(string(root, "sessionId"), "Resumed", "");
+            case "resumeAll" -> debugService.resumeAll("Resumed");
+            case "stepInto" -> debugService.resume(string(root, "sessionId"), "Step Into", "into");
+            case "stepOver" -> debugService.resume(string(root, "sessionId"), "Step Over", "over");
+            case "stepOut" -> debugService.resume(string(root, "sessionId"), "Step Out", "out");
+            case "stop" -> debugService.stop(string(root, "sessionId"));
+            case "clear" -> debugService.clear();
+            case "breakpoints" -> debugService.setBreakpoints(string(root, "graphId"), nodeSet(root.get("nodeIds")));
+            case "testRun" -> startDebugTestRun(root);
+            default -> {
+            }
+        }
+        sender.sendDebugSnapshot(session, debugService.snapshot());
+    }
+
+    private void ensureTraceSink() {
+        if (traceService != null && traceSink == null) {
+            traceSink = record -> {
+                for (Session subscribedSession : subscribedSessions) {
+                    sender.sendTraceEvent(subscribedSession, record);
+                }
+            };
+            traceService.addSink(traceSink);
+        }
+    }
+
+    private void startDebugTestRun(JsonObject root) {
+        if (executor == null) {
+            return;
+        }
+        String graphId = string(root, "graphId");
+        FlowGraph graph = graphId != null && !graphId.isBlank() ? storage.getGraph(graphId) : null;
+        if (graph == null) {
+            return;
+        }
+        String nodeId = string(root, "nodeId");
+        if (nodeId == null || nodeId.isBlank()) {
+            nodeId = firstExecutableNode(graph);
+        }
+        if (nodeId != null && !nodeId.isBlank()) {
+            executor.execute(graph, nodeId, null, null);
+        }
+    }
+
+    private String firstExecutableNode(FlowGraph graph) {
+        if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
+            return null;
+        }
+        for (Map.Entry<String, restudio.flow.data.FlowNode> entry : graph.getNodes().entrySet()) {
+            if (entry.getValue() != null && entry.getValue().getType() != null
+                && (entry.getValue().getType().startsWith("event.") || entry.getValue().getType().startsWith("event:"))) {
+                return entry.getKey();
+            }
+        }
+        return graph.getNodes().keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER).findFirst().orElse(null);
+    }
+
+    private Set<String> nodeSet(JsonElement element) {
+        Set<String> values = ConcurrentHashMap.newKeySet();
+        if (element != null && element.isJsonArray()) {
+            for (JsonElement item : element.getAsJsonArray()) {
+                if (item != null && !item.isJsonNull()) {
+                    values.add(item.getAsString());
+                }
+            }
+        }
+        return values;
+    }
+
+    private String string(JsonObject root, String key) {
+        if (root == null || key == null || !root.has(key) || root.get(key).isJsonNull()) {
+            return "";
+        }
+        return root.get(key).getAsString();
+    }
+
+    private String readRemaining(ByteBuffer buffer) {
+        if (buffer == null || !buffer.hasRemaining()) {
+            return "";
+        }
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

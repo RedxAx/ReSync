@@ -106,6 +106,9 @@ public class TypeAdapterRegistry {
         register(String.class, Float.class, Float::parseFloat);
         register(String.class, Boolean.class, this::parseBooleanStrict);
 
+        register(Location.class, Vector.class, Location::toVector);
+        register(Vector.class, Location.class, vector -> new Location(null, vector.getX(), vector.getY(), vector.getZ()));
+
         register(Number.class, Integer.class, Number::intValue);
         register(Number.class, Long.class, Number::longValue);
         register(Number.class, Double.class, Number::doubleValue);

@@ -830,7 +830,9 @@
         "name": "items_list",
         "dataType": "list"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.block_container_set",
@@ -1055,7 +1057,9 @@
         "name": "state_data",
         "dataType": "string"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.block_set_state",
@@ -1121,7 +1125,9 @@
         "name": "data",
         "dataType": "string"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.block_get_type",
@@ -1152,7 +1158,9 @@
         "name": "type",
         "dataType": "string"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.block_get_data",
@@ -1183,7 +1191,9 @@
         "name": "data",
         "dataType": "string"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.block_is_solid",
@@ -1214,7 +1224,8 @@
         "name": "is_solid",
         "dataType": "boolean"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
   }
 ]
-

@@ -6,12 +6,6 @@
     "handler": "itemstack",
     "inputs": [
       {
-        "name": "flow",
-        "description": "Flow input",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
         "name": "target",
         "description": "Target itemstack",
         "pinType": "DATA",
@@ -25,9 +19,7 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "set",
-          "has",
-          "do"
+          "has"
         ],
         "defaultValue": "get"
       },
@@ -52,31 +44,9 @@
           "localized_name"
         ],
         "defaultValue": "type"
-      },
-      {
-        "name": "value",
-        "description": "Value to set",
-        "pinType": "DATA",
-        "dataType": "any",
-        "visibleWhen": {
-          "action": "set"
-        }
       }
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "description": "Flow output",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
-        "name": "success",
-        "dataType": "boolean",
-        "visibleWhen": {
-          "action": "set,do,execute"
-        }
-      },
       {
         "name": "has",
         "dataType": "boolean",
@@ -180,7 +150,86 @@
           "property": "localized_name"
         }
       }
-    ]
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.actions",
+    "displayName": "Item Actions",
+    "category": "ITEM",
+    "handler": "itemstack",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target itemstack",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "type",
+          "amount",
+          "display_name",
+          "lore",
+          "durability",
+          "max_durability",
+          "enchantments",
+          "custom_model_data",
+          "unbreakable",
+          "repair_cost",
+          "item_flags",
+          "localized_name"
+        ],
+        "defaultValue": "type"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
   },
   {
     "id": "itemstack.type",
@@ -245,7 +294,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.amount",
@@ -310,7 +360,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.display_name",
@@ -365,7 +416,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.lore",
@@ -420,7 +472,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.durability",
@@ -485,7 +538,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.max_durability",
@@ -540,7 +594,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.enchantments",
@@ -595,7 +650,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.custom_model_data",
@@ -650,7 +706,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.unbreakable",
@@ -705,7 +762,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.repair_cost",
@@ -760,7 +818,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.item_flags",
@@ -815,7 +874,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "itemstack.localized_name",
@@ -870,7 +930,7 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   }
 ]
-

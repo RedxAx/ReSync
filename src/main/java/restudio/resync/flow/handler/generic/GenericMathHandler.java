@@ -1,5 +1,6 @@
 package restudio.resync.flow.handler.generic;
 
+import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
@@ -222,7 +223,8 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "block_z", vector.getBlockZ());
         });
         operations.put("vector_set", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector()).clone();
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source).clone();
             String component = ctx.getInputValue(node, "component", String.class, "x");
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
             switch (component != null ? component.toLowerCase(Locale.ROOT) : "x") {
@@ -230,27 +232,31 @@ public class GenericMathHandler implements NodeHandler {
                 case "z" -> vector.setZ(value);
                 default -> vector.setX(value);
             }
-            ctx.setOutput(node, "vector", vector);
+            ctx.setOutput(node, "vector", preserveVectorShape(source, vector));
         });
         operations.put("vector_add", (ctx, node) -> {
-            Vector vector1 = ctx.getInputValue(node, "vector1", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector1");
+            Vector vector1 = vectorFrom(source);
             Vector vector2 = ctx.getInputValue(node, "vector2", Vector.class, new Vector());
-            ctx.setOutput(node, "result_vector", vector1.clone().add(vector2));
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, vector1.clone().add(vector2)));
         });
         operations.put("vector_subtract", (ctx, node) -> {
-            Vector vector1 = ctx.getInputValue(node, "vector1", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector1");
+            Vector vector1 = vectorFrom(source);
             Vector vector2 = ctx.getInputValue(node, "vector2", Vector.class, new Vector());
-            ctx.setOutput(node, "result_vector", vector1.clone().subtract(vector2));
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, vector1.clone().subtract(vector2)));
         });
         operations.put("vector_multiply", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
             Double scalar = ctx.getInputValue(node, "scalar", Double.class, 1.0);
-            ctx.setOutput(node, "result_vector", vector.clone().multiply(scalar));
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, vector.clone().multiply(scalar)));
         });
         operations.put("vector_divide", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
             Double scalar = ctx.getInputValue(node, "scalar", Double.class, 1.0);
-            ctx.setOutput(node, "result_vector", scalar != 0 ? vector.clone().multiply(1.0 / scalar) : new Vector());
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, scalar != 0 ? vector.clone().multiply(1.0 / scalar) : new Vector()));
         });
         operations.put("vector_multiply_components", (ctx, node) -> {
             Vector vector1 = ctx.getInputValue(node, "vector1", Vector.class, new Vector());
@@ -273,16 +279,19 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "result_vector", new Vector(Math.max(vector1.getX(), vector2.getX()), Math.max(vector1.getY(), vector2.getY()), Math.max(vector1.getZ(), vector2.getZ())));
         });
         operations.put("vector_floor", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
-            ctx.setOutput(node, "result_vector", new Vector(Math.floor(vector.getX()), Math.floor(vector.getY()), Math.floor(vector.getZ())));
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, new Vector(Math.floor(vector.getX()), Math.floor(vector.getY()), Math.floor(vector.getZ()))));
         });
         operations.put("vector_ceil", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
-            ctx.setOutput(node, "result_vector", new Vector(Math.ceil(vector.getX()), Math.ceil(vector.getY()), Math.ceil(vector.getZ())));
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, new Vector(Math.ceil(vector.getX()), Math.ceil(vector.getY()), Math.ceil(vector.getZ()))));
         });
         operations.put("vector_round", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
-            ctx.setOutput(node, "result_vector", new Vector(Math.round(vector.getX()), Math.round(vector.getY()), Math.round(vector.getZ())));
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
+            ctx.setOutput(node, "result_vector", preserveVectorShape(source, new Vector(Math.round(vector.getX()), Math.round(vector.getY()), Math.round(vector.getZ()))));
         });
         operations.put("vector_dot", (ctx, node) -> {
             Vector vector1 = ctx.getInputValue(node, "vector1", Vector.class, new Vector());
@@ -304,8 +313,9 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "length", vector.length());
         });
         operations.put("vector_normalize", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
-            ctx.setOutput(node, "normalized_vector", vector.clone().normalize());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
+            ctx.setOutput(node, "normalized_vector", preserveVectorShape(source, vector.clone().normalize()));
         });
         operations.put("vector_angle_between", (ctx, node) -> {
             Vector vector1 = ctx.getInputValue(node, "vector1", Vector.class, new Vector());
@@ -319,29 +329,53 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "midpoint_vector", vector1.clone().add(vector2).multiply(0.5));
         });
         operations.put("vector_rotate_x", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
             Double degrees = ctx.getInputValue(node, "degrees", Double.class, 0.0);
             double radians = Math.toRadians(degrees);
             double cos = Math.cos(radians);
             double sin = Math.sin(radians);
-            ctx.setOutput(node, "rotated_vector", new Vector(vector.getX(), vector.getY() * cos - vector.getZ() * sin, vector.getY() * sin + vector.getZ() * cos));
+            ctx.setOutput(node, "rotated_vector", preserveVectorShape(source, new Vector(vector.getX(), vector.getY() * cos - vector.getZ() * sin, vector.getY() * sin + vector.getZ() * cos)));
         });
         operations.put("vector_rotate_y", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
             Double degrees = ctx.getInputValue(node, "degrees", Double.class, 0.0);
             double radians = Math.toRadians(degrees);
             double cos = Math.cos(radians);
             double sin = Math.sin(radians);
-            ctx.setOutput(node, "rotated_vector", new Vector(vector.getX() * cos + vector.getZ() * sin, vector.getY(), -vector.getX() * sin + vector.getZ() * cos));
+            ctx.setOutput(node, "rotated_vector", preserveVectorShape(source, new Vector(vector.getX() * cos + vector.getZ() * sin, vector.getY(), -vector.getX() * sin + vector.getZ() * cos)));
         });
         operations.put("vector_rotate_z", (ctx, node) -> {
-            Vector vector = ctx.getInputValue(node, "vector", Vector.class, new Vector());
+            Object source = ctx.getInputValue(node, "vector");
+            Vector vector = vectorFrom(source);
             Double degrees = ctx.getInputValue(node, "degrees", Double.class, 0.0);
             double radians = Math.toRadians(degrees);
             double cos = Math.cos(radians);
             double sin = Math.sin(radians);
-            ctx.setOutput(node, "rotated_vector", new Vector(vector.getX() * cos - vector.getY() * sin, vector.getX() * sin + vector.getY() * cos, vector.getZ()));
+            ctx.setOutput(node, "rotated_vector", preserveVectorShape(source, new Vector(vector.getX() * cos - vector.getY() * sin, vector.getX() * sin + vector.getY() * cos, vector.getZ())));
         });
+    }
+
+    private Vector vectorFrom(Object value) {
+        if (value instanceof Location location) {
+            return location.toVector();
+        }
+        if (value instanceof Vector vector) {
+            return vector;
+        }
+        return new Vector();
+    }
+
+    private Object preserveVectorShape(Object source, Vector result) {
+        if (source instanceof Location location) {
+            Location preserved = location.clone();
+            preserved.setX(result.getX());
+            preserved.setY(result.getY());
+            preserved.setZ(result.getZ());
+            return preserved;
+        }
+        return result;
     }
 
     private double safeDivide(double dividend, double divisor) {

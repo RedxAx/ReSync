@@ -6,12 +6,6 @@
     "handler": "inventory",
     "inputs": [
       {
-        "name": "flow",
-        "description": "Flow input",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
         "name": "target",
         "description": "Target inventory",
         "pinType": "DATA",
@@ -25,8 +19,6 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "do",
-          "set",
           "has"
         ],
         "defaultValue": "get"
@@ -44,34 +36,15 @@
           "first_empty",
           "max_stack_size",
           "holder",
-          "clear"
+          "clear",
+          "contents",
+          "storage_contents",
+          "armor"
         ],
         "defaultValue": "size"
-      },
-      {
-        "name": "value",
-        "description": "Value to set",
-        "pinType": "DATA",
-        "dataType": "any",
-        "visibleWhen": {
-          "action": "set"
-        }
       }
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "description": "Flow output",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
-        "name": "success",
-        "dataType": "boolean",
-        "visibleWhen": {
-          "action": "set,do,execute"
-        }
-      },
       {
         "name": "has",
         "dataType": "boolean",
@@ -126,8 +99,117 @@
           "action": "get",
           "property": "holder"
         }
+      },
+      {
+        "name": "clear",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "clear"
+        }
+      },
+      {
+        "name": "contents",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "contents"
+        }
+      },
+      {
+        "name": "storage_contents",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "storage_contents"
+        }
+      },
+      {
+        "name": "armor",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "armor"
+        }
       }
-    ]
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "inventory.actions",
+    "displayName": "Inventory Actions",
+    "category": "INVENTORY",
+    "handler": "inventory",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target inventory",
+        "pinType": "DATA",
+        "dataType": "inventory"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "size",
+          "type",
+          "items",
+          "first_empty",
+          "max_stack_size",
+          "holder",
+          "clear",
+          "contents",
+          "storage_contents",
+          "armor"
+        ],
+        "defaultValue": "size"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
   },
   {
     "id": "inventory.size",
@@ -182,7 +264,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.type",
@@ -237,7 +320,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.items",
@@ -292,7 +376,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.first_empty",
@@ -347,7 +432,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.max_stack_size",
@@ -402,7 +488,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.holder",
@@ -457,7 +544,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.clear",
@@ -513,7 +601,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.player_has_item",
@@ -551,7 +640,9 @@
         "dataType": "number",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.player_remove_item",
@@ -771,7 +862,9 @@
         "dataType": "list",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_set_contents",
@@ -903,7 +996,9 @@
         "dataType": "boolean",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_count_item",
@@ -941,7 +1036,9 @@
         "dataType": "number",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_get_slot",
@@ -979,7 +1076,9 @@
         "dataType": "itemstack",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_set_slot",
@@ -1215,7 +1314,9 @@
         "dataType": "boolean",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_count_material",
@@ -1243,7 +1344,9 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_sort",
@@ -1298,7 +1401,9 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_clear_all",
@@ -1353,7 +1458,9 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_contains_at_least",
@@ -1386,7 +1493,9 @@
         "dataType": "boolean",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_remove_any",
@@ -2324,7 +2433,9 @@
         "dataType": "string",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "itemstack.properties"
   },
   {
     "id": "inventory.item_set_nbt",
@@ -2390,7 +2501,9 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_size",
@@ -2418,7 +2531,9 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   },
   {
     "id": "inventory.inventory_get_max_stack_size",
@@ -2446,7 +2561,8 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "inventory.properties"
   }
 ]
-

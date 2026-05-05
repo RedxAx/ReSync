@@ -47,8 +47,8 @@ public final class FlowDataType {
     public static final FlowDataType ITEM = new FlowDataType("item", MATERIAL, ItemStack.class, FlowItem.class, 0x32CD32);
     public static final FlowDataType WORLD = new FlowDataType("world", null, World.class, FlowWorldRef.class, 0x00CED1);
     public static final FlowDataType BIOME = new FlowDataType("biome", null, Biome.class, null, 0x20B2AA);
-    public static final FlowDataType LOCATION = new FlowDataType("location", null, Location.class, null, 0xFFA500);
     public static final FlowDataType VECTOR = new FlowDataType("vector", null, Vector.class, null, 0x7FFFD4);
+    public static final FlowDataType LOCATION = new FlowDataType("location", VECTOR, Location.class, null, 0xFFA500);
     public static final FlowDataType VECTOR2 = new FlowDataType("vector2", VECTOR, Vector.class, null, 0x7FFFD4);
     public static final FlowDataType VECTOR3 = new FlowDataType("vector3", VECTOR, Vector.class, null, 0x40E0D0);
     public static final FlowDataType SEED = new FlowDataType("seed", NUMBER, Integer.class, null, 0xFFD700);

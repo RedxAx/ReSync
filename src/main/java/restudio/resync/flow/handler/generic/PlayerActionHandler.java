@@ -489,11 +489,16 @@ public class PlayerActionHandler implements NodeHandler {
                     case "spin" -> {
                         Float yaw = ctx.getInputValue(node, "yaw", Float.class, 0.0f);
                         Float pitch = ctx.getInputValue(node, "pitch", Float.class, 0.0f);
+                        Boolean resetVelocity = ctx.getInputValue(node, "reset_velocity", Boolean.class, false);
                         runSync(() -> {
+                            Vector velocity = resetVelocity ? null : target.getVelocity().clone();
                             Location loc = target.getLocation();
                             loc.setYaw(loc.getYaw() + yaw);
                             loc.setPitch(loc.getPitch() + pitch);
                             target.teleport(loc);
+                            if (velocity != null) {
+                                target.setVelocity(velocity);
+                            }
                         });
                         success = true;
                     }
@@ -501,11 +506,16 @@ public class PlayerActionHandler implements NodeHandler {
                         Location base = callSync(target::getLocation);
                         Float yaw = ctx.getInputValue(node, "yaw", Float.class, base.getYaw());
                         Float pitch = ctx.getInputValue(node, "pitch", Float.class, base.getPitch());
+                        Boolean resetVelocity = ctx.getInputValue(node, "reset_velocity", Boolean.class, false);
                         runSync(() -> {
+                            Vector velocity = resetVelocity ? null : target.getVelocity().clone();
                             Location loc = target.getLocation();
                             loc.setYaw(yaw);
                             loc.setPitch(pitch);
                             target.teleport(loc);
+                            if (velocity != null) {
+                                target.setVelocity(velocity);
+                            }
                         });
                         success = true;
                     }

@@ -362,7 +362,9 @@
         "name": "level",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.player_show_bossbar",
@@ -856,6 +858,15 @@
         "dataType": "number",
         "visibleWhen": {
           "mode": "teleport,spin,set_rotation"
+        }
+      },
+      {
+        "name": "reset_velocity",
+        "dataType": "boolean",
+        "widget": "TOGGLE",
+        "defaultValue": false,
+        "visibleWhen": {
+          "mode": "spin,set_rotation"
         }
       },
       {
@@ -2144,7 +2155,9 @@
         "name": "is_op",
         "dataType": "boolean"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.player_get_exp_to_level",
@@ -2175,7 +2188,9 @@
         "name": "exp_needed",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.player_get_total_exp",
@@ -2206,7 +2221,8 @@
         "name": "total_exp",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
   }
 ]
-

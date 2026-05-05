@@ -6,12 +6,6 @@
     "handler": "player",
     "inputs": [
       {
-        "name": "flow",
-        "description": "Flow input",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
         "name": "target",
         "description": "Target player",
         "pinType": "DATA",
@@ -25,9 +19,7 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "set",
-          "has",
-          "do"
+          "has"
         ],
         "defaultValue": "get"
       },
@@ -93,31 +85,9 @@
           "armor"
         ],
         "defaultValue": "location"
-      },
-      {
-        "name": "value",
-        "description": "Value to set",
-        "pinType": "DATA",
-        "dataType": "any",
-        "visibleWhen": {
-          "action": "set"
-        }
       }
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "description": "Flow output",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
-        "name": "success",
-        "dataType": "boolean",
-        "visibleWhen": {
-          "action": "set,do,execute"
-        }
-      },
       {
         "name": "has",
         "dataType": "boolean",
@@ -549,7 +519,127 @@
           "property": "armor"
         }
       }
-    ]
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "player.actions",
+    "displayName": "Player Actions",
+    "category": "PLAYER",
+    "handler": "player",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target player",
+        "pinType": "DATA",
+        "dataType": "player"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "location",
+          "health",
+          "max_health",
+          "food_level",
+          "gamemode",
+          "sneak",
+          "fly",
+          "name",
+          "uuid",
+          "world",
+          "inventory",
+          "item_in_hand",
+          "display_name",
+          "xp_level",
+          "walk_speed",
+          "fly_speed",
+          "exp",
+          "total_exp",
+          "exp_to_level",
+          "allow_flight",
+          "on_ground",
+          "sleeping",
+          "bed_spawn_location",
+          "last_damage",
+          "killer",
+          "ping",
+          "player_list_name",
+          "op",
+          "offhand_item",
+          "saturation",
+          "exhaustion",
+          "sprint",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "xp_progress",
+          "compass_target",
+          "ip",
+          "is_flying",
+          "online",
+          "whitelisted",
+          "banned",
+          "sleep_ticks",
+          "locale",
+          "view_distance",
+          "is_op",
+          "item_in_offhand",
+          "armor"
+        ],
+        "defaultValue": "location"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
   },
   {
     "id": "player.location",
@@ -614,7 +704,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.health",
@@ -679,7 +770,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.max_health",
@@ -744,7 +836,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.food_level",
@@ -809,7 +902,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.gamemode",
@@ -874,7 +968,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.sneak",
@@ -939,7 +1034,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.fly",
@@ -1004,7 +1100,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.name",
@@ -1059,7 +1156,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.uuid",
@@ -1114,7 +1212,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.world",
@@ -1169,7 +1268,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.inventory",
@@ -1224,7 +1324,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.item_in_hand",
@@ -1289,7 +1390,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.display_name",
@@ -1354,7 +1456,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.xp_level",
@@ -1419,7 +1522,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.walk_speed",
@@ -1484,7 +1588,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.fly_speed",
@@ -1549,7 +1654,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.exp",
@@ -1614,7 +1720,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.total_exp",
@@ -1679,7 +1786,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.exp_to_level",
@@ -1734,7 +1842,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.allow_flight",
@@ -1799,7 +1908,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.on_ground",
@@ -1854,7 +1964,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.sleeping",
@@ -1909,7 +2020,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.bed_spawn_location",
@@ -1964,7 +2076,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.last_damage",
@@ -2019,7 +2132,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.killer",
@@ -2074,7 +2188,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.ping",
@@ -2129,7 +2244,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.player_list_name",
@@ -2194,7 +2310,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.op",
@@ -2249,7 +2366,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.offhand_item",
@@ -2314,7 +2432,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.saturation",
@@ -2379,7 +2498,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.exhaustion",
@@ -2444,7 +2564,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.sprint",
@@ -2509,7 +2630,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.vanish",
@@ -2574,7 +2696,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.glowing",
@@ -2639,7 +2762,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.invulnerable",
@@ -2704,7 +2828,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.fire_ticks",
@@ -2769,7 +2894,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.freeze_ticks",
@@ -2834,7 +2960,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.no_damage_ticks",
@@ -2899,7 +3026,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.remaining_air",
@@ -2964,7 +3092,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.max_air",
@@ -3029,7 +3158,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.xp_progress",
@@ -3094,7 +3224,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.compass_target",
@@ -3159,7 +3290,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.ip",
@@ -3214,7 +3346,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.is_flying",
@@ -3269,7 +3402,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.online",
@@ -3324,7 +3458,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.whitelisted",
@@ -3389,7 +3524,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.banned",
@@ -3444,7 +3580,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.sleep_ticks",
@@ -3499,7 +3636,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.locale",
@@ -3554,7 +3692,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.view_distance",
@@ -3619,7 +3758,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.is_op",
@@ -3674,7 +3814,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.item_in_offhand",
@@ -3739,7 +3880,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   },
   {
     "id": "player.armor",
@@ -3794,7 +3936,7 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "player.properties"
   }
 ]
-

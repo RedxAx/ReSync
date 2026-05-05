@@ -1,18 +1,25 @@
 package restudio.resync.flow.handler.family;
 
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Container;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.ItemMeta;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
@@ -51,20 +58,26 @@ public class JsonFamilyHandler implements NodeHandler {
             property = ctx.getInputValue(node, "property", String.class, "");
         }
         if (property == null || property.isBlank()) {
-            ctx.triggerOutput("flow");
+            if (isExecutionAction(action)) {
+                ctx.triggerOutput("flow");
+            }
             return;
         }
         if (!isSupportedProperty(property)) {
             ctx.setOutput(node, "success", false);
             ctx.setOutput(node, "has", false);
-            ctx.triggerOutput("flow");
+            if (isExecutionAction(action)) {
+                ctx.triggerOutput("flow");
+            }
             return;
         }
         Object target = resolveTarget(ctx, node);
         if (target == null) {
             ctx.setOutput(node, "success", false);
             ctx.setOutput(node, "has", false);
-            ctx.triggerOutput("flow");
+            if (isExecutionAction(action)) {
+                ctx.triggerOutput("flow");
+            }
             return;
         }
         switch (action == null ? "get" : action.toLowerCase(Locale.ROOT)) {
@@ -77,7 +90,9 @@ public class JsonFamilyHandler implements NodeHandler {
                 ctx.setOutput(node, property, value);
             }
         }
-        ctx.triggerOutput("flow");
+        if (isExecutionAction(action)) {
+            ctx.triggerOutput("flow");
+        }
     }
 
     @Override
@@ -103,6 +118,10 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private Object readValue(Object target, String property) {
+        Object explicit = readExplicitValue(target, property);
+        if (explicit != MissingValue.INSTANCE) {
+            return explicit;
+        }
         String suffix = toMethodSuffix(property);
         for (String methodName : new String[] {"get" + suffix, "is" + suffix, property}) {
             try {
@@ -112,6 +131,167 @@ public class JsonFamilyHandler implements NodeHandler {
             }
         }
         return null;
+    }
+
+    private Object readExplicitValue(Object target, String property) {
+        return switch (familyId) {
+            case "player" -> readPlayerValue(target, property);
+            case "entity" -> readEntityValue(target, property);
+            case "world" -> readWorldValue(target, property);
+            case "block" -> readBlockValue(target, property);
+            case "inventory" -> readInventoryValue(target, property);
+            case "itemstack" -> readItemStackValue(target, property);
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readPlayerValue(Object target, String property) {
+        if (!(target instanceof Player player)) {
+            return MissingValue.INSTANCE;
+        }
+        return switch (property) {
+            case "uuid" -> player.getUniqueId().toString();
+            case "gamemode" -> player.getGameMode().name();
+            case "world" -> player.getWorld();
+            case "inventory" -> player.getInventory();
+            case "item_in_hand", "item_in_mainhand" -> player.getInventory().getItemInMainHand();
+            case "offhand_item", "item_in_offhand" -> player.getInventory().getItemInOffHand();
+            case "xp_level" -> player.getLevel();
+            case "exp" -> player.getExp();
+            case "total_exp" -> player.getTotalExperience();
+            case "exp_to_level" -> player.getExpToLevel();
+            case "allow_flight" -> player.getAllowFlight();
+            case "on_ground" -> player.isOnGround();
+            case "sleeping" -> player.isSleeping();
+            case "bed_spawn_location" -> player.getBedSpawnLocation();
+            case "last_damage" -> player.getLastDamageCause();
+            case "killer" -> player.getKiller();
+            case "ping" -> player.getPing();
+            case "player_list_name" -> player.getPlayerListName();
+            case "op", "is_op" -> player.isOp();
+            case "sneak" -> player.isSneaking();
+            case "fly", "is_flying" -> player.isFlying();
+            case "sprint" -> player.isSprinting();
+            case "vanish" -> !player.canSee(player);
+            case "ip" -> player.getAddress() != null ? player.getAddress().getAddress().getHostAddress() : "";
+            case "online" -> player.isOnline();
+            case "whitelisted" -> player.isWhitelisted();
+            case "banned" -> player.isBanned();
+            case "locale" -> player.locale().toLanguageTag();
+            case "armor" -> player.getInventory().getArmorContents();
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readEntityValue(Object target, String property) {
+        if (!(target instanceof Entity entity)) {
+            return MissingValue.INSTANCE;
+        }
+        return switch (property) {
+            case "type" -> entity.getType().name();
+            case "uuid" -> entity.getUniqueId().toString();
+            case "world" -> entity.getWorld();
+            case "exists" -> entity.isValid() && !entity.isDead();
+            case "is_alive" -> entity.isValid() && !entity.isDead();
+            case "is_valid" -> entity.isValid();
+            case "is_dead" -> entity.isDead() || !entity.isValid();
+            case "health" -> entity instanceof LivingEntity living ? living.getHealth() : 0.0;
+            case "max_health" -> maxHealth(entity);
+            case "absorption" -> entity instanceof LivingEntity living ? living.getAbsorptionAmount() : 0.0;
+            case "type_info" -> entity.getType().name();
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readWorldValue(Object target, String property) {
+        if (!(target instanceof World world)) {
+            return MissingValue.INSTANCE;
+        }
+        return switch (property) {
+            case "weather" -> world.hasStorm() ? world.isThundering() ? "thunder" : "rain" : "clear";
+            case "weather_type" -> world.hasStorm() ? world.isThundering() ? "thunder" : "rain" : "clear";
+            case "has_storm" -> world.hasStorm();
+            case "difficulty" -> world.getDifficulty().name();
+            case "environment" -> world.getEnvironment().name();
+            case "players" -> world.getPlayers();
+            case "entities" -> world.getEntities();
+            case "loaded_chunks" -> Arrays.asList(world.getLoadedChunks());
+            case "time_relative" -> world.getTime();
+            case "pvp" -> world.getPVP();
+            case "keep_spawn" -> world.getKeepSpawnInMemory();
+            case "thundering", "is_thundering" -> world.isThundering();
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readBlockValue(Object target, String property) {
+        if (!(target instanceof Block block)) {
+            return MissingValue.INSTANCE;
+        }
+        return switch (property) {
+            case "type" -> block.getType().name();
+            case "data" -> block.getBlockData().getAsString();
+            case "state" -> block.getState().getBlockData().getAsString();
+            case "location" -> block.getLocation();
+            case "world" -> block.getWorld();
+            case "x" -> block.getX();
+            case "y" -> block.getY();
+            case "z" -> block.getZ();
+            case "is_solid" -> block.isSolid();
+            case "is_liquid" -> block.isLiquid();
+            case "is_air" -> block.isEmpty();
+            case "container_items" -> readContainerItems(block);
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readInventoryValue(Object target, String property) {
+        if (!(target instanceof Inventory inventory)) {
+            return MissingValue.INSTANCE;
+        }
+        return switch (property) {
+            case "type" -> inventory.getType().name();
+            case "items", "contents" -> inventory.getContents();
+            case "storage_contents" -> inventory.getStorageContents();
+            case "first_empty" -> inventory.firstEmpty();
+            case "max_stack_size" -> inventory.getMaxStackSize();
+            case "holder" -> inventory.getHolder();
+            case "armor" -> inventory instanceof PlayerInventory playerInventory ? playerInventory.getArmorContents() : null;
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private Object readItemStackValue(Object target, String property) {
+        if (!(target instanceof ItemStack item)) {
+            return MissingValue.INSTANCE;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return switch (property) {
+            case "type" -> item.getType().name();
+            case "display_name" -> meta != null && meta.hasDisplayName() ? meta.getDisplayName() : "";
+            case "lore" -> meta != null && meta.hasLore() ? meta.getLore() : java.util.List.of();
+            case "durability" -> meta instanceof Damageable damageable ? damageable.getDamage() : 0;
+            case "max_durability" -> item.getType().getMaxDurability();
+            case "enchantments" -> item.getEnchantments();
+            case "custom_model_data" -> meta != null && meta.hasCustomModelData() ? meta.getCustomModelData() : 0;
+            case "unbreakable" -> meta != null && meta.isUnbreakable();
+            case "item_flags" -> meta != null ? meta.getItemFlags() : Set.of();
+            default -> MissingValue.INSTANCE;
+        };
+    }
+
+    private double maxHealth(Entity entity) {
+        if (!(entity instanceof LivingEntity living)) {
+            return 0.0;
+        }
+        return living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null
+            ? living.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue()
+            : 0.0;
+    }
+
+    private Object readContainerItems(Block block) {
+        BlockState state = block.getState();
+        return state instanceof Container container ? container.getInventory().getContents() : new ItemStack[0];
     }
 
     private void setValue(FlowContext ctx, FlowNode node, Object target, String property) {
@@ -146,6 +326,18 @@ public class JsonFamilyHandler implements NodeHandler {
             }
         }
         return false;
+    }
+
+    private boolean isExecutionAction(String action) {
+        if (action == null) {
+            return false;
+        }
+        String normalized = action.toLowerCase(Locale.ROOT);
+        return "set".equals(normalized) || "do".equals(normalized) || "execute".equals(normalized);
+    }
+
+    private enum MissingValue {
+        INSTANCE
     }
 
     private Object coerceValue(Object value, Class<?> targetType) {

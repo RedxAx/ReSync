@@ -6,12 +6,6 @@
     "handler": "entity",
     "inputs": [
       {
-        "name": "flow",
-        "description": "Flow input",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
         "name": "target",
         "description": "Target entity",
         "pinType": "DATA",
@@ -25,8 +19,6 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "set",
-          "do",
           "has"
         ],
         "defaultValue": "get"
@@ -77,34 +69,15 @@
           "fall_distance",
           "portal_cooldown",
           "scoreboard_tags",
-          "absorption"
+          "absorption",
+          "is_alive",
+          "is_valid",
+          "is_dead"
         ],
         "defaultValue": "name"
-      },
-      {
-        "name": "value",
-        "description": "Value to set",
-        "pinType": "DATA",
-        "dataType": "any",
-        "visibleWhen": {
-          "action": "set"
-        }
       }
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "description": "Flow output",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
-        "name": "success",
-        "dataType": "boolean",
-        "visibleWhen": {
-          "action": "set,do,execute"
-        }
-      },
       {
         "name": "has",
         "dataType": "boolean",
@@ -415,8 +388,158 @@
           "action": "get",
           "property": "absorption"
         }
+      },
+      {
+        "name": "remove",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "remove"
+        }
+      },
+      {
+        "name": "kill",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "kill"
+        }
+      },
+      {
+        "name": "is_alive",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_alive"
+        }
+      },
+      {
+        "name": "is_valid",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_valid"
+        }
+      },
+      {
+        "name": "is_dead",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_dead"
+        }
       }
-    ]
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.actions",
+    "displayName": "Entity Actions",
+    "category": "ENTITY",
+    "handler": "entity",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "name",
+          "custom_name",
+          "glowing",
+          "silent",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "health",
+          "max_health",
+          "persistent",
+          "target",
+          "baby",
+          "tamed",
+          "sitting",
+          "swimming",
+          "pickup_items",
+          "gravity",
+          "visible",
+          "ai",
+          "collidable",
+          "remove",
+          "kill",
+          "exists",
+          "type",
+          "uuid",
+          "location",
+          "velocity",
+          "world",
+          "passengers",
+          "vehicle",
+          "height",
+          "width",
+          "ticks_lived",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "fall_distance",
+          "portal_cooldown",
+          "scoreboard_tags",
+          "absorption",
+          "is_alive",
+          "is_valid",
+          "is_dead"
+        ],
+        "defaultValue": "name"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
   },
   {
     "id": "entity.name",
@@ -471,7 +594,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.custom_name",
@@ -536,7 +660,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.glowing",
@@ -601,7 +726,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.silent",
@@ -666,7 +792,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.invulnerable",
@@ -731,7 +858,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.fire_ticks",
@@ -796,7 +924,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.freeze_ticks",
@@ -861,7 +990,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.health",
@@ -926,7 +1056,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.max_health",
@@ -981,7 +1112,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.persistent",
@@ -1046,7 +1178,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.target",
@@ -1111,7 +1244,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.baby",
@@ -1176,7 +1310,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.tamed",
@@ -1241,7 +1376,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.sitting",
@@ -1306,7 +1442,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.swimming",
@@ -1371,7 +1508,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.pickup_items",
@@ -1436,7 +1574,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.gravity",
@@ -1501,7 +1640,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.visible",
@@ -1566,7 +1706,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.ai",
@@ -1631,7 +1772,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.collidable",
@@ -1696,7 +1838,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.remove",
@@ -1752,7 +1895,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.kill",
@@ -1791,7 +1935,9 @@
         "name": "flow",
         "pinType": "FLOW"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.exists",
@@ -1846,7 +1992,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.type",
@@ -1901,7 +2048,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.uuid",
@@ -1956,7 +2104,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.location",
@@ -2011,7 +2160,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.velocity",
@@ -2076,7 +2226,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.world",
@@ -2131,7 +2282,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.passengers",
@@ -2186,7 +2338,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.vehicle",
@@ -2241,7 +2394,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.height",
@@ -2296,7 +2450,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.width",
@@ -2351,7 +2506,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.ticks_lived",
@@ -2416,7 +2572,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_set_type",
@@ -3626,7 +3783,9 @@
         "dataType": "boolean",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_info",
@@ -3699,7 +3858,9 @@
         "dataType": "boolean",
         "pinType": "DATA"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_last_damage",
@@ -3807,7 +3968,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.remaining_air",
@@ -3872,7 +4034,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.max_air",
@@ -3937,7 +4100,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.fall_distance",
@@ -4002,7 +4166,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.portal_cooldown",
@@ -4067,7 +4232,8 @@
         "pinType": "DATA"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.scoreboard_tags",
@@ -4122,7 +4288,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.absorption",
@@ -4177,7 +4344,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_health",
@@ -4220,7 +4388,9 @@
         "pinType": "DATA",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_velocity",
@@ -4253,7 +4423,9 @@
         "pinType": "DATA",
         "dataType": "vector"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_fire_ticks",
@@ -4286,7 +4458,9 @@
         "pinType": "DATA",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_freeze_ticks",
@@ -4319,7 +4493,9 @@
         "pinType": "DATA",
         "dataType": "number"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   },
   {
     "id": "entity.entity_get_location",
@@ -4352,7 +4528,8 @@
         "pinType": "DATA",
         "dataType": "location"
       }
-    ]
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
   }
 ]
-

@@ -6,12 +6,6 @@
     "handler": "block",
     "inputs": [
       {
-        "name": "flow",
-        "description": "Flow input",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
         "name": "target",
         "description": "Target block",
         "pinType": "DATA",
@@ -25,8 +19,6 @@
         "widget": "DROPDOWN",
         "options": [
           "get",
-          "set",
-          "do",
           "has"
         ],
         "defaultValue": "get"
@@ -52,34 +44,14 @@
           "world",
           "x",
           "y",
-          "z"
+          "z",
+          "state",
+          "container_items"
         ],
         "defaultValue": "type"
-      },
-      {
-        "name": "value",
-        "description": "Value to set",
-        "pinType": "DATA",
-        "dataType": "any",
-        "visibleWhen": {
-          "action": "set"
-        }
       }
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "description": "Flow output",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      },
-      {
-        "name": "success",
-        "dataType": "boolean",
-        "visibleWhen": {
-          "action": "set,do,execute"
-        }
-      },
       {
         "name": "has",
         "dataType": "boolean",
@@ -198,8 +170,116 @@
           "action": "get",
           "property": "z"
         }
+      },
+      {
+        "name": "break_naturally",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "break_naturally"
+        }
+      },
+      {
+        "name": "state",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "state"
+        }
+      },
+      {
+        "name": "container_items",
+        "dataType": "list",
+        "visibleWhen": {
+          "action": "get",
+          "property": "container_items"
+        }
       }
-    ]
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "block.actions",
+    "displayName": "Block Actions",
+    "category": "BLOCK",
+    "handler": "block",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target block",
+        "pinType": "DATA",
+        "dataType": "block"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "type",
+          "data",
+          "light_level",
+          "biome",
+          "temperature",
+          "humidity",
+          "is_solid",
+          "is_liquid",
+          "is_air",
+          "break_naturally",
+          "location",
+          "world",
+          "x",
+          "y",
+          "z",
+          "state",
+          "container_items"
+        ],
+        "defaultValue": "type"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
   },
   {
     "id": "block.type",
@@ -264,7 +344,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.data",
@@ -319,7 +400,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.light_level",
@@ -374,7 +456,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.biome",
@@ -439,7 +522,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.temperature",
@@ -494,7 +578,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.humidity",
@@ -549,7 +634,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.is_solid",
@@ -604,7 +690,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.is_liquid",
@@ -659,7 +746,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.is_air",
@@ -714,7 +802,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.break_naturally",
@@ -770,7 +859,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.location",
@@ -825,7 +915,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.world",
@@ -880,7 +971,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.x",
@@ -935,7 +1027,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.y",
@@ -990,7 +1083,8 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   },
   {
     "id": "block.z",
@@ -1045,7 +1139,7 @@
         "pinType": "FLOW"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "canonicalId": "block.properties"
   }
 ]
-

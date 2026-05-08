@@ -48,6 +48,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "player_one",
         "dataType": "player"
       },
@@ -68,6 +73,11 @@
       {
         "name": "result",
         "dataType": "any"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -81,6 +91,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "text",
         "dataType": "string"
       }
@@ -93,6 +108,11 @@
       {
         "name": "result",
         "dataType": "any"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -175,4 +195,3 @@
     ]
   }
 ]
-

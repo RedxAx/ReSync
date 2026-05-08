@@ -33,6 +33,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "location",
         "dataType": "location"
       },
@@ -51,7 +56,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.fade",
@@ -75,6 +86,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "player",
         "dataType": "player"
       },
@@ -93,7 +109,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.play.for.all",
@@ -105,6 +127,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "sound_type",
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
@@ -119,7 +146,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.stop.for.player",
@@ -131,6 +164,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "player",
         "dataType": "player"
       },
@@ -141,7 +179,13 @@
         "optionsSource": "server:minecraft:sound"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.stop.all",
@@ -153,11 +197,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "player",
         "dataType": "player"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.play.category",
@@ -168,6 +223,11 @@
       "operation": "sound_play_category"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "player",
         "dataType": "player"
@@ -205,7 +265,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.stop.category",
@@ -216,6 +282,11 @@
       "operation": "sound_stop_category"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "player",
         "dataType": "player"
@@ -239,7 +310,13 @@
         "defaultValue": "MASTER"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.loop.for.player",
@@ -250,6 +327,11 @@
       "operation": "sound_loop_for_player"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "player",
         "dataType": "player"
@@ -273,7 +355,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.play.sequence",
@@ -284,6 +372,11 @@
       "operation": "sound_play_sequence"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "player",
         "dataType": "player"
@@ -297,7 +390,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "sound.play.with.distance",
@@ -308,6 +407,11 @@
       "operation": "sound_play_with_distance"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "location",
         "dataType": "location"
@@ -331,7 +435,12 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   }
 ]
-

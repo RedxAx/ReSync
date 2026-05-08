@@ -21,6 +21,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "time_string",
         "dataType": "string"
       },
@@ -33,6 +38,11 @@
       {
         "name": "task_id",
         "dataType": "string"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -46,6 +56,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "interval_ticks",
         "dataType": "number"
       },
@@ -58,6 +73,11 @@
       {
         "name": "task_id",
         "dataType": "string"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -71,11 +91,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "task_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "schedule.wait_ticks",
@@ -87,11 +118,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "ticks",
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "schedule.interval",
@@ -138,4 +180,3 @@
     "outputs": []
   }
 ]
-

@@ -9,6 +9,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "message",
         "dataType": "string"
       }
@@ -17,6 +22,11 @@
       {
         "name": "sent_count",
         "dataType": "number"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -30,6 +40,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "command",
         "dataType": "string"
       }
@@ -38,6 +53,11 @@
       {
         "name": "success",
         "dataType": "boolean"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -115,11 +135,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "reason",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "server.system_shutdown",
@@ -131,11 +162,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "reason",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "server.system_get_motd",
@@ -163,11 +205,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "motd",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "server.broadcast",
@@ -262,4 +315,3 @@
     "inputs": []
   }
 ]
-

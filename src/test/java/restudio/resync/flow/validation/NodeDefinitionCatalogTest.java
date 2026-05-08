@@ -70,6 +70,35 @@ class NodeDefinitionCatalogTest {
         }
     }
 
+    @Test
+    void visibleSideEffectNodesExposeFlowPins() throws Exception {
+        Map<String, List<String>> nodes = Map.of(
+            "server.json", List.of("server.system_broadcast", "server.execute.command", "server.system_restart", "server.system_shutdown", "server.system_set_motd"),
+            "schedule.json", List.of("schedule.schedule", "schedule.schedule_repeating", "schedule.cancel_task", "schedule.wait_ticks"),
+            "placeholder.json", List.of("placeholder.placeholder_set", "placeholder.placeholder_remove"),
+            "sound.json", List.of("sound.sound_play_ambient", "sound.play.for.player", "sound.play.for.all", "sound.stop.for.player", "sound.stop.all", "sound.play.category", "sound.stop.category", "sound.loop.for.player", "sound.play.sequence", "sound.play.with.distance"),
+            "team.json", List.of("team.remove", "team.set.allow.friendly.fire", "team.see.friendly.invisibles", "team.set.display.name"),
+            "misc.json", List.of("misc.delay"),
+            "function.json", List.of("function.function_output")
+        );
+
+        for (Map.Entry<String, List<String>> entry : nodes.entrySet()) {
+            for (String nodeId : entry.getValue()) {
+                JsonObject node = findNode(entry.getKey(), nodeId);
+                assertTrue(hasFlowInput(node), nodeId + " should expose flow input");
+                if (!"function.function_output".equals(nodeId)) {
+                    assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
+                }
+            }
+        }
+
+        for (String nodeId : List.of("region.region_create", "region.region_delete", "region.region_clone", "region.region_save", "region.region_load", "region.region_set_blocks", "region.region_mirror_x", "region.region_mirror_y", "region.region_mirror_z", "region.region_rotate_90", "region.region_rotate_180", "region.region_move", "region.region_stack")) {
+            JsonObject node = findNode("region.json", nodeId);
+            assertTrue(hasFlowInput(node), nodeId + " should expose flow input");
+            assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
+        }
+    }
+
     private JsonObject findNode(String fileName, String id) throws Exception {
         Path file = Path.of("src", "main", "resources", "nodes", "migrated", fileName);
         JsonElement element = JsonParser.parseString(Files.readString(file));
@@ -92,6 +121,27 @@ class NodeDefinitionCatalogTest {
                 if (pin.has("pinType") && "FLOW".equalsIgnoreCase(pin.get("pinType").getAsString())) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasFlowInput(JsonObject node) {
+        return hasFlowPin(node, "inputs");
+    }
+
+    private boolean hasFlowOutput(JsonObject node) {
+        return hasFlowPin(node, "outputs");
+    }
+
+    private boolean hasFlowPin(JsonObject node, String pins) {
+        if (!node.has(pins)) {
+            return false;
+        }
+        for (JsonElement pinElement : node.getAsJsonArray(pins)) {
+            JsonObject pin = pinElement.getAsJsonObject();
+            if (pin.has("pinType") && "FLOW".equalsIgnoreCase(pin.get("pinType").getAsString())) {
+                return true;
             }
         }
         return false;

@@ -153,6 +153,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "min_location",
         "dataType": "location"
       },
@@ -165,7 +170,13 @@
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_delete",
@@ -177,6 +188,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "min_location",
         "dataType": "location"
       },
@@ -185,7 +201,13 @@
         "dataType": "location"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_contains",
@@ -416,6 +438,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "source_clipboard_id",
         "dataType": "string"
       },
@@ -424,7 +451,13 @@
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_intersect",
@@ -547,6 +580,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       },
@@ -555,7 +593,13 @@
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_load",
@@ -567,6 +611,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "file_path",
         "dataType": "string"
       },
@@ -575,7 +624,13 @@
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_set_blocks",
@@ -586,6 +641,11 @@
       "operation": "region_set_blocks"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "min_location",
         "dataType": "location"
@@ -599,7 +659,13 @@
         "dataType": "material"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_get_blocks",
@@ -636,11 +702,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_mirror_y",
@@ -652,11 +729,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_mirror_z",
@@ -668,11 +756,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_rotate_90",
@@ -684,11 +783,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_rotate_180",
@@ -700,11 +810,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "clipboard_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_move",
@@ -715,6 +836,11 @@
       "operation": "region_move"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "min_location",
         "dataType": "location"
@@ -736,7 +862,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.region_stack",
@@ -747,6 +879,11 @@
       "operation": "region_stack"
     },
     "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
       {
         "name": "clipboard_id",
         "dataType": "string"
@@ -772,7 +909,13 @@
         "dataType": "number"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "region.copy",
@@ -1093,4 +1236,3 @@
     ]
   }
 ]
-

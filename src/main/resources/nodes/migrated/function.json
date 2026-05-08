@@ -78,6 +78,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "name",
         "dataType": "string"
       },
@@ -113,4 +118,3 @@
     "hidden": true
   }
 ]
-

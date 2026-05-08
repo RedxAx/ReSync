@@ -81,11 +81,22 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "team_id",
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "team.set.allow.friendly.fire",
@@ -97,6 +108,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "team_id",
         "dataType": "string"
       },
@@ -105,7 +121,13 @@
         "dataType": "boolean"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "team.delete",
@@ -212,6 +234,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "team_id",
         "dataType": "string"
       },
@@ -220,7 +247,13 @@
         "dataType": "boolean"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   },
   {
     "id": "team.set.display.name",
@@ -232,6 +265,11 @@
     },
     "inputs": [
       {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
         "name": "team_id",
         "dataType": "string"
       },
@@ -240,7 +278,12 @@
         "dataType": "string"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
   }
 ]
-

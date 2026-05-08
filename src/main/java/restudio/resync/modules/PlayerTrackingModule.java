@@ -3,20 +3,42 @@ package restudio.resync.modules;
 import com.google.gson.Gson;
 import restudio.resync.Log;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Event;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerExpChangeEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLevelChangeEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.Material;
+import org.bukkit.World;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowExecutionListener;
 import restudio.resync.player.PlayerDossier;
+import restudio.resync.player.PlayerFacetState;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.player.PlayerTrackingPrivacyPolicy;
 import restudio.resync.player.PlayerTrackingListener;
@@ -26,12 +48,18 @@ import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +74,13 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private PlayerTrackingService trackingService;
     private PlayerSessionLinkService sessionLinkService;
     private final PlayerTrackingPrivacyPolicy privacyPolicy = new PlayerTrackingPrivacyPolicy();
+    private final Map<UUID, Integer> pendingLiveBroadcastTasks = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastLiveBroadcastAt = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> stateRevisions = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> inventoryRevisions = new ConcurrentHashMap<>();
+    private final Map<UUID, String> lastInventorySignatures = new ConcurrentHashMap<>();
+    private final Set<UUID> pendingInventoryRevisionPlayers = ConcurrentHashMap.newKeySet();
+    private int liveStateTaskId = -1;
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -72,6 +107,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         for (Player player : Bukkit.getOnlinePlayers()) {
             trackingService.markOnline(player, "bootstrap");
         }
+        liveStateTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(context.getPlugin(), this::broadcastLivePlayerData, 20L, 20L);
     }
 
     @Override
@@ -87,6 +123,19 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         }
         HandlerList.unregisterAll(this);
         subscribedSessions.clear();
+        if (liveStateTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(liveStateTaskId);
+            liveStateTaskId = -1;
+        }
+        for (Integer taskId : pendingLiveBroadcastTasks.values()) {
+            Bukkit.getScheduler().cancelTask(taskId);
+        }
+        pendingLiveBroadcastTasks.clear();
+        lastLiveBroadcastAt.clear();
+        stateRevisions.clear();
+        inventoryRevisions.clear();
+        lastInventorySignatures.clear();
+        pendingInventoryRevisionPlayers.clear();
     }
 
     @Override
@@ -120,9 +169,14 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
                 sendSnapshot(session);
                 return;
             }
+            if ("player_control".equalsIgnoreCase(request.type)) {
+                handlePlayerControl(session, request);
+                return;
+            }
             switch (request.action) {
                 case "snapshot" -> sendSnapshot(session);
                 case "dossier" -> sendDossier(session, request.playerId);
+                case "capabilities" -> sendCapabilities(session);
                 case "link" -> linkSession(session, request.playerId);
                 case "unlink" -> unlinkSession(session, request.playerId);
                 default -> sendSnapshot(session);
@@ -178,6 +232,95 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             privacyPolicy.sanitizeCommand(event.getMessage(), context.getConfig().getPlayerTracking().isCaptureCommandArguments()));
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerDropItem(PlayerDropItemEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerSwapHandItems(PlayerSwapHandItemsEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerItemHeld(PlayerItemHeldEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, false);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onFoodLevelChange(FoodLevelChangeEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityRegainHealth(EntityRegainHealthEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            scheduleLivePlayerDataBroadcast(player, 1L, true, false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerExpChange(PlayerExpChangeEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, false);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerLevelChange(PlayerLevelChangeEvent event) {
+        scheduleLivePlayerDataBroadcast(event.getPlayer(), 1L, true, false);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (to == null || from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ() && from.getYaw() == to.getYaw() && from.getPitch() == to.getPitch()) {
+            return;
+        }
+        scheduleThrottledLivePlayerDataBroadcast(event.getPlayer(), 500L);
+    }
+
     private void handleSubscribeBinding(Session session, String rawData) {
         if (rawData == null || rawData.isBlank()) {
             return;
@@ -192,7 +335,10 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     }
 
     private void sendSnapshot(Session session) {
-        List<PlayerDossier> dossiers = new ArrayList<>(trackingService.getDossiers());
+        List<PlayerDossier> dossiers = new ArrayList<>();
+        for (PlayerDossier dossier : trackingService.getDossiers()) {
+            dossiers.add(enrichDossier(dossier));
+        }
         send(session, PlayerTrackingUpdate.snapshot(dossiers));
     }
 
@@ -204,8 +350,460 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         }
         PlayerDossier dossier = trackingService.getDossier(uuid);
         if (dossier != null) {
-            send(session, PlayerTrackingUpdate.delta("dossier", dossier));
+            send(session, PlayerTrackingUpdate.delta("dossier", enrichDossier(dossier)));
         }
+    }
+
+    private void sendCapabilities(Session session) {
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("type", "player_control_capabilities");
+        response.put("version", 1);
+        response.put("provider", "resync");
+        response.put("operations", List.of("playerData", "onlineInventoryEdit", "gameRules", "liveSettings"));
+        sendRaw(session, response);
+    }
+
+    private void handlePlayerControl(Session session, TrackingRequest request) {
+        switch (request.action) {
+            case "inventoryEdit" -> handleInventoryEdit(session, request);
+            case "inventoryEditBatch" -> handleInventoryEdit(session, request);
+            case "playerDataSnapshot" -> sendPlayerDataSnapshot(session, request);
+            case "inventorySnapshot" -> sendInventorySnapshot(session, request, false);
+            case "enderSnapshot" -> sendInventorySnapshot(session, request, true);
+            case "gameRulesList" -> sendGameRulesList(session, request);
+            case "gameRuleSet" -> setGameRule(session, request);
+            case "liveSettingsList" -> sendLiveSettingsList(session, request);
+            case "liveSettingSet" -> setLiveSetting(session, request);
+            default -> sendCapabilities(session);
+        }
+    }
+
+    private void handleInventoryEdit(Session session, TrackingRequest request) {
+        UUID uuid = parsePlayerId(request.playerId);
+        List<InventoryEditRequest> edits = inventoryEdits(request);
+        if (uuid == null || edits.isEmpty()) {
+            sendControlResponse(session, request, false, "InvalidPlayerOrSlot", Map.of());
+            return;
+        }
+        Player onlinePlayer = Bukkit.getPlayer(uuid);
+        if (onlinePlayer == null || !onlinePlayer.isOnline()) {
+            sendControlResponse(session, request, false, "PlayerOffline", Map.of());
+            return;
+        }
+        Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            long currentInventoryRevision = inventoryRevision(uuid);
+            if (request.baseInventoryRevision >= 0L && request.baseInventoryRevision != currentInventoryRevision) {
+                sendControlResponse(session, request, false, "InventoryChanged", Map.of("playerData", livePlayerData(onlinePlayer)));
+                sendLivePlayerData(onlinePlayer, "inventoryChanged");
+                return;
+            }
+            boolean success = true;
+            for (InventoryEditRequest edit : edits) {
+                if (!isValidInventorySlot(onlinePlayer, edit.slot)) {
+                    success = false;
+                    break;
+                }
+            }
+            if (success) {
+                for (InventoryEditRequest edit : edits) {
+                    if (!applyInventoryEdit(onlinePlayer, edit.slot, itemFromRequest(edit))) {
+                        success = false;
+                        break;
+                    }
+                }
+            }
+            if (success) {
+                onlinePlayer.updateInventory();
+                bumpInventoryRevision(onlinePlayer.getUniqueId());
+                bumpStateRevision(onlinePlayer.getUniqueId());
+                LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+                payload.put("playerData", livePlayerData(onlinePlayer));
+                sendControlResponse(session, request, true, "InventoryUpdated", payload);
+                sendLivePlayerData(onlinePlayer, "inventoryEdit");
+            } else {
+                sendControlResponse(session, request, false, "InventoryEditFailed", Map.of());
+            }
+        });
+    }
+
+    private boolean isValidInventorySlot(Player player, String slot) {
+        if (player == null || slot == null || slot.isBlank()) {
+            return false;
+        }
+        try {
+            if (slot.startsWith("enderchest.")) {
+                int index = parseSlot(slot, "enderchest.");
+                return index >= 0 && index < player.getEnderChest().getSize();
+            }
+            if (slot.startsWith("hotbar.")) {
+                int index = parseSlot(slot, "hotbar.");
+                return index >= 0 && index < 9;
+            }
+            if (slot.startsWith("inventory.")) {
+                int index = parseSlot(slot, "inventory.");
+                return index >= 0 && index < 27;
+            }
+            return switch (slot) {
+                case "armor.head", "armor.chest", "armor.legs", "armor.feet", "weapon.offhand" -> true;
+                default -> false;
+            };
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private List<InventoryEditRequest> inventoryEdits(TrackingRequest request) {
+        if (request.edits != null && !request.edits.isEmpty()) {
+            return request.edits.stream()
+                    .filter(edit -> edit != null && edit.slot != null && !edit.slot.isBlank())
+                    .toList();
+        }
+        if (request.slot == null || request.slot.isBlank()) {
+            return List.of();
+        }
+        InventoryEditRequest edit = new InventoryEditRequest();
+        edit.slot = request.slot;
+        edit.itemId = request.itemId;
+        edit.count = request.count;
+        edit.item = request.item;
+        return List.of(edit);
+    }
+
+    private boolean applyInventoryEdit(Player player, String slot, ItemStack item) {
+        try {
+            if (slot.startsWith("enderchest.")) {
+                player.getEnderChest().setItem(parseSlot(slot, "enderchest."), item);
+                return true;
+            }
+            if (slot.startsWith("hotbar.")) {
+                player.getInventory().setItem(parseSlot(slot, "hotbar."), item);
+                return true;
+            }
+            if (slot.startsWith("inventory.")) {
+                player.getInventory().setItem(parseSlot(slot, "inventory.") + 9, item);
+                return true;
+            }
+            switch (slot) {
+                case "armor.head" -> player.getInventory().setHelmet(item);
+                case "armor.chest" -> player.getInventory().setChestplate(item);
+                case "armor.legs" -> player.getInventory().setLeggings(item);
+                case "armor.feet" -> player.getInventory().setBoots(item);
+                case "weapon.offhand" -> player.getInventory().setItemInOffHand(item);
+                default -> {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private ItemStack itemFromRequest(InventoryEditRequest edit) {
+        if (edit.item != null && !edit.item.isEmpty()) {
+            try {
+                Object encoded = edit.item.get("encodedItem");
+                if (encoded instanceof String value && !value.isBlank()) {
+                    ItemStack decoded = decodeItem(value);
+                    if (decoded != null) {
+                        return decoded;
+                    }
+                }
+                LinkedHashMap<String, Object> serialized = new LinkedHashMap<>(edit.item);
+                serialized.remove("encodedItem");
+                return ItemStack.deserialize(serialized);
+            } catch (Exception ignored) {
+            }
+        }
+        String itemId = edit.itemId == null || edit.itemId.isBlank() ? "minecraft:air" : edit.itemId;
+        int count = Math.max(0, edit.count);
+        if (count <= 0 || "minecraft:air".equalsIgnoreCase(itemId)) {
+            return null;
+        }
+        Material material = Material.matchMaterial(itemId);
+        if (material == null && itemId.startsWith("minecraft:")) {
+            material = Material.matchMaterial(itemId.substring("minecraft:".length()));
+        }
+        return material == null ? null : new ItemStack(material, Math.max(1, count));
+    }
+
+    private int parseSlot(String slot, String prefix) {
+        return Integer.parseInt(slot.substring(prefix.length()));
+    }
+
+    private void sendPlayerDataSnapshot(Session session, TrackingRequest request) {
+        UUID uuid = parsePlayerId(request.playerId);
+        Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            Player player = uuid != null ? Bukkit.getPlayer(uuid) : null;
+            if (player == null || !player.isOnline()) {
+                sendControlResponse(session, request, false, "PlayerOffline", Map.of());
+                return;
+            }
+            sendControlResponse(session, request, true, "PlayerData", Map.of("playerData", livePlayerData(player)));
+        });
+    }
+
+    private void sendInventorySnapshot(Session session, TrackingRequest request, boolean ender) {
+        UUID uuid = parsePlayerId(request.playerId);
+        Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            Player player = uuid != null ? Bukkit.getPlayer(uuid) : null;
+            if (player == null || !player.isOnline()) {
+                sendControlResponse(session, request, false, "PlayerOffline", Map.of());
+                return;
+            }
+            Map<String, Object> data = ender
+                    ? Map.of("enderChest", itemList(player.getEnderChest().getContents(), 0))
+                    : Map.of("inventory", itemList(player.getInventory().getStorageContents(), 0), "armor", armorList(player), "offhand", itemList(new ItemStack[] { player.getInventory().getItemInOffHand() }, -106));
+            sendControlResponse(session, request, true, ender ? "EnderSnapshot" : "InventorySnapshot", data);
+        });
+    }
+
+    private void sendGameRulesList(Session session, TrackingRequest request) {
+        World world = resolveWorld(request.worldName);
+        if (world == null) {
+            sendControlResponse(session, request, false, "WorldUnavailable", Map.of());
+            return;
+        }
+        List<Map<String, Object>> rules = new ArrayList<>();
+        for (String name : world.getGameRules()) {
+            Object value = world.getGameRuleValue(name);
+            rules.add(Map.of("key", name, "value", value == null ? "" : String.valueOf(value), "type", value instanceof Boolean ? "boolean" : value instanceof Number ? "integer" : "string"));
+        }
+        sendControlResponse(session, request, true, "GameRules", Map.of("worldName", world.getName(), "rules", rules));
+    }
+
+    private void setGameRule(Session session, TrackingRequest request) {
+        World world = resolveWorld(request.worldName);
+        if (world == null || request.key == null || request.value == null) {
+            sendControlResponse(session, request, false, "InvalidGameRule", Map.of());
+            return;
+        }
+        Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            boolean success = world.setGameRuleValue(request.key, request.value);
+            sendControlResponse(session, request, success, success ? "GameRuleUpdated" : "InvalidGameRule", Map.of());
+        });
+    }
+
+    private void sendLiveSettingsList(Session session, TrackingRequest request) {
+        World world = resolveWorld(request.worldName);
+        if (world == null) {
+            sendControlResponse(session, request, false, "WorldUnavailable", Map.of());
+            return;
+        }
+        List<Map<String, Object>> settings = List.of(
+                Map.of("key", "difficulty", "value", world.getDifficulty().name().toLowerCase(), "type", "string"),
+                Map.of("key", "time", "value", String.valueOf(world.getTime()), "type", "integer"),
+                Map.of("key", "storm", "value", String.valueOf(world.hasStorm()), "type", "boolean"),
+                Map.of("key", "thundering", "value", String.valueOf(world.isThundering()), "type", "boolean")
+        );
+        sendControlResponse(session, request, true, "LiveSettings", Map.of("worldName", world.getName(), "settings", settings));
+    }
+
+    private void setLiveSetting(Session session, TrackingRequest request) {
+        World world = resolveWorld(request.worldName);
+        if (world == null || request.key == null || request.value == null) {
+            sendControlResponse(session, request, false, "InvalidLiveSetting", Map.of());
+            return;
+        }
+        Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            boolean success = true;
+            try {
+                switch (request.key) {
+                    case "time" -> world.setTime(Long.parseLong(request.value));
+                    case "storm" -> world.setStorm(Boolean.parseBoolean(request.value));
+                    case "thundering" -> world.setThundering(Boolean.parseBoolean(request.value));
+                    case "difficulty" -> world.setDifficulty(org.bukkit.Difficulty.valueOf(request.value.toUpperCase()));
+                    default -> success = false;
+                }
+            } catch (Exception e) {
+                success = false;
+            }
+            sendControlResponse(session, request, success, success ? "LiveSettingUpdated" : "InvalidLiveSetting", Map.of());
+        });
+    }
+
+    private World resolveWorld(String worldName) {
+        if (worldName != null && !worldName.isBlank()) {
+            World world = Bukkit.getWorld(worldName);
+            if (world != null) return world;
+        }
+        return Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().getFirst();
+    }
+
+    private PlayerDossier enrichDossier(PlayerDossier dossier) {
+        if (dossier == null || dossier.getPlayerId() == null) {
+            return dossier;
+        }
+        UUID uuid = parsePlayerId(dossier.getPlayerId());
+        if (uuid == null) {
+            return dossier;
+        }
+        Player player = Bukkit.getPlayer(uuid);
+        if (player == null || !player.isOnline()) {
+            return dossier;
+        }
+        PlayerDossier copy = dossier.copy();
+        PlayerFacetState facet = new PlayerFacetState();
+        facet.setFacetId("playerData");
+        facet.setModuleId(getModuleId());
+        facet.setUpdatedAt(System.currentTimeMillis());
+        facet.setData(livePlayerData(player));
+        copy.getFacets().put("playerData", facet);
+        return copy;
+    }
+
+    private Map<String, Object> livePlayerData(Player player) {
+        syncInventoryRevisionIfChanged(player);
+        LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+        data.put("health", player.getHealth());
+        data.put("food", player.getFoodLevel());
+        data.put("saturation", player.getSaturation());
+        data.put("experienceLevel", player.getLevel());
+        data.put("experienceProgress", player.getExp());
+        data.put("totalExperience", player.getTotalExperience());
+        data.put("gameMode", player.getGameMode().name().toLowerCase());
+        data.put("flying", player.isFlying());
+        data.put("fallFlying", player.isGliding());
+        data.put("stateRevision", stateRevision(player.getUniqueId()));
+        data.put("inventoryRevision", inventoryRevision(player.getUniqueId()));
+        data.put("location", locationData(player.getLocation()));
+        data.put("inventory", itemList(player.getInventory().getStorageContents(), 0));
+        data.put("armor", armorList(player));
+        data.put("offhand", itemList(new ItemStack[] { player.getInventory().getItemInOffHand() }, -106));
+        data.put("enderChest", itemList(player.getEnderChest().getContents(), 0));
+        data.put("effects", player.getActivePotionEffects().stream().map(effect -> {
+            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+            out.put("id", effect.getType().getKey().toString());
+            out.put("amplifier", effect.getAmplifier());
+            out.put("duration", effect.getDuration());
+            out.put("ambient", effect.isAmbient());
+            out.put("showParticles", effect.hasParticles());
+            return out;
+        }).toList());
+        data.put("attributes", attributes(player));
+        return data;
+    }
+
+    private Map<String, Object> locationData(Location location) {
+        LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+        data.put("x", location.getX());
+        data.put("y", location.getY());
+        data.put("z", location.getZ());
+        data.put("yaw", location.getYaw());
+        data.put("pitch", location.getPitch());
+        data.put("dimension", location.getWorld() != null ? location.getWorld().getName() : "");
+        return data;
+    }
+
+    private List<Map<String, Object>> armorList(Player player) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        for (int i = 0; i < armor.length; i++) {
+            Map<String, Object> item = itemData(armor[i], 100 + i);
+            if (!item.isEmpty()) {
+                items.add(item);
+            }
+        }
+        return items;
+    }
+
+    private List<Map<String, Object>> itemList(ItemStack[] contents, int slotOffset) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (contents == null) {
+            return items;
+        }
+        for (int i = 0; i < contents.length; i++) {
+            int slot = slotOffset == -106 ? -106 : i + slotOffset;
+            Map<String, Object> item = itemData(contents[i], slot);
+            if (!item.isEmpty()) {
+                items.add(item);
+            }
+        }
+        return items;
+    }
+
+    private Map<String, Object> itemData(ItemStack item, int slot) {
+        if (item == null || item.getType().isAir()) {
+            return Map.of();
+        }
+        LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+        data.put("id", item.getType().getKey().toString());
+        data.put("count", item.getAmount());
+        data.put("slot", slot);
+        LinkedHashMap<String, Object> tag = new LinkedHashMap<>(item.serialize());
+        tag.put("encodedItem", encodeItem(item));
+        data.put("tag", tag);
+        return data;
+    }
+
+    private String encodeItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return "";
+        }
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            BukkitObjectOutputStream data = new BukkitObjectOutputStream(output);
+            data.writeObject(item);
+            data.close();
+            return Base64.getEncoder().encodeToString(output.toByteArray());
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private ItemStack decodeItem(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] raw = Base64.getDecoder().decode(encoded);
+            BukkitObjectInputStream data = new BukkitObjectInputStream(new ByteArrayInputStream(raw));
+            Object value = data.readObject();
+            data.close();
+            return value instanceof ItemStack item ? item : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private List<Map<String, Object>> attributes(Player player) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Attribute attribute : Attribute.values()) {
+            AttributeInstance instance = player.getAttribute(attribute);
+            if (instance == null) {
+                continue;
+            }
+            LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+            data.put("id", attribute.getKey().toString());
+            data.put("base", instance.getBaseValue());
+            data.put("value", instance.getValue());
+            out.add(data);
+        }
+        return out;
+    }
+
+    private void sendControlResult(Session session, String action, boolean success, String reason) {
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("type", "player_control_result");
+        response.put("version", 1);
+        response.put("action", action);
+        response.put("success", success);
+        response.put("reason", reason);
+        sendRaw(session, response);
+    }
+
+    private void sendControlResponse(Session session, TrackingRequest request, boolean success, String reason, Map<String, Object> payload) {
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("type", "player_control_response");
+        response.put("version", 1);
+        response.put("requestId", request.requestId);
+        response.put("action", request.action);
+        response.put("success", success);
+        response.put("reason", reason);
+        if (payload != null) {
+            response.putAll(payload);
+        }
+        sendRaw(session, response);
     }
 
     private void linkSession(Session session, String playerId) {
@@ -241,6 +839,130 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         }
     }
 
+    private void broadcastLivePlayerData() {
+        if (subscribedSessions.isEmpty()) {
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendLivePlayerData(player, "livePlayerData");
+        }
+    }
+
+    private void scheduleThrottledLivePlayerDataBroadcast(Player player, long throttleMs) {
+        if (player == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = lastLiveBroadcastAt.get(player.getUniqueId());
+        if (last != null && now - last < throttleMs) {
+            return;
+        }
+        lastLiveBroadcastAt.put(player.getUniqueId(), now);
+        scheduleLivePlayerDataBroadcast(player, 1L, false, false);
+    }
+
+    private void scheduleLivePlayerDataBroadcast(Player player, long delayTicks, boolean replacePending, boolean inventoryChanged) {
+        if (player == null) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        if (inventoryChanged) {
+            pendingInventoryRevisionPlayers.add(uuid);
+        }
+        Integer existing = pendingLiveBroadcastTasks.get(uuid);
+        if (existing != null) {
+            if (!replacePending) {
+                return;
+            }
+            Bukkit.getScheduler().cancelTask(existing);
+        }
+        int taskId = Bukkit.getScheduler().scheduleSyncDelayedTask(context.getPlugin(), () -> {
+            pendingLiveBroadcastTasks.remove(uuid);
+            Player current = Bukkit.getPlayer(uuid);
+            if (current != null && current.isOnline()) {
+                if (pendingInventoryRevisionPlayers.remove(uuid)) {
+                    syncInventoryRevisionIfChanged(current);
+                }
+                bumpStateRevision(uuid);
+                lastLiveBroadcastAt.put(uuid, System.currentTimeMillis());
+                sendLivePlayerData(current, "livePlayerData");
+            }
+        }, Math.max(0L, delayTicks));
+        pendingLiveBroadcastTasks.put(uuid, taskId);
+    }
+
+    private long stateRevision(UUID uuid) {
+        return uuid == null ? 0L : stateRevisions.getOrDefault(uuid, 0L);
+    }
+
+    private long inventoryRevision(UUID uuid) {
+        return uuid == null ? 0L : inventoryRevisions.getOrDefault(uuid, 0L);
+    }
+
+    private long bumpStateRevision(UUID uuid) {
+        return uuid == null ? 0L : stateRevisions.merge(uuid, 1L, Long::sum);
+    }
+
+    private long bumpInventoryRevision(UUID uuid) {
+        return uuid == null ? 0L : inventoryRevisions.merge(uuid, 1L, Long::sum);
+    }
+
+    private void syncInventoryRevisionIfChanged(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        String signature = inventorySignature(player);
+        String previous = lastInventorySignatures.put(uuid, signature);
+        if (previous != null && !Objects.equals(previous, signature)) {
+            bumpInventoryRevision(uuid);
+        }
+    }
+
+    private String inventorySignature(Player player) {
+        StringBuilder builder = new StringBuilder();
+        appendInventorySignature(builder, player.getInventory().getStorageContents());
+        appendInventorySignature(builder, player.getInventory().getArmorContents());
+        appendInventorySignature(builder, new ItemStack[] { player.getInventory().getItemInOffHand() });
+        appendInventorySignature(builder, player.getEnderChest().getContents());
+        return builder.toString();
+    }
+
+    private void appendInventorySignature(StringBuilder builder, ItemStack[] contents) {
+        if (contents == null) {
+            builder.append("null;");
+            return;
+        }
+        for (int index = 0; index < contents.length; index++) {
+            ItemStack item = contents[index];
+            if (item == null || item.getType().isAir()) {
+                builder.append(index).append(":air;");
+                continue;
+            }
+            builder.append(index).append(':')
+                    .append(item.getType().getKey())
+                    .append(':')
+                    .append(item.getAmount())
+                    .append(':')
+                    .append(item.serialize().hashCode())
+                    .append(';');
+        }
+    }
+
+    private void sendLivePlayerData(Player player, String reason) {
+        if (player == null || subscribedSessions.isEmpty()) {
+            return;
+        }
+        PlayerDossier dossier = trackingService.getDossier(player.getUniqueId());
+        if (dossier == null) {
+            trackingService.markOnline(player, "live");
+            dossier = trackingService.getDossier(player.getUniqueId());
+        }
+        if (dossier != null) {
+            broadcast(PlayerTrackingUpdate.delta(reason, enrichDossier(dossier)));
+        }
+    }
+
     private void send(Session session, PlayerTrackingUpdate update) {
         if (session == null || update == null || !session.getConnection().getWebSocket().isOpen()) {
             return;
@@ -251,8 +973,38 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         codec.sendMessage(session.getConnection().getWebSocket(), message, channelId, true);
     }
 
+    private void sendRaw(Session session, Object payload) {
+        if (session == null || payload == null || !session.getConnection().getWebSocket().isOpen()) {
+            return;
+        }
+        DataMessage message = new DataMessage();
+        message.setChannel(channelId);
+        message.setPayload(gson.toJson(payload).getBytes(StandardCharsets.UTF_8));
+        codec.sendMessage(session.getConnection().getWebSocket(), message, channelId, true);
+    }
+
     private static class TrackingRequest {
+        private String type;
+        private String requestId;
         private String action;
         private String playerId;
+        private String playerName;
+        private boolean online;
+        private String slot;
+        private String itemId;
+        private int count;
+        private long baseInventoryRevision = -1L;
+        private Map<String, Object> item;
+        private List<InventoryEditRequest> edits;
+        private String worldName;
+        private String key;
+        private String value;
+    }
+
+    private static class InventoryEditRequest {
+        private String slot;
+        private String itemId;
+        private int count;
+        private Map<String, Object> item;
     }
 }

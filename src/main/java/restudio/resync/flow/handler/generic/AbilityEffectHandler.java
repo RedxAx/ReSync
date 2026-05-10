@@ -32,6 +32,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import restudio.flow.data.CustomContentDefinition;
@@ -316,12 +317,10 @@ public class AbilityEffectHandler implements NodeHandler {
         operations.put("leap_to_location", (ctx, node) -> {
             Entity target = target(ctx, node);
             Location location = location(ctx, node);
-            double strength = number(ctx, node, "strength", 1.0);
-            double upwardStrength = number(ctx, node, "upward_strength", 0.2);
             if (target != null && location != null) {
-                Vector vector = location.toVector().subtract(target.getLocation().toVector()).normalize().multiply(strength);
-                vector.setY(vector.getY() + upwardStrength);
-                target.setVelocity(vector);
+                LeapResult result = leapToLocation(ctx, node, target, location);
+                ctx.setOutput(node, "destination", result != null ? result.destination() : null);
+                ctx.setOutput(node, "blocked", result != null && result.blocked());
             }
             ctx.triggerOutput("flow");
         });
@@ -850,6 +849,168 @@ public class AbilityEffectHandler implements NodeHandler {
             }
         }
         ctx.triggerOutput("flow");
+    }
+
+    private LeapResult leapToLocation(FlowContext ctx, FlowNode node, Entity target, Location requestedLocation) {
+        Location start = target.getLocation();
+        if (start.getWorld() == null || requestedLocation.getWorld() == null || !start.getWorld().equals(requestedLocation.getWorld())) {
+            return null;
+        }
+        int duration = Math.min(200, Math.max(1, integer(ctx, node, "duration_ticks", 20)));
+        double arrivalRadius = Math.max(0.05, number(ctx, node, "arrival_radius", 0.35));
+        LeapResult result = leapPath(target, start, requestedLocation, duration);
+        target.setVelocity(new Vector(0.0, 0.0, 0.0));
+        for (int tick = 1; tick <= result.points().size(); tick++) {
+            int scheduledTick = tick;
+            Location point = result.points().get(tick - 1);
+            ctx.runLater(() -> moveAlongLeapPath(target, point), scheduledTick);
+        }
+        ctx.runLater(() -> {
+            if (!target.isValid() || !(target instanceof Player)) {
+                return;
+            }
+            Location current = target.getLocation();
+            Location destination = result.destination();
+            if (current.getWorld() != null && current.getWorld().equals(destination.getWorld()) && current.distanceSquared(destination) <= arrivalRadius * arrivalRadius) {
+                target.setVelocity(new Vector(0.0, 0.0, 0.0));
+                target.setFallDistance(0.0f);
+            }
+        }, duration + 1);
+        return result;
+    }
+
+    private LeapResult leapPath(Entity target, Location start, Location requestedDestination, int duration) {
+        Location destination = nearestLeapDestination(target, requestedDestination);
+        boolean adjustedDestination = destination.distanceSquared(requestedDestination) > 0.01;
+        double distance = Math.max(0.0, start.distance(destination));
+        double baseHeight = Math.min(12.0, Math.max(1.25, distance * 0.28));
+        for (int attempt = 0; attempt < 5; attempt++) {
+            List<Location> points = leapPoints(start, destination, duration, baseHeight + attempt * 1.5);
+            if (firstBlockedLeapPoint(target, points) == null) {
+                return new LeapResult(destination, points, adjustedDestination);
+            }
+        }
+        List<Location> points = leapPoints(start, destination, duration, baseHeight);
+        List<Location> reachable = new ArrayList<>();
+        Location lastClear = start.clone();
+        for (Location point : points) {
+            if (!hasEntitySpace(target, point)) {
+                break;
+            }
+            lastClear = point;
+            reachable.add(point);
+        }
+        Location fallback = nearestLeapDestination(target, lastClear);
+        if (!sameBlock(lastClear, fallback) && hasEntitySpace(target, fallback)) {
+            reachable.add(fallback);
+        }
+        return new LeapResult(fallback, reachable, true);
+    }
+
+    private List<Location> leapPoints(Location start, Location destination, int duration, double arcHeight) {
+        List<Location> points = new ArrayList<>();
+        for (int tick = 1; tick <= duration; tick++) {
+            double progress = tick / (double) duration;
+            double smooth = progress * progress * (3.0 - 2.0 * progress);
+            points.add(start.clone().add(
+                (destination.getX() - start.getX()) * smooth,
+                (destination.getY() - start.getY()) * smooth + Math.sin(Math.PI * smooth) * arcHeight,
+                (destination.getZ() - start.getZ()) * smooth
+            ));
+        }
+        return points;
+    }
+
+    private Location firstBlockedLeapPoint(Entity target, List<Location> points) {
+        for (Location point : points) {
+            if (!hasEntitySpace(target, point)) {
+                return point;
+            }
+        }
+        return null;
+    }
+
+    private void moveAlongLeapPath(Entity target, Location point) {
+        if (!target.isValid() || !hasEntitySpace(target, point)) {
+            return;
+        }
+        Location current = target.getLocation();
+        if (target instanceof Player) {
+            target.setVelocity(point.toVector().subtract(current.toVector()));
+        } else {
+            Location targetLocation = point.clone();
+            targetLocation.setYaw(current.getYaw());
+            targetLocation.setPitch(current.getPitch());
+            target.teleport(targetLocation);
+            target.setVelocity(new Vector(0.0, 0.0, 0.0));
+        }
+        target.setFallDistance(0.0f);
+    }
+
+    private Location nearestLeapDestination(Entity target, Location destination) {
+        if (hasEntitySpace(target, destination)) {
+            return destination.clone();
+        }
+        if (destination.getWorld() == null) {
+            return destination.clone();
+        }
+        Location best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int y = -2; y <= 3; y++) {
+            for (int radius = 0; radius <= 2; radius++) {
+                for (int x = -radius; x <= radius; x++) {
+                    for (int z = -radius; z <= radius; z++) {
+                        if (Math.abs(x) != radius && Math.abs(z) != radius) {
+                            continue;
+                        }
+                        Location candidate = destination.clone().add(x, y, z);
+                        if (!hasEntitySpace(target, candidate)) {
+                            continue;
+                        }
+                        double distance = candidate.distanceSquared(destination);
+                        if (distance < bestDistance) {
+                            best = candidate;
+                            bestDistance = distance;
+                        }
+                    }
+                }
+            }
+        }
+        return best != null ? best : destination.clone();
+    }
+
+    private boolean hasEntitySpace(Entity target, Location location) {
+        World world = location.getWorld();
+        if (world == null) {
+            return false;
+        }
+        BoundingBox bounds = target.getBoundingBox();
+        double width = Math.max(0.6, Math.max(bounds.getWidthX(), bounds.getWidthZ()));
+        double height = Math.max(1.0, bounds.getHeight());
+        double halfWidth = width * 0.5;
+        int minX = (int) Math.floor(location.getX() - halfWidth);
+        int maxX = (int) Math.floor(location.getX() + halfWidth);
+        int minY = (int) Math.floor(location.getY());
+        int maxY = (int) Math.floor(location.getY() + height);
+        int minZ = (int) Math.floor(location.getZ() - halfWidth);
+        int maxZ = (int) Math.floor(location.getZ() + halfWidth);
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    if (!world.getBlockAt(x, y, z).isPassable()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean sameBlock(Location first, Location second) {
+        return first.getBlockX() == second.getBlockX() && first.getBlockY() == second.getBlockY() && first.getBlockZ() == second.getBlockZ();
+    }
+
+    private record LeapResult(Location destination, List<Location> points, boolean blocked) {
     }
 
     private List<Entity> entitiesAround(FlowContext ctx, FlowNode node) {

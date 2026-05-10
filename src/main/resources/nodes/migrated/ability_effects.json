@@ -643,11 +643,13 @@
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "target", "dataType": "entity" },
       { "name": "location", "dataType": "location" },
-      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
-      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.2 }
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 20 },
+      { "name": "arrival_radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.35 }
     ],
     "outputs": [
-      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "destination", "dataType": "location" },
+      { "name": "blocked", "dataType": "boolean" }
     ]
   },
   {

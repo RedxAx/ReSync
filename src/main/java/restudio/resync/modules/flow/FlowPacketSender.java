@@ -76,6 +76,10 @@ public class FlowPacketSender {
         sendJsonPacket(session, (byte) 0x32, gson.toJson(content), "CONTENT_TOO_LARGE", "Custom content data exceeds maximum size");
     }
 
+    public void sendProjectMetadataData(Session session, String json) {
+        sendJsonPacket(session, (byte) 0x52, json, "PROJECT_METADATA_TOO_LARGE", "Project metadata exceeds maximum size");
+    }
+
     public void sendFlowSaveAck(Session session, String flowId) {
         sendIdAck(session, (byte) 0x07, flowId);
     }
@@ -94,6 +98,10 @@ public class FlowPacketSender {
 
     public void sendCustomContentSaveAck(Session session, String contentId) {
         sendIdAck(session, (byte) 0x35, contentId);
+    }
+
+    public void sendProjectMetadataSaveAck(Session session, String metadataId) {
+        sendIdAck(session, (byte) 0x56, metadataId);
     }
 
     public JobRecord<String> beginJob(Session session, String action, String target) {
@@ -144,6 +152,10 @@ public class FlowPacketSender {
 
     public void sendCustomContentList(Session session, List<String> contentIds) {
         sendStringList(session, (byte) 0x31, contentIds);
+    }
+
+    public void sendProjectMetadataList(Session session, List<String> metadataIds) {
+        sendStringList(session, (byte) 0x53, metadataIds);
     }
 
     public void sendGuiState(Session session, boolean editable, String guiId, String flowId) {

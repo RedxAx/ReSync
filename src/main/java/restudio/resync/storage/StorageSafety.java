@@ -59,9 +59,6 @@ public final class StorageSafety {
         if (!target.startsWith(root) || target.getParent() == null || !target.getParent().equals(root)) {
             throw new IOException("Unsafe write target: " + file);
         }
-        if (Files.exists(target)) {
-            Files.copy(target, target.resolveSibling(target.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
-        }
         Path temp = Files.createTempFile(root, target.getFileName().toString(), ".tmp");
         try {
             Files.writeString(temp, content == null ? "" : content, StandardCharsets.UTF_8);

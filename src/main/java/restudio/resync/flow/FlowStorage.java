@@ -6,9 +6,9 @@ import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
-
 import restudio.resync.Log;
 import restudio.resync.storage.StorageSafety;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -27,6 +27,7 @@ public class FlowStorage {
     private final File guiDir;
     private final File scoreboardDir;
     private final File tabDir;
+    private final File projectMetadataDir;
     private final File configFile;
     private static final String DEFAULT_SCOREBOARD_ID_KEY = "flow.default-scoreboard.id";
     private static final String DEFAULT_SCOREBOARD_USE_PAPI_KEY = "flow.default-scoreboard.usePapi";
@@ -37,6 +38,7 @@ public class FlowStorage {
     private final Map<String, GuiDefinition> guiCache = new ConcurrentHashMap<>();
     private final Map<String, ScoreboardDefinition> scoreboardCache = new ConcurrentHashMap<>();
     private final Map<String, TabDefinition> tabCache = new ConcurrentHashMap<>();
+    private final Map<String, String> projectMetadataCache = new ConcurrentHashMap<>();
     private volatile String defaultScoreboardId;
     private volatile boolean defaultScoreboardUsePapi = true;
     private volatile String defaultTabId;
@@ -52,6 +54,7 @@ public class FlowStorage {
         this.guiDir = new File(dataFolder, "guis");
         this.scoreboardDir = new File(dataFolder, "scoreboards");
         this.tabDir = new File(dataFolder, "tabs");
+        this.projectMetadataDir = new File(dataFolder, "project-metadata");
         this.configFile = new File(dataFolder, "config.properties");
         if (!flowDir.exists()) {
             flowDir.mkdirs();
@@ -64,6 +67,9 @@ public class FlowStorage {
         }
         if (!tabDir.exists()) {
             tabDir.mkdirs();
+        }
+        if (!projectMetadataDir.exists()) {
+            projectMetadataDir.mkdirs();
         }
         loadDefaultScoreboard();
         loadDefaultTab();
@@ -316,6 +322,56 @@ public class FlowStorage {
         return graphCache;
     }
 
+    public String getProjectMetadata(String id) {
+        String safeId = projectMetadataId(id);
+        String cached = projectMetadataCache.get(safeId);
+        if (cached != null) {
+            return cached;
+        }
+        Path file = jsonFile(projectMetadataDir, safeId, "load project metadata");
+        if (file != null && Files.exists(file)) {
+            try {
+                String json = StorageSafety.readUtf8(file);
+                projectMetadataCache.put(safeId, json);
+                return json;
+            } catch (IOException e) {
+                Log.warn("Failed to load project metadata: " + safeId + " - " + e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    public void saveProjectMetadata(String json) {
+        String safeId = projectMetadataId("project");
+        Path file = jsonFile(projectMetadataDir, safeId, "save project metadata");
+        if (file == null) {
+            throw new IllegalStateException("Failed to resolve project metadata file");
+        }
+        try {
+            StorageSafety.writeUtf8Atomic(file, json);
+            projectMetadataCache.put(safeId, json);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to save project metadata: " + safeId, e);
+        }
+    }
+
+    public void deleteProjectMetadata(String id) {
+        String safeId = projectMetadataId(id);
+        try {
+            Path file = jsonFile(projectMetadataDir, safeId, "delete project metadata");
+            if (file != null) {
+                StorageSafety.deleteIfExists(file);
+            }
+            projectMetadataCache.remove(safeId);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to delete project metadata: " + safeId, e);
+        }
+    }
+
+    public List<String> listProjectMetadataIds() {
+        return listSafeIds(projectMetadataDir);
+    }
+
     public List<String> listFlowIds() {
         return listSafeIds(flowDir);
     }
@@ -441,6 +497,15 @@ public class FlowStorage {
         guiCache.clear();
         scoreboardCache.clear();
         tabCache.clear();
+        projectMetadataCache.clear();
+    }
+
+    private String projectMetadataId(String id) {
+        try {
+            return StorageSafety.validateId(id);
+        } catch (IllegalArgumentException e) {
+            return "project";
+        }
     }
 
     private synchronized void loadDefaultScoreboard() {

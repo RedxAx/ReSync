@@ -97,15 +97,23 @@ public class FlowBlueprintPacketHandler {
             String flowId = graph.getId().toString();
             rollbackFlowId = flowId;
             previousGraph = storage.getGraph(flowId);
-            storage.saveGraph(graph);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
+            CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
+            if (content != null) {
+                if (customContentStorage != null) {
+                    previousContent = customContentStorage.getByFlow(flowId).stream()
+                        .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
+                    customContentStorage.save(content);
+                }
+                Log.fine("Custom content saved from flow: " + content.getId());
+                sender.sendFlowSaveAck(session, flowId);
+                sender.succeedJob(job, flowId, "Saved");
+                return;
+            }
+            storage.saveGraph(graph);
             if (customContentStorage != null) {
                 previousContent = customContentStorage.getByFlow(flowId).stream()
                     .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
-                CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
-                if (content != null) {
-                    customContentStorage.save(content);
-                }
             }
             updateEventBindings(graph);
             Log.fine("Flow saved: " + flowId);

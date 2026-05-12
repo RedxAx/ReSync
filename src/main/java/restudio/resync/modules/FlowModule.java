@@ -32,6 +32,7 @@ import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
 import restudio.resync.modules.flow.FlowOptionCatalogPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
+import restudio.resync.modules.flow.FlowProjectMetadataPacketHandler;
 import restudio.resync.modules.flow.FlowScoreboardPacketHandler;
 import restudio.resync.modules.flow.FlowTabPacketHandler;
 import restudio.resync.protocol.Codec;
@@ -58,6 +59,7 @@ public class FlowModule implements Module {
     private final FlowOptionCatalogPacketHandler optionCatalogHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
     private final FlowCustomContentPacketHandler customContentHandler;
+    private final FlowProjectMetadataPacketHandler projectMetadataHandler;
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowNodePluginRegistry pluginRegistry;
     private FlowTraceService traceService;
@@ -81,6 +83,7 @@ public class FlowModule implements Module {
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry, customContentService);
         this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
+        this.projectMetadataHandler = new FlowProjectMetadataPacketHandler(storage, sender);
     }
 
     @Override
@@ -158,6 +161,10 @@ public class FlowModule implements Module {
                 case 0x43 -> handleTraceClear(session);
                 case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
                 case 0x46 -> handleDebugCommand(session, buffer);
+                case 0x50 -> projectMetadataHandler.handleRequest(session, buffer);
+                case 0x51 -> projectMetadataHandler.handleListRequest(session);
+                case 0x54 -> projectMetadataHandler.handleSave(session, buffer);
+                case 0x55 -> projectMetadataHandler.handleDelete(session, buffer);
                 default -> {
                     Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
                     sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));

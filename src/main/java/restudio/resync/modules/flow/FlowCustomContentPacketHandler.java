@@ -1,7 +1,12 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import restudio.flow.data.CustomContentDefinition;
+import restudio.flow.data.FlowDataObject;
+import restudio.flow.data.FlowDataObjectAdapter;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
 import restudio.resync.customcontent.CustomContentStorage;
@@ -15,7 +20,10 @@ import java.util.List;
 public class FlowCustomContentPacketHandler {
     private final CustomContentStorage storage;
     private final FlowPacketSender sender;
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder()
+        .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+        .registerTypeAdapter(FlowDataObject.class, new FlowDataObjectAdapter())
+        .create();
     private final CustomContentValidator validator = new CustomContentValidator();
 
     public FlowCustomContentPacketHandler(CustomContentStorage storage, FlowPacketSender sender) {

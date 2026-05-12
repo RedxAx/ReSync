@@ -14,6 +14,7 @@ public class CustomContentDefinition {
     private Integer customModelData;
     private String armorSlot = "";
     private int version = 1;
+    private FlowGraph graph;
     private List<String> lore = new ArrayList<>();
     private List<String> tags = new ArrayList<>();
     private List<CustomAbilityBinding> abilities = new ArrayList<>();
@@ -96,6 +97,14 @@ public class CustomContentDefinition {
 
     public void setVersion(int version) {
         this.version = version;
+    }
+
+    public FlowGraph getGraph() {
+        return graph;
+    }
+
+    public void setGraph(FlowGraph graph) {
+        this.graph = graph;
     }
 
     public List<String> getLore() {

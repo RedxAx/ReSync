@@ -16,14 +16,14 @@ class StorageSafetyTest {
     Path tempDir;
 
     @Test
-    void atomicWriteCreatesBackupAndKeepsTargetInRoot() throws Exception {
+    void atomicWriteOverwritesWithoutBackupAndKeepsTargetInRoot() throws Exception {
         Path file = StorageSafety.jsonFile(tempDir, "flow-one");
 
         StorageSafety.writeUtf8Atomic(file, "{\"v\":1}");
         StorageSafety.writeUtf8Atomic(file, "{\"v\":2}");
 
         assertEquals("{\"v\":2}", Files.readString(file));
-        assertEquals("{\"v\":1}", Files.readString(file.resolveSibling(file.getFileName() + ".bak")));
+        assertFalse(Files.exists(file.resolveSibling(file.getFileName() + ".bak")));
     }
 
     @Test

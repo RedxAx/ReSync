@@ -8,6 +8,10 @@ import restudio.flow.data.CustomArmorDefinition;
 import restudio.flow.data.CustomBlockDefinition;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomItemDefinition;
+import restudio.flow.data.FlowDataObject;
+import restudio.flow.data.FlowDataObjectAdapter;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.resync.Log;
 import restudio.resync.storage.StorageSafety;
 
@@ -24,7 +28,11 @@ public class CustomContentStorage {
     private final File contentDir;
     private final Path contentPath;
     private final Map<String, CustomContentDefinition> cache = new ConcurrentHashMap<>();
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final Gson gson = new GsonBuilder()
+        .setPrettyPrinting()
+        .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+        .registerTypeAdapter(FlowDataObject.class, new FlowDataObjectAdapter())
+        .create();
     private final CustomContentValidator validator = new CustomContentValidator();
 
     public CustomContentStorage(JavaPlugin plugin) {

@@ -156,7 +156,7 @@ public class CustomContentService {
             if (!passes(definition, binding, player, event, eventVars)) {
                 continue;
             }
-            FlowGraph graph = flowStorage.getGraph(binding.getFlowId());
+            FlowGraph graph = graphFor(definition, binding.getFlowId());
             if (graph == null) {
                 continue;
             }
@@ -179,11 +179,14 @@ public class CustomContentService {
 
     private CustomContentDefinition compiledDefinition(String contentId, CustomContentDefinition storedDefinition) {
         String flowId = storedDefinition.getFlowId();
-        if (flowId == null || flowId.isBlank()) {
+        FlowGraph sourceGraph = storedDefinition.getGraph();
+        if (sourceGraph == null && (flowId == null || flowId.isBlank())) {
             compiledDefinitions.remove(contentId);
             return storedDefinition;
         }
-        FlowGraph sourceGraph = flowStorage.getGraph(flowId);
+        if (sourceGraph == null) {
+            sourceGraph = flowStorage.getGraph(flowId);
+        }
         if (sourceGraph == null) {
             compiledDefinitions.remove(contentId);
             return storedDefinition;
@@ -201,6 +204,16 @@ public class CustomContentService {
         }
         compiledDefinitions.put(contentId, new CompiledContentDefinition(graphDefinition, graphIdentity, graphVersion));
         return graphDefinition;
+    }
+
+    private FlowGraph graphFor(CustomContentDefinition definition, String flowId) {
+        if (definition != null && definition.getGraph() != null) {
+            FlowGraph graph = definition.getGraph();
+            if (flowId == null || flowId.isBlank() || flowId.equals(graph.getId())) {
+                return graph;
+            }
+        }
+        return flowStorage.getGraph(flowId);
     }
 
     private boolean passes(CustomContentDefinition definition, CustomAbilityBinding binding, Player player, Event event, Map<String, Object> vars) {

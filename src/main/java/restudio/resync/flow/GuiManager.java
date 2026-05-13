@@ -171,6 +171,17 @@ public class GuiManager implements Listener {
                     }
                     break;
                 }
+                String command = el.getCommand();
+                if (command != null && !command.isBlank()) {
+                    String preparedCommand = command.trim();
+                    if (preparedCommand.startsWith("/")) {
+                        preparedCommand = preparedCommand.substring(1);
+                    }
+                    if (!preparedCommand.isBlank()) {
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), preparedCommand);
+                    }
+                    break;
+                }
                 String flowId = el.getFlowId();
                 if (flowId != null) {
                     FlowGraph graph = storage.getGraph(flowId);

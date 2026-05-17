@@ -404,7 +404,7 @@ public class WorldGenModule implements Module {
         DataMessage message = new DataMessage();
         message.setChannel(channelId);
         message.setPayload(buffer.array());
-        codec.sendMessage(session.getConnection().getWebSocket(), message, channelId, jsonBytes.length > 1024);
+        codec.sendMessage(session.getConnection().getFrameSender(), message, channelId, jsonBytes.length > 1024);
     }
 
     private record PreviewCreateRequest(WorldGenGraph graph, String previewId, String environment, long seed, String playerUuid) {

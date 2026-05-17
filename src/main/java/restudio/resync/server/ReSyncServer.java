@@ -3,6 +3,7 @@ package restudio.resync.server;
 import org.bukkit.Bukkit;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
+import org.bukkit.entity.Player;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.compression.CompressionPool;
@@ -31,6 +32,7 @@ import restudio.resync.player.PlayerTrackingManager;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.protocol.Codec;
+import restudio.resync.protocol.FrameSender;
 import restudio.resync.protocol.FrameHeader;
 import restudio.resync.protocol.MessageType;
 import restudio.resync.protocol.messages.DataMessage;
@@ -160,6 +162,57 @@ public class ReSyncServer {
         Log.fine("Client disconnected: " + conn.getRemoteSocketAddress());
     }
 
+    public ConnectionInfo onBridgeOpen(FrameSender sender) {
+        return connectionManager.createVirtualConnection(sender);
+    }
+
+    public void onBridgeClose(ConnectionInfo info) {
+        if (info == null) {
+            return;
+        }
+        Session session = sessionManager.getSession(info);
+        if (session != null) {
+            moduleRegistry.cleanupSession(session);
+        }
+        sessionManager.removeSession(info);
+        connectionManager.removeVirtualConnection(info);
+        info.setState(ConnectionState.CLOSING);
+    }
+
+    public Map<String, Integer> getBridgeChannels() {
+        return channelMuxer.getNumericChannels();
+    }
+
+    public void onBridgeMessage(ConnectionInfo info, Player player, byte[] data) {
+        if (info == null || player == null || data == null) {
+            return;
+        }
+        try {
+            String clientId = info.getClientId() != null ? info.getClientId() : player.getUniqueId().toString();
+            if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
+                sendError(info, 429, "Global rate limit exceeded");
+                return;
+            }
+            if (!rateLimiter.tryConsume(clientId, 1, config.getQueue().getMaxRequestsPerClient(), config.getQueue().getMaxRequestsPerClient(), 1000)) {
+                sendError(info, 429, "Rate limit exceeded");
+                return;
+            }
+            Codec.Frame frame = codec.decodeFrame(data);
+            if (frame.header.getMessageType() == MessageType.DATA && !info.acceptInboundDataSequence(frame.header.getSequence())) {
+                sendError(info, 409, "Stale data frame");
+                return;
+            }
+            Message payload = codec.decodePayload(frame);
+            handleBridgePayload(info, player, payload, frame.header);
+        } catch (Exception e) {
+            String reason = e.getMessage();
+            if (reason == null || reason.isBlank()) {
+                reason = e.getClass().getSimpleName();
+            }
+            Log.warn("Error handling bridge message: " + reason);
+        }
+    }
+
     public void onMessage(WebSocket conn, ByteBuffer message) {
         ConnectionInfo info = connectionManager.getConnection(conn);
         if (info == null) {
@@ -173,20 +226,20 @@ public class ReSyncServer {
         try {
             String clientId = info.getClientId() != null ? info.getClientId() : conn.getRemoteSocketAddress().toString();
             if (!rateLimiter.tryConsume("global", 1, config.getQueue().getMaxGlobalRequests(), config.getQueue().getMaxGlobalRequests(), 1000)) {
-                sendError(conn, 429, "Global rate limit exceeded");
+                sendError(info, 429, "Global rate limit exceeded");
                 return;
             }
             if (!rateLimiter.tryConsume(clientId, 1, config.getQueue().getMaxRequestsPerClient(), config.getQueue().getMaxRequestsPerClient(), 1000)) {
-                sendError(conn, 429, "Rate limit exceeded");
+                sendError(info, 429, "Rate limit exceeded");
                 return;
             }
             Codec.Frame frame = codec.decodeFrame(data);
             if (frame.header.getMessageType() == MessageType.DATA && !info.acceptInboundDataSequence(frame.header.getSequence())) {
-                sendError(conn, 409, "Stale data frame");
+                sendError(info, 409, "Stale data frame");
                 return;
             }
             Message payload = codec.decodePayload(frame);
-            handlePayload(conn, info, payload, frame.header);
+            handlePayload(info, payload, frame.header);
         } catch (Exception e) {
             String reason = e.getMessage();
             if (reason == null || reason.isBlank()) {
@@ -196,15 +249,15 @@ public class ReSyncServer {
         }
     }
 
-    private void handlePayload(WebSocket conn, ConnectionInfo info, Message payload, FrameHeader header) {
+    private void handlePayload(ConnectionInfo info, Message payload, FrameHeader header) {
         if (info.getState() != ConnectionState.AUTHENTICATED && payload.getType() != MessageType.HANDSHAKE_REQUEST) {
-            sendError(conn, 401, "Handshake required");
-            conn.close(1008, "Handshake required");
+            sendError(info, 401, "Handshake required");
+            info.getFrameSender().close(1008, "Handshake required");
             return;
         }
         switch (payload.getType()) {
-            case HANDSHAKE_REQUEST -> handleHandshake(conn, info, (HandshakeRequest) payload);
-            case SUBSCRIBE -> handleSubscribe(conn, info, (SubscribeRequest) payload);
+            case HANDSHAKE_REQUEST -> handleHandshake(info, (HandshakeRequest) payload);
+            case SUBSCRIBE -> handleSubscribe(info, (SubscribeRequest) payload);
             case UNSUBSCRIBE -> handleUnsubscribe(info, (UnsubscribeRequest) payload);
             case DATA -> handleData(info, (DataMessage) payload);
             case HEARTBEAT -> handleHeartbeat(info, (Heartbeat) payload);
@@ -212,10 +265,18 @@ public class ReSyncServer {
         }
     }
 
-    private void handleHandshake(WebSocket conn, ConnectionInfo info, HandshakeRequest req) {
+    private void handleBridgePayload(ConnectionInfo info, Player player, Message payload, FrameHeader header) {
+        if (payload.getType() == MessageType.HANDSHAKE_REQUEST) {
+            handleBridgeHandshake(info, player, (HandshakeRequest) payload);
+            return;
+        }
+        handlePayload(info, payload, header);
+    }
+
+    private void handleHandshake(ConnectionInfo info, HandshakeRequest req) {
         if (req.getProtocolVersion() != 2) {
-            sendError(conn, 400, "Unsupported protocol version");
-            conn.close(1003, "Unsupported protocol version");
+            sendError(info, 400, "Unsupported protocol version");
+            info.getFrameSender().close(1003, "Unsupported protocol version");
             return;
         }
 
@@ -223,20 +284,43 @@ public class ReSyncServer {
         try {
             identity = clientAuthorizer.authorize(req.getApiKey(), req.getClientId(), req.getClientVersion());
         } catch (SecurityException exception) {
-            sendError(conn, 401, exception.getMessage());
-            conn.close(1008, exception.getMessage());
+            sendError(info, 401, exception.getMessage());
+            info.getFrameSender().close(1008, exception.getMessage());
             return;
         }
+        completeHandshake(info, req, identity);
+    }
 
+    private void handleBridgeHandshake(ConnectionInfo info, Player player, HandshakeRequest req) {
+        if (req.getProtocolVersion() != 2) {
+            sendError(info, 400, "Unsupported protocol version");
+            info.getFrameSender().close(1003, "Unsupported protocol version");
+            return;
+        }
+        if (!player.isOp() && !player.hasPermission("resync.api.access")) {
+            sendError(info, 401, "No Permission");
+            info.getFrameSender().close(1008, "No Permission");
+            return;
+        }
+        String clientId = req.getClientId();
+        if (clientId == null || clientId.isBlank()) {
+            clientId = "bridge:" + player.getUniqueId();
+            req.setClientId(clientId);
+        }
+        completeHandshake(info, req, new ClientIdentity(clientId, req.getClientVersion()));
+        sessionManager.linkPlayerToSession(player.getUniqueId(), sessionManager.getSession(info));
+    }
+
+    private void completeHandshake(ConnectionInfo info, HandshakeRequest req, ClientIdentity identity) {
         Session oldSession = sessionManager.getSession(info);
         if (oldSession != null) {
             moduleRegistry.cleanupSession(oldSession);
-            sessionManager.removeSession(conn);
+            sessionManager.removeSession(info);
         }
 
         Session duplicate = sessionManager.getSessionByClientId(identity.clientId());
         if (duplicate != null && duplicate.getConnection() != info) {
-            duplicate.getConnection().getWebSocket().close(1000, "Duplicate client replaced");
+            duplicate.getConnection().getFrameSender().close(1000, "Duplicate client replaced");
         }
 
         info.setClientId(req.getClientId());
@@ -256,20 +340,20 @@ public class ReSyncServer {
         response.setSupportedTileSizes(new int[]{32, 64, 128, 256});
         response.setChannels(channelMuxer.getNumericChannels());
 
-        codec.sendMessage(conn, response, 0, false);
+        codec.sendMessage(info.getFrameSender(), response, 0, false);
         Log.info("Client authenticated: " + req.getClientId());
     }
 
-    private void handleSubscribe(WebSocket conn, ConnectionInfo info, SubscribeRequest req) {
+    private void handleSubscribe(ConnectionInfo info, SubscribeRequest req) {
         Session session = sessionManager.getSession(info);
         if (session == null) {
-            sendError(conn, 401, "Not authenticated");
+            sendError(info, 401, "Not authenticated");
             return;
         }
 
         Module module = moduleRegistry.getModuleByChannel(req.getChannelId());
         if (module == null) {
-            sendError(conn, 404, "Unknown channel: " + req.getChannelId());
+            sendError(info, 404, "Unknown channel: " + req.getChannelId());
             return;
         }
 
@@ -321,7 +405,7 @@ public class ReSyncServer {
             return;
         }
         if (!session.getSubscribedChannels().contains(channel.getId())) {
-            sendError(info.getWebSocket(), 403, "Channel subscription required");
+            sendError(info, 403, "Channel subscription required");
             return;
         }
 
@@ -330,14 +414,24 @@ public class ReSyncServer {
     }
 
     private void handleHeartbeat(ConnectionInfo info, Heartbeat req) {
-        connectionManager.updateHeartbeat(info.getWebSocket());
+        connectionManager.updateHeartbeat(info);
     }
 
     private void sendError(WebSocket conn, int code, String message) {
+        if (conn == null) {
+            return;
+        }
         ErrorMessage error = new ErrorMessage();
         error.setErrorCode(code);
         error.setErrorText(message);
         codec.sendMessage(conn, error, 0, false);
+    }
+
+    private void sendError(ConnectionInfo info, int code, String message) {
+        ErrorMessage error = new ErrorMessage();
+        error.setErrorCode(code);
+        error.setErrorText(message);
+        codec.sendMessage(info.getFrameSender(), error, 0, false);
     }
 
     public void shutdown() {

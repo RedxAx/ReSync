@@ -1,12 +1,14 @@
 package restudio.resync.core;
 
 import org.java_websocket.WebSocket;
+import restudio.resync.protocol.FrameSender;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConnectionInfo {
     private final WebSocket webSocket;
+    private final FrameSender frameSender;
     private final int connectionId;
     private final long connectionTime;
     private final AtomicLong lastHeartbeat;
@@ -18,7 +20,22 @@ public class ConnectionInfo {
     private String clientVersion;
 
     public ConnectionInfo(WebSocket webSocket, int connectionId) {
+        this(webSocket, new FrameSender() {
+            @Override
+            public void send(byte[] frame) {
+                webSocket.send(frame);
+            }
+
+            @Override
+            public void close(int code, String reason) {
+                webSocket.close(code, reason);
+            }
+        }, connectionId);
+    }
+
+    public ConnectionInfo(WebSocket webSocket, FrameSender frameSender, int connectionId) {
         this.webSocket = webSocket;
+        this.frameSender = frameSender;
         this.connectionId = connectionId;
         this.connectionTime = System.currentTimeMillis();
         this.lastHeartbeat = new AtomicLong(System.currentTimeMillis());
@@ -30,6 +47,14 @@ public class ConnectionInfo {
 
     public WebSocket getWebSocket() {
         return webSocket;
+    }
+
+    public FrameSender getFrameSender() {
+        return frameSender;
+    }
+
+    public boolean isOpen() {
+        return webSocket == null || webSocket.isOpen();
     }
 
     public int getConnectionId() {

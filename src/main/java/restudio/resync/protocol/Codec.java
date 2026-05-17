@@ -132,6 +132,11 @@ public class Codec {
         conn.send(frame);
     }
 
+    public void sendMessage(FrameSender sender, Message message, int channel, boolean compress) {
+        byte[] frame = encodeFrame(message, channel, compress);
+        sender.send(frame);
+    }
+
     public int getNextSequence() {
         return sequenceCounter.get();
     }

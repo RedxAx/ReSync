@@ -6,6 +6,7 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
+import restudio.resync.bridge.ReSyncPluginMessageBridge;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
@@ -18,6 +19,7 @@ public class ReSync extends JavaPlugin {
     private static ReSync instance;
     private WebSocketServer wsServer;
     private ReSyncServer server;
+    private ReSyncPluginMessageBridge pluginMessageBridge;
     private Object placeholderExpansion;
     private InteractiveSelectionManager interactiveSelectionManager;
 
@@ -35,6 +37,8 @@ public class ReSync extends JavaPlugin {
         }
 
         server = new ReSyncServer(this, config);
+        pluginMessageBridge = new ReSyncPluginMessageBridge(this);
+        pluginMessageBridge.register();
         interactiveSelectionManager = new InteractiveSelectionManager(this);
         interactiveSelectionManager.start();
 
@@ -90,6 +94,10 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (pluginMessageBridge != null) {
+            pluginMessageBridge.unregister();
+            pluginMessageBridge = null;
+        }
         if (server != null) {
             server.shutdown();
         }

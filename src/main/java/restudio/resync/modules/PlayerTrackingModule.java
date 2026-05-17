@@ -964,23 +964,23 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     }
 
     private void send(Session session, PlayerTrackingUpdate update) {
-        if (session == null || update == null || !session.getConnection().getWebSocket().isOpen()) {
+        if (session == null || update == null || !session.getConnection().isOpen()) {
             return;
         }
         DataMessage message = new DataMessage();
         message.setChannel(channelId);
         message.setPayload(gson.toJson(update).getBytes(StandardCharsets.UTF_8));
-        codec.sendMessage(session.getConnection().getWebSocket(), message, channelId, true);
+        codec.sendMessage(session.getConnection().getFrameSender(), message, channelId, true);
     }
 
     private void sendRaw(Session session, Object payload) {
-        if (session == null || payload == null || !session.getConnection().getWebSocket().isOpen()) {
+        if (session == null || payload == null || !session.getConnection().isOpen()) {
             return;
         }
         DataMessage message = new DataMessage();
         message.setChannel(channelId);
         message.setPayload(gson.toJson(payload).getBytes(StandardCharsets.UTF_8));
-        codec.sendMessage(session.getConnection().getWebSocket(), message, channelId, true);
+        codec.sendMessage(session.getConnection().getFrameSender(), message, channelId, true);
     }
 
     private static class TrackingRequest {

@@ -252,7 +252,7 @@ public class ChunkModule implements Module {
             }
 
             for (Session waitingSession : waitingSessions) {
-                if (waitingSession.getConnection().getWebSocket().isOpen()) {
+                if (waitingSession.getConnection().isOpen()) {
                     sendChunkData(waitingSession, chunkData);
                 }
             }
@@ -328,7 +328,7 @@ public class ChunkModule implements Module {
     }
 
     private void sendChunkData(Session session, byte[] chunkData) {
-        if (!session.getConnection().getWebSocket().isOpen()) {
+        if (!session.getConnection().isOpen()) {
             return;
         }
 
@@ -366,7 +366,7 @@ public class ChunkModule implements Module {
         message.setChannel(CHUNK_CHANNEL);
 
         byte[] frame = codec.encodeFrame(message, CHUNK_CHANNEL, true, true);
-        session.getConnection().getWebSocket().send(frame);
+        session.getConnection().getFrameSender().send(frame);
         session.getConnection().addBytesSent(frame.length);
     }
 
@@ -378,7 +378,7 @@ public class ChunkModule implements Module {
             Session session = entry.getKey();
             SessionBatch batch = entry.getValue();
 
-            if (!session.getConnection().getWebSocket().isOpen()) {
+            if (!session.getConnection().isOpen()) {
                 batches.remove(session);
                 continue;
             }
@@ -393,7 +393,7 @@ public class ChunkModule implements Module {
     }
 
     private void sendError(Session session, String errorText) {
-        if (!session.getConnection().getWebSocket().isOpen()) {
+        if (!session.getConnection().isOpen()) {
             return;
         }
 
@@ -402,7 +402,7 @@ public class ChunkModule implements Module {
         error.setErrorText(errorText);
 
         byte[] frame = codec.encodeFrame(error, 0, false);
-        session.getConnection().getWebSocket().send(frame);
+        session.getConnection().getFrameSender().send(frame);
     }
 
     private static String readSizedString(ByteBuffer buffer, int length) {

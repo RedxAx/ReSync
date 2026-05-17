@@ -299,13 +299,13 @@ public class WorldManagementModule implements Module, WorldManagementListener {
     }
 
     private void send(Session session, WorldChannelMessage message) {
-        if (session == null || message == null || session.getConnection() == null || !session.getConnection().getWebSocket().isOpen()) {
+        if (session == null || message == null || session.getConnection() == null || !session.getConnection().isOpen()) {
             return;
         }
         DataMessage output = new DataMessage();
         output.setChannel(channelId);
         output.setPayload(gson.toJson(message).getBytes(StandardCharsets.UTF_8));
-        codec.sendMessage(session.getConnection().getWebSocket(), output, channelId, true);
+        codec.sendMessage(session.getConnection().getFrameSender(), output, channelId, true);
     }
 
     private static class RequestMessage {

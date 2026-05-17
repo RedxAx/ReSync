@@ -324,6 +324,6 @@ public class FlowPacketSender {
         DataMessage msg = new DataMessage();
         msg.setChannel(channelId);
         msg.setPayload(payload);
-        codec.sendMessage(session.getConnection().getWebSocket(), msg, channelId, compress);
+        codec.sendMessage(session.getConnection().getFrameSender(), msg, channelId, compress);
     }
 }

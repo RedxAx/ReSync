@@ -52,7 +52,9 @@ public class SessionManager {
         String sessionId = UUID.randomUUID().toString();
         Session session = new Session(sessionId, identity.clientId(), connection, identity);
 
-        sessionsByConnection.put(connection.getWebSocket(), session);
+        if (connection.getWebSocket() != null) {
+            sessionsByConnection.put(connection.getWebSocket(), session);
+        }
         sessionsById.put(sessionId, session);
         sessionsByConnectionInfo.put(connection, session);
         sessionsByClientId.put(identity.clientId(), session);
@@ -104,6 +106,22 @@ public class SessionManager {
         }
     }
 
+    public void removeSession(ConnectionInfo connection) {
+        if (connection == null) {
+            return;
+        }
+        Session session = sessionsByConnectionInfo.remove(connection);
+        if (session != null) {
+            if (connection.getWebSocket() != null) {
+                sessionsByConnection.remove(connection.getWebSocket());
+            }
+            sessionsById.remove(session.getSessionId());
+            sessionsByClientId.remove(session.getClientId(), session);
+            sessionsByPlayer.entrySet().removeIf(entry -> entry.getValue() == session);
+            memoryMonitor.untrackSession(session);
+        }
+    }
+
     public int getSessionCount() {
         return sessionsByConnection.size();
     }
@@ -128,9 +146,9 @@ public class SessionManager {
 
             if (idleTime > sessionTimeoutMs) {
                 session.getConnection().setState(ConnectionState.TIMED_OUT);
-                session.getConnection().getWebSocket().close(1000, "Session timeout");
+                session.getConnection().getFrameSender().close(1000, "Session timeout");
             } else if (session.getMemoryUsage() > maxMemoryPerSession) {
-                session.getConnection().getWebSocket().close(1000, "Session memory limit exceeded");
+                session.getConnection().getFrameSender().close(1000, "Session memory limit exceeded");
             }
         }
     }

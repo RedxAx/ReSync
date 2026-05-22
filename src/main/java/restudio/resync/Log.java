@@ -17,6 +17,13 @@ public final class Log {
         return logger != null ? logger : Logger.getLogger("ReSync");
     }
 
+    private static String clean(String msg) {
+        if (msg == null) {
+            return "";
+        }
+        return msg.startsWith("[ReSync] ") ? msg.substring("[ReSync] ".length()) : msg;
+    }
+
     public static void setLevel(String levelName) {
         if (levelName == null) {
             return;
@@ -42,26 +49,26 @@ public final class Log {
     }
 
     public static void info(String msg) {
-        logger().info(msg);
+        logger().info(clean(msg));
     }
 
     public static void warn(String msg) {
-        logger().warning(msg);
+        logger().warning(clean(msg));
     }
 
     public static void warn(String msg, Throwable throwable) {
-        logger().log(Level.WARNING, msg, throwable);
+        logger().log(Level.WARNING, clean(msg), throwable);
     }
 
     public static void error(String msg) {
-        logger().severe(msg);
+        logger().severe(clean(msg));
     }
 
     public static void error(String msg, Throwable throwable) {
-        logger().log(Level.SEVERE, msg, throwable);
+        logger().log(Level.SEVERE, clean(msg), throwable);
     }
 
     public static void fine(String msg) {
-        logger().fine(msg);
+        logger().fine(clean(msg));
     }
 }

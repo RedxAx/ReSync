@@ -5,8 +5,10 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -61,12 +63,12 @@ public class LogicHandler implements NodeHandler {
         operations.put("equals", (ctx, node) -> {
             Object a = ctx.getInputValue(node, "a", null);
             Object b = ctx.getInputValue(node, "b", null);
-            ctx.setOutput(node, "result", (a != null && a.equals(b)) || (a == null && b == null));
+            ctx.setOutput(node, "result", dynamicEquals(a, b));
         });
         operations.put("not_equals", (ctx, node) -> {
             Object a = ctx.getInputValue(node, "a", null);
             Object b = ctx.getInputValue(node, "b", null);
-            ctx.setOutput(node, "result", !((a != null && a.equals(b)) || (a == null && b == null)));
+            ctx.setOutput(node, "result", !dynamicEquals(a, b));
         });
         operations.put("greater", (ctx, node) -> {
             Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
@@ -99,6 +101,61 @@ public class LogicHandler implements NodeHandler {
             String typeName = ctx.getInputValue(node, "type", String.class, "");
             ctx.setOutput(node, "result", matchesType(value, typeName));
         });
+    }
+
+    private static boolean dynamicEquals(Object first, Object second) {
+        if (first == null || second == null) {
+            return first == second;
+        }
+        BigDecimal firstNumber = numberValue(first);
+        BigDecimal secondNumber = numberValue(second);
+        if (firstNumber != null && secondNumber != null) {
+            return firstNumber.compareTo(secondNumber) == 0;
+        }
+        Boolean firstBoolean = booleanValue(first);
+        Boolean secondBoolean = booleanValue(second);
+        if (firstBoolean != null && secondBoolean != null) {
+            return firstBoolean.equals(secondBoolean);
+        }
+        return Objects.equals(first, second);
+    }
+
+    private static BigDecimal numberValue(Object value) {
+        if (value instanceof Number number) {
+            try {
+                return new BigDecimal(number.toString());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        if (value instanceof String string) {
+            String trimmed = string.trim();
+            if (trimmed.isEmpty()) {
+                return null;
+            }
+            try {
+                return new BigDecimal(trimmed);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Boolean booleanValue(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof String string) {
+            String trimmed = string.trim();
+            if ("true".equalsIgnoreCase(trimmed)) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase(trimmed)) {
+                return false;
+            }
+        }
+        return null;
     }
 
     private static boolean matchesType(Object value, String typeName) {

@@ -81,12 +81,12 @@ public class TextFormatHandler implements NodeHandler {
         operations.put("format_gradient", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
             String colors = ctx.getInputValue(node, "colors", String.class, "red:blue");
-            ctx.setOutput(node, "result", TextFormatter.parse("<gradient:" + colors + ">" + text + "</gradient>"));
+            ctx.setOutput(node, "result", TextFormatter.formatLegacy(TextFormatter.parse("<gradient:" + colors + ">" + text + "</gradient>")));
         });
 
         operations.put("format_mini_message", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
-            ctx.setOutput(node, "result", TextFormatter.parse(text));
+            ctx.setOutput(node, "result", TextFormatter.formatLegacy(TextFormatter.parse(text)));
         });
 
         operations.put("obfuscated", (ctx, node) -> {

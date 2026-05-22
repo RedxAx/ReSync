@@ -31,14 +31,14 @@ class CustomContentCompatibilityTest {
         CustomContentGraphAdapter.setContentProperty(graph, "tags", "rare, quest");
         CustomContentGraphAdapter.setContentProperty(graph, "enabled", false);
         CustomContentGraphAdapter.setContentProperty(graph, "priority", 7);
-        CustomContentGraphAdapter.setEnabledTriggerBranches(graph, List.of("use", "hit_entity"));
+        CustomContentGraphAdapter.setEnabledTriggerBranches(graph, List.of("use", "hit_entity", "while_holding"));
 
         CustomContentDefinition definition = CustomContentGraphAdapter.toDefinition(graph);
 
         assertEquals(42, definition.getCustomModelData());
         assertEquals(List.of("Line One", "Line Two"), definition.getLore());
         assertEquals(List.of("rare", "quest"), definition.getTags());
-        assertEquals(2, definition.getAbilities().size());
+        assertEquals(3, definition.getAbilities().size());
         assertTrue(definition.getAbilities().stream().allMatch(binding -> !binding.isEnabled()));
         assertTrue(definition.getAbilities().stream().allMatch(binding -> binding.getRule().getPriority() == 7));
     }

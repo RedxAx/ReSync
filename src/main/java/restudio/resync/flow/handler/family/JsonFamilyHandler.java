@@ -15,11 +15,13 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
@@ -83,7 +85,7 @@ public class JsonFamilyHandler implements NodeHandler {
         switch (action == null ? "get" : action.toLowerCase(Locale.ROOT)) {
             case "set" -> setValue(ctx, node, target, property);
             case "has" -> ctx.setOutput(node, "has", readValue(target, property) != null);
-            case "do", "execute" -> ctx.setOutput(node, "success", executeAction(target, property));
+            case "do", "execute" -> ctx.setOutput(node, "success", executeAction(ctx, target, property));
             default -> {
                 Object value = readValue(target, property);
                 ctx.setOutput(node, "value", value);
@@ -269,7 +271,7 @@ public class JsonFamilyHandler implements NodeHandler {
         return switch (property) {
             case "type" -> item.getType().name();
             case "display_name" -> meta != null && meta.hasDisplayName() ? meta.getDisplayName() : "";
-            case "lore" -> meta != null && meta.hasLore() ? meta.getLore() : java.util.List.of();
+            case "lore" -> meta != null && meta.hasLore() ? meta.getLore() : List.of();
             case "durability" -> meta instanceof Damageable damageable ? damageable.getDamage() : 0;
             case "max_durability" -> item.getType().getMaxDurability();
             case "enchantments" -> item.getEnchantments();
@@ -296,6 +298,10 @@ public class JsonFamilyHandler implements NodeHandler {
 
     private void setValue(FlowContext ctx, FlowNode node, Object target, String property) {
         Object value = ctx.getInputValue(node, "value", Object.class, null);
+        if (target instanceof LivingEntity living && setLivingAfterDamage(ctx, living, property, value)) {
+            ctx.setOutput(node, "success", true);
+            return;
+        }
         String methodName = "set" + toMethodSuffix(property);
         for (Method method : target.getClass().getMethods()) {
             if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
@@ -311,9 +317,9 @@ public class JsonFamilyHandler implements NodeHandler {
         ctx.setOutput(node, "success", false);
     }
 
-    private boolean executeAction(Object target, String property) {
+    private boolean executeAction(FlowContext ctx, Object target, String property) {
         if ("kill".equals(property) && target instanceof LivingEntity living) {
-            living.setHealth(0);
+            FlowMutations.setHealth(ctx, living, 0.0);
             return true;
         }
         String methodName = toMethodName(property);
@@ -324,6 +330,22 @@ public class JsonFamilyHandler implements NodeHandler {
                 return true;
             } catch (ReflectiveOperationException ignored) {
             }
+        }
+        return false;
+    }
+
+    private boolean setLivingAfterDamage(FlowContext ctx, LivingEntity living, String property, Object value) {
+        if ("health".equals(property) && value instanceof Number number) {
+            FlowMutations.setHealth(ctx, living, number.doubleValue());
+            return true;
+        }
+        if ("no_damage_ticks".equals(property) && value instanceof Number number) {
+            FlowMutations.noDamageTicks(ctx, living, number.intValue());
+            return true;
+        }
+        if ("absorption".equals(property) && value instanceof Number number) {
+            FlowMutations.setAbsorption(ctx, living, number.doubleValue());
+            return true;
         }
         return false;
     }

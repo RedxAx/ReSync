@@ -26,6 +26,7 @@ public class FlowContext {
     private final FlowRuntime runtime;
     private final FlowExecutor executor;
     private final Map<String, CompletableFuture<Void>> asyncOperations = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<Void>> beforeContinuationOperations = new ConcurrentHashMap<>();
     private final List<String> triggeredOutputs = new CopyOnWriteArrayList<>();
     private final Consumer<String> deferredOutputConsumer;
     private final AtomicLong operationCounter = new AtomicLong(0);
@@ -172,6 +173,14 @@ public class FlowContext {
         future.whenComplete((v, e) -> asyncOperations.remove(taskId));
     }
 
+    private void trackBeforeContinuationOperation(String taskId, CompletableFuture<Void> future) {
+        if (taskId == null || future == null) {
+            return;
+        }
+        beforeContinuationOperations.put(taskId, future);
+        future.whenComplete((v, e) -> beforeContinuationOperations.remove(taskId));
+    }
+
     public void setNodeOutput(String nodeId, String pinName, Object value) {
         runtime.setNodeOutput(nodeId, pinName, value);
     }
@@ -222,6 +231,22 @@ public class FlowContext {
         return future;
     }
 
+    public CompletableFuture<Void> runSyncBeforeContinuation(Runnable runnable) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        String taskId = nextOperationId("sync_continue");
+        trackAsyncOperation(taskId, future);
+        trackBeforeContinuationOperation(taskId, future);
+        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
+            try {
+                runnable.run();
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
     public CompletableFuture<Void> runLater(Runnable runnable, long delayTicks) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         String taskId = nextOperationId("later");
@@ -238,8 +263,33 @@ public class FlowContext {
         return future;
     }
 
+    public CompletableFuture<Void> runLaterBeforeContinuation(Runnable runnable, long delayTicks) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        String taskId = nextOperationId("later_continue");
+        trackAsyncOperation(taskId, future);
+        trackBeforeContinuationOperation(taskId, future);
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> {
+            try {
+                runnable.run();
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        }, delayTicks);
+
+        return future;
+    }
+
     public Map<String, CompletableFuture<Void>> getAsyncOperations() {
         return asyncOperations;
+    }
+
+    public boolean hasPendingBeforeContinuationOperations() {
+        return !beforeContinuationOperations.isEmpty();
+    }
+
+    public Map<String, CompletableFuture<Void>> getBeforeContinuationOperations() {
+        return beforeContinuationOperations;
     }
 
     public FlowContext createSubContext(Map<String, Object> variables) {

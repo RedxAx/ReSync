@@ -62,7 +62,7 @@ public class PlayerActionHandler implements NodeHandler {
             Player target = ctx.getInputValue(node, "target", Player.class, null);
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (target != null) {
-                target.sendMessage(TextFormatter.parse(text));
+                target.sendMessage(TextFormatter.formatLegacy(text));
             }
         });
 
@@ -648,11 +648,11 @@ public class PlayerActionHandler implements NodeHandler {
             Player target = ctx.getInputValue(node, "target", Player.class, null);
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (target != null && !text.isEmpty()) {
-                Component component = TextFormatter.parse(text);
+                String message = TextFormatter.formatLegacy(text);
                 if (Bukkit.isPrimaryThread()) {
-                    target.sendMessage(component);
+                    target.sendMessage(message);
                 } else {
-                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.sendMessage(component));
+                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> target.sendMessage(message));
                 }
             }
         });

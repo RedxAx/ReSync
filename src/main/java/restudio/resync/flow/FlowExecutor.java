@@ -1,6 +1,8 @@
 package restudio.resync.flow;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.scheduler.BukkitTask;
@@ -27,6 +29,7 @@ import java.util.HashSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class FlowExecutor {
@@ -37,8 +40,8 @@ public class FlowExecutor {
     private final int maxExecutionSteps;
     private final boolean enableDebug;
     private final IdCompatibilityLayer idCompatibility;
-    private final Map<String, Object> eventVariables = new java.util.concurrent.ConcurrentHashMap<>();
-    private Map<String, BukkitTask> pendingTasks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Object> eventVariables = new ConcurrentHashMap<>();
+    private Map<String, BukkitTask> pendingTasks = new ConcurrentHashMap<>();
     private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
     private FlowTraceService traceService;
     private FlowDebugService debugService;
@@ -213,11 +216,11 @@ public class FlowExecutor {
 
             CompletableFuture<Void> result;
             if (!outputPins.isEmpty()) {
-                result = executeTriggeredOutputs(runtime, startNodeId, outputPins, player, event, steps);
+                CompletableFuture<Void> pending = pendingBeforeContinuationOperations(context);
+                List<String> pins = outputPins;
+                result = pending.thenCompose(ignored -> executeTriggeredOutputs(runtime, startNodeId, pins, player, event, steps));
             } else if (context.hasPendingAsyncOperations()) {
-                result = CompletableFuture.allOf(
-                    context.getAsyncOperations().values().toArray(new CompletableFuture[0])
-                );
+                result = pendingOperations(context);
             } else {
                 result = findNextAndExecute(runtime, startNodeId, "flow", player, event, steps);
             }
@@ -233,6 +236,20 @@ public class FlowExecutor {
                 startNodeId
             ));
         }
+    }
+
+    private CompletableFuture<Void> pendingOperations(FlowContext context) {
+        if (context == null || !context.hasPendingAsyncOperations()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(context.getAsyncOperations().values().toArray(new CompletableFuture[0]));
+    }
+
+    private CompletableFuture<Void> pendingBeforeContinuationOperations(FlowContext context) {
+        if (context == null || !context.hasPendingBeforeContinuationOperations()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(context.getBeforeContinuationOperations().values().toArray(new CompletableFuture[0]));
     }
 
     private void dispatchDeferredOutput(FlowRuntime runtime, String currentNodeId, String outputPin,
@@ -270,7 +287,7 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
 
-        List<CompletableFuture<Void>> futures = new java.util.ArrayList<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (String outputPin : outputPins) {
             if (outputPin == null || outputPin.isBlank()) {
                 continue;
@@ -472,7 +489,7 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
         runtime.resetLoopControl();
-        List<Player> players = new java.util.ArrayList<>(org.bukkit.Bukkit.getOnlinePlayers());
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
 
         List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
@@ -506,7 +523,7 @@ public class FlowExecutor {
         if (radius == null) {
             radius = 10.0;
         }
-        org.bukkit.Location center = (org.bukkit.Location) runtime.resolveInput(loopNode, "center", org.bukkit.Location.class);
+        Location center = (Location) runtime.resolveInput(loopNode, "center", Location.class);
         if (center == null && player != null) {
             center = player.getLocation();
         }
@@ -514,7 +531,7 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
 
-        List<org.bukkit.entity.Entity> entities = new java.util.ArrayList<>(
+        List<Entity> entities = new ArrayList<>(
             center.getWorld().getNearbyEntities(center, radius, radius, radius));
         List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
@@ -522,7 +539,7 @@ public class FlowExecutor {
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
         for (int i = 0; i < entities.size(); i++) {
             int index = i;
-            org.bukkit.entity.Entity entity = entities.get(i);
+            Entity entity = entities.get(i);
             future = future.thenCompose(v -> {
                 if (runtime.isBreakLoopRequested()) {
                     return CompletableFuture.completedFuture(null);
@@ -624,7 +641,7 @@ public class FlowExecutor {
         if (targetNodeIds == null || targetNodeIds.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        List<CompletableFuture<Void>> futures = new java.util.ArrayList<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (String nodeId : targetNodeIds) {
             futures.add(execute(runtime, nodeId, player, event, steps + 1));
         }
@@ -805,7 +822,7 @@ public class FlowExecutor {
     }
 
     private List<String> findTargetNodes(FlowGraph graph, String nodeId, String pinName) {
-        List<String> targets = new java.util.ArrayList<>();
+        List<String> targets = new ArrayList<>();
         for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
             if (conn.getSourcePin().equals(pinName)) {
                 targets.add(conn.getTargetNodeId());

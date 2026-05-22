@@ -27,6 +27,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -38,8 +39,10 @@ import org.bukkit.util.Vector;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowNode;
 import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentListener;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.flow.FlowMutations;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -47,6 +50,7 @@ import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +60,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class AbilityEffectHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
@@ -80,7 +85,7 @@ public class AbilityEffectHandler implements NodeHandler {
             ctx.triggerOutput("flow");
         });
         operations.put("damage_area", (ctx, node) -> {
-            Location location = location(ctx, node);
+            Location location = areaCenter(ctx, node);
             double radius = number(ctx, node, "radius", 5.0);
             double damage = number(ctx, node, "damage", 4.0);
             String targetFilter = string(ctx, node, "target_filter", "any");
@@ -88,14 +93,14 @@ public class AbilityEffectHandler implements NodeHandler {
             if (location != null && location.getWorld() != null) {
                 for (Entity entity : location.getWorld().getNearbyEntities(location, radius, radius, radius)) {
                     if (entity instanceof LivingEntity living && acceptsTarget(entity, targetFilter) && (!excludeCaster || entity != ctx.getPlayer())) {
-                        living.damage(damage, ctx.getPlayer());
+                        damage(living, damage, ctx.getPlayer());
                     }
                 }
             }
             ctx.triggerOutput("flow");
         });
         operations.put("heal_area", (ctx, node) -> {
-            Location location = location(ctx, node);
+            Location location = areaCenter(ctx, node);
             double radius = number(ctx, node, "radius", 5.0);
             double amount = number(ctx, node, "amount", 4.0);
             String targetFilter = string(ctx, node, "target_filter", "any");
@@ -103,14 +108,14 @@ public class AbilityEffectHandler implements NodeHandler {
             if (location != null && location.getWorld() != null) {
                 for (Entity entity : location.getWorld().getNearbyEntities(location, radius, radius, radius)) {
                     if (entity instanceof LivingEntity living && acceptsTarget(entity, targetFilter) && (!excludeCaster || entity != ctx.getPlayer())) {
-                        living.setHealth(Math.min(living.getMaxHealth(), living.getHealth() + amount));
+                        FlowMutations.heal(ctx, living, amount);
                     }
                 }
             }
             ctx.triggerOutput("flow");
         });
         operations.put("knockback_area", (ctx, node) -> {
-            Location location = location(ctx, node);
+            Location location = areaCenter(ctx, node);
             double radius = number(ctx, node, "radius", 5.0);
             double strength = number(ctx, node, "strength", 1.2);
             double upwardStrength = number(ctx, node, "upward_strength", 0.2);
@@ -121,15 +126,15 @@ public class AbilityEffectHandler implements NodeHandler {
                     if (!acceptsTarget(entity, targetFilter) || excludeCaster && entity == ctx.getPlayer()) {
                         continue;
                     }
-                    Vector direction = entity.getLocation().toVector().subtract(location.toVector()).normalize().multiply(strength);
+                    Vector direction = knockbackDirection(ctx, entity, location).multiply(strength);
                     direction.setY(Math.max(upwardStrength, direction.getY()));
-                    entity.setVelocity(direction);
+                    FlowMutations.applyVelocity(ctx, entity, direction);
                 }
             }
             ctx.triggerOutput("flow");
         });
         operations.put("find_entities_radius", (ctx, node) -> {
-            Location location = location(ctx, node);
+            Location location = areaCenter(ctx, node);
             double radius = number(ctx, node, "radius", 5.0);
             String targetFilter = string(ctx, node, "target_filter", "any");
             boolean excludeCaster = bool(ctx, node, "exclude_caster", false);
@@ -239,9 +244,9 @@ public class AbilityEffectHandler implements NodeHandler {
             boolean useSource = bool(ctx, node, "use_source", true);
             if (target instanceof LivingEntity living) {
                 if (useSource && ctx.getPlayer() != null) {
-                    living.damage(amount, ctx.getPlayer());
+                    damage(living, amount, ctx.getPlayer());
                 } else {
-                    living.damage(amount);
+                    damage(living, amount, null);
                 }
             }
             ctx.triggerOutput("flow");
@@ -250,7 +255,7 @@ public class AbilityEffectHandler implements NodeHandler {
             Entity target = target(ctx, node);
             double amount = number(ctx, node, "amount", 4.0);
             if (target instanceof LivingEntity living) {
-                living.setHealth(Math.min(living.getMaxHealth(), living.getHealth() + amount));
+                FlowMutations.heal(ctx, living, amount);
             }
             ctx.triggerOutput("flow");
         });
@@ -258,7 +263,7 @@ public class AbilityEffectHandler implements NodeHandler {
             Entity target = target(ctx, node);
             double health = number(ctx, node, "health", 20.0);
             if (target instanceof LivingEntity living) {
-                living.setHealth(Math.max(0.0, Math.min(living.getMaxHealth(), health)));
+                FlowMutations.setHealth(ctx, living, health);
             }
             ctx.triggerOutput("flow");
         });
@@ -277,20 +282,14 @@ public class AbilityEffectHandler implements NodeHandler {
             double amount = number(ctx, node, "amount", 4.0);
             int duration = integer(ctx, node, "duration_ticks", 100);
             if (target instanceof LivingEntity living) {
-                double previous = living.getAbsorptionAmount();
-                living.setAbsorptionAmount(Math.max(previous, amount));
-                ctx.runLater(() -> {
-                    if (living.isValid()) {
-                        living.setAbsorptionAmount(Math.min(living.getAbsorptionAmount(), previous));
-                    }
-                }, Math.max(1, duration));
+                FlowMutations.shield(ctx, living, amount, duration);
             }
             ctx.triggerOutput("flow");
         });
         operations.put("reflect_damage", (ctx, node) -> {
             double percent = number(ctx, node, "percent", 100.0);
             if (ctx.getEvent() instanceof EntityDamageByEntityEvent damageEvent && damageEvent.getDamager() instanceof LivingEntity damager) {
-                damager.damage(damageEvent.getDamage() * Math.max(0.0, percent) / 100.0, damageEvent.getEntity());
+                damage(damager, damageEvent.getDamage() * Math.max(0.0, percent) / 100.0, damageEvent.getEntity());
             }
             ctx.triggerOutput("flow");
         });
@@ -299,9 +298,9 @@ public class AbilityEffectHandler implements NodeHandler {
             if (target != null) {
                 double strength = number(ctx, node, "strength", 1.0);
                 double upwardStrength = number(ctx, node, "upward_strength", 0.5);
-                Vector vector = direction(ctx, node).normalize().multiply(strength);
+                Vector vector = normalizedDirection(ctx, node).multiply(strength);
                 vector.setY(vector.getY() + upwardStrength);
-                target.setVelocity(vector);
+                FlowMutations.applyVelocity(ctx, target, vector);
             }
             ctx.triggerOutput("flow");
         });
@@ -310,7 +309,10 @@ public class AbilityEffectHandler implements NodeHandler {
             Location location = location(ctx, node);
             double strength = number(ctx, node, "strength", 1.0);
             if (target != null && location != null) {
-                target.setVelocity(location.toVector().subtract(target.getLocation().toVector()).normalize().multiply(strength));
+                Vector vector = location.toVector().subtract(target.getLocation().toVector());
+                if (vector.lengthSquared() > 0.0001) {
+                    FlowMutations.applyVelocity(ctx, target, vector.normalize().multiply(strength));
+                }
             }
             ctx.triggerOutput("flow");
         });
@@ -393,7 +395,7 @@ public class AbilityEffectHandler implements NodeHandler {
         operations.put("set_velocity", (ctx, node) -> {
             Entity target = target(ctx, node);
             if (target != null) {
-                target.setVelocity(new Vector(number(ctx, node, "x", 0), number(ctx, node, "y", 0), number(ctx, node, "z", 0)));
+                FlowMutations.applyVelocity(ctx, target, new Vector(number(ctx, node, "x", 0), number(ctx, node, "y", 0), number(ctx, node, "z", 0)));
             }
             ctx.triggerOutput("flow");
         });
@@ -444,7 +446,7 @@ public class AbilityEffectHandler implements NodeHandler {
         operations.put("line_entities", (ctx, node) -> {
             Player player = ctx.getPlayer();
             Location origin = location(ctx, node);
-            Vector direction = direction(ctx, node).normalize();
+            Vector direction = normalizedDirection(ctx, node);
             double range = number(ctx, node, "range", 12.0);
             double width = number(ctx, node, "width", 1.0);
             String targetFilter = string(ctx, node, "target_filter", "living_entity");
@@ -474,9 +476,9 @@ public class AbilityEffectHandler implements NodeHandler {
             if (target != null) {
                 double strength = number(ctx, node, "strength", 1.4);
                 double upwardStrength = number(ctx, node, "upward_strength", 0.15);
-                Vector vector = direction(ctx, node).normalize().multiply(strength);
+                Vector vector = normalizedDirection(ctx, node).multiply(strength);
                 vector.setY(Math.max(vector.getY(), upwardStrength));
-                target.setVelocity(vector);
+                FlowMutations.applyVelocity(ctx, target, vector);
             }
             ctx.triggerOutput("flow");
         });
@@ -671,7 +673,7 @@ public class AbilityEffectHandler implements NodeHandler {
             if (origin != null) {
                 entities.sort(Comparator.comparingDouble(entity -> entity.getLocation().distanceSquared(origin)));
                 if ("farthest".equalsIgnoreCase(mode)) {
-                    java.util.Collections.reverse(entities);
+                    Collections.reverse(entities);
                 }
             }
             ctx.setOutput(node, "entities", entities);
@@ -792,6 +794,76 @@ public class AbilityEffectHandler implements NodeHandler {
             ctx.setOutput(node, "succeeded", success);
             ctx.triggerOutput(success ? "success" : "fail");
         });
+        operations.put("entity_query", (ctx, node) -> {
+            if (!cooldownReady(ctx, node, "entity_query")) {
+                ctx.triggerOutput("cooldown");
+                return;
+            }
+            List<Entity> entities = queryEntities(ctx, node);
+            Entity entity = selectEntity(ctx, node, entities);
+            ctx.setOutput(node, "entities", entities);
+            ctx.setOutput(node, "entity", entity);
+            ctx.setOutput(node, "count", entities.size());
+            ctx.setOutput(node, "has_result", entity != null || !entities.isEmpty());
+            ctx.setOutput(node, "location", entity != null ? entity.getLocation() : areaCenter(ctx, node));
+            ctx.triggerOutput(entity != null || !entities.isEmpty() ? "found" : "empty");
+            ctx.triggerOutput("flow");
+        });
+        operations.put("entity_effect", (ctx, node) -> {
+            if (!cooldownReady(ctx, node, "entity_effect")) {
+                ctx.triggerOutput("cooldown");
+                return;
+            }
+            List<Entity> entities = entityList(ctx, node);
+            String mode = string(ctx, node, "mode", "damage");
+            int affected = 0;
+            for (Entity entity : entities) {
+                if (applyEntityEffect(ctx, node, entity, mode)) {
+                    affected++;
+                }
+            }
+            ctx.setOutput(node, "affected", affected);
+            if (affected <= 0) {
+                ctx.triggerOutput("empty");
+            }
+            ctx.triggerOutput("flow");
+        });
+        operations.put("area_effect", (ctx, node) -> {
+            if (!cooldownReady(ctx, node, "area_effect")) {
+                ctx.triggerOutput("cooldown");
+                return;
+            }
+            Location center = areaCenter(ctx, node);
+            String mode = string(ctx, node, "mode", "damage");
+            List<Entity> entities = areaEntities(ctx, node, center);
+            int affected = 0;
+            for (Entity entity : entities) {
+                if (applyEntityEffect(ctx, node, entity, mode)) {
+                    affected++;
+                }
+            }
+            applyAreaWorldEffect(ctx, node, center, mode);
+            ctx.setOutput(node, "entities", entities);
+            ctx.setOutput(node, "affected", affected);
+            ctx.setOutput(node, "location", center);
+            ctx.triggerOutput("flow");
+        });
+        operations.put("holding_effect", (ctx, node) -> {
+            if (!cooldownReady(ctx, node, "holding_effect")) {
+                ctx.triggerOutput("cooldown");
+                return;
+            }
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            ItemStack heldItem = item(ctx, node);
+            String mode = string(ctx, node, "mode", "potion");
+            boolean success = applyHoldingEffect(ctx, node, player, heldItem, mode);
+            ctx.setOutput(node, "item", heldItem);
+            ctx.setOutput(node, "success", success);
+            if (!success) {
+                ctx.triggerOutput("fail");
+            }
+            ctx.triggerOutput("flow");
+        });
         operations.put("mark_target", (ctx, node) -> {
             Entity target = target(ctx, node);
             String key = string(ctx, node, "key", "mark");
@@ -833,8 +905,401 @@ public class AbilityEffectHandler implements NodeHandler {
         }
     }
 
+    private boolean cooldownReady(FlowContext ctx, FlowNode node, String fallbackKey) {
+        int ticks = Math.max(0, integer(ctx, node, "cooldown_ticks", 0));
+        if (ticks <= 0) {
+            return true;
+        }
+        String key = familyCooldownKey(ctx, node, fallbackKey);
+        long now = System.currentTimeMillis();
+        long readyAt = COOLDOWNS.getOrDefault(key, 0L);
+        if (readyAt > now) {
+            ctx.setOutput(node, "cooldown_ticks_left", (int) Math.ceil((readyAt - now) / 50.0));
+            return false;
+        }
+        COOLDOWNS.put(key, now + ticks * 50L);
+        ctx.setOutput(node, "cooldown_ticks_left", 0);
+        return true;
+    }
+
+    private String familyCooldownKey(FlowContext ctx, FlowNode node, String fallbackKey) {
+        String key = string(ctx, node, "cooldown_key", fallbackKey);
+        String scope = string(ctx, node, "cooldown_scope", "player").toLowerCase(Locale.ROOT);
+        return switch (scope) {
+            case "global" -> key + ":global";
+            case "content" -> key + ':' + String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.content_id", ""));
+            case "target" -> key + ':' + (target(ctx, node) != null ? target(ctx, node).getUniqueId() : "none");
+            case "item", "item instance" -> key + ':' + String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.instance_id", ""));
+            default -> key + ':' + (ctx.getPlayer() != null ? ctx.getPlayer().getUniqueId() : "server");
+        };
+    }
+
+    private List<Entity> queryEntities(FlowContext ctx, FlowNode node) {
+        String mode = string(ctx, node, "mode", "radius").toLowerCase(Locale.ROOT);
+        return switch (mode) {
+            case "cone" -> coneEntities(ctx, node);
+            case "line" -> lineEntities(ctx, node);
+            case "box" -> boxEntities(ctx, node);
+            case "raycast" -> raycastEntity(ctx, node);
+            default -> entitiesAround(ctx, node);
+        };
+    }
+
+    private Entity selectEntity(FlowContext ctx, FlowNode node, List<Entity> entities) {
+        if (entities.isEmpty()) {
+            return null;
+        }
+        String mode = string(ctx, node, "mode", "radius").toLowerCase(Locale.ROOT);
+        String select = string(ctx, node, "select", switch (mode) {
+            case "nearest" -> "nearest";
+            case "random" -> "random";
+            default -> "first";
+        }).toLowerCase(Locale.ROOT);
+        Location center = areaCenter(ctx, node);
+        return switch (select) {
+            case "nearest" -> center != null ? entities.stream().min(Comparator.comparingDouble(entity -> entity.getLocation().distanceSquared(center))).orElse(null) : entities.getFirst();
+            case "farthest" -> center != null ? entities.stream().max(Comparator.comparingDouble(entity -> entity.getLocation().distanceSquared(center))).orElse(null) : entities.getFirst();
+            case "random" -> entities.get(ThreadLocalRandom.current().nextInt(entities.size()));
+            case "lowest_health" -> entities.stream()
+                .min(Comparator.comparingDouble(entity -> entity instanceof LivingEntity living ? living.getHealth() : Double.MAX_VALUE))
+                .orElse(entities.getFirst());
+            default -> entities.getFirst();
+        };
+    }
+
+    private List<Entity> coneEntities(FlowContext ctx, FlowNode node) {
+        Player player = ctx.getPlayer();
+        Location origin = areaCenter(ctx, node);
+        Vector facing = direction(ctx, node);
+        double range = number(ctx, node, "range", number(ctx, node, "radius", 8.0));
+        double angle = Math.max(0.0, Math.min(180.0, number(ctx, node, "angle", 60.0)));
+        String targetFilter = string(ctx, node, "target_filter", "living_entity");
+        boolean excludeCaster = bool(ctx, node, "exclude_caster", true);
+        List<Entity> entities = new ArrayList<>();
+        if (origin == null || origin.getWorld() == null || facing.lengthSquared() <= 0.0) {
+            return entities;
+        }
+        double cos = Math.cos(Math.toRadians(angle * 0.5));
+        Vector normalizedFacing = facing.clone().normalize();
+        for (Entity entity : origin.getWorld().getNearbyEntities(origin, range, range, range)) {
+            if (!acceptsTarget(entity, targetFilter) || excludeCaster && entity == player) {
+                continue;
+            }
+            Vector offset = entity.getLocation().toVector().subtract(origin.toVector());
+            if (offset.lengthSquared() <= 0.0001 || offset.lengthSquared() > range * range) {
+                continue;
+            }
+            if (offset.normalize().dot(normalizedFacing) >= cos) {
+                entities.add(entity);
+            }
+        }
+        return limitEntities(ctx, node, sortEntities(ctx, node, entities));
+    }
+
+    private List<Entity> lineEntities(FlowContext ctx, FlowNode node) {
+        Player player = ctx.getPlayer();
+        Location origin = areaCenter(ctx, node);
+        Vector facing = direction(ctx, node);
+        double range = number(ctx, node, "range", number(ctx, node, "radius", 12.0));
+        double width = number(ctx, node, "width", 1.0);
+        String targetFilter = string(ctx, node, "target_filter", "living_entity");
+        boolean excludeCaster = bool(ctx, node, "exclude_caster", true);
+        List<Entity> entities = new ArrayList<>();
+        if (origin == null || origin.getWorld() == null || facing.lengthSquared() <= 0.0) {
+            return entities;
+        }
+        Vector normalizedFacing = facing.clone().normalize();
+        for (Entity entity : origin.getWorld().getNearbyEntities(origin, range, range, range)) {
+            if (!acceptsTarget(entity, targetFilter) || excludeCaster && entity == player) {
+                continue;
+            }
+            Vector offset = entity.getLocation().toVector().subtract(origin.toVector());
+            double along = offset.dot(normalizedFacing);
+            if (along < 0.0 || along > range) {
+                continue;
+            }
+            Vector closest = normalizedFacing.clone().multiply(along);
+            if (offset.subtract(closest).length() <= width) {
+                entities.add(entity);
+            }
+        }
+        return limitEntities(ctx, node, sortEntities(ctx, node, entities));
+    }
+
+    private List<Entity> boxEntities(FlowContext ctx, FlowNode node) {
+        Location center = areaCenter(ctx, node);
+        String targetFilter = string(ctx, node, "target_filter", "living_entity");
+        boolean excludeCaster = bool(ctx, node, "exclude_caster", true);
+        double width = Math.max(0.0, number(ctx, node, "width", number(ctx, node, "radius", 5.0) * 2.0));
+        double height = Math.max(0.0, number(ctx, node, "height", width));
+        double depth = Math.max(0.0, number(ctx, node, "depth", width));
+        List<Entity> entities = new ArrayList<>();
+        if (center == null || center.getWorld() == null) {
+            return entities;
+        }
+        for (Entity entity : center.getWorld().getNearbyEntities(center, width * 0.5, height * 0.5, depth * 0.5)) {
+            if (acceptsTarget(entity, targetFilter) && (!excludeCaster || entity != ctx.getPlayer())) {
+                entities.add(entity);
+            }
+        }
+        return limitEntities(ctx, node, sortEntities(ctx, node, entities));
+    }
+
+    private List<Entity> raycastEntity(FlowContext ctx, FlowNode node) {
+        Player player = ctx.getPlayer();
+        if (player == null) {
+            return List.of();
+        }
+        double range = number(ctx, node, "range", 20.0);
+        String targetFilter = string(ctx, node, "target_filter", "living_entity");
+        RayTraceResult result = player.getWorld().rayTraceEntities(player.getEyeLocation(), player.getEyeLocation().getDirection(), range, entity -> entity != player && acceptsTarget(entity, targetFilter));
+        return result != null && result.getHitEntity() != null ? List.of(result.getHitEntity()) : List.of();
+    }
+
+    private List<Entity> areaEntities(FlowContext ctx, FlowNode node, Location center) {
+        String shape = string(ctx, node, "shape", "sphere").toLowerCase(Locale.ROOT);
+        Map<String, Object> inputs = new HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
+        inputs.put("mode", switch (shape) {
+            case "cone" -> "cone";
+            case "line" -> "line";
+            case "box" -> "box";
+            default -> "radius";
+        });
+        if (center != null) {
+            inputs.put("location", center);
+        }
+        FlowNode queryNode = new FlowNode("ability.entity_query", node.getX(), node.getY(), inputs);
+        return queryEntities(ctx, queryNode);
+    }
+
+    private List<Entity> sortEntities(FlowContext ctx, FlowNode node, List<Entity> entities) {
+        String sort = string(ctx, node, "sort", "none").toLowerCase(Locale.ROOT);
+        Location center = areaCenter(ctx, node);
+        List<Entity> sorted = new ArrayList<>(entities);
+        if ("nearest".equals(sort) && center != null) {
+            sorted.sort(Comparator.comparingDouble(entity -> entity.getLocation().distanceSquared(center)));
+        } else if ("farthest".equals(sort) && center != null) {
+            sorted.sort(Comparator.comparingDouble((Entity entity) -> entity.getLocation().distanceSquared(center)).reversed());
+        } else if ("lowest_health".equals(sort)) {
+            sorted.sort(Comparator.comparingDouble(entity -> entity instanceof LivingEntity living ? living.getHealth() : Double.MAX_VALUE));
+        } else if ("random".equals(sort)) {
+            Collections.shuffle(sorted);
+        }
+        return sorted;
+    }
+
+    private List<Entity> limitEntities(FlowContext ctx, FlowNode node, List<Entity> entities) {
+        int limit = integer(ctx, node, "limit", 0);
+        if (limit <= 0 || entities.size() <= limit) {
+            return entities;
+        }
+        return new ArrayList<>(entities.subList(0, limit));
+    }
+
+    private boolean applyEntityEffect(FlowContext ctx, FlowNode node, Entity entity, String mode) {
+        if (entity == null) {
+            return false;
+        }
+        String normalized = mode == null ? "damage" : mode.toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            case "damage" -> {
+                if (entity instanceof LivingEntity living) {
+                    damage(living, number(ctx, node, "amount", number(ctx, node, "damage", 4.0)), ctx.getPlayer());
+                    return true;
+                }
+            }
+            case "heal" -> {
+                if (entity instanceof LivingEntity living) {
+                    double amount = number(ctx, node, "amount", 4.0);
+                    FlowMutations.heal(ctx, living, amount);
+                    return true;
+                }
+            }
+            case "potion" -> {
+                if (entity instanceof LivingEntity living) {
+                    addEffect(living, string(ctx, node, "effect", "SPEED"), integer(ctx, node, "duration_ticks", 100), integer(ctx, node, "amplifier", 0));
+                    return true;
+                }
+            }
+            case "ignite" -> {
+                entity.setFireTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)));
+                return true;
+            }
+            case "freeze" -> {
+                entity.setFreezeTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)));
+                return true;
+            }
+            case "stun" -> {
+                if (entity instanceof LivingEntity living) {
+                    addEffect(living, "SLOW", integer(ctx, node, "duration_ticks", 60), 10);
+                    addEffect(living, "JUMP", integer(ctx, node, "duration_ticks", 60), 128);
+                    return true;
+                }
+            }
+            case "root" -> {
+                if (entity instanceof LivingEntity living) {
+                    addEffect(living, "SLOW", integer(ctx, node, "duration_ticks", 80), 20);
+                    return true;
+                }
+            }
+            case "silence" -> {
+                MARKS.put(markKey(entity.getUniqueId(), "silenced"), System.currentTimeMillis() + integer(ctx, node, "duration_ticks", 100) * 50L);
+                return true;
+            }
+            case "disarm" -> {
+                if (entity instanceof Player player) {
+                    PlayerInventory inventory = player.getInventory();
+                    ItemStack item = inventory.getItemInMainHand();
+                    if (item != null && !item.getType().isAir()) {
+                        DISARMED_ITEMS.put(player.getUniqueId(), item.clone());
+                        inventory.setItemInMainHand(new ItemStack(Material.AIR));
+                        ctx.runLater(() -> {
+                            ItemStack stored = DISARMED_ITEMS.remove(player.getUniqueId());
+                            if (stored != null && player.isOnline()) {
+                                ItemStack current = inventory.getItemInMainHand();
+                                if (current == null || current.getType().isAir()) {
+                                    inventory.setItemInMainHand(stored);
+                                } else {
+                                    inventory.addItem(stored);
+                                }
+                            }
+                        }, Math.max(1, integer(ctx, node, "duration_ticks", 60)));
+                        return true;
+                    }
+                }
+            }
+            case "launch" -> {
+                Vector vector = normalizedDirection(ctx, node).multiply(number(ctx, node, "strength", 1.0));
+                vector.setY(Math.max(number(ctx, node, "upward_strength", 0.5), vector.getY()));
+                FlowMutations.applyVelocity(ctx, entity, vector);
+                return true;
+            }
+            case "pull" -> {
+                Location center = areaCenter(ctx, node);
+                if (center != null) {
+                    Vector vector = center.toVector().subtract(entity.getLocation().toVector());
+                    if (vector.lengthSquared() <= 0.0001) {
+                        return false;
+                    }
+                    FlowMutations.applyVelocity(ctx, entity, vector.normalize().multiply(number(ctx, node, "strength", 1.0)));
+                    return true;
+                }
+            }
+            case "push", "knockback" -> {
+                Location center = areaCenter(ctx, node);
+                if (center != null) {
+                    Vector vector = knockbackDirection(ctx, entity, center).multiply(number(ctx, node, "strength", 1.0));
+                    vector.setY(Math.max(number(ctx, node, "upward_strength", 0.2), vector.getY()));
+                    FlowMutations.applyVelocity(ctx, entity, vector);
+                    return true;
+                }
+            }
+            case "set_velocity" -> {
+                FlowMutations.applyVelocity(ctx, entity, new Vector(number(ctx, node, "x", 0), number(ctx, node, "y", 0), number(ctx, node, "z", 0)));
+                return true;
+            }
+            case "no_damage_ticks" -> {
+                if (entity instanceof LivingEntity living) {
+                    FlowMutations.noDamageTicks(ctx, living, integer(ctx, node, "ticks", integer(ctx, node, "duration_ticks", 20)));
+                    return true;
+                }
+            }
+            case "shield" -> {
+                if (entity instanceof LivingEntity living) {
+                    FlowMutations.shield(ctx, living, number(ctx, node, "amount", 4.0), integer(ctx, node, "duration_ticks", 100));
+                    return true;
+                }
+            }
+            case "mark" -> {
+                MARKS.put(markKey(entity.getUniqueId(), string(ctx, node, "key", "mark")), System.currentTimeMillis() + integer(ctx, node, "duration_ticks", 100) * 50L);
+                return true;
+            }
+            case "remove_mark" -> {
+                MARKS.remove(markKey(entity.getUniqueId(), string(ctx, node, "key", "mark")));
+                return true;
+            }
+            case "life_steal" -> {
+                Player player = ctx.getPlayer();
+                if (player != null) {
+                    double amount = number(ctx, node, "amount", ctx.getEvent() instanceof EntityDamageEvent event ? event.getDamage() : 1.0);
+                    FlowMutations.heal(ctx, player, amount);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void applyAreaWorldEffect(FlowContext ctx, FlowNode node, Location center, String mode) {
+        if (center == null || center.getWorld() == null || mode == null) {
+            return;
+        }
+        String normalized = mode.toLowerCase(Locale.ROOT);
+        if ("particle".equals(normalized)) {
+            center.getWorld().spawnParticle(parseParticle(string(ctx, node, "particle", "FLAME")), center, integer(ctx, node, "count", 20), number(ctx, node, "radius", 3.0), number(ctx, node, "radius", 3.0), number(ctx, node, "radius", 3.0), number(ctx, node, "speed", 0.0));
+            return;
+        }
+        if ("sound".equals(normalized)) {
+            center.getWorld().playSound(center, parseSound(string(ctx, node, "sound", "ENTITY_EXPERIENCE_ORB_PICKUP")), (float) number(ctx, node, "volume", 1.0), (float) number(ctx, node, "pitch", 1.0));
+            return;
+        }
+        if ("extinguish".equals(normalized)) {
+            int radius = Math.max(0, integer(ctx, node, "radius", 5));
+            forEachBlock(center, radius, "sphere", block -> {
+                if (block.getType() == Material.FIRE) {
+                    block.setType(Material.AIR);
+                }
+            });
+        }
+    }
+
+    private boolean applyHoldingEffect(FlowContext ctx, FlowNode node, Player player, ItemStack heldItem, String mode) {
+        if (player == null) {
+            return false;
+        }
+        String normalized = mode == null ? "potion" : mode.toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            case "potion" -> {
+                addEffect(player, string(ctx, node, "effect", "SPEED"), integer(ctx, node, "duration_ticks", 40), integer(ctx, node, "amplifier", 0));
+                return true;
+            }
+            case "particle" -> {
+                player.getWorld().spawnParticle(parseParticle(string(ctx, node, "particle", "FLAME")), player.getLocation().add(0.0, 1.0, 0.0), integer(ctx, node, "count", 4), number(ctx, node, "spread", 0.3), number(ctx, node, "spread", 0.3), number(ctx, node, "spread", 0.3), number(ctx, node, "speed", 0.0));
+                return true;
+            }
+            case "sound" -> {
+                player.playSound(player.getLocation(), parseSound(string(ctx, node, "sound", "ENTITY_EXPERIENCE_ORB_PICKUP")), (float) number(ctx, node, "volume", 1.0), (float) number(ctx, node, "pitch", 1.0));
+                return true;
+            }
+            case "charge_drain" -> {
+                String key = string(ctx, node, "key", "charge");
+                double value = Math.max(0.0, getCharge(heldItem, key) - number(ctx, node, "amount", 1.0));
+                setCharge(heldItem, key, value);
+                ctx.setOutput(node, "value", value);
+                return true;
+            }
+            case "charge_regen" -> {
+                String key = string(ctx, node, "key", "charge");
+                double max = number(ctx, node, "max", 100.0);
+                double value = Math.min(max, getCharge(heldItem, key) + number(ctx, node, "amount", 1.0));
+                setCharge(heldItem, key, value);
+                ctx.setOutput(node, "value", value);
+                return true;
+            }
+            case "durability_drain" -> {
+                if (heldItem == null || !(heldItem.getItemMeta() instanceof Damageable damageable)) {
+                    return false;
+                }
+                damageable.setDamage(damageable.getDamage() + Math.max(1, integer(ctx, node, "amount", 1)));
+                heldItem.setItemMeta((ItemMeta) damageable);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void moveArea(FlowContext ctx, FlowNode node, int direction) {
-        Location location = location(ctx, node);
+        Location location = areaCenter(ctx, node);
         double radius = number(ctx, node, "radius", 5.0);
         double strength = number(ctx, node, "strength", 1.0);
         String targetFilter = string(ctx, node, "target_filter", "any");
@@ -844,8 +1309,10 @@ public class AbilityEffectHandler implements NodeHandler {
                 if (!acceptsTarget(entity, targetFilter) || excludeCaster && entity == ctx.getPlayer()) {
                     continue;
                 }
-                Vector vector = entity.getLocation().toVector().subtract(location.toVector()).normalize().multiply(strength * direction);
-                entity.setVelocity(vector);
+                Vector vector = direction > 0 ? knockbackDirection(ctx, entity, location) : location.toVector().subtract(entity.getLocation().toVector());
+                if (vector.lengthSquared() > 0.0001) {
+                    FlowMutations.applyVelocity(ctx, entity, vector.normalize().multiply(strength));
+                }
             }
         }
         ctx.triggerOutput("flow");
@@ -1014,7 +1481,7 @@ public class AbilityEffectHandler implements NodeHandler {
     }
 
     private List<Entity> entitiesAround(FlowContext ctx, FlowNode node) {
-        Location location = location(ctx, node);
+        Location location = areaCenter(ctx, node);
         double radius = number(ctx, node, "radius", 8.0);
         String targetFilter = string(ctx, node, "target_filter", "living_entity");
         boolean excludeCaster = bool(ctx, node, "exclude_caster", true);
@@ -1028,6 +1495,25 @@ public class AbilityEffectHandler implements NodeHandler {
             }
         }
         return entities;
+    }
+
+    private Location areaCenter(FlowContext ctx, FlowNode node) {
+        Location location = ctx.getInputValue(node, "location", Location.class, null);
+        if (location != null) {
+            return location;
+        }
+        Object eventLocation = ctx.getRuntime().getEventVariables().get("event.location");
+        if (eventLocation instanceof Location loc) {
+            return loc;
+        }
+        Entity target = eventEntity(ctx, "event.target");
+        if (target == null) {
+            target = eventEntity(ctx, "event.hit_entity");
+        }
+        if (target == null) {
+            target = eventEntity(ctx, "event.entity");
+        }
+        return target != null ? target.getLocation() : ctx.getPlayer() != null ? ctx.getPlayer().getLocation() : null;
     }
 
     private Location location(FlowContext ctx, FlowNode node) {
@@ -1048,7 +1534,20 @@ public class AbilityEffectHandler implements NodeHandler {
             return target;
         }
         Object eventTarget = ctx.getRuntime().getEventVariables().get("event.target");
-        return eventTarget instanceof Entity entity ? entity : ctx.getPlayer();
+        if (eventTarget instanceof Entity entity) {
+            return entity;
+        }
+        Entity hitEntity = eventEntity(ctx, "event.hit_entity");
+        if (hitEntity != null) {
+            return hitEntity;
+        }
+        Entity entity = eventEntity(ctx, "event.entity");
+        return entity != null ? entity : ctx.getPlayer();
+    }
+
+    private Entity eventEntity(FlowContext ctx, String key) {
+        Object value = ctx.getRuntime().getEventVariables().get(key);
+        return value instanceof Entity entity ? entity : null;
     }
 
     private Vector direction(FlowContext ctx, FlowNode node) {
@@ -1061,6 +1560,34 @@ public class AbilityEffectHandler implements NodeHandler {
             return target.getLocation().getDirection();
         }
         return new Vector(0, 0, 1);
+    }
+
+    private Vector normalizedDirection(FlowContext ctx, FlowNode node) {
+        Vector direction = direction(ctx, node);
+        if (direction == null || direction.lengthSquared() <= 0.0001) {
+            return new Vector(0.0, 0.0, 1.0);
+        }
+        return direction.clone().normalize();
+    }
+
+    private Vector knockbackDirection(FlowContext ctx, Entity entity, Location center) {
+        Vector direction = entity.getLocation().toVector().subtract(center.toVector());
+        if (direction.lengthSquared() > 0.0001) {
+            return direction.normalize();
+        }
+        Player player = ctx.getPlayer();
+        if (player != null && player.getWorld().equals(entity.getWorld())) {
+            direction = entity.getLocation().toVector().subtract(player.getLocation().toVector());
+            if (direction.lengthSquared() > 0.0001) {
+                return direction.normalize();
+            }
+            direction = player.getLocation().getDirection();
+            direction.setY(0.0);
+            if (direction.lengthSquared() > 0.0001) {
+                return direction.normalize();
+            }
+        }
+        return new Vector(0.0, 0.0, 1.0);
     }
 
     private RayTraceResult nearest(Location source, RayTraceResult first, RayTraceResult second) {
@@ -1087,6 +1614,16 @@ public class AbilityEffectHandler implements NodeHandler {
             case "passive" -> entity instanceof Animals;
             default -> true;
         };
+    }
+
+    private void damage(LivingEntity target, double amount, Entity source) {
+        CustomContentListener.runSuppressingDamageAbilities(() -> {
+            if (source != null) {
+                target.damage(amount, source);
+            } else {
+                target.damage(amount);
+            }
+        });
     }
 
     private boolean bool(FlowContext ctx, FlowNode node, String pin, boolean fallback) {
@@ -1178,7 +1715,7 @@ public class AbilityEffectHandler implements NodeHandler {
         return material == null || block.getType() == material;
     }
 
-    private void forEachBlock(Location center, int radius, String shape, java.util.function.Consumer<Block> consumer) {
+    private void forEachBlock(Location center, int radius, String shape, Consumer<Block> consumer) {
         World world = center.getWorld();
         int safeRadius = Math.max(0, radius);
         String normalized = shape == null ? "cube" : shape.toLowerCase(Locale.ROOT);
@@ -1219,6 +1756,23 @@ public class AbilityEffectHandler implements NodeHandler {
     }
 
     private List<Entity> entityList(FlowContext ctx, FlowNode node) {
+        String source = string(ctx, node, "target_source", "event target").toLowerCase(Locale.ROOT);
+        if ("entities".equals(source)) {
+            return connectedEntityList(ctx, node);
+        }
+        if ("target".equals(source)) {
+            Entity target = ctx.getInputValue(node, "target", Entity.class, null);
+            return target != null ? List.of(target) : List.of();
+        }
+        List<Entity> entities = connectedEntityList(ctx, node);
+        if (!entities.isEmpty()) {
+            return entities;
+        }
+        Entity target = target(ctx, node);
+        return target != null ? List.of(target) : List.of();
+    }
+
+    private List<Entity> connectedEntityList(FlowContext ctx, FlowNode node) {
         Object value = ctx.getInputValue(node, "entities");
         if (value instanceof Collection<?> collection) {
             List<Entity> entities = new ArrayList<>();
@@ -1229,8 +1783,7 @@ public class AbilityEffectHandler implements NodeHandler {
             }
             return entities;
         }
-        Entity target = target(ctx, node);
-        return target != null ? List.of(target) : List.of();
+        return List.of();
     }
 
     private ItemStack item(FlowContext ctx, FlowNode node) {

@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomContentListener implements Listener {
+    private static final ThreadLocal<Integer> SUPPRESSED_DAMAGE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private final CustomContentStorage storage;
     private final CustomContentService service;
     private final Map<UUID, String[]> armorSnapshots = new ConcurrentHashMap<>();
@@ -63,6 +64,9 @@ public class CustomContentListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onDamage(EntityDamageByEntityEvent event) {
+        if (isDamageAbilitySuppressed()) {
+            return;
+        }
         Player player = event.getDamager() instanceof Player p ? p : null;
         if (player != null) {
             ItemStack item = player.getInventory().getItemInMainHand();
@@ -84,6 +88,24 @@ public class CustomContentListener implements Listener {
                 }
             }
         }
+    }
+
+    public static void runSuppressingDamageAbilities(Runnable action) {
+        int depth = SUPPRESSED_DAMAGE_DEPTH.get();
+        SUPPRESSED_DAMAGE_DEPTH.set(depth + 1);
+        try {
+            action.run();
+        } finally {
+            if (depth == 0) {
+                SUPPRESSED_DAMAGE_DEPTH.remove();
+            } else {
+                SUPPRESSED_DAMAGE_DEPTH.set(depth);
+            }
+        }
+    }
+
+    public static boolean isDamageAbilitySuppressed() {
+        return SUPPRESSED_DAMAGE_DEPTH.get() > 0;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -181,10 +203,14 @@ public class CustomContentListener implements Listener {
         tickBlocks();
         for (Player player : Bukkit.getOnlinePlayers()) {
             scanArmor(player);
+            tickHeldItem(player, player.getInventory().getItemInMainHand(), EquipmentSlot.HAND);
+            tickHeldItem(player, player.getInventory().getItemInOffHand(), EquipmentSlot.OFF_HAND);
             for (ItemStack armor : player.getInventory().getArmorContents()) {
                 String contentId = service.identifyItem(armor);
                 if (contentId != null) {
-                    service.dispatch(contentId, "armor.tick", player, null, baseVars(player, armor, player.getLocation(), null, null));
+                    Map<String, Object> vars = baseVars(player, armor, player.getLocation(), null, null);
+                    service.dispatch(contentId, "armor.tick", player, null, vars);
+                    service.dispatch(contentId, "armor.while_holding", player, null, vars);
                 }
             }
             String fullSet = fullSetKey(player);
@@ -200,6 +226,13 @@ public class CustomContentListener implements Listener {
                     }
                 }
             }
+        }
+    }
+
+    private void tickHeldItem(Player player, ItemStack item, EquipmentSlot hand) {
+        String contentId = service.identifyItem(item);
+        if (contentId != null) {
+            service.dispatch(contentId, "item.while_holding", player, null, baseVars(player, item, player.getLocation(), null, hand));
         }
     }
 

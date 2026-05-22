@@ -33,6 +33,7 @@ import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
@@ -380,7 +381,7 @@ public class EntityActionHandler implements NodeHandler {
                         if (entity instanceof LivingEntity living) {
                             if ("set".equalsIgnoreCase(action)) {
                                 double health = numberValue;
-                                living.setHealth(Math.min(health, living.getMaxHealth()));
+                                FlowMutations.setHealth(ctx, living, health);
                                 success = true;
                             } else if ("get".equalsIgnoreCase(action)) {
                                 result = living.getHealth();
@@ -490,7 +491,7 @@ public class EntityActionHandler implements NodeHandler {
                     }
                     case "kill" -> {
                         if ("do".equalsIgnoreCase(action) && entity instanceof LivingEntity living) {
-                            living.setHealth(0);
+                            FlowMutations.setHealth(ctx, living, 0.0);
                             success = true;
                         }
                     }
@@ -747,4 +748,5 @@ public class EntityActionHandler implements NodeHandler {
         }
         ctx.triggerOutput("flow");
     }
+
 }

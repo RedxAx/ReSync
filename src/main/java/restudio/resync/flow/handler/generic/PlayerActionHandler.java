@@ -29,6 +29,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.util.TextFormatter;
@@ -323,7 +324,7 @@ public class PlayerActionHandler implements NodeHandler {
                         }
                         case "health" -> {
                             Double health = ctx.getInputValue(node, "value", Double.class, 20.0);
-                            runSync(() -> target.setHealth(Math.max(0, Math.min(target.getMaxHealth(), health))));
+                            FlowMutations.setHealth(ctx, target, health);
                             success = true;
                         }
                         case "max_health" -> {
@@ -333,7 +334,7 @@ public class PlayerActionHandler implements NodeHandler {
                         }
                         case "absorption" -> {
                             Double absorption = ctx.getInputValue(node, "value", Double.class, 0.0);
-                            runSync(() -> target.setAbsorptionAmount(Math.max(0, absorption)));
+                            FlowMutations.setAbsorption(ctx, target, absorption);
                             success = true;
                         }
                         case "walk_speed" -> {
@@ -358,7 +359,7 @@ public class PlayerActionHandler implements NodeHandler {
                         }
                         case "no_damage_ticks" -> {
                             Integer ticks = ctx.getInputValue(node, "value", Integer.class, 0);
-                            runSync(() -> target.setNoDamageTicks(ticks));
+                            FlowMutations.noDamageTicks(ctx, target, ticks);
                             success = true;
                         }
                         case "freeze_state" -> {
@@ -471,7 +472,7 @@ public class PlayerActionHandler implements NodeHandler {
                         Double vx = ctx.getInputValue(node, "vx", Double.class, 0.0);
                         Double vy = ctx.getInputValue(node, "vy", Double.class, 0.0);
                         Double vz = ctx.getInputValue(node, "vz", Double.class, 0.0);
-                        runSync(() -> target.setVelocity(new Vector(vx, vy, vz)));
+                        FlowMutations.applyVelocity(ctx, target, new Vector(vx, vy, vz));
                         success = true;
                     }
                     case "push" -> {
@@ -482,7 +483,7 @@ public class PlayerActionHandler implements NodeHandler {
                             if (direction.lengthSquared() > 0) {
                                 direction.normalize();
                             }
-                            target.setVelocity(direction.multiply(strength));
+                            FlowMutations.applyVelocity(ctx, target, direction.multiply(strength));
                         });
                         success = true;
                     }
@@ -497,7 +498,7 @@ public class PlayerActionHandler implements NodeHandler {
                             loc.setPitch(loc.getPitch() + pitch);
                             target.teleport(loc);
                             if (velocity != null) {
-                                target.setVelocity(velocity);
+                                FlowMutations.applyVelocity(ctx, target, velocity);
                             }
                         });
                         success = true;
@@ -514,7 +515,7 @@ public class PlayerActionHandler implements NodeHandler {
                             loc.setPitch(pitch);
                             target.teleport(loc);
                             if (velocity != null) {
-                                target.setVelocity(velocity);
+                                FlowMutations.applyVelocity(ctx, target, velocity);
                             }
                         });
                         success = true;

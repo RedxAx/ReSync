@@ -23,7 +23,8 @@ public final class CustomContentGraphAdapter {
             new TriggerDescriptor("break_block", "item.break_block"),
             new TriggerDescriptor("consume", "item.consume"),
             new TriggerDescriptor("drop", "item.drop"),
-            new TriggerDescriptor("pickup", "item.pickup")
+            new TriggerDescriptor("pickup", "item.pickup"),
+            new TriggerDescriptor("while_holding", "item.while_holding")
         ),
         "block", List.of(
             new TriggerDescriptor("place", "block.place"),
@@ -39,6 +40,7 @@ public final class CustomContentGraphAdapter {
             new TriggerDescriptor("unequip", "armor.unequip"),
             new TriggerDescriptor("damaged", "armor.damaged"),
             new TriggerDescriptor("tick", "armor.tick"),
+            new TriggerDescriptor("while_holding", "armor.while_holding"),
             new TriggerDescriptor("full_set", "armor.full_set"),
             new TriggerDescriptor("full_set_tick", "armor.full_set_tick")
         )

@@ -1,0 +1,1680 @@
+[
+  {
+    "id": "request:quest_info",
+    "displayName": "Quest Info",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "info"
+    },
+    "description": "Reads quest definition and player state",
+    "tags": [
+      "request",
+      "quest"
+    ],
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest",
+        "widget": "searchable_list",
+        "optionsSource": "request:quest_ids",
+        "defaultValue": "gather_logs"
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      },
+      {
+        "name": "quest_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "target",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_percent",
+        "dataType": "number"
+      },
+      {
+        "name": "active",
+        "dataType": "boolean"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "created_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "started_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "completed_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "last_progress_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "time_to_complete_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "active_time_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ],
+    "family": "request:quest"
+  },
+  {
+    "id": "request:find_quest",
+    "displayName": "Find Quest",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "find"
+    },
+    "description": "Finds a quest from a runtime ID or title",
+    "tags": [
+      "request",
+      "quest",
+      "lookup"
+    ],
+    "family": "request:quest",
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "query",
+        "dataType": "string",
+        "defaultValue": ""
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "id_title",
+          "id",
+          "title",
+          "contains"
+        ],
+        "defaultValue": "id_title"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "found",
+        "dataType": "boolean"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      }
+    ]
+  },
+  {
+    "id": "request:quest_list",
+    "displayName": "Quest List",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "list"
+    },
+    "description": "Lists quests for the current player",
+    "tags": [
+      "request",
+      "quest",
+      "list"
+    ],
+    "family": "request:quest",
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "visible",
+          "global",
+          "player",
+          "permission",
+          "owned",
+          "all"
+        ],
+        "defaultValue": "visible"
+      },
+      {
+        "name": "status",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "all",
+          "available",
+          "active",
+          "completed",
+          "quit"
+        ],
+        "defaultValue": "all"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "quests",
+        "dataType": "list"
+      },
+      {
+        "name": "quest_ids",
+        "dataType": "list"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "request:quest_profile",
+    "displayName": "Quest Profile",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "profile"
+    },
+    "description": "Reads the current player's quest profile",
+    "tags": [
+      "request",
+      "quest",
+      "profile"
+    ],
+    "family": "request:profile",
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "level",
+        "dataType": "number"
+      },
+      {
+        "name": "xp",
+        "dataType": "number"
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number"
+      },
+      {
+        "name": "active_count",
+        "dataType": "number"
+      },
+      {
+        "name": "completed_count",
+        "dataType": "number"
+      },
+      {
+        "name": "quit_count",
+        "dataType": "number"
+      },
+      {
+        "name": "available_count",
+        "dataType": "number"
+      },
+      {
+        "name": "quest_count",
+        "dataType": "number"
+      },
+      {
+        "name": "profile",
+        "dataType": "map",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ]
+  },
+  {
+    "id": "request:create_quest",
+    "displayName": "Create Quest",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "create"
+    },
+    "description": "Creates or replaces a quest",
+    "tags": [
+      "request",
+      "quest"
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "defaultValue": "new_quest"
+      },
+      {
+        "name": "title",
+        "dataType": "string",
+        "defaultValue": "New Quest"
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "defaultValue": ""
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "defaultValue": ""
+      },
+      {
+        "name": "target",
+        "dataType": "number",
+        "defaultValue": "1"
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "global",
+          "player",
+          "permission"
+        ],
+        "defaultValue": "global"
+      },
+      {
+        "name": "restrictions",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      },
+      {
+        "name": "progression",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "defaultValue": "",
+        "visibleWhen": {
+          "scope": "permission"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "defaultValue": "",
+        "visibleWhen": {
+          "restrictions": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "widget": "searchable_list",
+        "optionsSource": "request:quest_ids",
+        "defaultValue": "",
+        "visibleWhen": {
+          "restrictions": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "defaultValue": "3",
+        "visibleWhen": {
+          "restrictions": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "defaultValue": "0",
+        "visibleWhen": {
+          "restrictions": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "defaultValue": "1",
+        "visibleWhen": {
+          "progression": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "defaultValue": "50",
+        "visibleWhen": {
+          "progression": "true"
+        }
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "changed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "status",
+        "dataType": "string"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      },
+      {
+        "name": "quest_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "target",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_percent",
+        "dataType": "number"
+      },
+      {
+        "name": "active",
+        "dataType": "boolean"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "created_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "started_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "completed_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "last_progress_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "time_to_complete_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "active_time_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ],
+    "family": "request:quest"
+  },
+  {
+    "id": "request:quest_action",
+    "displayName": "Quest Action",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "action"
+    },
+    "description": "Runs a quest action",
+    "tags": [
+      "request",
+      "quest",
+      "action"
+    ],
+    "family": "request:quest",
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest",
+        "widget": "searchable_list",
+        "optionsSource": "request:quest_ids",
+        "defaultValue": "gather_logs"
+      },
+      {
+        "name": "action",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "start",
+          "complete",
+          "quit",
+          "reset",
+          "delete",
+          "can_start"
+        ],
+        "defaultValue": "start"
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "changed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "status",
+        "dataType": "string"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      },
+      {
+        "name": "quest_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "target",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_percent",
+        "dataType": "number"
+      },
+      {
+        "name": "active",
+        "dataType": "boolean"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "created_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "started_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "completed_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "last_progress_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "time_to_complete_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "active_time_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ]
+  },
+  {
+    "id": "request:quest_progress",
+    "displayName": "Quest Progress",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "progress_family"
+    },
+    "description": "Adds or sets quest progress",
+    "tags": [
+      "request",
+      "quest",
+      "progress"
+    ],
+    "family": "request:quest",
+    "recommended": true,
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest",
+        "widget": "searchable_list",
+        "optionsSource": "request:quest_ids",
+        "defaultValue": "gather_logs"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "dropdown",
+        "options": [
+          "add",
+          "set"
+        ],
+        "defaultValue": "add"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": "1",
+        "visibleWhen": {
+          "mode": "add"
+        }
+      },
+      {
+        "name": "progress",
+        "dataType": "number",
+        "defaultValue": "0",
+        "visibleWhen": {
+          "mode": "set"
+        }
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "changed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "status",
+        "dataType": "string"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      },
+      {
+        "name": "quest_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "target",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_percent",
+        "dataType": "number"
+      },
+      {
+        "name": "active",
+        "dataType": "boolean"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "previous_progress",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_added",
+        "dataType": "number"
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "created_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "started_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "completed_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "last_progress_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "time_to_complete_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "active_time_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ]
+  },
+  {
+    "id": "request:add_quest_xp",
+    "displayName": "Add Quest XP",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "xp"
+    },
+    "description": "Adds quest profile XP",
+    "tags": [
+      "request",
+      "quest",
+      "profile"
+    ],
+    "family": "request:profile",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": "50"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "changed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "status",
+        "dataType": "string"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      },
+      {
+        "name": "level",
+        "dataType": "number"
+      },
+      {
+        "name": "xp",
+        "dataType": "number"
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number"
+      },
+      {
+        "name": "previous_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "previous_xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ]
+  },
+  {
+    "id": "request:quest_event_listen",
+    "displayName": "Quest Event Listen",
+    "category": "utility",
+    "color": -12143478,
+    "priority": 10,
+    "handler": "request:handler",
+    "handlerConfig": {
+      "operation": "listen"
+    },
+    "description": "Continues when a ReQuest event is emitted",
+    "tags": [
+      "request",
+      "event"
+    ],
+    "family": "request:event",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "event",
+        "dataType": "string",
+        "widget": "searchable_list",
+        "optionsSource": "request:event_ids",
+        "defaultValue": "request:completed"
+      },
+      {
+        "name": "details",
+        "dataType": "boolean",
+        "widget": "toggle",
+        "defaultValue": "false"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "next",
+        "pinType": "flow",
+        "dataType": "execution"
+      },
+      {
+        "name": "listening",
+        "dataType": "boolean"
+      },
+      {
+        "name": "triggered",
+        "dataType": "boolean"
+      },
+      {
+        "name": "type",
+        "dataType": "string"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      },
+      {
+        "name": "quest",
+        "dataType": "request:quest"
+      },
+      {
+        "name": "quest_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "player_uuid",
+        "dataType": "string"
+      },
+      {
+        "name": "player_name",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "target",
+        "dataType": "number"
+      },
+      {
+        "name": "progress_percent",
+        "dataType": "number"
+      },
+      {
+        "name": "active",
+        "dataType": "boolean"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "previous_progress",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "progress_added",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "description",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "reward",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_reward",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "permission",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "required_quest",
+        "dataType": "request:quest",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "max_active",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "cooldown_seconds",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "owner",
+        "dataType": "string",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "xp_to_next_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "created_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "started_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "completed_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "quit_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "last_progress_at",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "time_to_complete_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "active_time_ms",
+        "dataType": "number",
+        "visibleWhen": {
+          "details": "true"
+        }
+      },
+      {
+        "name": "event_data",
+        "dataType": "map",
+        "visibleWhen": {
+          "details": "true"
+        }
+      }
+    ]
+  }
+]

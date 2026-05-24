@@ -70,7 +70,7 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onStart() {
-                getLogger().info("[ReSync] Server started on " + config.getBindHost() + ":" + getPort());
+                Log.info("Server started on " + config.getBindHost() + ":" + getPort());
             }
         };
 
@@ -86,7 +86,7 @@ public class ReSync extends JavaPlugin {
             getCommand("resync").setExecutor(command);
             getCommand("resync").setTabCompleter(command);
         } else {
-            getLogger().warning("[ReSync] Command '/resync' not found in plugin.yml");
+            Log.warn("Command '/resync' not found in plugin.yml");
         }
 
         registerPlaceholderExpansion();
@@ -116,13 +116,13 @@ public class ReSync extends JavaPlugin {
         if (wsServer != null) {
             try {
                 wsServer.stop();
-                getLogger().info("[ReSync] WebSocket server stopped.");
+                Log.info("WebSocket server stopped.");
             } catch (Exception e) {
-                getLogger().severe("[ReSync] Error stopping WebSocket server: " + e.getMessage());
+                Log.error("Error stopping WebSocket server: " + e.getMessage());
             }
         }
 
-        getLogger().info("[ReSync] Plugin disabled.");
+        Log.info("Plugin disabled.");
     }
 
     public static ReSync getInstance() {

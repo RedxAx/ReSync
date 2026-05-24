@@ -161,9 +161,10 @@ public class FlowExecutor {
         );
 
         String type = node.getType();
-        if (isLoopNode(type)) {
+        String loopOperation = resolveLoopOperation(node);
+        if (loopOperation != null) {
             ensureInputNodesReady(runtime, node, player, event);
-            CompletableFuture<Void> result = executeLoopNode(runtime, node, player, event, steps);
+            CompletableFuture<Void> result = executeLoopNode(runtime, node, loopOperation, player, event, steps);
             runtime.endFlowExecution(startNodeId);
             traceSuccess(runtime, graph, node, startNodeId, steps, traceStarted);
             return result;
@@ -397,24 +398,23 @@ public class FlowExecutor {
         });
     }
 
-    private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, Player player, Event event, int steps) {
-        String type = loopNode.getType();
-        if ("loop".equals(type) || "loop_count".equals(type)) {
+    private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, String operation, Player player, Event event, int steps) {
+        if ("loop".equals(operation) || "loop_count".equals(operation)) {
             return executeLoopCount(runtime, loopNode, player, event, steps);
         }
-        if ("loop_for_each".equals(type)) {
+        if ("loop_for_each".equals(operation)) {
             return executeLoopForEach(runtime, loopNode, player, event, steps);
         }
-        if ("loop_for_each_player".equals(type)) {
+        if ("loop_for_each_player".equals(operation)) {
             return executeLoopForEachPlayer(runtime, loopNode, player, event, steps);
         }
-        if ("loop_for_each_entity".equals(type)) {
+        if ("loop_for_each_entity".equals(operation)) {
             return executeLoopForEachEntity(runtime, loopNode, player, event, steps);
         }
-        if ("loop_interval".equals(type)) {
+        if ("loop_interval".equals(operation)) {
             return executeLoopInterval(runtime, loopNode, player, event, steps);
         }
-        if ("loop_while".equals(type)) {
+        if ("loop_while".equals(operation)) {
             return executeLoopWhile(runtime, loopNode, player, event, steps);
         }
         return CompletableFuture.completedFuture(null);
@@ -430,7 +430,7 @@ public class FlowExecutor {
         Integer count = (Integer) runtime.resolveInput(loopNode, "count", Integer.class);
         int iterations = count != null ? Math.max(0, count) : 0;
 
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
@@ -461,7 +461,7 @@ public class FlowExecutor {
             list = List.of();
         }
 
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
@@ -491,7 +491,7 @@ public class FlowExecutor {
         runtime.resetLoopControl();
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
 
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
@@ -533,7 +533,7 @@ public class FlowExecutor {
 
         List<Entity> entities = new ArrayList<>(
             center.getWorld().getNearbyEntities(center, radius, radius, radius));
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
@@ -566,7 +566,7 @@ public class FlowExecutor {
         int intervalTicks = intervalValue != null ? Math.max(0, intervalValue) : 20;
         int maxIterations = maxValue != null ? Math.max(0, maxValue) : 0;
 
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
         return executeLoopIntervalIteration(runtime, nodeId, loopTargets, completedTargets, player, event, steps, 0, intervalTicks, maxIterations);
     }
@@ -599,7 +599,7 @@ public class FlowExecutor {
         int intervalTicks = intervalValue != null ? Math.max(0, intervalValue) : 1;
         int maxIterations = maxValue != null ? Math.max(0, maxValue) : 0;
 
-        List<String> loopTargets = findTargetNodes(graph, nodeId, "loop");
+        List<String> loopTargets = findLoopTargets(graph, nodeId);
         List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
         return executeLoopWhileIteration(runtime, loopNode, nodeId, loopTargets, completedTargets, player, event,
             steps, 0, intervalTicks, maxIterations);
@@ -737,7 +737,19 @@ public class FlowExecutor {
         return false;
     }
 
-    private boolean isLoopNode(String type) {
+    private String resolveLoopOperation(FlowNode node) {
+        if (node == null) {
+            return null;
+        }
+        String configuredOperation = node.getHandlerConfig().getString("operation");
+        if (isLoopOperation(configuredOperation)) {
+            return configuredOperation;
+        }
+        String type = node.getType();
+        return isLoopOperation(type) ? type : null;
+    }
+
+    private boolean isLoopOperation(String type) {
         if (type == null) {
             return false;
         }
@@ -819,6 +831,14 @@ public class FlowExecutor {
             }
         }
         return null;
+    }
+
+    private List<String> findLoopTargets(FlowGraph graph, String nodeId) {
+        List<String> targets = findTargetNodes(graph, nodeId, "flow");
+        if (targets.isEmpty()) {
+            targets = findTargetNodes(graph, nodeId, "loop");
+        }
+        return targets;
     }
 
     private List<String> findTargetNodes(FlowGraph graph, String nodeId, String pinName) {

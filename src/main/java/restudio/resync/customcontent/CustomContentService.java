@@ -50,6 +50,16 @@ public class CustomContentService {
         }
     }
 
+    public boolean hasProvider(String providerId) {
+        return providerId != null && providers.containsKey(providerId.toLowerCase(Locale.ROOT));
+    }
+
+    public void unregisterProvider(String providerId) {
+        if (providerId != null) {
+            providers.remove(providerId.toLowerCase(Locale.ROOT));
+        }
+    }
+
     public List<String> getAvailableProviderIds() {
         return providers.values().stream()
             .filter(CustomContentProvider::isAvailable)

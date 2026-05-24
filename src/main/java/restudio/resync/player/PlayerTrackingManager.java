@@ -134,6 +134,11 @@ public class PlayerTrackingManager implements PlayerTrackingService {
 
     @Override
     public void upsertFacet(UUID playerId, String playerName, String facetId, String moduleId, Map<String, Object> data) {
+        upsertFacet(playerId, playerName, facetId, moduleId, null, data);
+    }
+
+    @Override
+    public void upsertFacet(UUID playerId, String playerName, String facetId, String moduleId, PlayerFacetMetadata metadata, Map<String, Object> data) {
         if (playerId == null || facetId == null || facetId.isBlank()) {
             return;
         }
@@ -142,6 +147,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
             facet.setFacetId(facetId);
             facet.setModuleId(moduleId);
             facet.setUpdatedAt(System.currentTimeMillis());
+            facet.setMetadata(metadata);
             facet.setData(data == null ? Map.of() : data);
             dossier.getFacets().put(facetId, facet);
         }, "facet:" + facetId);

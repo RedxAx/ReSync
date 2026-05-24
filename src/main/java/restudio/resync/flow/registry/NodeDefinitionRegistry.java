@@ -6,10 +6,19 @@ import java.util.List;
 import java.util.Map;
 
 public class NodeDefinitionRegistry {
+    private static NodeDefinitionRegistry INSTANCE;
     private final Map<String, NodeDefinition> definitions = new HashMap<>();
     private final Map<String, List<NodeDefinition>> pluginDefinitions = new HashMap<>();
     private final Map<String, String> nodeToPlugin = new HashMap<>();
     private String defaultPluginId = "standard";
+
+    public NodeDefinitionRegistry() {
+        INSTANCE = this;
+    }
+
+    public static NodeDefinitionRegistry getInstance() {
+        return INSTANCE;
+    }
 
     public void setDefaultPluginId(String pluginId) {
         if (pluginId != null && !pluginId.isBlank()) {

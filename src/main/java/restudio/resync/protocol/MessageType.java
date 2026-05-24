@@ -10,7 +10,8 @@ public enum MessageType {
     DATA(0x04),
     HEARTBEAT(0x05),
     ACK(0x06),
-    ERROR(0x07);
+    ERROR(0x07),
+    CHANNEL_REGISTRY(0x08);
 
     private final byte value;
 

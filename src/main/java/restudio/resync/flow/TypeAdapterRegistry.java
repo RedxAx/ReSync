@@ -119,6 +119,10 @@ public class TypeAdapterRegistry {
         register(Long.class, String.class, Object::toString);
         register(Double.class, String.class, Object::toString);
         register(Float.class, String.class, Object::toString);
+        register(Map.class, String.class, map -> {
+            Object id = map.get("id");
+            return id != null ? String.valueOf(id) : map.toString();
+        });
 
         register(UUID.class, String.class, UUID::toString);
         register(World.class, String.class, World::getName);
@@ -170,7 +174,7 @@ public class TypeAdapterRegistry {
 
         Class<?> sourceClass = source.getClass();
 
-        Function<Object, Object> adapter = adapters.get(new ClassPair(sourceClass, target));
+        Function<Object, Object> adapter = findAdapter(sourceClass, target);
 
         if (adapter != null) {
             return (T) adapter.apply(source);
@@ -208,7 +212,21 @@ public class TypeAdapterRegistry {
     public boolean canConvert(Class<?> source, Class<?> target) {
         if (target.isAssignableFrom(source)) return true;
         if (source.equals(String.class) && stringParsers.containsKey(target)) return true;
-        return adapters.containsKey(new ClassPair(source, target));
+        return findAdapter(source, target) != null;
+    }
+
+    private Function<Object, Object> findAdapter(Class<?> source, Class<?> target) {
+        Function<Object, Object> exact = adapters.get(new ClassPair(source, target));
+        if (exact != null) {
+            return exact;
+        }
+        for (Map.Entry<ClassPair, Function<Object, Object>> entry : adapters.entrySet()) {
+            ClassPair pair = entry.getKey();
+            if (pair.getSource().isAssignableFrom(source) && target.isAssignableFrom(pair.getTarget())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     public Map<ClassPair, Function<Object, Object>> getAdapters() {

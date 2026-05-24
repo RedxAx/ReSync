@@ -4,9 +4,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.java_websocket.WebSocket;
 import restudio.resync.memory.MemoryMonitor;
+import restudio.resync.modules.Module;
+import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.security.ClientIdentity;
 
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -166,5 +169,42 @@ public class SessionManager {
 
     public java.util.Collection<Session> getSessions() {
         return sessionsById.values();
+    }
+
+    public void unsubscribeChannels(Set<String> channelIds) {
+        if (channelIds == null || channelIds.isEmpty()) {
+            return;
+        }
+        for (Session session : sessionsById.values()) {
+            for (String channelId : channelIds) {
+                session.unsubscribeChannel(channelId);
+                session.removeModule(channelId);
+            }
+        }
+    }
+
+    public void cleanupModuleChannels(Set<String> channelIds, Module module) {
+        if (channelIds == null || channelIds.isEmpty() || module == null) {
+            return;
+        }
+        for (Session session : sessionsById.values()) {
+            boolean touched = false;
+            for (String channelId : channelIds) {
+                if (!session.getSubscribedChannels().contains(channelId)) {
+                    continue;
+                }
+                UnsubscribeRequest request = new UnsubscribeRequest();
+                request.setChannelId(channelId);
+                module.onUnsubscribe(session, request);
+                session.unsubscribeChannel(channelId);
+                touched = true;
+            }
+            if (touched) {
+                boolean cleaned = session.removeModule(module.getChannelId());
+                if (!cleaned) {
+                    module.cleanup(session);
+                }
+            }
+        }
     }
 }

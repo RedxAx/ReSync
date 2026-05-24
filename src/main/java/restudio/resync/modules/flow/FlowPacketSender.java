@@ -204,10 +204,15 @@ public class FlowPacketSender {
     }
 
     public void sendOptionCatalog(Session session, String sourceId, List<String> values, String revision) {
+        sendOptionCatalog(session, sourceId, values, List.of(), revision);
+    }
+
+    public void sendOptionCatalog(Session session, String sourceId, List<String> values, List<?> items, String revision) {
         String json = gson.toJson(Map.of(
             "sourceId", sourceId != null ? sourceId : "",
             "revision", revision != null ? revision : "",
-            "values", values != null ? values : List.of()
+            "values", values != null ? values : List.of(),
+            "items", items != null ? items : List.of()
         ));
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);

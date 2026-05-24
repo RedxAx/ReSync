@@ -2,8 +2,13 @@ package restudio.resync.flow;
 
 import restudio.flow.data.FlowNode;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class CustomEventManager {
     private static CustomEventManager instance;
@@ -24,7 +29,7 @@ public class CustomEventManager {
     }
     
     public void listen(String eventId, Listener listener) {
-        listeners.computeIfAbsent(eventId, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(listener);
+        listeners.computeIfAbsent(eventId, k -> new CopyOnWriteArrayList<>()).add(listener);
         if (listener.timeoutTicks > 0) {
             listenerTimeouts.put(listener, currentTick + listener.timeoutTicks);
         }
@@ -43,6 +48,7 @@ public class CustomEventManager {
                 
                 for (Map.Entry<String, Object> entry : data.entrySet()) {
                     ctx.getRuntime().getEventVariables().put("custom." + eventId + "." + entry.getKey(), entry.getValue());
+                    ctx.setNodeOutput(nodeId, entry.getKey(), entry.getValue());
                 }
                 ctx.setNodeOutput(nodeId, "event_data", data);
                 ctx.setNodeOutput(nodeId, "triggered", true);

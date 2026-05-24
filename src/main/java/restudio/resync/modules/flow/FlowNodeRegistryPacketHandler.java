@@ -1,13 +1,15 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.resync.Log;
+import restudio.resync.api.ReSyncExtensionData;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.property.PropertyRegistry;
-import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.sync.FlowCategoryMetadata;
@@ -22,39 +24,35 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 public class FlowNodeRegistryPacketHandler {
     private final NodeDefinitionRegistry definitionRegistry;
-    private final FlowNodePluginRegistry pluginRegistry;
     private final FlowPacketSender sender;
     private final PropertyRegistry propertyRegistry;
     private final CustomContentService customContentService;
-    private final Gson gson = new Gson();
+    private final ReSyncExtensionData extensionData;
+    private final Gson gson = new GsonBuilder()
+        .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
+        .create();
 
-    public FlowNodeRegistryPacketHandler(NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry, FlowPacketSender sender, PropertyRegistry propertyRegistry, CustomContentService customContentService) {
+    public FlowNodeRegistryPacketHandler(NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender, PropertyRegistry propertyRegistry, CustomContentService customContentService) {
+        this(definitionRegistry, sender, propertyRegistry, customContentService, null);
+    }
+
+    public FlowNodeRegistryPacketHandler(NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender, PropertyRegistry propertyRegistry, CustomContentService customContentService, ReSyncExtensionData extensionData) {
         this.definitionRegistry = definitionRegistry;
-        this.pluginRegistry = pluginRegistry;
         this.sender = sender;
         this.propertyRegistry = propertyRegistry;
         this.customContentService = customContentService;
-        if (pluginRegistry != null) {
-            pluginRegistry.addListener(new FlowNodePluginRegistry.PluginChangeListener() {
-                @Override
-                public void onPluginLoaded(NodePluginPayload payload) {
-                    sender.broadcastNodeRegistry(buildDeltaSnapshot(List.of(payload), List.of()));
-                }
-
-                @Override
-                public void onPluginUnloaded(String pluginId) {
-                    sender.broadcastNodeRegistry(buildDeltaSnapshot(List.of(), List.of(pluginId)));
-                }
-            });
-        }
+        this.extensionData = extensionData;
     }
 
     public void handleRequest(Session session, ByteBuffer buffer) {
@@ -84,43 +82,28 @@ public class FlowNodeRegistryPacketHandler {
         stampRegistry(snapshot, nodeIds);
 
         List<NodePluginPayload> pluginPayloads = new ArrayList<>();
-        if (pluginRegistry != null) {
-            for (String pluginId : pluginRegistry.getPluginIds()) {
-                String checksum = pluginRegistry.getChecksum(pluginId);
-                String clientChecksum = clientChecksums != null ? clientChecksums.get(pluginId) : null;
-                if (fullSync || checksum == null || !checksum.equals(clientChecksum)) {
-                    NodePluginPayload payload = pluginRegistry.buildPayload(pluginId);
-                    if (payload != null) {
-                        pluginPayloads.add(payload);
-                    }
+        for (String pluginId : getPluginIds()) {
+            String checksum = getChecksum(pluginId);
+            String clientChecksum = clientChecksums != null ? clientChecksums.get(pluginId) : null;
+            if (fullSync || checksum == null || !checksum.equals(clientChecksum)) {
+                NodePluginPayload payload = buildPayload(pluginId);
+                if (payload != null) {
+                    pluginPayloads.add(payload);
                 }
             }
         }
         snapshot.setPlugins(pluginPayloads);
 
         List<String> removed = new ArrayList<>();
-        if (clientChecksums != null && pluginRegistry != null) {
+        if (clientChecksums != null) {
+            Set<String> serverPluginIds = getPluginIds();
             for (String pluginId : clientChecksums.keySet()) {
-                if (!pluginRegistry.getPluginIds().contains(pluginId)) {
+                if (!serverPluginIds.contains(pluginId)) {
                     removed.add(pluginId);
                 }
             }
         }
         snapshot.setRemovedPlugins(removed);
-        populatePropertyMetadata(snapshot);
-        populateServerMetadata(snapshot);
-        return snapshot;
-    }
-
-    private NodeRegistrySnapshot buildDeltaSnapshot(List<NodePluginPayload> plugins, List<String> removedPlugins) {
-        NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
-        snapshot.setFullSync(false);
-        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
-        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
-        snapshot.setNodeIds(nodeIds);
-        stampRegistry(snapshot, nodeIds);
-        snapshot.setPlugins(plugins);
-        snapshot.setRemovedPlugins(removedPlugins);
         populatePropertyMetadata(snapshot);
         populateServerMetadata(snapshot);
         return snapshot;
@@ -137,6 +120,19 @@ public class FlowNodeRegistryPacketHandler {
         return computeRegistryChecksum(nodeIds);
     }
 
+    public List<NodePluginPayload> buildPluginPayloads() {
+        List<NodePluginPayload> payloads = new ArrayList<>();
+        List<String> pluginIds = new ArrayList<>(getPluginIds());
+        pluginIds.sort(String.CASE_INSENSITIVE_ORDER);
+        for (String pluginId : pluginIds) {
+            NodePluginPayload payload = buildPayload(pluginId);
+            if (payload != null) {
+                payloads.add(payload);
+            }
+        }
+        return payloads;
+    }
+
     private String computeRegistryChecksum(List<String> nodeIds) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -148,13 +144,11 @@ public class FlowNodeRegistryPacketHandler {
                     updateDefinitionDigest(digest, definition);
                 }
             }
-            if (pluginRegistry != null) {
-                List<String> pluginIds = new ArrayList<>(pluginRegistry.getPluginIds());
-                pluginIds.sort(String.CASE_INSENSITIVE_ORDER);
-                for (String pluginId : pluginIds) {
-                    updateDigest(digest, pluginId);
-                    updateDigest(digest, pluginRegistry.getChecksum(pluginId));
-                }
+            List<String> pluginIds = new ArrayList<>(getPluginIds());
+            pluginIds.sort(String.CASE_INSENSITIVE_ORDER);
+            for (String pluginId : pluginIds) {
+                updateDigest(digest, pluginId);
+                updateDigest(digest, getChecksum(pluginId));
             }
             return HexFormat.of().formatHex(digest.digest());
         } catch (Exception ignored) {
@@ -250,6 +244,42 @@ public class FlowNodeRegistryPacketHandler {
         digest.update((byte) 0);
     }
 
+    private Set<String> getPluginIds() {
+        return new HashSet<>(definitionRegistry.getPluginIds());
+    }
+
+    private NodePluginPayload buildPayload(String pluginId) {
+        List<NodeDefinition> definitions = definitionRegistry.getDefinitionsForPlugin(pluginId);
+        if (definitions.isEmpty()) {
+            return null;
+        }
+        NodePluginPayload payload = new NodePluginPayload();
+        payload.setPluginId(pluginId);
+        payload.setVersion(extensionData != null ? extensionData.version(pluginId) : "builtin");
+        payload.setDescription(extensionData != null ? extensionData.description(pluginId) : "BuiltInNodeDefinitions");
+        payload.setChecksum(computeDefinitionChecksum(definitions));
+        payload.setNodes(definitions);
+        return payload;
+    }
+
+    private String getChecksum(String pluginId) {
+        List<NodeDefinition> definitions = definitionRegistry.getDefinitionsForPlugin(pluginId);
+        return definitions.isEmpty() ? null : computeDefinitionChecksum(definitions);
+    }
+
+    private String computeDefinitionChecksum(List<NodeDefinition> definitions) {
+        List<NodeDefinition> sorted = new ArrayList<>(definitions);
+        sorted.sort(java.util.Comparator.comparing(NodeDefinition::getId, String.CASE_INSENSITIVE_ORDER));
+        String json = gson.toJson(sorted);
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(json.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (Exception exception) {
+            return Integer.toHexString(json.hashCode());
+        }
+    }
+
     private void populatePropertyMetadata(NodeRegistrySnapshot snapshot) {
         if (propertyRegistry == null) {
             return;
@@ -291,8 +321,8 @@ public class FlowNodeRegistryPacketHandler {
             boolean object = isObjectType(type);
             list.add(new FlowTypeMetadata(type.getId(), type.getId(), type.getColor(), parentId, type.canStringify(), literal, object));
         }
-        if (pluginRegistry != null) {
-            list.addAll(pluginRegistry.getAllCustomTypes());
+        if (extensionData != null) {
+            list.addAll(extensionData.types());
         }
         return list;
     }
@@ -320,8 +350,8 @@ public class FlowNodeRegistryPacketHandler {
         for (NodeDefinition.NodeCategory cat : NodeDefinition.NodeCategory.values()) {
             list.add(new FlowCategoryMetadata(cat.getId(), cat.getDisplayName(), cat.getColor(), cat.getPriority()));
         }
-        if (pluginRegistry != null) {
-            list.addAll(pluginRegistry.getAllCustomCategories());
+        if (extensionData != null) {
+            list.addAll(extensionData.categories());
         }
         return list;
     }
@@ -349,8 +379,8 @@ public class FlowNodeRegistryPacketHandler {
                 list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_armor", "custom_content", "SEARCHABLE_LIST", true));
             }
         }
-        if (pluginRegistry != null) {
-            list.addAll(pluginRegistry.getAllCustomOptionSources());
+        if (extensionData != null) {
+            list.addAll(extensionData.optionSources());
         }
         return list;
     }
@@ -372,8 +402,8 @@ public class FlowNodeRegistryPacketHandler {
                 list.add(new FlowConversionRule("string", targetId));
             }
         }
-        if (pluginRegistry != null) {
-            list.addAll(pluginRegistry.getAllCustomConversionRules());
+        if (extensionData != null) {
+            list.addAll(extensionData.conversions());
         }
         return list;
     }

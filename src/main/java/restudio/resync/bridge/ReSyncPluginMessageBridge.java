@@ -63,7 +63,8 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
             }
             if (envelope.type() == ReSyncBridgeEnvelope.HELLO) {
                 handleHello(session, payload);
-            } else if (envelope.type() == ReSyncBridgeEnvelope.DATA && session.authorized && session.connection != null) {
+            } else if (envelope.type() == ReSyncBridgeEnvelope.DATA && session.authorized) {
+                ensureConnection(session);
                 plugin.getReSyncServer().onBridgeMessage(session.connection, player, payload);
             } else if (envelope.type() == ReSyncBridgeEnvelope.CLOSE) {
                 close(session);
@@ -87,7 +88,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
     private void handleHello(BridgeSession session, byte[] payload) {
         Player player = session.player;
         BridgeHello hello = readHello(payload);
-        Log.info("[ReSync] Vanilla bridge hello from " + player.getName() + " mod=" + hello.modVersion + " server=" + hello.serverAddress);
+        Log.fine("Vanilla bridge hello from " + player.getName() + " mod=" + hello.modVersion + " server=" + hello.serverAddress);
         if (hello.protocolVersion != BRIDGE_PROTOCOL) {
             Log.warn("[ReSync] Vanilla bridge rejected " + player.getName() + ": unsupported protocol " + hello.protocolVersion);
             sendAuth(session, false, "Unsupported Bridge");
@@ -100,10 +101,16 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
             close(session);
             return;
         }
+        session.authorized = true;
+        sendAuth(session, true, Bukkit.getServer().getName());
+        Log.fine("Vanilla bridge authorized " + player.getName());
+    }
+
+    private void ensureConnection(BridgeSession session) {
         if (session.connection != null) {
-            plugin.getReSyncServer().onBridgeClose(session.connection);
-            session.connection = null;
+            return;
         }
+        Player player = session.player;
         session.connection = plugin.getReSyncServer().onBridgeOpen(new FrameSender() {
             @Override
             public void send(byte[] frame) {
@@ -116,9 +123,6 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
                 ReSyncPluginMessageBridge.this.close(session);
             }
         });
-        session.authorized = true;
-        sendAuth(session, true, Bukkit.getServer().getName());
-        Log.info("[ReSync] Vanilla bridge authorized " + player.getName());
     }
 
     private void sendAuth(BridgeSession session, boolean success, String displayName) {
@@ -141,7 +145,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
         session.chunker.send(session.sessionId, session.sequence.getAndIncrement(), ReSyncBridgeEnvelope.AUTH_RESULT, buffer.array(), envelope -> {
             byte[] encoded = envelope.encode();
             session.player.sendPluginMessage(plugin, CHANNEL, encoded);
-            Log.info("[ReSync] Vanilla bridge auth result sent to " + session.player.getName() + " success=" + success + " bytes=" + encoded.length + " channels=" + channels.size());
+            Log.fine("Vanilla bridge auth result sent to " + session.player.getName() + " success=" + success + " bytes=" + encoded.length + " channels=" + channels.size());
         });
     }
 

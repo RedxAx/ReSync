@@ -37,6 +37,7 @@ public class Codec {
         messageTypes.put((byte) 0x05, Heartbeat.class);
         messageTypes.put((byte) 0x06, AckMessage.class);
         messageTypes.put((byte) 0x07, ErrorMessage.class);
+        messageTypes.put((byte) 0x08, ChannelRegistryMessage.class);
     }
 
     public byte[] encodeFrame(Message message, int channel, boolean compress) {

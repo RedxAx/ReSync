@@ -6,6 +6,7 @@ import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -171,6 +172,7 @@ public final class ReSyncBuiltInGenerators {
                 resolved.add(Material.DIRT);
                 resolved.add(Material.BEDROCK);
             }
+            Collections.reverse(resolved);
             return resolved;
         }
     }

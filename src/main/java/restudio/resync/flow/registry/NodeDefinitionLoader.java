@@ -87,6 +87,25 @@ public class NodeDefinitionLoader {
         return results;
     }
 
+    public List<NodeDefinition> loadFromClassLoader(ClassLoader classLoader, String resourcePath) {
+        List<NodeDefinition> results = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        if (classLoader == null || resourcePath == null || resourcePath.isBlank()) {
+            return results;
+        }
+        try {
+            loadFromClassLoaderUrls(classLoader, resourcePath, results, errors);
+        } catch (Exception e) {
+            Log.warn("[NodeDefinitionLoader] Failed to scan extension resources: " + e.getMessage());
+        }
+        if (!errors.isEmpty()) {
+            for (String error : errors) {
+                Log.warn("[NodeDefinitionLoader] " + error);
+            }
+        }
+        return results;
+    }
+
     private boolean loadFromCodeSource(String resourcePath, List<NodeDefinition> results, List<String> errors) throws IOException, URISyntaxException {
         URL location = NodeDefinitionLoader.class.getProtectionDomain().getCodeSource().getLocation();
         if (location == null) {
@@ -358,6 +377,21 @@ public class NodeDefinitionLoader {
             }
             builder.outputMappings(mappings);
         }
+        if (dto.tags != null) {
+            builder.tags(dto.tags);
+        }
+        if (dto.examples != null) {
+            builder.examples(dto.examples);
+        }
+        if (dto.family != null && !dto.family.isBlank()) {
+            builder.family(dto.family);
+        }
+        if (dto.recommended != null) {
+            builder.recommended(dto.recommended);
+        }
+        if (dto.replacementFor != null && !dto.replacementFor.isBlank()) {
+            builder.replacementFor(dto.replacementFor);
+        }
 
         if (dto.inputs != null) {
             for (PinJson pin : dto.inputs) {
@@ -437,6 +471,9 @@ public class NodeDefinitionLoader {
         }
         FlowDataType type = FlowDataType.fromString(raw);
         if (type == FlowDataType.ANY && !"any".equalsIgnoreCase(raw)) {
+            if (raw.contains(":")) {
+                return new FlowDataType(raw, FlowDataType.STRING, String.class, null, 0x808080);
+            }
             Log.warn("[NodeDefinitionLoader] Unknown dataType: " + raw);
             return null;
         }
@@ -526,6 +563,11 @@ public class NodeDefinitionLoader {
         List<PinMappingJson> outputMappings;
         List<PinJson> inputs;
         List<PinJson> outputs;
+        List<String> tags;
+        List<String> examples;
+        String family;
+        Boolean recommended;
+        String replacementFor;
     }
 
     private static class AvailabilityJson {

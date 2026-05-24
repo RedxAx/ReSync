@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import restudio.resync.Log;
+import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.ReSyncExtensionData;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
@@ -16,10 +18,8 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
-import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
-import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
@@ -61,7 +61,6 @@ public class FlowModule implements Module {
     private final FlowCustomContentPacketHandler customContentHandler;
     private final FlowProjectMetadataPacketHandler projectMetadataHandler;
     private final NodeDefinitionRegistry definitionRegistry;
-    private final FlowNodePluginRegistry pluginRegistry;
     private FlowTraceService traceService;
     private FlowDebugService debugService;
     private FlowTraceSink traceSink;
@@ -69,19 +68,32 @@ public class FlowModule implements Module {
     private final Gson gson = new Gson();
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
-                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry, FlowNodePluginRegistry pluginRegistry,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
                       PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService, null);
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService, extensionData, null);
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry) {
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
-        this.pluginRegistry = pluginRegistry;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions);
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
         this.guiHandler = new FlowGuiPacketHandler(storage, sender);
         this.scoreboardHandler = new FlowScoreboardPacketHandler(storage, sender);
         this.tabHandler = new FlowTabPacketHandler(storage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
-        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService);
-        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, pluginRegistry, sender, propertyRegistry, customContentService);
+        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService, optionCatalogRegistry);
+        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData);
         this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
         this.projectMetadataHandler = new FlowProjectMetadataPacketHandler(storage, sender);
     }
@@ -195,16 +207,7 @@ public class FlowModule implements Module {
         snapshot.setGeneratedAt(System.currentTimeMillis());
         snapshot.setRegistryChecksum(nodeRegistryHandler.computeRegistryChecksum());
 
-        List<NodePluginPayload> payloads = new ArrayList<>();
-        if (pluginRegistry != null) {
-            for (String pluginId : pluginRegistry.getPluginIds()) {
-                NodePluginPayload payload = pluginRegistry.buildPayload(pluginId);
-                if (payload != null) {
-                    payloads.add(payload);
-                }
-            }
-        }
-        snapshot.setPlugins(payloads);
+        snapshot.setPlugins(nodeRegistryHandler.buildPluginPayloads());
         snapshot.setRemovedPlugins(List.of());
         nodeRegistryHandler.populateServerMetadata(snapshot);
         return snapshot;

@@ -12,6 +12,17 @@ public class PropertyRegistry {
                 .put(property, handler);
     }
 
+    public void unregister(String family, String property) {
+        Map<String, PropertyHandler<?, ?>> familyMap = families.get(family);
+        if (familyMap == null) {
+            return;
+        }
+        familyMap.remove(property);
+        if (familyMap.isEmpty()) {
+            families.remove(family, familyMap);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public <T, V> PropertyHandler<T, V> get(String family, String property) {
         Map<String, PropertyHandler<?, ?>> familyMap = families.get(family);

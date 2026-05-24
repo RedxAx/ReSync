@@ -71,6 +71,10 @@ public class FlowNode {
         return new HandlerConfig(handlerConfig);
     }
 
+    public Map<String, Object> getHandlerConfigValues() {
+        return new HashMap<>(handlerConfig);
+    }
+
     public void setHandlerConfig(Map<String, Object> handlerConfig) {
         this.handlerConfig = handlerConfig != null ? new HashMap<>(handlerConfig) : new HashMap<>();
     }

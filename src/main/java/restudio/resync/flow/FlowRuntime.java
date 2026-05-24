@@ -341,13 +341,17 @@ public class FlowRuntime {
             return null;
         }
         for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() != null && "function_start".equals(entry.getValue().getType())) {
+            if (entry.getValue() != null && isFunctionStartType(entry.getValue().getType())) {
                 return entry.getKey();
             }
         }
         List<Map.Entry<String, FlowNode>> entries = new ArrayList<>(graph.getNodes().entrySet());
         entries.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
         return entries.isEmpty() ? null : entries.getFirst().getKey();
+    }
+
+    private boolean isFunctionStartType(String type) {
+        return "function_start".equals(type) || "function.start".equals(type) || "function.function_start".equals(type);
     }
     
     public void setBreakLoopRequested(boolean requested) {

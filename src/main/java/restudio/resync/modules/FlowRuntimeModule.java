@@ -3,6 +3,9 @@ package restudio.resync.modules;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.scheduler.BukkitTask;
+import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.ReSyncExtensionData;
+import restudio.resync.api.ReSyncExtensionManager;
 import restudio.resync.customcontent.CustomContentAccess;
 import restudio.resync.customcontent.CustomContentListener;
 import restudio.resync.customcontent.CustomContentService;
@@ -70,7 +73,6 @@ import restudio.resync.flow.handler.generic.VariableScopeHandler;
 import restudio.resync.flow.handler.generic.WorldActionHandler;
 import restudio.resync.flow.handler.family.JsonFamilyHandler;
 import restudio.resync.flow.handler.property.PropertyRegistry;
-import restudio.resync.flow.plugins.FlowNodePluginRegistry;
 import restudio.resync.flow.handler.event.FlowEventRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
@@ -93,7 +95,6 @@ public class FlowRuntimeModule implements Module {
     private GuiManager guiManager;
     private GlobalTriggers globalTriggers;
     private SystemEventListener systemEventListener;
-    private FlowNodePluginRegistry nodePluginRegistry;
     private ScoreboardRuntimeListener scoreboardRuntimeListener;
     private PropertyRegistry propertyRegistry;
     private CustomContentStorage customContentStorage;
@@ -115,8 +116,6 @@ public class FlowRuntimeModule implements Module {
         storage = new FlowStorage(context.getPlugin());
         customContentStorage = new CustomContentStorage(context.getPlugin());
         customContentStorage.preloadAll();
-        new FlowGraphMigrator(storage).migrateStoredFlows();
-        storage.preloadAll();
         TypeAdapterRegistry typeAdapterRegistry = new TypeAdapterRegistry();
         HandlerRegistry handlerRegistry = new HandlerRegistry();
         FlowRegistry flowRegistry = new FlowRegistry();
@@ -186,12 +185,8 @@ public class FlowRuntimeModule implements Module {
             jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
-        nodePluginRegistry = new FlowNodePluginRegistry(
-            flowRegistry,
-            nodeDefinitionRegistry,
-            context.getPlugin().getDataFolder().toPath().resolve("flow-plugins")
-        );
-        nodePluginRegistry.loadInitialPlugins();
+        new FlowGraphMigrator(storage, nodeDefinitionRegistry).migrateStoredFlows();
+        storage.preloadAll();
         traceService = new FlowTraceService(500);
         debugService = new FlowDebugService(traceService);
         executor = new FlowExecutor(handlerRegistry, nodeDefinitionRegistry, typeAdapterRegistry, new HashMap<>());
@@ -205,7 +200,7 @@ public class FlowRuntimeModule implements Module {
         flowEventRegistry.registerFromJson(new java.util.ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, nodePluginRegistry, propertyRegistry, customContentStorage, customContentService);
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class));
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);
@@ -218,7 +213,6 @@ public class FlowRuntimeModule implements Module {
         context.registerService(TypeRegistry.class, typeRegistry);
         context.registerService(FlowRegistry.class, flowRegistry);
         context.registerService(NodeDefinitionRegistry.class, nodeDefinitionRegistry);
-        context.registerService(FlowNodePluginRegistry.class, nodePluginRegistry);
         context.registerService(TriggerRegistry.class, triggerRegistry);
         context.registerService(FlowExecutor.class, executor);
         context.registerService(FlowTraceService.class, traceService);
@@ -231,9 +225,6 @@ public class FlowRuntimeModule implements Module {
     }
 
     public void reloadNodeDefinitions() {
-        if (nodePluginRegistry != null) {
-            nodePluginRegistry.shutdown();
-        }
         if (executor != null) {
             executor.cancelPendingTasks();
         }
@@ -307,12 +298,10 @@ public class FlowRuntimeModule implements Module {
             jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
-        nodePluginRegistry = new FlowNodePluginRegistry(
-            moduleContext.getRequiredService(FlowRegistry.class),
-            nodeDefinitionRegistry,
-            moduleContext.getPlugin().getDataFolder().toPath().resolve("flow-plugins")
-        );
-        nodePluginRegistry.loadInitialPlugins();
+        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
+        if (extensionManager != null) {
+            extensionManager.reloadExtensions();
+        }
         if (delegate != null) {
             delegate.refreshCustomFunctionDefinitions();
         }
@@ -321,8 +310,10 @@ public class FlowRuntimeModule implements Module {
     public Map<String, Object> nodeRegistryDiagnostics() {
         NodeDefinitionRegistry nodeDefinitionRegistry = moduleContext.getRequiredService(NodeDefinitionRegistry.class);
         Map<String, Object> diagnostics = new HashMap<>();
-        List<String> definitionSets = nodePluginRegistry != null ? nodePluginRegistry.getDefinitionSetIds() : nodeDefinitionRegistry.getPluginIds();
-        List<String> externalPlugins = nodePluginRegistry != null ? new java.util.ArrayList<>(nodePluginRegistry.getExternalPluginIds()) : java.util.List.of();
+        List<String> definitionSets = nodeDefinitionRegistry.getPluginIds();
+        definitionSets.sort(String.CASE_INSENSITIVE_ORDER);
+        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
+        List<String> externalPlugins = extensionManager != null ? new java.util.ArrayList<>(extensionManager.getPluginIds()) : new java.util.ArrayList<>();
         externalPlugins.sort(String.CASE_INSENSITIVE_ORDER);
         diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
         diagnostics.put("definitionSets", definitionSets.size());
@@ -377,9 +368,6 @@ public class FlowRuntimeModule implements Module {
             tickTask = null;
         }
         TabListService.stopUpdater();
-        if (nodePluginRegistry != null) {
-            nodePluginRegistry.shutdown();
-        }
         if (executor != null) {
             executor.cancelPendingTasks();
         }
@@ -419,9 +407,6 @@ public class FlowRuntimeModule implements Module {
 
     @Override
     public void onTick() {
-        if (nodePluginRegistry != null) {
-            nodePluginRegistry.tick();
-        }
         delegate.onTick();
     }
 

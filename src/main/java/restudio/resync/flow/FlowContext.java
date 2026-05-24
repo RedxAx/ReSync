@@ -52,6 +52,11 @@ public class FlowContext {
         return player;
     }
 
+    public Player getPlayerInput(FlowNode node, String pinName) {
+        Player selected = getInputValue(node, pinName, Player.class, null);
+        return selected != null ? selected : player;
+    }
+
     public Event getEvent() {
         return event;
     }

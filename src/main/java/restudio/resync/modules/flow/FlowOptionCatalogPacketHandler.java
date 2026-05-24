@@ -10,6 +10,8 @@ import org.bukkit.block.Biome;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.potion.PotionEffectType;
+import restudio.resync.api.OptionCatalogProvider;
+import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.core.Session;
 
@@ -23,10 +25,16 @@ import java.util.Locale;
 public class FlowOptionCatalogPacketHandler {
     private final FlowPacketSender sender;
     private final CustomContentService customContentService;
+    private final OptionCatalogRegistry optionCatalogRegistry;
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
+        this(sender, customContentService, null);
+    }
+
+    public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService, OptionCatalogRegistry optionCatalogRegistry) {
         this.sender = sender;
         this.customContentService = customContentService;
+        this.optionCatalogRegistry = optionCatalogRegistry;
     }
 
     public void handle(Session session, ByteBuffer buffer) {
@@ -40,10 +48,19 @@ public class FlowOptionCatalogPacketHandler {
         byte[] sourceBytes = new byte[sourceLength];
         buffer.get(sourceBytes);
         String sourceId = new String(sourceBytes, StandardCharsets.UTF_8);
+        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
+        if (provider != null) {
+            sender.sendOptionCatalog(session, sourceId, provider.values(), provider.items(), provider.revision());
+            return;
+        }
         sender.sendOptionCatalog(session, sourceId, values(sourceId), revision(sourceId));
     }
 
     private List<String> values(String sourceId) {
+        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
+        if (provider != null) {
+            return provider.values();
+        }
         return switch (normalize(sourceId)) {
             case "advancement" -> advancements();
             case "biome" -> registryKeys(Registry.BIOME);
@@ -67,6 +84,10 @@ public class FlowOptionCatalogPacketHandler {
     }
 
     private String revision(String sourceId) {
+        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
+        if (provider != null) {
+            return provider.revision();
+        }
         return normalize(sourceId) + ":" + Bukkit.getVersion();
     }
 

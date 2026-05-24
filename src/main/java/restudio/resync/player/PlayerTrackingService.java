@@ -19,6 +19,8 @@ public interface PlayerTrackingService {
 
     void upsertFacet(UUID playerId, String playerName, String facetId, String moduleId, Map<String, Object> data);
 
+    void upsertFacet(UUID playerId, String playerName, String facetId, String moduleId, PlayerFacetMetadata metadata, Map<String, Object> data);
+
     void removeFacet(UUID playerId, String facetId);
 
     void addListener(PlayerTrackingListener listener);

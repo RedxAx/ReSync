@@ -5,6 +5,8 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -14,10 +16,16 @@ import java.util.Set;
 public class FlowGraphMigrator {
     private static final Set<String> LEGACY_EVENT_FLOW_PINS = Set.of("next", "left", "right", "middle", "shift_left", "shift_right");
     private final FlowStorage storage;
+    private final NodeDefinitionRegistry nodeDefinitionRegistry;
     private final IdCompatibilityLayer idCompatibility;
 
     public FlowGraphMigrator(FlowStorage storage) {
+        this(storage, null);
+    }
+
+    public FlowGraphMigrator(FlowStorage storage, NodeDefinitionRegistry nodeDefinitionRegistry) {
         this.storage = storage;
+        this.nodeDefinitionRegistry = nodeDefinitionRegistry;
         this.idCompatibility = new IdCompatibilityLayer();
     }
 
@@ -79,6 +87,9 @@ public class FlowGraphMigrator {
             if (migrateNodeValues(node, originalType)) {
                 changed = true;
             }
+            if (migrateHandlerConfig(node)) {
+                changed = true;
+            }
             if (outdatedNode) {
                 node.setVersion(FlowNode.CURRENT_VERSION);
                 changed = true;
@@ -86,6 +97,28 @@ public class FlowGraphMigrator {
         }
         if (migrateConnections(graph, originalTypes)) {
             changed = true;
+        }
+        return changed;
+    }
+
+    private boolean migrateHandlerConfig(FlowNode node) {
+        if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
+            return false;
+        }
+        NodeDefinition definition = nodeDefinitionRegistry.get(node.getType());
+        if (definition == null || definition.getHandlerConfig() == null || definition.getHandlerConfig().isEmpty()) {
+            return false;
+        }
+        Map<String, Object> handlerConfig = node.getHandlerConfigValues();
+        boolean changed = false;
+        for (Map.Entry<String, Object> entry : definition.getHandlerConfig().entrySet()) {
+            if (!handlerConfig.containsKey(entry.getKey())) {
+                handlerConfig.put(entry.getKey(), entry.getValue());
+                changed = true;
+            }
+        }
+        if (changed) {
+            node.setHandlerConfig(handlerConfig);
         }
         return changed;
     }

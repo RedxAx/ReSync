@@ -68,12 +68,15 @@ public class Session {
         updateActivity();
     }
 
-    public void removeModule(String channelId) {
+    public boolean removeModule(String channelId) {
         Module module = activeModules.remove(channelId);
         if (module != null) {
             module.cleanup(this);
+            updateActivity();
+            return true;
         }
         updateActivity();
+        return false;
     }
 
     public void updateActivity() {

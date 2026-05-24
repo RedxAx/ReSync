@@ -6,6 +6,9 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.bukkit.entity.Player;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.ReSyncExtensionData;
+import restudio.resync.api.ReSyncExtensionManager;
 import restudio.resync.compression.CompressionPool;
 import restudio.resync.core.ChannelMuxer;
 import restudio.resync.core.ConnectionInfo;
@@ -35,6 +38,7 @@ import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.FrameSender;
 import restudio.resync.protocol.FrameHeader;
 import restudio.resync.protocol.MessageType;
+import restudio.resync.protocol.messages.ChannelRegistryMessage;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.ErrorMessage;
 import restudio.resync.protocol.messages.HandshakeRequest;
@@ -74,6 +78,7 @@ public class ReSyncServer {
     private final MemoryMonitor memoryMonitor;
     private final ModuleContext moduleContext;
     private final ClientAuthorizer clientAuthorizer;
+    private final ReSyncExtensionManager extensionManager;
     private final AtomicInteger openConnections = new AtomicInteger();
 
     public ReSyncServer(ReSync plugin, ReSyncConfig config) {
@@ -113,6 +118,20 @@ public class ReSyncServer {
         registerCoreServices();
         registerModules();
         moduleRegistry.initializeModules(moduleContext);
+        moduleRegistry.addListener(new ModuleRegistry.ModuleChangeListener() {
+            @Override
+            public void onModuleRegistered(Module module) {
+                publishChannelDelta(module.getChannels(), List.of());
+            }
+
+            @Override
+            public void onModuleUnregistered(String moduleId, java.util.Set<String> channels) {
+                publishChannelDelta(List.of(), new ArrayList<>(channels));
+            }
+        });
+        this.extensionManager = new ReSyncExtensionManager(moduleContext, plugin.getDataFolder().toPath().resolve("extensions"));
+        moduleContext.registerService(ReSyncExtensionManager.class, extensionManager);
+        this.extensionManager.loadInitialExtensions();
         startScheduler();
     }
 
@@ -120,6 +139,8 @@ public class ReSyncServer {
         moduleContext.registerService(PlayerTrackingService.class, new PlayerTrackingManager(plugin));
         moduleContext.registerService(PlayerSessionLinkService.class, new DefaultPlayerSessionLinkService());
         moduleContext.registerService(ModuleContext.class, moduleContext);
+        moduleContext.registerService(OptionCatalogRegistry.class, new OptionCatalogRegistry());
+        moduleContext.registerService(ReSyncExtensionData.class, new ReSyncExtensionData());
     }
 
     private void registerModules() {
@@ -134,6 +155,7 @@ public class ReSyncServer {
         scheduler.scheduleWithFixedDelay(() -> {
             try {
                 moduleRegistry.tickAll();
+                extensionManager.tick();
             } catch (Exception e) {
                 Log.warn("Module tick failed: " + e.getMessage());
             }
@@ -341,7 +363,56 @@ public class ReSyncServer {
         response.setChannels(channelMuxer.getNumericChannels());
 
         codec.sendMessage(info.getFrameSender(), response, 0, false);
-        Log.info("Client authenticated: " + req.getClientId());
+        publishChannelSnapshot(info);
+        Log.fine("Client authenticated: " + req.getClientId());
+    }
+
+    private void publishChannelSnapshot(ConnectionInfo info) {
+        if (!supportsChannelRegistry(info)) {
+            return;
+        }
+        ChannelRegistryMessage message = new ChannelRegistryMessage();
+        message.setSnapshot(true);
+        message.setChannels(channelMuxer.getNumericChannels());
+        codec.sendMessage(info.getFrameSender(), message, 0, false);
+    }
+
+    private void publishChannelDelta(Iterable<String> addedChannels, List<String> removedChannels) {
+        Map<String, Integer> added = new LinkedHashMap<>();
+        Map<String, Integer> numericChannels = channelMuxer.getNumericChannels();
+        if (addedChannels != null) {
+            for (String channelId : addedChannels) {
+                Integer numericId = numericChannels.get(channelId);
+                if (numericId != null) {
+                    added.put(channelId, numericId);
+                }
+            }
+        }
+        ChannelRegistryMessage message = new ChannelRegistryMessage();
+        message.setSnapshot(false);
+        message.setChannels(added);
+        message.setRemovedChannels(removedChannels);
+        for (Session session : sessionManager.getSessions()) {
+            if (!supportsChannelRegistry(session.getConnection())) {
+                continue;
+            }
+            codec.sendMessage(session.getConnection().getFrameSender(), message, 0, false);
+        }
+    }
+
+    private boolean supportsChannelRegistry(ConnectionInfo info) {
+        String version = info != null ? info.getClientVersion() : null;
+        if (version == null || version.isBlank()) {
+            return false;
+        }
+        String[] parts = version.split("\\.");
+        try {
+            int major = parts.length > 0 ? Integer.parseInt(parts[0]) : 0;
+            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+            return major > 2 || (major == 2 && minor >= 1);
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     private void handleSubscribe(ConnectionInfo info, SubscribeRequest req) {
@@ -435,6 +506,7 @@ public class ReSyncServer {
     }
 
     public void shutdown() {
+        extensionManager.shutdown();
         moduleRegistry.shutdownModules(moduleContext);
         scheduler.shutdown();
         connectionManager.shutdown();
@@ -463,6 +535,10 @@ public class ReSyncServer {
 
     public ModuleContext getModuleContext() {
         return moduleContext;
+    }
+
+    public ReSyncExtensionManager getExtensionManager() {
+        return extensionManager;
     }
 
     public ReSyncConfig getConfig() {

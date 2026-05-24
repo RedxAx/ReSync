@@ -12,6 +12,8 @@ import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
+import restudio.resync.flow.migration.FlowGraphMigrator;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
@@ -34,13 +36,19 @@ public class FlowBlueprintPacketHandler {
     private final FlowStorage storage;
     private final TriggerRegistry triggerRegistry;
     private final GlobalTriggers globalTriggers;
+    private final NodeDefinitionRegistry definitionRegistry;
     private final FlowPacketSender sender;
     private final Gson gson = new Gson();
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, FlowPacketSender sender) {
+        this(storage, triggerRegistry, globalTriggers, NodeDefinitionRegistry.getInstance(), sender);
+    }
+
+    public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender) {
         this.storage = storage;
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
+        this.definitionRegistry = definitionRegistry;
         this.sender = sender;
         refreshAllEventBindings();
     }
@@ -94,6 +102,7 @@ public class FlowBlueprintPacketHandler {
             if (graph.getId() == null) {
                 graph.setId(UUID.randomUUID().toString());
             }
+            new FlowGraphMigrator(storage, definitionRegistry).migrateGraph(graph);
             String flowId = graph.getId().toString();
             rollbackFlowId = flowId;
             previousGraph = storage.getGraph(flowId);

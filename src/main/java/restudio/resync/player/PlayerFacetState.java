@@ -7,6 +7,7 @@ public class PlayerFacetState {
     private String facetId;
     private String moduleId;
     private long updatedAt;
+    private PlayerFacetMetadata metadata;
     private Map<String, Object> data = new LinkedHashMap<>();
 
     public PlayerFacetState copy() {
@@ -14,6 +15,7 @@ public class PlayerFacetState {
         copy.facetId = facetId;
         copy.moduleId = moduleId;
         copy.updatedAt = updatedAt;
+        copy.metadata = metadata == null ? null : metadata.copy();
         copy.data = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
         return copy;
     }
@@ -40,6 +42,14 @@ public class PlayerFacetState {
 
     public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public PlayerFacetMetadata getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(PlayerFacetMetadata metadata) {
+        this.metadata = metadata;
     }
 
     public Map<String, Object> getData() {

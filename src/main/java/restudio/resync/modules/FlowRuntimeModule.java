@@ -21,6 +21,7 @@ import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.GuiManager;
+import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.ScoreboardRuntimeListener;
 import restudio.resync.flow.SystemEventListener;
 import restudio.resync.flow.TabListService;
@@ -79,13 +80,19 @@ import restudio.resync.flow.registry.NodeDefinitionLoader;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeDefinitionValidator;
 import restudio.resync.flow.triggers.TriggerRegistry;
+import restudio.resync.modules.flow.FlowPacketSender;
+import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class FlowRuntimeModule implements Module {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("flow", "Flow", "flow");
@@ -176,12 +183,12 @@ public class FlowRuntimeModule implements Module {
         NodeDefinitionRegistry nodeDefinitionRegistry = new NodeDefinitionRegistry();
         NodeDefinitionLoader jsonLoader = new NodeDefinitionLoader();
         jsonLoader.setValidator(new NodeDefinitionValidator(handlerRegistry, true));
-        java.util.List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
+        List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
         classpathDefs.removeIf(this::isUnavailable);
         jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
-        java.nio.file.Path nodesDir = context.getPlugin().getDataFolder().toPath().resolve("nodes");
-        if (java.nio.file.Files.exists(nodesDir)) {
-            java.util.List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
+        Path nodesDir = context.getPlugin().getDataFolder().toPath().resolve("nodes");
+        if (Files.exists(nodesDir)) {
+            List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
             jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
@@ -197,7 +204,7 @@ public class FlowRuntimeModule implements Module {
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
         globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry);
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher());
-        flowEventRegistry.registerFromJson(new java.util.ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
+        flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class));
@@ -221,6 +228,8 @@ public class FlowRuntimeModule implements Module {
         context.registerService(GuiManager.class, guiManager);
         context.registerService(FlowRuntimeModule.class, this);
         FlowRuntimeAccess.configure(context.getPlugin(), () -> storage, () -> executor != null ? executor.getGlobalVariables() : null);
+        FlowPacketSender editStateSender = new FlowPacketSender(context.getCodec(), channelId, Set.of());
+        ScoreboardTemplateManager.configureEditStateBridge(editStateSender::sendEditTargetState, context.getRequiredService(PlayerSessionLinkService.class));
         CustomContentAccess.configure(customContentStorage, customContentService);
     }
 
@@ -289,12 +298,12 @@ public class FlowRuntimeModule implements Module {
         NodeDefinitionLoader jsonLoader = new NodeDefinitionLoader();
         NodeDefinitionValidator validator = new NodeDefinitionValidator(handlerRegistry, true);
         jsonLoader.setValidator(validator);
-        java.util.List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
+        List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
         classpathDefs.removeIf(this::isUnavailable);
         jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
-        java.nio.file.Path nodesDir = moduleContext.getPlugin().getDataFolder().toPath().resolve("nodes");
-        if (java.nio.file.Files.exists(nodesDir)) {
-            java.util.List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
+        Path nodesDir = moduleContext.getPlugin().getDataFolder().toPath().resolve("nodes");
+        if (Files.exists(nodesDir)) {
+            List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
             jsonDefs.removeIf(this::isUnavailable);
             jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
         }
@@ -313,7 +322,7 @@ public class FlowRuntimeModule implements Module {
         List<String> definitionSets = nodeDefinitionRegistry.getPluginIds();
         definitionSets.sort(String.CASE_INSENSITIVE_ORDER);
         ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
-        List<String> externalPlugins = extensionManager != null ? new java.util.ArrayList<>(extensionManager.getPluginIds()) : new java.util.ArrayList<>();
+        List<String> externalPlugins = extensionManager != null ? new ArrayList<>(extensionManager.getPluginIds()) : new ArrayList<>();
         externalPlugins.sort(String.CASE_INSENSITIVE_ORDER);
         diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
         diagnostics.put("definitionSets", definitionSets.size());
@@ -387,6 +396,7 @@ public class FlowRuntimeModule implements Module {
             HandlerList.unregisterAll(customContentListener);
         }
         FlowRuntimeAccess.clear();
+        ScoreboardTemplateManager.clearEditStateBridge();
         CustomContentAccess.clear();
     }
 

@@ -5,6 +5,7 @@ import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.GuiManager;
 import restudio.resync.jobs.JobRecord;
 
 import java.nio.ByteBuffer;
@@ -62,6 +63,8 @@ public class FlowGuiPacketHandler {
                 return;
             }
             storage.saveGui(gui);
+            GuiManager.refreshOpenGuis(gui);
+            GuiManager.refreshSessionGui(session, gui);
             Log.fine("GUI saved: " + gui.getId());
             sender.sendGuiSaveAck(session, gui.getId());
             sender.succeedJob(job, gui.getId(), "Saved");

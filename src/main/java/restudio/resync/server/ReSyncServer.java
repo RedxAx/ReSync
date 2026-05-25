@@ -19,6 +19,7 @@ import restudio.resync.core.SessionManager;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
+import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.memory.MemoryMonitor;
 import restudio.resync.modules.ChunkTransportModule;
 import restudio.resync.modules.FlowModule;
@@ -330,7 +331,17 @@ public class ReSyncServer {
             req.setClientId(clientId);
         }
         completeHandshake(info, req, new ClientIdentity(clientId, req.getClientVersion()));
-        sessionManager.linkPlayerToSession(player.getUniqueId(), sessionManager.getSession(info));
+        Session session = sessionManager.getSession(info);
+        sessionManager.linkPlayerToSession(player.getUniqueId(), session);
+        PlayerSessionLinkService linkService = getPlayerSessionLinkService();
+        if (linkService != null) {
+            linkService.link(player.getUniqueId(), session);
+        }
+        GuiManager guiManager = getGuiManager();
+        if (guiManager != null) {
+            guiManager.sendOpenGuiState(player, session);
+        }
+        ScoreboardTemplateManager.sendActiveState(player, session);
     }
 
     private void completeHandshake(ConnectionInfo info, HandshakeRequest req, ClientIdentity identity) {

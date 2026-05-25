@@ -180,6 +180,35 @@ public class FlowPacketSender {
         sendRaw(session, buffer.array(), false);
     }
 
+    public void sendEditTargetState(Session session, boolean editable, String type, String resourceId, String flowId) {
+        if (type != null && type.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_EDIT_TARGET_TYPE", "Edit target type too long");
+            return;
+        }
+        if (resourceId != null && resourceId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_EDIT_TARGET_ID", "Edit target ID too long");
+            return;
+        }
+        if (flowId != null && flowId.length() > MAX_STRING_LENGTH) {
+            sendError(session, "INVALID_FLOW_ID", "Flow ID too long");
+            return;
+        }
+
+        byte[] typeBytes = type != null ? type.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        byte[] idBytes = resourceId != null ? resourceId.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        byte[] flowBytes = flowId != null ? flowId.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 4 + typeBytes.length + 4 + idBytes.length + 4 + flowBytes.length);
+        buffer.put((byte) 0x5A);
+        buffer.put((byte) (editable ? 1 : 0));
+        buffer.putInt(typeBytes.length);
+        buffer.put(typeBytes);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+        buffer.putInt(flowBytes.length);
+        buffer.put(flowBytes);
+        sendRaw(session, buffer.array(), false);
+    }
+
     public void sendPlaceholderPreview(Session session, int requestId, String rendered) {
         byte[] renderedBytes = rendered.getBytes(StandardCharsets.UTF_8);
         ByteBuffer out = ByteBuffer.allocate(1 + 4 + 4 + renderedBytes.length);

@@ -23,15 +23,19 @@ import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.flow.util.TextFormatter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 public class GuiManager implements Listener {
     private static final int PLAYER_INVENTORY_SLOTS = 36;
+    private static final Set<GuiManager> INSTANCES = new CopyOnWriteArraySet<>();
     private final ReSyncServer server;
     private final FlowStorage storage;
     private final FlowExecutor executor;
@@ -46,6 +50,23 @@ public class GuiManager implements Listener {
         this.executor = executor;
         this.flowModule = flowModule;
         this.sessionLinkService = server.getPlayerSessionLinkService();
+        INSTANCES.add(this);
+    }
+
+    public static void refreshOpenGuis(GuiDefinition gui) {
+        if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
+            return;
+        }
+        Runnable task = () -> {
+            for (GuiManager manager : INSTANCES) {
+                manager.refreshOpenGui(gui);
+            }
+        };
+        if (FlowRuntimeAccess.getPlugin() != null) {
+            Bukkit.getScheduler().runTask(FlowRuntimeAccess.getPlugin(), task);
+        } else {
+            task.run();
+        }
     }
 
     public void openGui(Player player, String guiId) {
@@ -99,6 +120,74 @@ public class GuiManager implements Listener {
         }
         if (session != null) {
             flowModule.sendGuiState(session, true, def.getId(), flowId);
+        }
+    }
+
+    public void sendOpenGuiState(Player player, Session session) {
+        if (player == null || session == null) {
+            return;
+        }
+        GuiDefinition def = openGuis.get(player.getUniqueId());
+        if (def == null) {
+            var view = player.getOpenInventory();
+            if (view != null && view.getTopInventory().getHolder() instanceof RemotelyHolder holder) {
+                def = holder.getGuiDefinition();
+                if (def != null) {
+                    openGuis.put(player.getUniqueId(), def);
+                }
+            }
+        }
+        if (def != null) {
+            flowModule.sendGuiState(session, true, def.getId(), findFlowIdForGui(def));
+        }
+    }
+
+    public void refreshOpenGui(GuiDefinition gui) {
+        if (gui == null || gui.getId() == null || gui.getId().isBlank()) {
+            return;
+        }
+        List<UUID> players = new ArrayList<>();
+        for (Map.Entry<UUID, GuiDefinition> entry : openGuis.entrySet()) {
+            GuiDefinition open = entry.getValue();
+            if (open != null && gui.getId().equals(open.getId())) {
+                players.add(entry.getKey());
+            }
+        }
+        for (UUID playerId : players) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) {
+                openGuis.remove(playerId);
+                continue;
+            }
+            var view = player.getOpenInventory();
+            if (view == null || !(view.getTopInventory().getHolder() instanceof RemotelyHolder holder)) {
+                openGuis.remove(playerId);
+                continue;
+            }
+            GuiDefinition open = holder.getGuiDefinition();
+            if (open != null && gui.getId().equals(open.getId())) {
+                openGui(player, gui);
+            }
+        }
+    }
+
+    public static void refreshSessionGui(Session session, GuiDefinition gui) {
+        if (session == null || gui == null || gui.getId() == null || gui.getId().isBlank()) {
+            return;
+        }
+        Runnable task = () -> {
+            for (GuiManager manager : INSTANCES) {
+                UUID playerId = manager.sessionLinkService.getLinkedPlayer(session);
+                Player player = playerId != null ? Bukkit.getPlayer(playerId) : null;
+                if (player != null && player.isOnline()) {
+                    manager.openGui(player, gui);
+                }
+            }
+        };
+        if (FlowRuntimeAccess.getPlugin() != null) {
+            Bukkit.getScheduler().runTask(FlowRuntimeAccess.getPlugin(), task);
+        } else {
+            task.run();
         }
     }
 

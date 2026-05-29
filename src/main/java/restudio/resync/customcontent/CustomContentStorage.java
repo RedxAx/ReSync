@@ -13,6 +13,8 @@ import restudio.flow.data.FlowDataObjectAdapter;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.resync.Log;
+import restudio.resync.resources.JsonAssetStore;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
@@ -33,6 +35,7 @@ public class CustomContentStorage {
     private final File contentDir;
     private final Path contentPath;
     private final File assetsDir;
+    private final JsonAssetStore<CustomContentDefinition> assetStore;
     private final Map<String, CustomContentDefinition> cache = new ConcurrentHashMap<>();
     private final Gson gson = new GsonBuilder()
             .setPrettyPrinting()
@@ -49,6 +52,16 @@ public class CustomContentStorage {
         this.contentDir = new File(dataFolder, "custom-content");
         this.contentPath = contentDir.toPath();
         this.assetsDir = new File(dataFolder, "assets");
+        this.assetStore = new JsonAssetStore<>(
+            assetsDir.toPath(),
+            contentPath,
+            ReSyncResourceCatalog.CUSTOM_CONTENT,
+            ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.CUSTOM_CONTENT),
+            json -> gson.fromJson(json, CustomContentDefinition.class),
+            gson::toJson,
+            CustomContentDefinition::getId,
+            this::defaultFolder
+        );
         if (!assetsDir.exists()) {
             assetsDir.mkdirs();
         }
@@ -70,11 +83,11 @@ public class CustomContentStorage {
         if (cached != null) {
             return cached;
         }
-        Path file = findAssetFile(safeId);
-        if (file != null) {
-            return loadFromFile(file, safeId);
+        CustomContentDefinition definition = assetStore.get(safeId);
+        if (definition != null) {
+            cache.put(safeId, definition);
         }
-        return null;
+        return definition;
     }
 
     public void save(CustomContentDefinition definition) {
@@ -90,10 +103,9 @@ public class CustomContentStorage {
             throw new IllegalArgumentException(String.join("; ", errors));
         }
         try {
-            Path target = findAssetFile(safeId);
-            StorageSafety.writeUtf8Atomic(target != null ? target : defaultAssetFile(definition), gson.toJson(definition));
+            assetStore.save(definition);
             cache.put(safeId, definition);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to save custom content: " + safeId, e);
         }
     }
@@ -104,32 +116,16 @@ public class CustomContentStorage {
             throw new IllegalArgumentException("Invalid custom content id");
         }
         try {
-            StorageSafety.deleteIfExists(StorageSafety.jsonFile(contentPath, safeId));
-            Path assetFile = findAssetFile(safeId);
-            if (assetFile != null) {
-                deleteAssetFile(assetFile);
-            }
+            assetStore.delete(safeId);
             cache.remove(safeId);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to delete custom content: " + safeId, e);
         }
     }
 
     public List<String> listIds() {
         Set<String> ids = new HashSet<>(cache.keySet());
-        Path root = assetsDir.toPath();
-        if (root.toFile().exists()) {
-            try (Stream<Path> paths = java.nio.file.Files.walk(root)) {
-                paths
-                        .filter(path -> java.nio.file.Files.isRegularFile(path) && path.getFileName().toString().startsWith("custom_content__") && path.getFileName().toString().endsWith(".json"))
-                        .map(path -> path.getFileName().toString())
-                        .map(name -> name.substring("custom_content__".length(), name.length() - 5))
-                        .filter(id -> safeId(id, "list") != null)
-                        .forEach(ids::add);
-            } catch (IOException e) {
-                Log.warn("Failed to list custom content assets: " + e.getMessage());
-            }
-        }
+        ids.addAll(assetStore.listIds());
         return ids.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
@@ -236,28 +232,21 @@ public class CustomContentStorage {
     }
 
     private Path defaultAssetFile(CustomContentDefinition definition) throws IOException {
-        String folder = switch (definition.getType() != null ? definition.getType().toLowerCase() : "item") {
-            case "armor" -> "Content/Armor";
-            case "block" -> "Content/Blocks";
-            default -> "Content/Items";
-        };
-        Path target = assetsDir.toPath().resolve(folder).resolve("custom_content__" + definition.getId() + ".json");
+        Path target = assetsDir.toPath().resolve(defaultFolder(definition)).resolve("custom_content__" + definition.getId() + ".json");
         Files.createDirectories(target.getParent());
         return target;
     }
 
+    private String defaultFolder(CustomContentDefinition definition) {
+        return switch (definition != null && definition.getType() != null ? definition.getType().toLowerCase() : "item") {
+            case "armor" -> "Content/Armor";
+            case "block" -> "Content/Blocks";
+            default -> "Content/Items";
+        };
+    }
+
     private void migrateLegacyAssets() {
-        File[] files = contentDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files != null) {
-            for (File file : files) {
-                String id = file.getName().substring(0, file.getName().length() - 5);
-                if (safeId(id, "migrate") == null) {
-                    continue;
-                }
-                migrateLegacyFile(file.toPath(), id);
-            }
-        }
-        deleteLegacyDirectory();
+        assetStore.migrateLegacyAssets();
     }
 
     private void migrateLegacyFile(Path file, String id) {

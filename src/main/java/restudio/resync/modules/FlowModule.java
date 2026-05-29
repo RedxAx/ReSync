@@ -26,15 +26,11 @@ import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
-import restudio.resync.modules.flow.FlowCustomContentPacketHandler;
-import restudio.resync.modules.flow.FlowGuiPacketHandler;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
 import restudio.resync.modules.flow.FlowOptionCatalogPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
-import restudio.resync.modules.flow.FlowProjectMetadataPacketHandler;
-import restudio.resync.modules.flow.FlowScoreboardPacketHandler;
-import restudio.resync.modules.flow.FlowTabPacketHandler;
+import restudio.resync.modules.flow.FlowResourcePacketRouter;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
@@ -52,14 +48,10 @@ public class FlowModule implements Module {
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final FlowPacketSender sender;
     private final FlowBlueprintPacketHandler blueprintHandler;
-    private final FlowGuiPacketHandler guiHandler;
-    private final FlowScoreboardPacketHandler scoreboardHandler;
-    private final FlowTabPacketHandler tabHandler;
+    private final FlowResourcePacketRouter resourceRouter;
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
     private final FlowOptionCatalogPacketHandler optionCatalogHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
-    private final FlowCustomContentPacketHandler customContentHandler;
-    private final FlowProjectMetadataPacketHandler projectMetadataHandler;
     private final NodeDefinitionRegistry definitionRegistry;
     private FlowTraceService traceService;
     private FlowDebugService debugService;
@@ -88,14 +80,10 @@ public class FlowModule implements Module {
         this.definitionRegistry = definitionRegistry;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions);
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
-        this.guiHandler = new FlowGuiPacketHandler(storage, sender);
-        this.scoreboardHandler = new FlowScoreboardPacketHandler(storage, sender);
-        this.tabHandler = new FlowTabPacketHandler(storage, sender);
+        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService, optionCatalogRegistry);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData);
-        this.customContentHandler = new FlowCustomContentPacketHandler(customContentStorage, sender);
-        this.projectMetadataHandler = new FlowProjectMetadataPacketHandler(storage, sender);
     }
 
     @Override
@@ -140,46 +128,28 @@ public class FlowModule implements Module {
         byte packetId = buffer.get();
 
         try {
-            switch (packetId) {
-                case 0x01 -> blueprintHandler.handleRequest(session, buffer);
-                case 0x02 -> {
-                }
-                case 0x03 -> blueprintHandler.handleSave(session, buffer);
-                case 0x04 -> {
-                }
-                case 0x06 -> blueprintHandler.handleTriggerUpdate(session, buffer);
-                case 0x08 -> blueprintHandler.handleDelete(session, buffer);
-                case 0x09 -> blueprintHandler.handleListRequest(session);
-                case 0x0C -> nodeRegistryHandler.handleRequest(session, buffer);
-                case 0x11 -> guiHandler.handleRequest(session, buffer);
-                case 0x13 -> guiHandler.handleSave(session, buffer);
-                case 0x14 -> guiHandler.handleListRequest(session);
-                case 0x16 -> guiHandler.handleDelete(session, buffer);
-                case 0x18 -> scoreboardHandler.handleRequest(session, buffer);
-                case 0x19 -> scoreboardHandler.handleSave(session, buffer);
-                case 0x1A -> scoreboardHandler.handleListRequest(session);
-                case 0x1B -> scoreboardHandler.handleDelete(session, buffer);
-                case 0x20 -> tabHandler.handleRequest(session, buffer);
-                case 0x21 -> tabHandler.handleSave(session, buffer);
-                case 0x22 -> tabHandler.handleListRequest(session);
-                case 0x23 -> tabHandler.handleDelete(session, buffer);
-                case 0x27 -> placeholderPreviewHandler.handle(session, buffer);
-                case 0x30 -> customContentHandler.handleRequest(session, buffer);
-                case 0x33 -> customContentHandler.handleSave(session, buffer);
-                case 0x34 -> customContentHandler.handleDelete(session, buffer);
-                case 0x36 -> customContentHandler.handleListRequest(session);
-                case 0x37 -> optionCatalogHandler.handle(session, buffer);
-                case 0x40 -> handleTraceToggle(session, buffer);
-                case 0x43 -> handleTraceClear(session);
-                case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
-                case 0x46 -> handleDebugCommand(session, buffer);
-                case 0x50 -> projectMetadataHandler.handleRequest(session, buffer);
-                case 0x51 -> projectMetadataHandler.handleListRequest(session);
-                case 0x54 -> projectMetadataHandler.handleSave(session, buffer);
-                case 0x55 -> projectMetadataHandler.handleDelete(session, buffer);
-                default -> {
-                    Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
-                    sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
+            if (!resourceRouter.handle(session, packetId, buffer)) {
+                switch (packetId) {
+                    case 0x01 -> blueprintHandler.handleRequest(session, buffer);
+                    case 0x02 -> {
+                    }
+                    case 0x03 -> blueprintHandler.handleSave(session, buffer);
+                    case 0x04 -> {
+                    }
+                    case 0x06 -> blueprintHandler.handleTriggerUpdate(session, buffer);
+                    case 0x08 -> blueprintHandler.handleDelete(session, buffer);
+                    case 0x09 -> blueprintHandler.handleListRequest(session);
+                    case 0x0C -> nodeRegistryHandler.handleRequest(session, buffer);
+                    case 0x27 -> placeholderPreviewHandler.handle(session, buffer);
+                    case 0x37 -> optionCatalogHandler.handle(session, buffer);
+                    case 0x40 -> handleTraceToggle(session, buffer);
+                    case 0x43 -> handleTraceClear(session);
+                    case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
+                    case 0x46 -> handleDebugCommand(session, buffer);
+                    default -> {
+                        Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
+                        sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
+                    }
                 }
             }
         } catch (Exception e) {

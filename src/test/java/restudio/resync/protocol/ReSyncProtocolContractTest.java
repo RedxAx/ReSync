@@ -2,6 +2,7 @@ package restudio.resync.protocol;
 
 import org.junit.jupiter.api.Test;
 import restudio.resync.contracts.ReSyncProtocolContract;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -19,5 +20,19 @@ class ReSyncProtocolContractTest {
         assertEquals(0x35, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE_ACK);
         assertEquals(0x36, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_REQUEST);
         assertEquals(0x44, ReSyncProtocolContract.FLOW_PACKET_JOB);
+    }
+
+    @Test
+    void managedResourceCatalogKeepsLegacyFlowPacketIds() {
+        assertEquals(ReSyncProtocolContract.FLOW_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.FLOW_PACKET_SAVE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().save());
+        assertEquals(ReSyncProtocolContract.FLOW_PACKET_DELETE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().delete());
+        assertEquals(ReSyncProtocolContract.FLOW_PACKET_LIST_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().listRequest());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_RESPONSE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().list());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_DATA, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().data());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().save());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_DELETE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().delete());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().saveAck());
+        assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().listRequest());
     }
 }

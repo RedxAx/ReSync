@@ -2,6 +2,8 @@ package restudio.resync.worldgen;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.resync.Log;
+import restudio.resync.resources.JsonAssetStore;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
@@ -23,12 +25,22 @@ public class WorldGenProjectStorage {
     private final File projectDir;
     private final Path projectPath;
     private final File assetsDir;
+    private final JsonAssetStore<WorldGenProject> assetStore;
     private final Map<String, WorldGenProject> cache = new ConcurrentHashMap<>();
 
     public WorldGenProjectStorage(JavaPlugin plugin) {
         this.projectDir = new File(plugin.getDataFolder(), "worldgen-projects");
         this.projectPath = projectDir.toPath();
         this.assetsDir = new File(plugin.getDataFolder(), "assets");
+        this.assetStore = new JsonAssetStore<>(
+            assetsDir.toPath(),
+            projectPath,
+            ReSyncResourceCatalog.WORLDGEN,
+            ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.WORLDGEN),
+            WorldGenSerializer::deserializeProject,
+            WorldGenSerializer::serializeProject,
+            WorldGenProject::getId
+        );
         if (!assetsDir.exists()) {
             assetsDir.mkdirs();
         }
@@ -44,11 +56,14 @@ public class WorldGenProjectStorage {
         if (cached != null) {
             return cached;
         }
-        Path file = findAssetFile(safeId);
-        if (file != null) {
-            return loadProject(file, safeId);
+        WorldGenProject project = assetStore.get(safeId);
+        if (project != null) {
+            if (project.getId() == null || project.getId().isBlank()) {
+                project.setId(safeId);
+            }
+            cache.put(project.getId(), project);
         }
-        return null;
+        return project;
     }
 
     public void saveProject(WorldGenProject project) {
@@ -61,10 +76,9 @@ public class WorldGenProjectStorage {
         }
         project.rebuildIndices();
         try {
-            Path target = findAssetFile(safeId);
-            StorageSafety.writeUtf8Atomic(target != null ? target : defaultAssetFile(safeId), WorldGenSerializer.serializeProject(project));
+            assetStore.save(project);
             cache.put(safeId, project);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to save WorldGen project: " + safeId, e);
         }
     }
@@ -75,34 +89,15 @@ public class WorldGenProjectStorage {
             throw new IllegalArgumentException("Invalid WorldGen project id");
         }
         try {
-            if (projectDir.exists()) {
-                StorageSafety.deleteIfExists(StorageSafety.jsonFile(projectPath, safeId));
-            }
-            Path assetFile = findAssetFile(safeId);
-            if (assetFile != null) {
-                deleteAssetFile(assetFile);
-            }
+            assetStore.delete(safeId);
             cache.remove(safeId);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to delete WorldGen project: " + safeId, e);
         }
     }
 
     public List<String> listProjectIds() {
-        Set<String> ids = new HashSet<>();
-        Path root = assetsDir.toPath();
-        if (root.toFile().exists()) {
-            try (Stream<Path> paths = Files.walk(root)) {
-                paths
-                        .filter(path -> Files.isRegularFile(path) && path.getFileName().toString().startsWith("worldgen__") && path.getFileName().toString().endsWith(".json"))
-                        .map(path -> path.getFileName().toString())
-                        .map(name -> name.substring("worldgen__".length(), name.length() - 5))
-                        .filter(id -> safeId(id, "list") != null)
-                        .forEach(ids::add);
-            } catch (IOException e) {
-                Log.warn("Failed to list WorldGen assets: " + e.getMessage());
-            }
-        }
+        Set<String> ids = new HashSet<>(assetStore.listIds());
         return ids.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
@@ -155,17 +150,7 @@ public class WorldGenProjectStorage {
     }
 
     private void migrateLegacyAssets() {
-        File[] files = projectDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files != null) {
-            for (File file : files) {
-                String id = file.getName().substring(0, file.getName().length() - 5);
-                if (safeId(id, "migrate") == null) {
-                    continue;
-                }
-                migrateLegacyFile(file.toPath(), id);
-            }
-        }
-        deleteLegacyDirectory();
+        assetStore.migrateLegacyAssets();
     }
 
     private void migrateLegacyFile(Path file, String id) {

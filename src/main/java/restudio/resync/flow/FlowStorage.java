@@ -10,6 +10,7 @@ import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.Log;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
@@ -1194,14 +1195,14 @@ public class FlowStorage {
 
     private String defaultFolderForType(String type) {
         return switch (type) {
-            case "function" -> "Blueprints/Functions";
-            case "command" -> "Blueprints/Commands";
-            case "custom_content" -> "Content/Items";
-            case "gui" -> "GUIs";
-            case "scoreboard" -> "Customization/Scoreboards";
-            case "tab" -> "Customization/Tabs";
-            case "worldgen" -> "WorldGen";
-            default -> "Blueprints/Flows";
+            case "function" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.FUNCTION);
+            case "command" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.COMMAND);
+            case "custom_content" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.CUSTOM_CONTENT);
+            case "gui" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.GUI);
+            case "scoreboard" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.SCOREBOARD);
+            case "tab" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.TAB);
+            case "worldgen" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.WORLDGEN);
+            default -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.FLOW);
         };
     }
 

@@ -2,6 +2,7 @@ package restudio.resync.customcontent;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -11,15 +12,18 @@ import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomTriggerRule;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomContentService {
@@ -91,6 +95,96 @@ public class CustomContentService {
             case "armor" -> nexoProvider.armorIds();
             default -> List.of();
         };
+    }
+
+    public List<OptionCatalogItem> recipeItemCatalog() {
+        ensureNexoProvider();
+        List<OptionCatalogItem> items = new ArrayList<>();
+        Set<String> values = new LinkedHashSet<>();
+        for (CustomContentDefinition definition : contentStorage.getAll()) {
+            if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
+                continue;
+            }
+            String contentType = definition.getType() != null ? definition.getType().toLowerCase(Locale.ROOT) : "";
+            if (!Set.of("item", "armor", "block").contains(contentType)) {
+                continue;
+            }
+            String value = "content:" + definition.getId();
+            if (!values.add(value)) {
+                continue;
+            }
+            String label = definition.getDisplayName() != null && !definition.getDisplayName().isBlank()
+                ? definition.getDisplayName()
+                : definition.getId();
+            items.add(new OptionCatalogItem(value, label, contentType, "", "ReSync", Map.of()));
+        }
+        CustomContentProvider nexo = providers.get("nexo");
+        if (nexo instanceof NexoContentProvider nexoProvider && nexoProvider.isAvailable()) {
+            Set<String> providerIds = new LinkedHashSet<>();
+            providerIds.addAll(nexoProvider.itemIds());
+            providerIds.addAll(nexoProvider.armorIds());
+            providerIds.addAll(nexoProvider.blockIds());
+            for (String externalId : providerIds) {
+                if (externalId == null || externalId.isBlank()) {
+                    continue;
+                }
+                String value = "provider:nexo:" + externalId;
+                if (!values.add(value)) {
+                    continue;
+                }
+                items.add(new OptionCatalogItem(value, externalId, "", "", "Providers", Map.of()));
+            }
+        }
+        for (Material material : Material.values()) {
+            if (!material.isItem() || material.isAir()) {
+                continue;
+            }
+            String value = material.name().toLowerCase(Locale.ROOT);
+            if (values.add(value)) {
+                items.add(new OptionCatalogItem(value, formatMaterialLabel(value), "", "", "Vanilla", Map.of()));
+            }
+        }
+        items.sort(Comparator.comparingInt((OptionCatalogItem item) -> recipeItemGroupRank(item.group()))
+            .thenComparing(OptionCatalogItem::label, String.CASE_INSENSITIVE_ORDER));
+        return items;
+    }
+
+    private void ensureNexoProvider() {
+        if (providers.containsKey("nexo")) {
+            return;
+        }
+        if (Bukkit.getPluginManager().getPlugin("Nexo") != null) {
+            registerProvider(new NexoContentProvider(contentStorage, vanillaProvider));
+        }
+    }
+
+    private static int recipeItemGroupRank(String group) {
+        if (group == null) {
+            return 2;
+        }
+        return switch (group.toLowerCase(Locale.ROOT)) {
+            case "resync" -> 0;
+            case "providers", "nexo" -> 1;
+            default -> 2;
+        };
+    }
+
+    private static String formatMaterialLabel(String material) {
+        String cleaned = material.replace('_', ' ').toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        for (String part : cleaned.split("\\s+")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append(' ');
+            }
+            builder.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                builder.append(part.substring(1));
+            }
+        }
+        return builder.isEmpty() ? material : builder.toString();
     }
 
     public CustomContentProvider providerFor(CustomContentDefinition definition) {

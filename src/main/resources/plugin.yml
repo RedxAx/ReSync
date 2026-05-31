@@ -9,6 +9,7 @@ softdepend:
   - PlaceholderAPI
   - Vault
   - LuckPerms
+  - ProtocolLib
   - Nexo
 permissions:
   resync.api.access:
@@ -20,5 +21,5 @@ permissions:
 commands:
   resync:
     description: Manage ReSync systems
-    usage: /resync <scoreboard|tab|world|portal|flow|item> ...
+    usage: /resync <scoreboard|tab|world|portal|flow|item|resource> ...
     permission: resync.command

@@ -1,11 +1,15 @@
 package restudio.resync.modules.flow;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customcontent.CustomContentValidator;
 import restudio.resync.flow.FlowStorage;
@@ -21,13 +25,23 @@ import java.util.List;
 
 public class FlowResourcePacketRouter {
     private final List<FlowResourcePacketHandler<?>> handlers = new ArrayList<>();
+    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender) {
+        this(storage, customContentStorage, null, sender);
+    }
+
+    public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender) {
         handlers.add(new FlowResourcePacketHandler<>(guiAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(scoreboardAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(tabAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(customContentAdapter(customContentStorage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(projectMetadataAdapter(storage, sender), sender));
+        if (jsonResourceStorage != null) {
+            for (String type : jsonResourceStorage.resourceTypes()) {
+                handlers.add(new FlowResourcePacketHandler<>(jsonAdapter(jsonResourceStorage, type, sender), sender));
+            }
+        }
     }
 
     public boolean handle(Session session, byte packetId, ByteBuffer buffer) {
@@ -388,6 +402,63 @@ public class FlowResourcePacketRouter {
             @Override
             public String deleteErrorCode() {
                 return "PROJECT_METADATA_DELETE_FAILED";
+            }
+        };
+    }
+
+    private FlowResourceAdapter<JsonObject> jsonAdapter(ReSyncJsonResourceStorage storage, String type, FlowPacketSender sender) {
+        return new FlowResourceAdapter<>() {
+            @Override
+            public ReSyncManagedResource descriptor() {
+                return ReSyncResourceCatalog.byType(type);
+            }
+
+            @Override
+            public JsonObject get(String id) {
+                return storage.get(type, id);
+            }
+
+            @Override
+            public List<String> listIds() {
+                return storage.listIds(type);
+            }
+
+            @Override
+            public JsonObject deserialize(String json) {
+                return gson.fromJson(json, JsonObject.class);
+            }
+
+            @Override
+            public String id(JsonObject value) {
+                if (value == null || !value.has("id") || value.get("id").isJsonNull()) {
+                    return "";
+                }
+                return value.get("id").getAsString();
+            }
+
+            @Override
+            public void save(JsonObject value) {
+                storage.save(type, value);
+            }
+
+            @Override
+            public void delete(String id) {
+                storage.delete(type, id);
+            }
+
+            @Override
+            public void sendData(Session session, JsonObject value) {
+                sender.sendJsonResourceData(session, descriptor().flowPackets().data(), gson.toJson(value), descriptor().displayName());
+            }
+
+            @Override
+            public void sendList(Session session, List<String> ids) {
+                sender.sendJsonResourceList(session, descriptor().flowPackets().list(), ids);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id) {
+                sender.sendJsonResourceSaveAck(session, descriptor().flowPackets().saveAck(), id);
             }
         };
     }

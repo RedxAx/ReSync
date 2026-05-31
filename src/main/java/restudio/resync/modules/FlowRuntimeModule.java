@@ -10,6 +10,7 @@ import restudio.resync.customcontent.CustomContentAccess;
 import restudio.resync.customcontent.CustomContentListener;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
@@ -30,6 +31,7 @@ import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.BlockActionHandler;
 import restudio.resync.flow.handler.generic.AbilityEffectHandler;
+import restudio.resync.flow.handler.generic.ChatHandler;
 import restudio.resync.flow.handler.generic.ColorHandler;
 import restudio.resync.flow.handler.generic.ConversionHandler;
 import restudio.resync.flow.migration.FlowGraphMigrator;
@@ -138,6 +140,7 @@ public class FlowRuntimeModule implements Module {
         new ConversionHandler().registerTo(handlerRegistry);
         new DebugHandler().registerTo(handlerRegistry);
         new DiscordHandler().registerTo(handlerRegistry);
+        new ChatHandler().registerTo(handlerRegistry);
         if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
             new EconomyHandler().registerTo(handlerRegistry);
         }
@@ -207,7 +210,7 @@ public class FlowRuntimeModule implements Module {
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class));
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class), context.getService(ReSyncJsonResourceStorage.class));
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);
@@ -255,6 +258,7 @@ public class FlowRuntimeModule implements Module {
         new ConversionHandler().registerTo(handlerRegistry);
         new DebugHandler().registerTo(handlerRegistry);
         new DiscordHandler().registerTo(handlerRegistry);
+        new ChatHandler().registerTo(handlerRegistry);
         if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
             new EconomyHandler().registerTo(handlerRegistry);
         }

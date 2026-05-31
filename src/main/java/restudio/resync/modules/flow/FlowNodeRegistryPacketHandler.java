@@ -372,6 +372,7 @@ public class FlowNodeRegistryPacketHandler {
         list.add(new FlowOptionSourceMetadata("server:minecraft:world", "minecraft", "SEARCHABLE_LIST", false));
         if (customContentService != null) {
             list.add(new FlowOptionSourceMetadata("server:custom_content:provider", "custom_content", "DROPDOWN", false));
+            list.add(new FlowOptionSourceMetadata("server:custom_content:recipe_item", "custom_content", "SEARCHABLE_LIST", true));
             if (customContentService.isProviderAvailable("nexo")) {
                 list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_item", "custom_content", "SEARCHABLE_LIST", true));
                 list.add(new FlowOptionSourceMetadata("server:custom_content:nexo_block", "custom_content", "SEARCHABLE_LIST", true));

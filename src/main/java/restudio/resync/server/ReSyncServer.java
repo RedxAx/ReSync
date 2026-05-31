@@ -1,5 +1,6 @@
 package restudio.resync.server;
 
+import com.google.gson.Gson;
 import org.bukkit.Bukkit;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -16,18 +17,24 @@ import restudio.resync.core.ConnectionManager;
 import restudio.resync.core.ConnectionState;
 import restudio.resync.core.Session;
 import restudio.resync.core.SessionManager;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
+import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.memory.MemoryMonitor;
 import restudio.resync.modules.ChunkTransportModule;
+import restudio.resync.modules.ChatModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.FlowRuntimeModule;
+import restudio.resync.modules.MessageRewriteModule;
 import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleRegistry;
+import restudio.resync.modules.MotdModule;
 import restudio.resync.modules.PlayerTrackingModule;
+import restudio.resync.modules.RecipeModule;
 import restudio.resync.modules.WorldManagementModule;
 import restudio.resync.modules.WorldGenModule;
 import restudio.resync.player.DefaultPlayerSessionLinkService;
@@ -50,21 +57,25 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.queue.RateLimiter;
 import restudio.resync.queue.RequestQueue;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.security.ClientAuthorizer;
 import restudio.resync.security.ClientIdentity;
 import restudio.resync.server.ReSyncConfig;
+import restudio.resync.text.ReTextService;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReSyncServer {
+    private static final Gson GSON = new Gson();
     private final ReSync plugin;
     private final ReSyncConfig config;
     private final ConnectionManager connectionManager;
@@ -126,7 +137,7 @@ public class ReSyncServer {
             }
 
             @Override
-            public void onModuleUnregistered(String moduleId, java.util.Set<String> channels) {
+            public void onModuleUnregistered(String moduleId, Set<String> channels) {
                 publishChannelDelta(List.of(), new ArrayList<>(channels));
             }
         });
@@ -137,16 +148,39 @@ public class ReSyncServer {
     }
 
     private void registerCoreServices() {
+        ReSyncJsonResourceStorage jsonResourceStorage = new ReSyncJsonResourceStorage(plugin);
+        jsonResourceStorage.migrateLegacyAssets();
         moduleContext.registerService(PlayerTrackingService.class, new PlayerTrackingManager(plugin));
         moduleContext.registerService(PlayerSessionLinkService.class, new DefaultPlayerSessionLinkService());
         moduleContext.registerService(ModuleContext.class, moduleContext);
         moduleContext.registerService(OptionCatalogRegistry.class, new OptionCatalogRegistry());
         moduleContext.registerService(ReSyncExtensionData.class, new ReSyncExtensionData());
+        moduleContext.registerService(ReSyncJsonResourceStorage.class, jsonResourceStorage);
+        ReTextService reTextService = new ReTextService(jsonResourceStorage);
+        moduleContext.registerService(ReTextService.class, reTextService);
+        jsonResourceStorage.addListener((type, id, value, deleted) -> {
+            if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type)) {
+                reTextService.clearTemplateCache();
+                return;
+            }
+            if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                RecipeModule recipes = moduleContext.getService(RecipeModule.class);
+                if (recipes != null) {
+                    Bukkit.getScheduler().runTask(plugin, recipes::reloadRecipes);
+                }
+                return;
+            }
+        });
+        TextFormatter.configure(reTextService);
     }
 
     private void registerModules() {
         moduleRegistry.registerModule(new ChunkTransportModule());
         moduleRegistry.registerModule(new FlowRuntimeModule());
+        moduleRegistry.registerModule(new ChatModule());
+        moduleRegistry.registerModule(new MotdModule());
+        moduleRegistry.registerModule(new MessageRewriteModule());
+        moduleRegistry.registerModule(new RecipeModule());
         moduleRegistry.registerModule(new PlayerTrackingModule());
         moduleRegistry.registerModule(new WorldManagementModule());
         moduleRegistry.registerModule(new WorldGenModule());
@@ -289,6 +323,11 @@ public class ReSyncServer {
     }
 
     private void handleBridgePayload(ConnectionInfo info, Player player, Message payload, FrameHeader header) {
+        if (!hasBridgeAccess(player)) {
+            sendError(info, 401, "No Permission");
+            info.getFrameSender().close(1008, "No Permission");
+            return;
+        }
         if (payload.getType() == MessageType.HANDSHAKE_REQUEST) {
             handleBridgeHandshake(info, player, (HandshakeRequest) payload);
             return;
@@ -318,11 +357,6 @@ public class ReSyncServer {
         if (req.getProtocolVersion() != 2) {
             sendError(info, 400, "Unsupported protocol version");
             info.getFrameSender().close(1003, "Unsupported protocol version");
-            return;
-        }
-        if (!player.isOp() && !player.hasPermission("resync.api.access")) {
-            sendError(info, 401, "No Permission");
-            info.getFrameSender().close(1008, "No Permission");
             return;
         }
         String clientId = req.getClientId();
@@ -372,10 +406,15 @@ public class ReSyncServer {
         response.setWorlds(worlds);
         response.setSupportedTileSizes(new int[]{32, 64, 128, 256});
         response.setChannels(channelMuxer.getNumericChannels());
+        response.setCapabilitiesJson(GSON.toJson(capabilitySnapshot()));
 
         codec.sendMessage(info.getFrameSender(), response, 0, false);
         publishChannelSnapshot(info);
         Log.fine("Client authenticated: " + req.getClientId());
+    }
+
+    private boolean hasBridgeAccess(Player player) {
+        return player != null && player.isOnline() && (player.isOp() || player.hasPermission("resync.api.access"));
     }
 
     private void publishChannelSnapshot(ConnectionInfo info) {
@@ -526,6 +565,7 @@ public class ReSyncServer {
         compressionPool.close();
         rateLimiter.resetAll();
         memoryMonitor.shutdown();
+        TextFormatter.clear();
     }
 
     public ConnectionManager getConnectionManager() {
@@ -568,7 +608,24 @@ public class ReSyncServer {
         snapshot.put("sessionMemoryLimitBytes", memoryMonitor.getMaxMemoryForSessions());
         snapshot.put("authMode", "adminApiKey");
         snapshot.put("openConnections", openConnections.get());
+        snapshot.put("capabilities", capabilitySnapshot());
         return snapshot;
+    }
+
+    private Map<String, Object> capabilitySnapshot() {
+        Map<String, Object> capabilities = new LinkedHashMap<>();
+        capabilities.put("paperVersion", Bukkit.getMinecraftVersion());
+        capabilities.put("placeholderApi", Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI"));
+        capabilities.put("protocolLib", Bukkit.getPluginManager().isPluginEnabled("ProtocolLib"));
+        capabilities.put("recipeTypes", List.of("shaped", "shapeless", "furnace", "blasting", "smoking", "campfire", "stonecutting", "smithing_transform", "smithing_trim"));
+        capabilities.put("packetHooks", Bukkit.getPluginManager().isPluginEnabled("ProtocolLib") ? List.of("native", "packet") : List.of("native"));
+        ReSyncJsonResourceStorage jsonStorage = moduleContext.getService(ReSyncJsonResourceStorage.class);
+        capabilities.put("resourceTypes", jsonStorage != null ? jsonStorage.resourceTypes() : List.of());
+        MessageRewriteModule messageRewriteModule = moduleContext.getService(MessageRewriteModule.class);
+        if (messageRewriteModule != null) {
+            capabilities.put("messageRewrite", messageRewriteModule.capabilityPayload());
+        }
+        return capabilities;
     }
 
     public FlowModule getFlowModule() {

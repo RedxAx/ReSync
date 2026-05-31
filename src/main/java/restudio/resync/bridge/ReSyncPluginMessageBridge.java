@@ -7,6 +7,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.messaging.PluginMessageListener;
+import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.core.ConnectionInfo;
@@ -24,6 +25,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
     private final ReSync plugin;
     private final Map<UUID, BridgeSession> sessions = new ConcurrentHashMap<>();
     private static final int BRIDGE_PROTOCOL = 1;
+    private BukkitTask monitorTask;
 
     public ReSyncPluginMessageBridge(ReSync plugin) {
         this.plugin = plugin;
@@ -33,10 +35,15 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
         Bukkit.getMessenger().registerIncomingPluginChannel(plugin, CHANNEL, this);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        monitorTask = Bukkit.getScheduler().runTaskTimer(plugin, this::monitorSessions, 20L, 20L);
         Log.info("[ReSync] Vanilla bridge registered on " + CHANNEL);
     }
 
     public void unregister() {
+        if (monitorTask != null) {
+            monitorTask.cancel();
+            monitorTask = null;
+        }
         for (BridgeSession session : sessions.values()) {
             close(session);
         }
@@ -64,6 +71,10 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
             if (envelope.type() == ReSyncBridgeEnvelope.HELLO) {
                 handleHello(session, payload);
             } else if (envelope.type() == ReSyncBridgeEnvelope.DATA && session.authorized) {
+                if (!hasBridgeAccess(player)) {
+                    closeUnauthorized(session);
+                    return;
+                }
                 ensureConnection(session);
                 plugin.getReSyncServer().onBridgeMessage(session.connection, player, payload);
             } else if (envelope.type() == ReSyncBridgeEnvelope.CLOSE) {
@@ -85,6 +96,14 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
         });
     }
 
+    private void monitorSessions() {
+        for (BridgeSession session : sessions.values()) {
+            if (session.authorized && !hasBridgeAccess(session.player)) {
+                closeUnauthorized(session);
+            }
+        }
+    }
+
     private void handleHello(BridgeSession session, byte[] payload) {
         Player player = session.player;
         BridgeHello hello = readHello(payload);
@@ -95,7 +114,7 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
             close(session);
             return;
         }
-        if (!player.isOp() && !player.hasPermission("resync.api.access")) {
+        if (!hasBridgeAccess(player)) {
             Log.warn("[ReSync] Vanilla bridge rejected " + player.getName() + ": no permission");
             sendAuth(session, false, "No Permission");
             close(session);
@@ -170,10 +189,32 @@ public class ReSyncPluginMessageBridge implements PluginMessageListener, Listene
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
+    private boolean hasBridgeAccess(Player player) {
+        return player != null && player.isOnline() && (player.isOp() || player.hasPermission("resync.api.access"));
+    }
+
     private void putString(ByteBuffer buffer, String value) {
         byte[] bytes = (value == null ? "" : value).getBytes(StandardCharsets.UTF_8);
         buffer.putInt(bytes.length);
         buffer.put(bytes);
+    }
+
+    private void closeUnauthorized(BridgeSession session) {
+        if (session == null || session.closed) {
+            return;
+        }
+        String name = session.player != null ? session.player.getName() : session.sessionId.toString();
+        Log.warn("[ReSync] Vanilla bridge closed " + name + ": no permission");
+        sendClose(session, "No Permission");
+        close(session);
+    }
+
+    private void sendClose(BridgeSession session, String reason) {
+        if (session == null || session.player == null || !session.player.isOnline()) {
+            return;
+        }
+        byte[] payload = (reason == null ? "" : reason).getBytes(StandardCharsets.UTF_8);
+        session.chunker.send(session.sessionId, session.sequence.getAndIncrement(), ReSyncBridgeEnvelope.CLOSE, payload, envelope -> session.player.sendPluginMessage(plugin, CHANNEL, envelope.encode()));
     }
 
     private void close(BridgeSession session) {

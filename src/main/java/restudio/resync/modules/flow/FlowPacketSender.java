@@ -2,6 +2,9 @@ package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowDataTypeAdapter;
 import restudio.flow.data.FlowGraph;
@@ -20,6 +23,7 @@ import restudio.resync.jobs.JobRecord;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,14 +39,14 @@ public class FlowPacketSender {
     private final JobManager jobManager;
     private final Gson gson = new GsonBuilder()
             .registerTypeAdapter(FlowDataType.class, new FlowDataTypeAdapter())
-            .registerTypeAdapter(NodeDefinition.NodeCategory.class, new com.google.gson.TypeAdapter<NodeDefinition.NodeCategory>() {
+            .registerTypeAdapter(NodeDefinition.NodeCategory.class, new TypeAdapter<NodeDefinition.NodeCategory>() {
                 @Override
-                public void write(com.google.gson.stream.JsonWriter out, NodeDefinition.NodeCategory value) throws java.io.IOException {
+                public void write(JsonWriter out, NodeDefinition.NodeCategory value) throws IOException {
                     out.value(value != null ? value.getId() : null);
                 }
 
                 @Override
-                public NodeDefinition.NodeCategory read(com.google.gson.stream.JsonReader in) throws java.io.IOException {
+                public NodeDefinition.NodeCategory read(JsonReader in) throws IOException {
                     String id = in.nextString();
                     return NodeDefinition.NodeCategory.fromString(id);
                 }
@@ -80,6 +84,11 @@ public class FlowPacketSender {
         sendJsonPacket(session, (byte) 0x52, json, "PROJECT_METADATA_TOO_LARGE", "Project metadata exceeds maximum size");
     }
 
+    public void sendJsonResourceData(Session session, byte packetId, String json, String typeName) {
+        String displayName = typeName != null && !typeName.isBlank() ? typeName : "Resource";
+        sendJsonPacket(session, packetId, json, displayName.toUpperCase().replace(' ', '_') + "_TOO_LARGE", displayName + " data exceeds maximum size");
+    }
+
     public void sendFlowSaveAck(Session session, String flowId) {
         sendIdAck(session, (byte) 0x07, flowId);
     }
@@ -102,6 +111,10 @@ public class FlowPacketSender {
 
     public void sendProjectMetadataSaveAck(Session session, String metadataId) {
         sendIdAck(session, (byte) 0x56, metadataId);
+    }
+
+    public void sendJsonResourceSaveAck(Session session, byte packetId, String id) {
+        sendIdAck(session, packetId, id);
     }
 
     public JobRecord<String> beginJob(Session session, String action, String target) {
@@ -156,6 +169,10 @@ public class FlowPacketSender {
 
     public void sendProjectMetadataList(Session session, List<String> metadataIds) {
         sendStringList(session, (byte) 0x53, metadataIds);
+    }
+
+    public void sendJsonResourceList(Session session, byte packetId, List<String> ids) {
+        sendStringList(session, packetId, ids);
     }
 
     public void sendGuiState(Session session, boolean editable, String guiId, String flowId) {

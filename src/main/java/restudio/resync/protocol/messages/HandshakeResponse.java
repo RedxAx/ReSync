@@ -19,6 +19,7 @@ public class HandshakeResponse extends Message {
     private List<String> worlds;
     private int[] supportedTileSizes;
     private Map<String, Integer> channels = new LinkedHashMap<>();
+    private String capabilitiesJson = "";
 
     @Override
     public MessageType getType() {
@@ -37,12 +38,14 @@ public class HandshakeResponse extends Message {
             }
         }
 
+        byte[] capabilitiesBytes = capabilitiesBytes();
         ByteBuffer buffer = ByteBuffer.allocate(
             1 + 4 + messageBytes.length +
             4 + 4 + serverVersionBytes.length +
             4 + worldsBytesLength +
             4 + (supportedTileSizes != null ? supportedTileSizes.length * 4 : 0) +
-            4 + channelsBytesLength()
+            4 + channelsBytesLength() +
+            4 + capabilitiesBytes.length
         );
 
         buffer.put((byte) (success ? 1 : 0));
@@ -81,6 +84,8 @@ public class HandshakeResponse extends Message {
             }
         }
 
+        buffer.putInt(capabilitiesBytes.length);
+        buffer.put(capabilitiesBytes);
         return buffer.array();
     }
 
@@ -133,6 +138,14 @@ public class HandshakeResponse extends Message {
                 channels.put(new String(channelBytes, StandardCharsets.UTF_8), buffer.getInt());
             }
         }
+        if (buffer.remaining() >= 4) {
+            int capabilitiesLen = buffer.getInt();
+            if (capabilitiesLen >= 0 && buffer.remaining() >= capabilitiesLen) {
+                byte[] capabilitiesBytes = new byte[capabilitiesLen];
+                buffer.get(capabilitiesBytes);
+                capabilitiesJson = new String(capabilitiesBytes, StandardCharsets.UTF_8);
+            }
+        }
     }
 
     private int channelsBytesLength() {
@@ -144,6 +157,10 @@ public class HandshakeResponse extends Message {
             length += 4 + channel.getBytes(StandardCharsets.UTF_8).length + 4;
         }
         return length;
+    }
+
+    private byte[] capabilitiesBytes() {
+        return capabilitiesJson != null ? capabilitiesJson.getBytes(StandardCharsets.UTF_8) : new byte[0];
     }
 
     public boolean isSuccess() {
@@ -200,5 +217,13 @@ public class HandshakeResponse extends Message {
 
     public void setChannels(Map<String, Integer> channels) {
         this.channels = channels == null ? new LinkedHashMap<>() : new LinkedHashMap<>(channels);
+    }
+
+    public String getCapabilitiesJson() {
+        return capabilitiesJson;
+    }
+
+    public void setCapabilitiesJson(String capabilitiesJson) {
+        this.capabilitiesJson = capabilitiesJson != null ? capabilitiesJson : "";
     }
 }

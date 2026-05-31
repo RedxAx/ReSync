@@ -14,6 +14,16 @@ public final class ReSyncResourceCatalog {
     public static final String TAB = "tab";
     public static final String CUSTOM_CONTENT = "custom_content";
     public static final String PROJECT_METADATA = "project_metadata";
+    public static final String CHAT_CHANNEL = "chat_channel";
+    public static final String CHAT_FORMAT = "chat_format";
+    public static final String CHAT_RULE = "chat_rule";
+    public static final String PRIVATE_MESSAGE_FORMAT = "private_message_format";
+    public static final String MENTION_STYLE = "mention_style";
+    public static final String IGNORE_LIST = "ignore_list";
+    public static final String MOTD_PROFILE = "motd_profile";
+    public static final String MESSAGE_RULE = "message_rule";
+    public static final String RECIPE_DEFINITION = "recipe_definition";
+    public static final String TEXT_TEMPLATE = "text_template";
     public static final String WORLDGEN = "worldgen";
     public static final String WORLD = "world";
     private static final Map<String, ReSyncManagedResource> BY_TYPE = new LinkedHashMap<>();
@@ -28,6 +38,16 @@ public final class ReSyncResourceCatalog {
         register(new ReSyncManagedResource(TAB, "Tab", "Customization/Tabs", new ReSyncManagedResource.FlowPackets((byte) 0x20, (byte) 0x22, (byte) 0x24, (byte) 0x25, (byte) 0x21, (byte) 0x23, (byte) 0x26), true));
         register(new ReSyncManagedResource(CUSTOM_CONTENT, "Custom Content", "Content/Items", new ReSyncManagedResource.FlowPackets((byte) 0x30, (byte) 0x36, (byte) 0x32, (byte) 0x31, (byte) 0x33, (byte) 0x34, (byte) 0x35), true));
         register(new ReSyncManagedResource(PROJECT_METADATA, "Project Metadata", "", new ReSyncManagedResource.FlowPackets((byte) 0x50, (byte) 0x51, (byte) 0x52, (byte) 0x53, (byte) 0x54, (byte) 0x55, (byte) 0x56), true));
+        register(new ReSyncManagedResource(CHAT_CHANNEL, "Chat Channel", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x67, (byte) 0x68, (byte) 0x69, (byte) 0x6A, (byte) 0x6B, (byte) 0x6C, (byte) 0x6D), true));
+        register(new ReSyncManagedResource(CHAT_FORMAT, "Chat Format", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x6E, (byte) 0x6F, (byte) 0x70, (byte) 0x71, (byte) 0x72, (byte) 0x73, (byte) 0x74), true));
+        register(new ReSyncManagedResource(CHAT_RULE, "Chat Rule", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x75, (byte) 0x76, (byte) 0x77, (byte) 0x78, (byte) 0x79, (byte) 0x7A, (byte) 0x7B), true));
+        register(new ReSyncManagedResource(PRIVATE_MESSAGE_FORMAT, "Private Message Format", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x7C, (byte) 0x7D, (byte) 0x7E, (byte) 0x7F, (byte) 0x80, (byte) 0x81, (byte) 0x82), true));
+        register(new ReSyncManagedResource(MENTION_STYLE, "Mention Style", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x83, (byte) 0x84, (byte) 0x85, (byte) 0x86, (byte) 0x87, (byte) 0x88, (byte) 0x89), true));
+        register(new ReSyncManagedResource(IGNORE_LIST, "Ignore List", "Customization/Chat", new ReSyncManagedResource.FlowPackets((byte) 0x8A, (byte) 0x8B, (byte) 0x8C, (byte) 0x8D, (byte) 0x8E, (byte) 0x8F, (byte) 0x90), true));
+        register(new ReSyncManagedResource(MOTD_PROFILE, "MOTD Profile", "Customization/MOTDs", new ReSyncManagedResource.FlowPackets((byte) 0x91, (byte) 0x92, (byte) 0x93, (byte) 0x94, (byte) 0x95, (byte) 0x96, (byte) 0x97), true));
+        register(new ReSyncManagedResource(MESSAGE_RULE, "Message Rule", "Customization/Messages", new ReSyncManagedResource.FlowPackets((byte) 0x98, (byte) 0x99, (byte) 0x9A, (byte) 0x9B, (byte) 0x9C, (byte) 0x9D, (byte) 0x9E), true));
+        register(new ReSyncManagedResource(RECIPE_DEFINITION, "Recipe Definition", "Content/Recipes", new ReSyncManagedResource.FlowPackets((byte) 0x9F, (byte) 0xA0, (byte) 0xA1, (byte) 0xA2, (byte) 0xA3, (byte) 0xA4, (byte) 0xA5), true));
+        register(new ReSyncManagedResource(TEXT_TEMPLATE, "Text Template", "Text/Templates", new ReSyncManagedResource.FlowPackets((byte) 0xA6, (byte) 0xA7, (byte) 0xA8, (byte) 0xA9, (byte) 0xAA, (byte) 0xAB, (byte) 0xAC), true));
         register(new ReSyncManagedResource(WORLDGEN, "WorldGen", "WorldGen", null, true));
         register(new ReSyncManagedResource(WORLD, "World", "Worlds", null, true));
     }
@@ -57,8 +77,11 @@ public final class ReSyncResourceCatalog {
         if (resource.flowPackets() != null) {
             BY_FLOW_PACKET.put(resource.flowPackets().request(), resource);
             BY_FLOW_PACKET.put(resource.flowPackets().listRequest(), resource);
+            BY_FLOW_PACKET.put(resource.flowPackets().data(), resource);
+            BY_FLOW_PACKET.put(resource.flowPackets().list(), resource);
             BY_FLOW_PACKET.put(resource.flowPackets().save(), resource);
             BY_FLOW_PACKET.put(resource.flowPackets().delete(), resource);
+            BY_FLOW_PACKET.put(resource.flowPackets().saveAck(), resource);
         }
     }
 }

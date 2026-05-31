@@ -1,5 +1,9 @@
 package restudio.resync.commands;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -11,12 +15,15 @@ import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.ReSync;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
+import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.selection.InteractiveSelectionManager;
+import restudio.resync.server.ReSyncServer;
 import restudio.resync.world.WorldGameRuleDescriptor;
 import restudio.resync.world.WorldGeneratorDescriptor;
 import restudio.resync.world.WorldInventoryGroup;
@@ -27,6 +34,7 @@ import restudio.resync.world.WorldPortal;
 import restudio.resync.world.WorldProfileSettings;
 import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSignPortal;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,6 +42,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class ReSyncCommand implements TabExecutor {
     private final ReSync plugin;
@@ -61,6 +72,7 @@ public class ReSyncCommand implements TabExecutor {
             case "portal" -> handlePortal(sender, args);
             case "flow" -> handleFlow(sender, args);
             case "item" -> handleItem(sender, args);
+            case "resource" -> handleResource(sender, args);
             default -> {
                 sendUsage(sender);
                 yield true;
@@ -71,7 +83,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item"), args[0]);
+            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item", "resource"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -81,12 +93,13 @@ public class ReSyncCommand implements TabExecutor {
             case "portal" -> tabCompletePortal(args);
             case "flow" -> tabCompleteFlow(args);
             case "item" -> tabCompleteItem(args);
+            case "resource" -> tabCompleteResource(args);
             default -> List.of();
         };
     }
 
     private boolean handleStatus(CommandSender sender) {
-        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
+        ReSyncServer server = plugin.getReSyncServer();
         if (server == null) {
             sendError(sender, "Server Not Initialized");
             return true;
@@ -185,6 +198,398 @@ public class ReSyncCommand implements TabExecutor {
         return List.of();
     }
 
+    private boolean handleResource(CommandSender sender, String[] args) {
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        if (storage == null) {
+            sendError(sender, "Resource Storage Unavailable");
+            return true;
+        }
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync resource types");
+            sendUsageLine(sender, "/resync resource list <type>");
+            sendUsageLine(sender, "/resync resource info <type> <id>");
+            sendUsageLine(sender, "/resync resource create <type> <id>");
+            sendUsageLine(sender, "/resync resource set <type> <id> <field> <value>");
+            sendUsageLine(sender, "/resync resource delete <type> <id>");
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        return switch (action) {
+            case "types" -> {
+                sendInfo(sender, "Resource Types", String.join(", ", storage.resourceTypes()));
+                yield true;
+            }
+            case "list" -> handleResourceList(sender, storage, args);
+            case "info" -> handleResourceInfo(sender, storage, args);
+            case "create" -> handleResourceCreate(sender, storage, args);
+            case "set" -> handleResourceSet(sender, storage, args);
+            case "apply" -> handleResourceApply(sender, storage, args);
+            case "delete" -> handleResourceDelete(sender, storage, args);
+            default -> {
+                sendError(sender, "Unknown resource command: " + action);
+                yield true;
+            }
+        };
+    }
+
+    private boolean handleResourceList(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource list <type>");
+        if (type == null) {
+            return true;
+        }
+        List<String> ids = storage.listIds(type).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        if (ids.isEmpty()) {
+            sendInfo(sender, "No Resources", type);
+            return true;
+        }
+        sendInfo(sender, prettyResourceType(type), String.join(", ", ids));
+        return true;
+    }
+
+    private boolean handleResourceInfo(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource info <type> <id>");
+        if (type == null) {
+            return true;
+        }
+        String id = requiredArg(sender, args, 3, "/resync resource info <type> <id>");
+        if (id == null) {
+            return true;
+        }
+        JsonObject resource = storage.get(type, id);
+        if (resource == null) {
+            sendError(sender, "Resource Not Found", id);
+            return true;
+        }
+        sendInfo(sender, prettyResourceType(type), id);
+        for (Map.Entry<String, JsonElement> entry : resource.entrySet()) {
+            sendInfo(sender, entry.getKey(), shortJsonValue(entry.getValue()));
+        }
+        return true;
+    }
+
+    private boolean handleResourceCreate(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource create <type> <id>");
+        if (type == null) {
+            return true;
+        }
+        String id = requiredArg(sender, args, 3, "/resync resource create <type> <id>");
+        if (id == null) {
+            return true;
+        }
+        if (storage.get(type, id) != null) {
+            sendError(sender, "Resource Already Exists", id);
+            return true;
+        }
+        JsonObject resource = defaultResource(type, id);
+        storage.save(type, resource);
+        sendSuccess(sender, "Resource Created", prettyResourceType(type) + " " + id);
+        return true;
+    }
+
+    private boolean handleResourceSet(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource set <type> <id> <field> <value>");
+        if (type == null) {
+            return true;
+        }
+        String id = requiredArg(sender, args, 3, "/resync resource set <type> <id> <field> <value>");
+        String field = requiredArg(sender, args, 4, "/resync resource set <type> <id> <field> <value>");
+        if (id == null || field == null || args.length < 6) {
+            if (args.length < 6) {
+                sendError(sender, "Usage", "/resync resource set <type> <id> <field> <value>");
+            }
+            return true;
+        }
+        JsonObject resource = storage.get(type, id);
+        if (resource == null) {
+            sendError(sender, "Resource Not Found", id);
+            return true;
+        }
+        String value = joinArgs(args, 5);
+        putResourceValue(resource, field, value);
+        storage.save(type, resource);
+        sendSuccess(sender, "Resource Updated", id + " " + field);
+        return true;
+    }
+
+    private boolean handleResourceDelete(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource delete <type> <id>");
+        if (type == null) {
+            return true;
+        }
+        String id = requiredArg(sender, args, 3, "/resync resource delete <type> <id>");
+        if (id == null) {
+            return true;
+        }
+        if (storage.get(type, id) == null) {
+            sendError(sender, "Resource Not Found", id);
+            return true;
+        }
+        storage.delete(type, id);
+        sendSuccess(sender, "Resource Deleted", id);
+        return true;
+    }
+
+    private boolean handleResourceApply(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args) {
+        String type = resourceTypeArg(sender, storage, args, 2, "/resync resource apply <type> <id>");
+        if (type == null) {
+            return true;
+        }
+        String id = requiredArg(sender, args, 3, "/resync resource apply <type> <id>");
+        if (id == null) {
+            return true;
+        }
+        if (storage.get(type, id) == null) {
+            sendError(sender, "Resource Not Found", id);
+            return true;
+        }
+        sendError(sender, "Unsupported Resource Apply", prettyResourceType(type));
+        return true;
+    }
+
+    private List<String> tabCompleteResource(String[] args) {
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        if (storage == null) {
+            return List.of();
+        }
+        if (args.length == 2) {
+            return filter(List.of("types", "list", "info", "create", "set", "apply", "delete"), args[1]);
+        }
+        if (args.length == 3 && !List.of("types").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(resourceTypeOptions(storage), args[2]);
+        }
+        if (args.length == 4 && List.of("info", "set", "apply", "delete").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(resourceIds(storage, resourceTypeAlias(args[2])), args[3]);
+        }
+        if (args.length == 5 && "set".equalsIgnoreCase(args[1])) {
+            return filter(resourceFieldOptions(resourceTypeAlias(args[2])), args[4]);
+        }
+        if (args.length == 6 && "set".equalsIgnoreCase(args[1])) {
+            return filter(resourceValueOptions(resourceTypeAlias(args[2]), args[4]), args[5]);
+        }
+        return List.of();
+    }
+
+    private String resourceTypeArg(CommandSender sender, ReSyncJsonResourceStorage storage, String[] args, int index, String usage) {
+        String type = requiredArg(sender, args, index, usage);
+        if (type == null) {
+            return null;
+        }
+        type = resourceTypeAlias(type);
+        if (!storage.resourceTypes().contains(type)) {
+            sendError(sender, "Unknown Resource Type", type);
+            return null;
+        }
+        return type;
+    }
+
+    private String resourceTypeAlias(String type) {
+        if (type == null) {
+            return "";
+        }
+        return switch (type.toLowerCase(Locale.ROOT)) {
+            case "channel", "chat", "chat_channel" -> ReSyncResourceCatalog.CHAT_CHANNEL;
+            case "chatformat", "chat_format", "format" -> ReSyncResourceCatalog.CHAT_FORMAT;
+            case "chatrule", "chat_rule" -> ReSyncResourceCatalog.CHAT_RULE;
+            case "pm", "private_message", "private_message_format" -> ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT;
+            case "mention", "mention_style" -> ReSyncResourceCatalog.MENTION_STYLE;
+            case "ignore", "ignore_list" -> ReSyncResourceCatalog.IGNORE_LIST;
+            case "motd", "motd_profile" -> ReSyncResourceCatalog.MOTD_PROFILE;
+            case "message", "message_rule" -> ReSyncResourceCatalog.MESSAGE_RULE;
+            case "recipe", "recipe_definition" -> ReSyncResourceCatalog.RECIPE_DEFINITION;
+            case "text", "template", "text_template" -> ReSyncResourceCatalog.TEXT_TEMPLATE;
+            default -> type.toLowerCase(Locale.ROOT);
+        };
+    }
+
+    private List<String> resourceTypeOptions(ReSyncJsonResourceStorage storage) {
+        List<String> values = new ArrayList<>(storage.resourceTypes());
+        values.addAll(List.of("motd", "message", "recipe", "text", "chat"));
+        return values;
+    }
+
+    private List<String> resourceIds(ReSyncJsonResourceStorage storage, String type) {
+        return storage.resourceTypes().contains(type) ? storage.listIds(type) : List.of();
+    }
+
+    private List<String> resourceFieldOptions(String type) {
+        return switch (type) {
+            case ReSyncResourceCatalog.MOTD_PROFILE -> List.of("line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers");
+            case ReSyncResourceCatalog.MESSAGE_RULE -> List.of("source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission", "players", "flowPredicate", "flowId");
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors");
+            case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
+            default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
+        };
+    }
+
+    private List<String> resourceValueOptions(String type, String field) {
+        if ("enabled".equalsIgnoreCase(field)) {
+            return booleanOptions();
+        }
+        if (ReSyncResourceCatalog.MOTD_PROFILE.equals(type) && "playerCountMode".equalsIgnoreCase(field)) {
+            return List.of("real", "hidden", "fixed");
+        }
+        if (ReSyncResourceCatalog.MESSAGE_RULE.equals(type) && "action".equalsIgnoreCase(field)) {
+            return List.of("replace_section", "replace", "append", "prepend", "remove", "flow");
+        }
+        if (ReSyncResourceCatalog.MESSAGE_RULE.equals(type) && "source".equalsIgnoreCase(field)) {
+            return List.of("join", "quit", "kick", "death", "title", "actionbar", "bossbar", "openScreen", "packetText", "system");
+        }
+        if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type) && "mode".equalsIgnoreCase(field)) {
+            return List.of("frames", "typing", "scroll", "gradient", "blink", "random", "conditional");
+        }
+        return List.of();
+    }
+
+    private JsonObject defaultResource(String type, String id) {
+        JsonObject resource = new JsonObject();
+        resource.addProperty("id", id);
+        resource.addProperty("enabled", true);
+        resource.addProperty("folder", ReSyncResourceCatalog.defaultFolder(type));
+        switch (type) {
+            case ReSyncResourceCatalog.MOTD_PROFILE -> {
+                resource.addProperty("priority", 0);
+                resource.addProperty("line1", "<green>ReSync Server");
+                resource.addProperty("line2", "<gray>Powered By ReStudio");
+                resource.addProperty("playerCountMode", "real");
+            }
+            case ReSyncResourceCatalog.MESSAGE_RULE -> {
+                resource.addProperty("source", "join");
+                resource.addProperty("priority", 0);
+                resource.addProperty("action", "replace_section");
+                resource.addProperty("contains", "");
+                resource.addProperty("replacement", "{message}");
+            }
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> {
+                resource.addProperty("text", id);
+                JsonArray frames = new JsonArray();
+                frames.add(id);
+                resource.add("frames", frames);
+                resource.addProperty("mode", "frames");
+                resource.addProperty("frameMillis", 250);
+            }
+            default -> resource.addProperty("displayName", id);
+        }
+        return resource;
+    }
+
+    private void putResourceValue(JsonObject resource, String field, String value) {
+        if (field.contains(".")) {
+            String[] parts = field.split("\\.", 2);
+            JsonObject object = resource.has(parts[0]) && resource.get(parts[0]).isJsonObject() ? resource.getAsJsonObject(parts[0]) : new JsonObject();
+            resource.add(parts[0], object);
+            putResourceValue(object, parts[1], value);
+            return;
+        }
+        if (arrayResourceField(field)) {
+            JsonArray array = new JsonArray();
+            for (String part : value.split("\\|")) {
+                String trimmed = part.trim();
+                if (!trimmed.isBlank()) {
+                    array.add(resourceArrayValue(field, trimmed));
+                }
+            }
+            resource.add(field, array);
+            return;
+        }
+        if (value == null || value.isBlank() || "none".equalsIgnoreCase(value)) {
+            resource.remove(field);
+            return;
+        }
+        if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
+            resource.addProperty(field, Boolean.parseBoolean(value));
+            return;
+        }
+        Integer integer = parseInt(value);
+        if (integer != null) {
+            resource.addProperty(field, integer);
+            return;
+        }
+        resource.addProperty(field, value);
+    }
+
+    private boolean arrayResourceField(String field) {
+        return switch (field) {
+            case "frames", "colors", "shape", "ingredients", "nodes", "temporaryNodes", "parents", "tracks", "prefixes", "suffixes", "players", "sources" -> true;
+            default -> false;
+        };
+    }
+
+    private JsonElement resourceArrayValue(String field, String value) {
+        return switch (field) {
+            case "temporaryNodes" -> {
+                JsonObject object = new JsonObject();
+                String[] parts = splitResourceValue(value, 2);
+                object.addProperty("node", parts[0]);
+                Integer seconds = parts[1].isBlank() ? null : parseInt(parts[1]);
+                if (seconds != null) {
+                    object.addProperty("seconds", seconds);
+                }
+                yield object;
+            }
+            case "prefixes", "suffixes" -> {
+                JsonObject object = new JsonObject();
+                String[] parts = splitResourceValue(value, 2);
+                Integer priority = parseInt(parts[1]);
+                object.addProperty("value", parts[0]);
+                object.addProperty("priority", priority != null ? priority : 0);
+                yield object;
+            }
+            case "tracks" -> {
+                String[] parts = splitResourceValue(value, 2);
+                if (parts[1].isBlank()) {
+                    yield new JsonPrimitive(parts[0]);
+                }
+                JsonObject object = new JsonObject();
+                object.addProperty("name", parts[0]);
+                JsonArray groups = new JsonArray();
+                for (String group : parts[1].split(",")) {
+                    String trimmed = group.trim();
+                    if (!trimmed.isBlank()) {
+                        groups.add(trimmed);
+                    }
+                }
+                object.add("groups", groups);
+                yield object;
+            }
+            default -> new JsonPrimitive(value);
+        };
+    }
+
+    private String[] splitResourceValue(String value, int size) {
+        String[] raw = value == null ? new String[0] : value.split(":", size);
+        String[] parts = new String[size];
+        for (int i = 0; i < size; i++) {
+            parts[i] = i < raw.length ? raw[i].trim() : "";
+        }
+        return parts;
+    }
+
+    private String prettyResourceType(String type) {
+        String text = type == null ? "" : type.replace('_', ' ');
+        StringBuilder builder = new StringBuilder();
+        for (String part : text.split("\\s+")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append(' ');
+            }
+            builder.append(part.substring(0, 1).toUpperCase(Locale.ROOT));
+            if (part.length() > 1) {
+                builder.append(part.substring(1).toLowerCase(Locale.ROOT));
+            }
+        }
+        return builder.isEmpty() ? "Resource" : builder.toString();
+    }
+
+    private String shortJsonValue(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return "None";
+        }
+        String value = element.isJsonPrimitive() ? element.getAsString() : element.toString();
+        return value.length() <= 96 ? value : value.substring(0, 93) + "...";
+    }
+
     private boolean handleFlow(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sendUsageLine(sender, "/resync flow reload nodes");
@@ -193,7 +598,7 @@ public class ReSyncCommand implements TabExecutor {
         }
         String sub = args[1].toLowerCase(Locale.ROOT);
         if ("registry".equals(sub)) {
-            restudio.resync.modules.FlowRuntimeModule module = flowRuntimeModule();
+            FlowRuntimeModule module = flowRuntimeModule();
             if (module == null) {
                 sendError(sender, "Flow Module Not Initialized");
                 return true;
@@ -221,7 +626,7 @@ public class ReSyncCommand implements TabExecutor {
             sendUsageLine(sender, "/resync flow reload nodes");
             return true;
         }
-        restudio.resync.modules.FlowRuntimeModule module = flowRuntimeModule();
+        FlowRuntimeModule module = flowRuntimeModule();
         if (module == null) {
             sendError(sender, "Flow module not initialized");
             return true;
@@ -245,12 +650,12 @@ public class ReSyncCommand implements TabExecutor {
         return List.of();
     }
 
-    private restudio.resync.modules.FlowRuntimeModule flowRuntimeModule() {
-        restudio.resync.server.ReSyncServer server = plugin.getReSyncServer();
+    private FlowRuntimeModule flowRuntimeModule() {
+        ReSyncServer server = plugin.getReSyncServer();
         if (server == null || server.getModuleContext() == null) {
             return null;
         }
-        return server.getModuleContext().getService(restudio.resync.modules.FlowRuntimeModule.class);
+        return server.getModuleContext().getService(FlowRuntimeModule.class);
     }
 
     private String shortChecksum(String checksum) {
@@ -262,7 +667,7 @@ public class ReSyncCommand implements TabExecutor {
 
     private String joinedDiagnosticList(Object value) {
         if (value instanceof List<?> list && !list.isEmpty()) {
-            return list.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
+            return list.stream().map(String::valueOf).collect(Collectors.joining(", "));
         }
         return "None";
     }
@@ -966,7 +1371,7 @@ public class ReSyncCommand implements TabExecutor {
         }
     }
 
-    private void applyWorldProfile(CommandSender sender, WorldManagementService service, String worldName, WorldProfileSettings current, java.util.function.Consumer<WorldProfileSettings> mutator) {
+    private void applyWorldProfile(CommandSender sender, WorldManagementService service, String worldName, WorldProfileSettings current, Consumer<WorldProfileSettings> mutator) {
         WorldProfileSettings updated = current == null ? new WorldProfileSettings() : current.copy();
         mutator.accept(updated);
         sendResult(sender, service.setWorldProfile(worldName, updated));
@@ -1009,7 +1414,7 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void handleWorldProfileBoolean(CommandSender sender, WorldManagementService service, String worldName, WorldProfileSettings profile, String[] args,
-                                           int valueIndex, String usage, java.util.function.BiConsumer<WorldProfileSettings, Boolean> mutator) {
+                                           int valueIndex, String usage, BiConsumer<WorldProfileSettings, Boolean> mutator) {
         String raw = requiredArg(sender, args, valueIndex, usage);
         if (raw == null) {
             return;
@@ -1521,7 +1926,7 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void handlePortalBooleanMutation(CommandSender sender, WorldManagementService service, String[] args, String usage,
-                                             java.util.function.BiConsumer<WorldPortal, Boolean> mutator) {
+                                             BiConsumer<WorldPortal, Boolean> mutator) {
         String portalId = requiredArg(sender, args, 2, usage);
         String raw = requiredArg(sender, args, 3, usage);
         if (portalId == null || raw == null) {
@@ -1721,6 +2126,13 @@ public class ReSyncCommand implements TabExecutor {
             return null;
         }
         return plugin.getReSyncServer().getModuleContext().getService(CustomContentService.class);
+    }
+
+    private ReSyncJsonResourceStorage getJsonResourceStorage() {
+        if (plugin.getReSyncServer() == null || plugin.getReSyncServer().getModuleContext() == null) {
+            return null;
+        }
+        return plugin.getReSyncServer().getModuleContext().getService(ReSyncJsonResourceStorage.class);
     }
 
     private WorldRegistryEntry findWorldEntry(WorldManagementService service, String worldName) {
@@ -2002,7 +2414,7 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void applyPortalMutation(CommandSender sender, WorldManagementService service, String portalId,
-                                     java.util.function.Consumer<WorldPortal> mutator) {
+                                     Consumer<WorldPortal> mutator) {
         WorldPortal portal = service.getPortal(portalId);
         if (portal == null) {
             sendError(sender, "Portal Not Found", portalId);
@@ -2014,7 +2426,7 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void applyInventoryGroupMutation(CommandSender sender, WorldManagementService service, String groupId,
-                                             java.util.function.Consumer<WorldInventoryGroup> mutator) {
+                                             Consumer<WorldInventoryGroup> mutator) {
         WorldInventoryGroup group = findInventoryGroup(service, groupId);
         if (group == null) {
             sendError(sender, "Inventory Group Not Found", groupId);
@@ -2026,7 +2438,7 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void applySignPortalMutation(CommandSender sender, WorldManagementService service, String signId,
-                                         java.util.function.Consumer<WorldSignPortal> mutator) {
+                                         Consumer<WorldSignPortal> mutator) {
         WorldSignPortal signPortal = findSignPortal(service, signId);
         if (signPortal == null) {
             sendError(sender, "Sign Portal Not Found", signId);
@@ -2481,6 +2893,12 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync tab interval [ticks]");
         sendUsageLine(sender, "/resync item list");
         sendUsageLine(sender, "/resync item give <player> <itemId> [amount]");
+        sendUsageLine(sender, "/resync resource types");
+        sendUsageLine(sender, "/resync resource list <type>");
+        sendUsageLine(sender, "/resync resource create <type> <id>");
+        sendUsageLine(sender, "/resync resource set <type> <id> <field> <value>");
+        sendUsageLine(sender, "/resync resource apply permission <id>");
+        sendUsageLine(sender, "/resync resource delete <type> <id>");
         sendUsageLine(sender, "/resync world list");
         sendUsageLine(sender, "/resync world info <world>");
         sendUsageLine(sender, "/resync world create <world> [seed] [environment] [generator]");

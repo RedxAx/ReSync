@@ -47,11 +47,14 @@ public class CustomContentListener implements Listener {
         ItemStack item = event.getItem() != null ? event.getItem() : itemInHand(player, event.getHand());
         String itemId = service.identifyItem(item);
         if (itemId != null) {
-            Map<String, Object> vars = baseVars(player, item, null, null, event.getHand());
-            Action action = event.getAction();
-            String trigger = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK ? "item.left_click" : "item.right_click";
-            service.dispatch(itemId, trigger, player, event, vars);
-            service.dispatch(itemId, "item.use", player, event, vars);
+            CustomContentDefinition definition = storage.get(itemId);
+            if (!isBlockPlacementAttempt(definition, event)) {
+                Map<String, Object> vars = baseVars(player, item, null, null, event.getHand());
+                Action action = event.getAction();
+                String trigger = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK ? "item.left_click" : "item.right_click";
+                service.dispatch(itemId, trigger, player, event, vars);
+                service.dispatch(itemId, "item.use", player, event, vars);
+            }
         }
         if (event.getClickedBlock() != null) {
             Location location = event.getClickedBlock().getLocation();
@@ -355,5 +358,9 @@ public class CustomContentListener implements Listener {
             return null;
         }
         return hand == EquipmentSlot.OFF_HAND ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+    }
+
+    private boolean isBlockPlacementAttempt(CustomContentDefinition definition, PlayerInteractEvent event) {
+        return definition != null && "block".equalsIgnoreCase(definition.getType()) && event.getAction() == Action.RIGHT_CLICK_BLOCK && event.getClickedBlock() != null;
     }
 }

@@ -9,6 +9,7 @@ import net.luckperms.api.node.types.PermissionNode;
 import net.luckperms.api.node.types.PrefixNode;
 import net.luckperms.api.node.types.SuffixNode;
 import net.luckperms.api.query.QueryOptions;
+import net.luckperms.api.track.Track;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -822,6 +823,53 @@ public class PermissionHandler implements NodeHandler {
             lp.getUserManager().saveUser(user);
             ctx.setOutput(node, "success", true);
         });
+
+        operations.put("perm_list_tracks", (ctx, node) -> {
+            LuckPerms lp = getLuckPerms();
+            if (lp == null) {
+                ctx.setOutput(node, "tracks", new ArrayList<>());
+                ctx.setOutput(node, "success", false);
+                return;
+            }
+            List<String> tracks = new ArrayList<>();
+            lp.getTrackManager().getLoadedTracks().forEach(track -> tracks.add(track.getName()));
+            ctx.setOutput(node, "tracks", tracks);
+            ctx.setOutput(node, "success", true);
+        });
+
+        operations.put("perm_promote", (ctx, node) -> {
+            mutateTrackPosition(ctx, node, true);
+        });
+
+        operations.put("perm_demote", (ctx, node) -> {
+            mutateTrackPosition(ctx, node, false);
+        });
+
+    }
+
+    private void mutateTrackPosition(FlowContext ctx, FlowNode node, boolean promote) {
+        LuckPerms lp = getLuckPerms();
+        Player player = ctx.getInputValue(node, "player", Player.class, null);
+        String trackName = ctx.getInputValue(node, "track", String.class, "");
+        if (lp == null || player == null || trackName.isBlank()) {
+            ctx.setOutput(node, "success", false);
+            ctx.setOutput(node, "result", lp == null ? "LuckPerms Missing" : player == null ? "Player Missing" : "Track Missing");
+            ctx.triggerOutput("failure_flow");
+            return;
+        }
+        User user = lp.getUserManager().getUser(player.getUniqueId());
+        Track track = lp.getTrackManager().getTrack(trackName);
+        if (user == null || track == null) {
+            ctx.setOutput(node, "success", false);
+            ctx.setOutput(node, "result", user == null ? "User Missing" : "Track Missing");
+            ctx.triggerOutput("failure_flow");
+            return;
+        }
+        Object result = promote ? track.promote(user, getQueryOptions(lp, user).context()) : track.demote(user, getQueryOptions(lp, user).context());
+        lp.getUserManager().saveUser(user);
+        ctx.setOutput(node, "success", true);
+        ctx.setOutput(node, "result", result != null ? result.toString() : "");
+        ctx.triggerOutput("success_flow");
     }
 
     private LuckPerms getLuckPerms() {

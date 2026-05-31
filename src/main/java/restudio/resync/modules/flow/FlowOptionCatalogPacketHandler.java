@@ -10,6 +10,7 @@ import org.bukkit.block.Biome;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.potion.PotionEffectType;
+import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
@@ -51,6 +52,12 @@ public class FlowOptionCatalogPacketHandler {
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
             sender.sendOptionCatalog(session, sourceId, provider.values(), provider.items(), provider.revision());
+            return;
+        }
+        if ("custom_content_recipe_item".equals(normalize(sourceId)) && customContentService != null) {
+            List<OptionCatalogItem> items = customContentService.recipeItemCatalog();
+            List<String> values = items.stream().map(OptionCatalogItem::value).toList();
+            sender.sendOptionCatalog(session, sourceId, values, items, "recipe_item:" + Bukkit.getVersion());
             return;
         }
         sender.sendOptionCatalog(session, sourceId, values(sourceId), revision(sourceId));

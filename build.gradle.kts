@@ -24,6 +24,7 @@ dependencies {
     compileOnly("net.luckperms:api:5.4")
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("com.nexomc:nexo:1.23")
+    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     implementation("org.apache.logging.log4j:log4j-core:2.25.4")
     implementation("org.slf4j:slf4j-jdk14:2.0.17")

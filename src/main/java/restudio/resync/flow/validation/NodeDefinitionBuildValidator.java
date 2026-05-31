@@ -300,7 +300,7 @@ public final class NodeDefinitionBuildValidator {
             prefix = "minecraft:";
         } else if (optionsSource.startsWith("server:custom_content:")) {
             String catalog = optionsSource.substring("server:custom_content:".length());
-            if (!Set.of("provider", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(catalog)) {
+            if (!Set.of("provider", "recipe_item", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(catalog)) {
                 errors.add(id + "." + pinName + " references unknown custom content optionsSource " + optionsSource);
             }
             return;

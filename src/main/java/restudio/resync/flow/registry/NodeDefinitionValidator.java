@@ -252,7 +252,7 @@ public class NodeDefinitionValidator {
             ).contains(category);
         }
         if (source.startsWith("server:custom_content:")) {
-            return Set.of("provider", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(source.substring("server:custom_content:".length()));
+            return Set.of("provider", "recipe_item", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(source.substring("server:custom_content:".length()));
         }
         return false;
     }

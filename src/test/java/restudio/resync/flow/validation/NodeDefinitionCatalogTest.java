@@ -26,7 +26,7 @@ class NodeDefinitionCatalogTest {
             }
         }
 
-        assertEquals(1217, count);
+        assertEquals(1232, count);
     }
 
     @Test
@@ -94,6 +94,44 @@ class NodeDefinitionCatalogTest {
 
         for (String nodeId : List.of("region.region_create", "region.region_delete", "region.region_clone", "region.region_save", "region.region_load", "region.region_set_blocks", "region.region_mirror_x", "region.region_mirror_y", "region.region_mirror_z", "region.region_rotate_90", "region.region_rotate_180", "region.region_move", "region.region_stack")) {
             JsonObject node = findNode("region.json", nodeId);
+            assertTrue(hasFlowInput(node), nodeId + " should expose flow input");
+            assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
+        }
+    }
+
+    @Test
+    void chatPlanNodesAreVisibleAndActionable() throws Exception {
+        for (String nodeId : List.of("chat.cancel", "chat.set.message", "chat.add.viewer", "chat.remove.viewer", "chat.send.channel")) {
+            JsonObject node = findNode("chat.json", nodeId);
+            assertEquals("CHAT", node.get("category").getAsString());
+            assertFalse(node.has("hidden") && node.get("hidden").getAsBoolean());
+            assertTrue(hasFlowInput(node), nodeId + " should expose flow input");
+            assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
+        }
+
+        for (String nodeId : List.of("event.chat.received", "event.chat.routed", "event.chat.private_message", "event.chat.mention", "event.chat.channel_join", "event.chat.channel_leave", "event.chat.channel_send")) {
+            JsonObject node = findNode("chat.json", nodeId);
+            assertTrue(node.get("trigger").getAsBoolean());
+            assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
+            assertTrue(node.has("eventType") && !node.get("eventType").getAsString().isBlank(), nodeId + " should register a real event type");
+        }
+    }
+
+    @Test
+    void permissionNodesUsePolishedVisibleLabels() throws Exception {
+        JsonObject check = findNode("permission.json", "permission.perm_has");
+        JsonObject grant = findNode("permission.json", "permission.perm_add");
+        JsonObject temporary = findNode("permission.json", "permission.perm_add_temp");
+
+        assertEquals("Check Permission", check.get("displayName").getAsString());
+        assertEquals("Grant Permission", grant.get("displayName").getAsString());
+        assertEquals("Grant Temporary Permission", temporary.get("displayName").getAsString());
+        assertFalse(check.has("hidden") && check.get("hidden").getAsBoolean());
+        assertFalse(grant.has("hidden") && grant.get("hidden").getAsBoolean());
+        assertFalse(temporary.has("hidden") && temporary.get("hidden").getAsBoolean());
+
+        for (String nodeId : List.of("perm.set.group", "perm.get.groups", "perm.get.prefix", "perm.get.suffix", "perm.check", "perm.grant", "perm.revoke")) {
+            JsonObject node = findNode("permission.json", nodeId);
             assertTrue(hasFlowInput(node), nodeId + " should expose flow input");
             assertTrue(hasFlowOutput(node), nodeId + " should expose flow output");
         }

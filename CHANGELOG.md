@@ -1,28 +1,13 @@
 ## Added
-- Added packet-based ReSync connections for Remotely and RemotelyMod, including plugin message bridging, chunked envelopes, session tracking, and frame sending.
-- Added packet-based GUI and scoreboard subscriptions so Remotely can receive live ReSync UI state more reliably.
-- Added the beta ReSync Extension API with extension registration, extension storage, option catalog providers, node definitions, extension data, and extension manager support.
-- Added the ReQuest example extension as a working API example with quest profiles, quest state, commands, handlers, modules, and custom node definitions.
-- Added player facet metadata/state tracking and player tracking services for richer live project context.
-- Added option catalog and node registry packet handling so Remotely can load extension and built-in node data dynamically.
-- Added custom content metadata and compatibility support for ReSync custom content projects.
-- Added GUI item command actions.
-- Added an improved Leap To Location node.
-- Added built-in generator registration support through the ReSync world generation path.
-- 
-## Changed
-- Restructured ReSync file and content management across flow storage, custom content storage, world generation storage, metadata, and packet handlers.
-- Improved Flow runtime reliability through stronger mutations, execution context handling, type adaptation, JSON family behavior, and migrated node definitions.
-- Improved custom content graph compatibility and listener behavior.
-- Improved connection management around sessions, channel registration, chunk modules, world modules, player tracking, and ReSync server startup.
-- Improved Flow registry and plugin loading so extensions can contribute nodes and option catalogs through the new API.
-- Improved Remotely integration for GUI, scoreboard, player, node registry, option catalog, and custom content synchronization.
+- Added the Chat module with channels, formats, rules, private messages, mentions, ignore lists, channel membership, cooldowns, chat spy support, and new chat flow nodes and events.
+- Added the MOTD module with profile-based server list MOTDs, icon support, and live MOTD rendering through ReText.
+- Added the Recipe module for custom shaped, shapeless, furnace, blasting, smoking, campfire, stonecutter, and smithing recipes using custom content items and vanilla/provider items.
+- Added the Message Rewrite module for join, quit, death, kick, and ProtocolLib-backed message customization with predicates and flow hooks.
+- Added ReTextService for MiniMessage, legacy color codes, placeholders, animations, and text template rendering.
+- Added unified JSON resource storage and packet routing through FlowResourcePacketRouter, JsonAssetStore, and ReSyncResourceCatalog for chat, MOTD, recipe, message, and text template resources.
+- Expanded chat and permission migrated node catalogs and added chat and permission flow handlers.
 
-## Fixed
-- Fixed broken ReSync file storage paths for flows, custom content, and world generation projects.
-- Fixed flow reliability issues in custom content, ability effects, entity actions, player actions, JSON handling, and migrated node catalogs.
-- Fixed invisible player messages when multiple text formatting operations are used.
-- Fixed double log prefixing.
-- Fixed numeric logic comparisons so `0`, `"0"`, and `0.0` are handled consistently.
-- Fixed ReSync connection issues in the packet-based Remotely bridge.
-- Fixed GUI and scoreboard subscription behavior over packet-based connections.
+## Changed
+- Consolidated Remotely packet handlers into unified FlowResourcePacketHandler and FlowResourcePacketRouter instead of separate GUI, scoreboard, tab, custom content, and metadata handlers.
+- Improved custom content storage, flow storage, and world generation storage to work with the new managed resource system.
+- Expanded ReSync commands and resource diagnostics for the new customization and content resource types.

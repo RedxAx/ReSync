@@ -26,6 +26,7 @@ import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.memory.MemoryMonitor;
 import restudio.resync.modules.ChunkTransportModule;
 import restudio.resync.modules.ChatModule;
+import restudio.resync.modules.AdvancementModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.MessageRewriteModule;
@@ -181,6 +182,7 @@ public class ReSyncServer {
         moduleRegistry.registerModule(new MotdModule());
         moduleRegistry.registerModule(new MessageRewriteModule());
         moduleRegistry.registerModule(new RecipeModule());
+        moduleRegistry.registerModule(new AdvancementModule());
         moduleRegistry.registerModule(new PlayerTrackingModule());
         moduleRegistry.registerModule(new WorldManagementModule());
         moduleRegistry.registerModule(new WorldGenModule());
@@ -621,6 +623,10 @@ public class ReSyncServer {
         capabilities.put("packetHooks", Bukkit.getPluginManager().isPluginEnabled("ProtocolLib") ? List.of("native", "packet") : List.of("native"));
         ReSyncJsonResourceStorage jsonStorage = moduleContext.getService(ReSyncJsonResourceStorage.class);
         capabilities.put("resourceTypes", jsonStorage != null ? jsonStorage.resourceTypes() : List.of());
+        AdvancementModule advancementModule = moduleContext.getService(AdvancementModule.class);
+        if (advancementModule != null) {
+            capabilities.put("advancements", advancementModule.capabilityPayload());
+        }
         MessageRewriteModule messageRewriteModule = moduleContext.getService(MessageRewriteModule.class);
         if (messageRewriteModule != null) {
             capabilities.put("messageRewrite", messageRewriteModule.capabilityPayload());

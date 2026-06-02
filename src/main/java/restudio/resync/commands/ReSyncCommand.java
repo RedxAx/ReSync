@@ -397,13 +397,14 @@ public class ReSyncCommand implements TabExecutor {
             case "message", "message_rule" -> ReSyncResourceCatalog.MESSAGE_RULE;
             case "recipe", "recipe_definition" -> ReSyncResourceCatalog.RECIPE_DEFINITION;
             case "text", "template", "text_template" -> ReSyncResourceCatalog.TEXT_TEMPLATE;
+            case "advancement", "advancements", "advancement_tree" -> ReSyncResourceCatalog.ADVANCEMENT_TREE;
             default -> type.toLowerCase(Locale.ROOT);
         };
     }
 
     private List<String> resourceTypeOptions(ReSyncJsonResourceStorage storage) {
         List<String> values = new ArrayList<>(storage.resourceTypes());
-        values.addAll(List.of("motd", "message", "recipe", "text", "chat"));
+        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement"));
         return values;
     }
 
@@ -417,6 +418,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.MESSAGE_RULE -> List.of("source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission", "players", "flowPredicate", "flowId");
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors");
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
+            case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
     }
@@ -466,6 +468,31 @@ public class ReSyncCommand implements TabExecutor {
                 resource.add("frames", frames);
                 resource.addProperty("mode", "frames");
                 resource.addProperty("frameMillis", 250);
+            }
+            case ReSyncResourceCatalog.ADVANCEMENT_TREE -> {
+                resource.addProperty("displayName", id);
+                JsonObject nodes = new JsonObject();
+                JsonObject root = new JsonObject();
+                root.addProperty("enabled", true);
+                root.addProperty("parent", "");
+                JsonObject position = new JsonObject();
+                position.addProperty("x", 0);
+                position.addProperty("y", 0);
+                root.add("position", position);
+                JsonObject display = new JsonObject();
+                display.addProperty("title", id);
+                display.addProperty("description", "Server Progress");
+                display.addProperty("icon", "minecraft:nether_star");
+                display.addProperty("frame", "task");
+                display.addProperty("background", "minecraft:gui/advancements/backgrounds/adventure");
+                display.addProperty("showToast", false);
+                display.addProperty("announceToChat", false);
+                display.addProperty("hidden", false);
+                root.add("display", display);
+                root.add("criteria", new JsonObject());
+                root.add("requirements", new JsonArray());
+                nodes.add("root", root);
+                resource.add("nodes", nodes);
             }
             default -> resource.addProperty("displayName", id);
         }

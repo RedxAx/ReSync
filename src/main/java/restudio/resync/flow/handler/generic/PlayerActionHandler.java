@@ -575,6 +575,7 @@ public class PlayerActionHandler implements NodeHandler {
             String mode = ctx.getInputValue(node, "mode", String.class, "");
             Player target = ctx.getInputValue(node, "target", Player.class, null);
             String key = ctx.getInputValue(node, "advancement_key", String.class, "");
+            String criterion = ctx.getInputValue(node, "criterion", String.class, "impossible");
             boolean success = false;
             boolean hasAdvancement = false;
             if (target != null && !key.isEmpty()) {
@@ -584,15 +585,15 @@ public class PlayerActionHandler implements NodeHandler {
                     if (advancement != null) {
                         switch (mode.toLowerCase()) {
                             case "grant" -> {
-                                runSync(() -> target.getAdvancementProgress(advancement).awardCriteria("impossible"));
+                                runSync(() -> target.getAdvancementProgress(advancement).awardCriteria(criterion));
                                 success = true;
                             }
                             case "revoke" -> {
-                                runSync(() -> target.getAdvancementProgress(advancement).revokeCriteria("impossible"));
+                                runSync(() -> target.getAdvancementProgress(advancement).revokeCriteria(criterion));
                                 success = true;
                             }
                             case "has" -> {
-                                hasAdvancement = callSync(() -> target.getAdvancementProgress(advancement).isDone());
+                                hasAdvancement = callSync(() -> target.getAdvancementProgress(advancement).getAwardedCriteria().contains(criterion));
                                 success = true;
                             }
                             default -> {

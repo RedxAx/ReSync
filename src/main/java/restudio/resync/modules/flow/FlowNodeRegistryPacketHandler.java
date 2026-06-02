@@ -366,6 +366,8 @@ public class FlowNodeRegistryPacketHandler {
         list.add(new FlowOptionSourceMetadata("server:minecraft:gamemode", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("server:minecraft:material", "minecraft", "SEARCHABLE_LIST", true));
         list.add(new FlowOptionSourceMetadata("server:minecraft:block", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:loot_table", "minecraft", "SEARCHABLE_LIST", true));
+        list.add(new FlowOptionSourceMetadata("server:minecraft:recipe", "minecraft", "SEARCHABLE_LIST", true));
         list.add(new FlowOptionSourceMetadata("server:minecraft:particle", "minecraft", "SEARCHABLE_LIST", true));
         list.add(new FlowOptionSourceMetadata("server:minecraft:potion_effect", "minecraft", "DROPDOWN", false));
         list.add(new FlowOptionSourceMetadata("server:minecraft:sound", "minecraft", "SEARCHABLE_LIST", true));

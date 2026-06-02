@@ -34,6 +34,9 @@ class CustomizationResourceCatalogTest {
         assertEquals("Customization/Messages", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.MESSAGE_RULE));
         assertEquals("Content/Recipes", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.RECIPE_DEFINITION));
         assertEquals("Text/Templates", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.TEXT_TEMPLATE));
+        assertEquals("Content/Advancements", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.ADVANCEMENT_TREE));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xA8));
+        assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xAD));
+        assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xB3));
     }
 }

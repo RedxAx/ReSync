@@ -977,6 +977,7 @@ public class FlowStorage {
         changed |= ensureFolder(metadata, "Content/Items", "Content", 0);
         changed |= ensureFolder(metadata, "Content/Armor", "Content", 1);
         changed |= ensureFolder(metadata, "Content/Blocks", "Content", 2);
+        changed |= ensureFolder(metadata, "Content/Advancements", "Content", 3);
         changed |= ensureFolder(metadata, "GUIs", "", 2);
         changed |= ensureFolder(metadata, "Customization", "", 3);
         changed |= ensureFolder(metadata, "Customization/Scoreboards", "Customization", 0);

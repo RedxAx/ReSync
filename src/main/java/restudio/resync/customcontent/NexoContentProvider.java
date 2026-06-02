@@ -67,6 +67,25 @@ public class NexoContentProvider implements CustomContentProvider {
         }
     }
 
+    public ItemStack createExternalItem(String itemId, int amount) {
+        if (!isAvailable() || itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        try {
+            ItemBuilder builder = NexoItems.itemFromId(itemId);
+            if (builder == null) {
+                return null;
+            }
+            ItemStack item = builder.build();
+            if (item != null) {
+                item.setAmount(Math.max(1, amount));
+            }
+            return item;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     @Override
     public String identifyItem(ItemStack item) {
         if (!isAvailable() || item == null) {
@@ -176,6 +195,33 @@ public class NexoContentProvider implements CustomContentProvider {
         values.addAll(blockIds());
         values.addAll(furnitureIds());
         return values.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    public boolean matchesExternalItem(ItemStack item, String externalId) {
+        if (!isAvailable() || item == null || externalId == null) {
+            return false;
+        }
+        try {
+            return externalId.equalsIgnoreCase(NexoItems.idFromItem(item));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public boolean matchesExternalBlock(Location location, String externalId) {
+        if (!isAvailable() || location == null || externalId == null) {
+            return false;
+        }
+        try {
+            CustomBlockMechanic block = NexoBlocks.customBlockMechanic(location);
+            if (block != null && externalId.equalsIgnoreCase(block.getItemID())) {
+                return true;
+            }
+            FurnitureMechanic furniture = NexoFurniture.furnitureMechanic(location);
+            return furniture != null && externalId.equalsIgnoreCase(furniture.getItemID());
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private boolean isArmorItem(String itemId) {

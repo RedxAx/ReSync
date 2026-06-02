@@ -1015,6 +1015,11 @@
         "dataType": "string",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:minecraft:advancement"
+      },
+      {
+        "name": "criterion",
+        "dataType": "string",
+        "defaultValue": "impossible"
       }
     ],
     "outputs": [

@@ -29,6 +29,7 @@ public class ReSyncJsonResourceStorage {
     private final Map<String, JsonAssetStore<JsonObject>> stores = new LinkedHashMap<>();
     private final Map<String, CachedIconData> iconDataCache = new ConcurrentHashMap<>();
     private final List<ResourceListener> listeners = new CopyOnWriteArrayList<>();
+    private final List<ResourceMutationInterceptor> interceptors = new CopyOnWriteArrayList<>();
     private final JavaPlugin plugin;
 
     private record CachedIconData(long modified, long size, String data, String hash) {
@@ -74,7 +75,15 @@ public class ReSyncJsonResourceStorage {
         if (ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
             prepareMotdIcon(value);
         }
-        store.save(value);
+        try {
+            for (ResourceMutationInterceptor interceptor : interceptors) {
+                interceptor.beforeSave(type, value);
+            }
+            store.save(value);
+        } catch (RuntimeException failure) {
+            notifySaveFailure(type, value, failure);
+            throw failure;
+        }
         notifyListeners(type, id(value), value, false);
     }
 
@@ -83,13 +92,27 @@ public class ReSyncJsonResourceStorage {
         if (store == null) {
             throw new IllegalArgumentException("Unknown resource type: " + type);
         }
-        store.delete(id);
+        try {
+            for (ResourceMutationInterceptor interceptor : interceptors) {
+                interceptor.beforeDelete(type, id);
+            }
+            store.delete(id);
+        } catch (RuntimeException failure) {
+            notifyDeleteFailure(type, id, failure);
+            throw failure;
+        }
         notifyListeners(type, id, null, true);
     }
 
     public void addListener(ResourceListener listener) {
         if (listener != null) {
             listeners.add(listener);
+        }
+    }
+
+    public void addInterceptor(ResourceMutationInterceptor interceptor) {
+        if (interceptor != null) {
+            interceptors.add(interceptor);
         }
     }
 
@@ -114,7 +137,8 @@ public class ReSyncJsonResourceStorage {
             ReSyncResourceCatalog.MOTD_PROFILE,
             ReSyncResourceCatalog.MESSAGE_RULE,
             ReSyncResourceCatalog.RECIPE_DEFINITION,
-            ReSyncResourceCatalog.TEXT_TEMPLATE
+            ReSyncResourceCatalog.TEXT_TEMPLATE,
+            ReSyncResourceCatalog.ADVANCEMENT_TREE
         );
     }
 
@@ -145,6 +169,7 @@ public class ReSyncJsonResourceStorage {
             case ReSyncResourceCatalog.MESSAGE_RULE -> "message-rules";
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> "recipes";
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> "text-templates";
+            case ReSyncResourceCatalog.ADVANCEMENT_TREE -> "advancement-trees";
             default -> type;
         };
     }
@@ -152,6 +177,26 @@ public class ReSyncJsonResourceStorage {
     private void notifyListeners(String type, String id, JsonObject value, boolean deleted) {
         for (ResourceListener listener : listeners) {
             listener.resourceChanged(type, id, value, deleted);
+        }
+    }
+
+    private void notifySaveFailure(String type, JsonObject value, RuntimeException failure) {
+        for (ResourceMutationInterceptor interceptor : interceptors) {
+            try {
+                interceptor.afterSaveFailure(type, value, failure);
+            } catch (RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
+        }
+    }
+
+    private void notifyDeleteFailure(String type, String id, RuntimeException failure) {
+        for (ResourceMutationInterceptor interceptor : interceptors) {
+            try {
+                interceptor.afterDeleteFailure(type, id, failure);
+            } catch (RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
         }
     }
 
@@ -295,5 +340,19 @@ public class ReSyncJsonResourceStorage {
     @FunctionalInterface
     public interface ResourceListener {
         void resourceChanged(String type, String id, JsonObject value, boolean deleted);
+    }
+
+    public interface ResourceMutationInterceptor {
+        default void beforeSave(String type, JsonObject value) {
+        }
+
+        default void beforeDelete(String type, String id) {
+        }
+
+        default void afterSaveFailure(String type, JsonObject value, RuntimeException failure) {
+        }
+
+        default void afterDeleteFailure(String type, String id, RuntimeException failure) {
+        }
     }
 }

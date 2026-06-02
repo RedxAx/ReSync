@@ -20,6 +20,8 @@ class ReSyncProtocolContractTest {
         assertEquals(0x35, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE_ACK);
         assertEquals(0x36, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_REQUEST);
         assertEquals(0x44, ReSyncProtocolContract.FLOW_PACKET_JOB);
+        assertEquals(0xAD, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_REQUEST);
+        assertEquals(0xB3, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK);
     }
 
     @Test
@@ -34,5 +36,7 @@ class ReSyncProtocolContractTest {
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_DELETE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().delete());
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().saveAck());
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().listRequest());
+        assertEquals(ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.ADVANCEMENT_TREE).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.ADVANCEMENT_TREE).flowPackets().saveAck());
     }
 }

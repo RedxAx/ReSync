@@ -9,6 +9,7 @@ import org.bukkit.advancement.Advancement;
 import org.bukkit.block.Biome;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
+import org.bukkit.inventory.Recipe;
 import org.bukkit.potion.PotionEffectType;
 import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
@@ -77,6 +78,8 @@ public class FlowOptionCatalogPacketHandler {
             case "gamemode" -> List.of("survival", "creative", "adventure", "spectator");
             case "material" -> enumNames(Material.values());
             case "block" -> blocks();
+            case "loot_table" -> registryKeys(Registry.LOOT_TABLES);
+            case "recipe" -> recipes();
             case "particle" -> registryKeys(Registry.PARTICLE_TYPE);
             case "potion_effect" -> potionEffects();
             case "sound" -> registryKeys(Registry.SOUNDS);
@@ -147,6 +150,19 @@ public class FlowOptionCatalogPacketHandler {
         }
         values.sort(String.CASE_INSENSITIVE_ORDER);
         return values;
+    }
+
+    private List<String> recipes() {
+        List<String> values = new ArrayList<>();
+        Bukkit.recipeIterator().forEachRemaining(recipe -> addRecipeKey(values, recipe));
+        values.sort(String.CASE_INSENSITIVE_ORDER);
+        return values;
+    }
+
+    private void addRecipeKey(List<String> values, Recipe recipe) {
+        if (recipe instanceof org.bukkit.Keyed keyed) {
+            values.add(keyed.getKey().toString());
+        }
     }
 
     private <T extends org.bukkit.Keyed> List<String> registryKeys(Registry<T> registry) {

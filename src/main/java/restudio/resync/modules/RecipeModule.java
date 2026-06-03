@@ -21,6 +21,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockCookEvent;
 import org.bukkit.event.block.CampfireStartEvent;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.FurnaceStartSmeltEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -36,6 +37,7 @@ import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.FurnaceRecipe;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
@@ -125,6 +127,9 @@ public class RecipeModule implements Module, Listener {
             if (!ResourceJson.bool(definition, "enabled", true)) {
                 continue;
             }
+            if (manualCraftingRecipe(definition)) {
+                continue;
+            }
             Recipe recipe = createRecipe(definition);
             if (recipe != null && Bukkit.addRecipe(recipe)) {
                 registered.add(key(definition));
@@ -134,27 +139,67 @@ public class RecipeModule implements Module, Listener {
 
     @EventHandler
     public void onPrepareCraft(PrepareItemCraftEvent event) {
-        JsonObject definition = definitionFor(event.getRecipe());
-        if (definition == null || !(event.getView().getPlayer() instanceof Player player)) {
+        if (!(event.getView().getPlayer() instanceof Player player)) {
             return;
         }
-        if (!conditionsPass(definition, player) || !ingredientsPass(definition, event.getInventory())) {
+        JsonObject definition = matchingManualCraftingDefinition(player, event.getInventory());
+        if (definition == null) {
+            definition = definitionFor(event.getRecipe());
+        }
+        if (definition == null) {
+            if (matrixHasCustomContent(event.getInventory().getMatrix())) {
+                event.getInventory().setResult(null);
+            }
+            return;
+        }
+        if (!conditionsPass(definition, player, false) || !ingredientsPass(definition, event.getInventory())) {
             event.getInventory().setResult(null);
             return;
         }
         ItemStack dynamic = dynamicOutput(definition, player);
         if (dynamic != null) {
             event.getInventory().setResult(dynamic);
+        } else if (manualCraftingRecipe(definition)) {
+            event.getInventory().setResult(item(ResourceJson.object(definition, "output")));
         }
     }
 
     @EventHandler
     public void onCraft(CraftItemEvent event) {
-        JsonObject definition = definitionFor(event.getRecipe());
-        if (definition == null || !(event.getWhoClicked() instanceof Player player)) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        boolean allowed = conditionsPass(definition, player) && ingredientsPass(definition, event.getInventory());
+        JsonObject definition = matchingManualCraftingDefinition(player, event.getInventory());
+        if (definition == null) {
+            definition = definitionFor(event.getRecipe());
+        }
+        if (definition == null) {
+            if (matrixHasCustomContent(event.getInventory().getMatrix())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+        handleCraftTake(definition, event, player, event.getInventory());
+    }
+
+    @EventHandler
+    public void onManualCraftTake(InventoryClickEvent event) {
+        if (event instanceof CraftItemEvent || event.getSlotType() != InventoryType.SlotType.RESULT || !(event.getWhoClicked() instanceof Player player)
+            || !(event.getView().getTopInventory() instanceof CraftingInventory inventory)) {
+            return;
+        }
+        JsonObject definition = matchingManualCraftingDefinition(player, inventory);
+        if (definition == null) {
+            if (matrixHasCustomContent(inventory.getMatrix())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
+        handleCraftTake(definition, event, player, inventory);
+    }
+
+    private void handleCraftTake(JsonObject definition, InventoryClickEvent event, Player player, CraftingInventory inventory) {
+        boolean allowed = conditionsPass(definition, player) && ingredientsPass(definition, inventory);
         if (!allowed) {
             event.setCancelled(true);
             String denyMessage = ResourceJson.string(ResourceJson.object(definition, "conditions"), "denyMessage", "<red>No Permission");
@@ -164,14 +209,33 @@ public class RecipeModule implements Module, Listener {
         }
         ItemStack dynamic = dynamicOutput(definition, player);
         if (dynamic != null) {
-            event.getInventory().setResult(dynamic);
+            inventory.setResult(dynamic);
+        } else if (manualCraftingRecipe(definition)) {
+            inventory.setResult(item(ResourceJson.object(definition, "output")));
         }
-        Bukkit.getScheduler().runTask(context.getPlugin(), () -> consumeExtraIngredients(definition, event.getInventory()));
+        int crafts = craftAmount(definition, event, inventory);
+        if (crafts <= 0) {
+            event.setCancelled(true);
+            return;
+        }
+        ItemStack output = inventory.getResult();
+        if (output == null || output.getType() == Material.AIR) {
+            event.setCancelled(true);
+            return;
+        }
+        output = output.clone();
+        output.setAmount(output.getAmount() * crafts);
+        if (!deliverClickResult(event, player, output)) {
+            event.setCancelled(true);
+            return;
+        }
+        event.setCancelled(true);
+        consumeIngredients(definition, inventory, crafts);
+        player.updateInventory();
         Map<String, Object> vars = new HashMap<>();
         vars.put("event.recipe", recipeId(definition));
-        if (event.getInventory().getResult() != null) {
-            vars.put("event.output", event.getInventory().getResult());
-        }
+        vars.put("event.amount", crafts);
+        vars.put("event.output", output);
         dispatchFlow(definition, "crafted", player, event, vars);
     }
 
@@ -181,7 +245,7 @@ public class RecipeModule implements Module, Listener {
         if (definition == null || !(event.getView().getPlayer() instanceof Player player)) {
             return;
         }
-        if (!conditionsPass(definition, player) || !smithingIngredientsPass(definition, event.getInventory())) {
+        if (!conditionsPass(definition, player, false) || !smithingIngredientsPass(definition, event.getInventory())) {
             event.getInventory().setResult(null);
             return;
         }
@@ -307,7 +371,7 @@ public class RecipeModule implements Module, Listener {
         if (definition == null) {
             return;
         }
-        if (!conditionsPass(definition, event.getPlayer()) || !itemMatches(inputDefinition(definition), event.getStonecutterInventory().getInputItem())) {
+        if (!conditionsPass(definition, event.getPlayer(), false) || !itemMatches(inputDefinition(definition), event.getStonecutterInventory().getInputItem())) {
             event.setCancelled(true);
         }
     }
@@ -326,7 +390,25 @@ public class RecipeModule implements Module, Listener {
             event.setCancelled(true);
             return;
         }
-        Bukkit.getScheduler().runTask(context.getPlugin(), () -> consumeExtraStonecuttingInput(definition, inventory));
+        int amount = stonecuttingAmount(definition, event, inventory);
+        if (amount <= 0) {
+            event.setCancelled(true);
+            return;
+        }
+        ItemStack output = event.getCurrentItem();
+        if (output == null || output.getType() == Material.AIR) {
+            event.setCancelled(true);
+            return;
+        }
+        output = output.clone();
+        output.setAmount(output.getAmount() * amount);
+        if (!deliverClickResult(event, player, output)) {
+            event.setCancelled(true);
+            return;
+        }
+        event.setCancelled(true);
+        consumeStonecuttingInput(definition, inventory, amount);
+        player.updateInventory();
     }
 
     private Recipe createRecipe(JsonObject definition) {
@@ -439,6 +521,10 @@ public class RecipeModule implements Module, Listener {
     }
 
     private ItemStack item(JsonObject object) {
+        ItemStack referenced = referencedItem(object, Math.max(1, ResourceJson.integer(object, "amount", 1)));
+        if (referenced != null) {
+            return referenced;
+        }
         String contentId = contentId(object);
         if (!contentId.isBlank() && customContentService != null) {
             ItemStack custom = customContentService.createItem(contentId, Math.max(1, ResourceJson.integer(object, "amount", 1)));
@@ -467,6 +553,11 @@ public class RecipeModule implements Module, Listener {
                 if (choice.isJsonObject()) {
                     materials.addAll(choiceMaterials(choice.getAsJsonObject()));
                 } else {
+                    ItemStack referenced = referencedItem(choice.getAsString(), 1);
+                    if (referenced != null && referenced.getType() != Material.AIR) {
+                        materials.add(referenced.getType());
+                        continue;
+                    }
                     Material material = material(choice.getAsString());
                     if (material != Material.AIR) {
                         materials.add(material);
@@ -477,6 +568,10 @@ public class RecipeModule implements Module, Listener {
         }
         if (element.isJsonObject()) {
             JsonObject object = element.getAsJsonObject();
+            RecipeChoice referenceChoice = referenceChoice(object);
+            if (referenceChoice != null) {
+                return referenceChoice;
+            }
             ItemStack exact = exactChoiceItem(object);
             if (exact != null) {
                 return new RecipeChoice.ExactChoice(exact);
@@ -490,6 +585,10 @@ public class RecipeModule implements Module, Listener {
                 return new RecipeChoice.MaterialChoice(tagged.stream().toList());
             }
             return materialChoice(ResourceJson.string(object, "material", ResourceJson.string(object, "item", "AIR")));
+        }
+        ItemStack referenced = referencedItem(element.getAsString(), 1);
+        if (referenced != null) {
+            return referenced.getType() != Material.AIR ? new RecipeChoice.MaterialChoice(referenced.getType()) : null;
         }
         return materialChoice(element.getAsString());
     }
@@ -509,6 +608,11 @@ public class RecipeModule implements Module, Listener {
         return materials;
     }
 
+    private RecipeChoice referenceChoice(JsonObject object) {
+        ItemStack referenced = referencedItem(object, 1);
+        return referenced != null && referenced.getType() != Material.AIR ? new RecipeChoice.MaterialChoice(referenced.getType()) : null;
+    }
+
     private Set<Material> tagMaterials(String tagName) {
         if (tagName == null || tagName.isBlank()) {
             return Set.of();
@@ -522,6 +626,10 @@ public class RecipeModule implements Module, Listener {
     }
 
     private ItemStack exactChoiceItem(JsonObject object) {
+        ItemStack referenced = referencedItem(object, 1);
+        if (referenced != null) {
+            return referenced;
+        }
         String contentId = contentId(object);
         if (!contentId.isBlank() && customContentService != null) {
             return customContentService.createItem(contentId, 1);
@@ -529,9 +637,50 @@ public class RecipeModule implements Module, Listener {
         return providerItem(object, 1);
     }
 
+    private ItemStack referencedItem(JsonObject object, int amount) {
+        String reference = itemReference(object);
+        if (reference.isBlank()) {
+            String contentId = contentId(object);
+            if (!contentId.isBlank()) {
+                reference = "content:" + contentId;
+            }
+        }
+        if (reference.isBlank()) {
+            String provider = ResourceJson.string(object, "provider", "");
+            String externalId = ResourceJson.string(object, "externalId", ResourceJson.string(object, "external_id", ResourceJson.string(object, "nexo", "")));
+            if (provider.isBlank() && !externalId.isBlank()) {
+                provider = "nexo";
+            }
+            if (!provider.isBlank() && !externalId.isBlank()) {
+                reference = "provider:" + provider + ':' + externalId;
+            }
+        }
+        return !reference.isBlank() ? referencedItem(reference, amount) : null;
+    }
+
+    private ItemStack referencedItem(String reference, int amount) {
+        if (customContentService == null || reference == null || reference.isBlank()) {
+            return null;
+        }
+        return customContentService.createReferencedItem(reference, Math.max(1, amount));
+    }
+
+    private String itemReference(JsonObject object) {
+        String reference = ResourceJson.string(object, "reference", ResourceJson.string(object, "ref", ""));
+        if (!reference.isBlank()) {
+            return reference;
+        }
+        String item = ResourceJson.string(object, "item", "");
+        if (isCustomItemReference(item)) {
+            return item;
+        }
+        String material = ResourceJson.string(object, "material", "");
+        return isCustomItemReference(material) ? material : "";
+    }
+
     private ItemStack providerItem(JsonObject object, int amount) {
         String provider = ResourceJson.string(object, "provider", "");
-        String externalId = ResourceJson.string(object, "externalId", ResourceJson.string(object, "nexo", ""));
+        String externalId = ResourceJson.string(object, "externalId", ResourceJson.string(object, "external_id", ResourceJson.string(object, "nexo", "")));
         if (provider.isBlank() && !externalId.isBlank()) {
             provider = "nexo";
         }
@@ -559,6 +708,10 @@ public class RecipeModule implements Module, Listener {
     }
 
     private boolean conditionsPass(JsonObject definition, Player player) {
+        return conditionsPass(definition, player, true);
+    }
+
+    private boolean conditionsPass(JsonObject definition, Player player, boolean commitCooldown) {
         JsonObject conditions = ResourceJson.object(definition, "conditions");
         if (player == null) {
             return !ResourceJson.bool(conditions, "requiresPlayer", false);
@@ -594,7 +747,7 @@ public class RecipeModule implements Module, Listener {
             return false;
         }
         int cooldownSeconds = ResourceJson.integer(conditions, "cooldownSeconds", 0);
-        if (cooldownSeconds > 0 && !cooldownReady(recipeId(definition), player, cooldownSeconds)) {
+        if (cooldownSeconds > 0 && !cooldownReady(recipeId(definition), player, cooldownSeconds, commitCooldown)) {
             return false;
         }
         String biome = ResourceJson.string(conditions, "biome", "");
@@ -716,8 +869,12 @@ public class RecipeModule implements Module, Listener {
             return true;
         }
         if (!requirement.isJsonObject()) {
+            String reference = requirement.getAsString();
+            if (isCustomItemReference(reference)) {
+                return customContentService.matchesItemReference(item, reference);
+            }
             String identified = customContentService.identifyItem(item);
-            return requirement.getAsString().equalsIgnoreCase(identified);
+            return reference.equalsIgnoreCase(identified);
         }
         JsonObject object = requirement.getAsJsonObject();
         if (!object.has("amount")) {
@@ -808,6 +965,79 @@ public class RecipeModule implements Module, Listener {
         return definitionFor(recipes.get(index));
     }
 
+    private JsonObject matchingManualCraftingDefinition(Player player, CraftingInventory inventory) {
+        for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
+            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
+            if (!ResourceJson.bool(definition, "enabled", true) || !manualCraftingRecipe(definition)) {
+                continue;
+            }
+            if (conditionsPass(definition, player, false) && ingredientsPass(definition, inventory)) {
+                return definition;
+            }
+        }
+        return null;
+    }
+
+    private boolean manualCraftingRecipe(JsonObject definition) {
+        String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
+        if (!"shaped".equals(type) && !"shapeless".equals(type)) {
+            return false;
+        }
+        if ("shapeless".equals(type)) {
+            for (JsonElement element : ingredients(definition)) {
+                if (customIngredientReference(element)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        JsonObject keys = ResourceJson.object(definition, "keys");
+        if (keys == null) {
+            return false;
+        }
+        for (String key : keys.keySet()) {
+            if (customIngredientReference(keys.get(key))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean customIngredientReference(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
+        if (element.isJsonArray()) {
+            for (JsonElement child : element.getAsJsonArray()) {
+                if (customIngredientReference(child)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!element.isJsonObject()) {
+            return isCustomItemReference(element.getAsString());
+        }
+        JsonObject object = element.getAsJsonObject();
+        if (!itemReference(object).isBlank() || !contentId(object).isBlank()) {
+            return true;
+        }
+        String externalId = ResourceJson.string(object, "externalId", ResourceJson.string(object, "external_id", ResourceJson.string(object, "nexo", "")));
+        return !externalId.isBlank();
+    }
+
+    private boolean matrixHasCustomContent(ItemStack[] matrix) {
+        if (customContentService == null) {
+            return false;
+        }
+        for (ItemStack item : matrix) {
+            if (item != null && item.getType() != Material.AIR && customContentService.identifyItem(item) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private JsonObject matchingCampfireDefinition(ItemStack item, Player player, String worldName) {
         for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
             JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
@@ -890,22 +1120,135 @@ public class RecipeModule implements Module, Listener {
         return required.isEmpty();
     }
 
-    private void consumeExtraIngredients(JsonObject definition, CraftingInventory inventory) {
-        String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
-        ItemStack[] matrix = inventory.getMatrix();
-        boolean changed = "shapeless".equals(type) ? consumeShapelessExtraIngredients(definition, matrix) : consumeShapedExtraIngredients(definition, matrix);
-        if (changed) {
-            inventory.setMatrix(matrix);
+    private int craftAmount(JsonObject definition, InventoryClickEvent event, CraftingInventory inventory) {
+        int maxCrafts = maxCrafts(definition, inventory);
+        if (maxCrafts <= 0) {
+            return 0;
         }
+        ItemStack result = inventory.getResult();
+        if (result == null || result.getType() == Material.AIR) {
+            return 0;
+        }
+        ClickType click = event.getClick();
+        if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+            return Math.min(maxCrafts, roomForResult(event, result));
+        }
+        if (click == ClickType.NUMBER_KEY) {
+            return hotbarCanTake(event, result) ? 1 : 0;
+        }
+        if (click == ClickType.DROP || click == ClickType.CONTROL_DROP || click == ClickType.WINDOW_BORDER_LEFT || click == ClickType.WINDOW_BORDER_RIGHT) {
+            return 1;
+        }
+        ItemStack cursor = event.getCursor();
+        if (cursor == null || cursor.getType() == Material.AIR) {
+            return 1;
+        }
+        return cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize() ? 1 : 0;
     }
 
-    private boolean consumeShapedExtraIngredients(JsonObject definition, ItemStack[] matrix) {
+    private boolean deliverClickResult(InventoryClickEvent event, Player player, ItemStack output) {
+        ClickType click = event.getClick();
+        if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+            return player.getInventory().addItem(output).isEmpty();
+        }
+        if (click == ClickType.NUMBER_KEY) {
+            int button = event.getHotbarButton();
+            if (button < 0 || button > 8) {
+                return false;
+            }
+            ItemStack item = player.getInventory().getItem(button);
+            if (item == null || item.getType() == Material.AIR) {
+                player.getInventory().setItem(button, output);
+                return true;
+            }
+            if (!item.isSimilar(output) || item.getAmount() + output.getAmount() > item.getMaxStackSize()) {
+                return false;
+            }
+            item.setAmount(item.getAmount() + output.getAmount());
+            return true;
+        }
+        if (click == ClickType.DROP || click == ClickType.CONTROL_DROP || click == ClickType.WINDOW_BORDER_LEFT || click == ClickType.WINDOW_BORDER_RIGHT) {
+            player.getWorld().dropItemNaturally(player.getLocation(), output);
+            return true;
+        }
+        ItemStack cursor = event.getCursor();
+        if (cursor == null || cursor.getType() == Material.AIR) {
+            player.setItemOnCursor(output);
+            return true;
+        }
+        if (!cursor.isSimilar(output) || cursor.getAmount() + output.getAmount() > cursor.getMaxStackSize()) {
+            return false;
+        }
+        cursor.setAmount(cursor.getAmount() + output.getAmount());
+        player.setItemOnCursor(cursor);
+        return true;
+    }
+
+    private int maxCrafts(JsonObject definition, CraftingInventory inventory) {
+        ItemStack[] matrix = inventory.getMatrix();
+        List<IngredientUse> uses = ingredientUses(definition, matrix);
+        if (uses.isEmpty()) {
+            return 0;
+        }
+        int crafts = Integer.MAX_VALUE;
+        for (IngredientUse use : uses) {
+            ItemStack item = matrix[use.slot()];
+            if (item == null || item.getType() == Material.AIR || use.amount() <= 0) {
+                return 0;
+            }
+            crafts = Math.min(crafts, item.getAmount() / use.amount());
+        }
+        return crafts == Integer.MAX_VALUE ? 0 : crafts;
+    }
+
+    private int roomForResult(InventoryClickEvent event, ItemStack result) {
+        Inventory bottom = event.getView().getBottomInventory();
+        int room = 0;
+        for (ItemStack item : bottom.getStorageContents()) {
+            if (item == null || item.getType() == Material.AIR) {
+                room += result.getMaxStackSize();
+            } else if (item.isSimilar(result)) {
+                room += Math.max(0, item.getMaxStackSize() - item.getAmount());
+            }
+        }
+        return room / Math.max(1, result.getAmount());
+    }
+
+    private boolean hotbarCanTake(InventoryClickEvent event, ItemStack result) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return false;
+        }
+        int button = event.getHotbarButton();
+        if (button < 0 || button > 8) {
+            return false;
+        }
+        ItemStack item = player.getInventory().getItem(button);
+        return item == null || item.getType() == Material.AIR || item.isSimilar(result) && item.getAmount() + result.getAmount() <= item.getMaxStackSize();
+    }
+
+    private void consumeIngredients(JsonObject definition, CraftingInventory inventory, int crafts) {
+        if (crafts <= 0) {
+            return;
+        }
+        ItemStack[] matrix = inventory.getMatrix();
+        for (IngredientUse use : ingredientUses(definition, matrix)) {
+            consumeAmount(matrix, use.slot(), use.amount() * crafts);
+        }
+        inventory.setMatrix(matrix);
+    }
+
+    private List<IngredientUse> ingredientUses(JsonObject definition, ItemStack[] matrix) {
+        String type = ResourceJson.string(definition, "type", "shaped").toLowerCase(Locale.ROOT);
+        return "shapeless".equals(type) ? shapelessIngredientUses(definition, matrix) : shapedIngredientUses(definition, matrix);
+    }
+
+    private List<IngredientUse> shapedIngredientUses(JsonObject definition, ItemStack[] matrix) {
         JsonArray shape = definition.has("shape") && definition.get("shape").isJsonArray() ? definition.getAsJsonArray("shape") : new JsonArray();
         JsonObject keys = ResourceJson.object(definition, "keys");
         if (shape.isEmpty() || keys == null) {
-            return false;
+            return List.of();
         }
-        boolean changed = false;
+        List<IngredientUse> uses = new ArrayList<>();
         for (int row = 0; row < Math.min(3, shape.size()); row++) {
             String line = shape.get(row).getAsString();
             for (int column = 0; column < Math.min(3, line.length()); column++) {
@@ -915,20 +1258,20 @@ public class RecipeModule implements Module, Listener {
                 }
                 JsonElement ingredient = keys.get(String.valueOf(symbol));
                 int index = row * 3 + column;
-                if (ingredient != null && index < matrix.length && consumeExtra(matrix, index, ingredient)) {
-                    changed = true;
+                if (ingredient != null && index < matrix.length && itemMatches(ingredient, matrix[index])) {
+                    uses.add(new IngredientUse(index, matchedAmount(ingredient, matrix[index])));
                 }
             }
         }
-        return changed;
+        return uses;
     }
 
-    private boolean consumeShapelessExtraIngredients(JsonObject definition, ItemStack[] matrix) {
+    private List<IngredientUse> shapelessIngredientUses(JsonObject definition, ItemStack[] matrix) {
         List<JsonElement> required = new ArrayList<>();
         for (JsonElement element : ingredients(definition)) {
             required.add(element);
         }
-        boolean changed = false;
+        List<IngredientUse> uses = new ArrayList<>();
         for (int index = 0; index < matrix.length; index++) {
             ItemStack item = matrix[index];
             if (item == null || item.getType() == Material.AIR) {
@@ -943,12 +1286,26 @@ public class RecipeModule implements Module, Listener {
             }
             if (match >= 0) {
                 JsonElement ingredient = required.remove(match);
-                if (consumeExtra(matrix, index, ingredient)) {
-                    changed = true;
-                }
+                uses.add(new IngredientUse(index, matchedAmount(ingredient, item)));
             }
         }
-        return changed;
+        return required.isEmpty() ? uses : List.of();
+    }
+
+    private void consumeAmount(ItemStack[] matrix, int index, int amount) {
+        if (amount <= 0 || index < 0 || index >= matrix.length) {
+            return;
+        }
+        ItemStack item = matrix[index];
+        if (item == null || item.getType() == Material.AIR) {
+            return;
+        }
+        int nextAmount = item.getAmount() - amount;
+        if (nextAmount <= 0) {
+            matrix[index] = null;
+        } else {
+            item.setAmount(nextAmount);
+        }
     }
 
     private void consumeExtraSmithingIngredients(JsonObject definition, SmithingInventory inventory) {
@@ -965,8 +1322,51 @@ public class RecipeModule implements Module, Listener {
         inventory.setSmelting(consumedExtra(inventory.getSmelting(), inputDefinition(definition)));
     }
 
-    private void consumeExtraStonecuttingInput(JsonObject definition, StonecutterInventory inventory) {
-        inventory.setInputItem(consumedExtra(inventory.getInputItem(), inputDefinition(definition)));
+    private int stonecuttingAmount(JsonObject definition, InventoryClickEvent event, StonecutterInventory inventory) {
+        ItemStack input = inventory.getInputItem();
+        JsonElement ingredient = inputDefinition(definition);
+        if (!itemMatches(ingredient, input)) {
+            return 0;
+        }
+        int perCraft = matchedAmount(ingredient, input);
+        if (perCraft <= 0) {
+            return 0;
+        }
+        int maxCrafts = input.getAmount() / perCraft;
+        if (maxCrafts <= 0) {
+            return 0;
+        }
+        ItemStack result = event.getCurrentItem();
+        if (result == null || result.getType() == Material.AIR) {
+            return 0;
+        }
+        ClickType click = event.getClick();
+        if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+            return Math.min(maxCrafts, roomForResult(event, result));
+        }
+        if (click == ClickType.NUMBER_KEY) {
+            return hotbarCanTake(event, result) ? 1 : 0;
+        }
+        ItemStack cursor = event.getCursor();
+        if (cursor == null || cursor.getType() == Material.AIR) {
+            return 1;
+        }
+        return cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize() ? 1 : 0;
+    }
+
+    private void consumeStonecuttingInput(JsonObject definition, StonecutterInventory inventory, int crafts) {
+        ItemStack input = inventory.getInputItem();
+        int amount = matchedAmount(inputDefinition(definition), input) * crafts;
+        if (input == null || input.getType() == Material.AIR || amount <= 0) {
+            return;
+        }
+        int nextAmount = input.getAmount() - amount;
+        if (nextAmount <= 0) {
+            inventory.setInputItem(null);
+        } else {
+            input.setAmount(nextAmount);
+            inventory.setInputItem(input);
+        }
     }
 
     private void consumeCampfireExtra(Player player, EquipmentSlot hand, Location location, ItemStack before, int amount) {
@@ -1004,21 +1404,6 @@ public class RecipeModule implements Module, Listener {
         }
         item.setAmount(amount);
         return item;
-    }
-
-    private boolean consumeExtra(ItemStack[] matrix, int index, JsonElement ingredient) {
-        int extra = Math.max(0, matchedAmount(ingredient, matrix[index]) - 1);
-        if (extra == 0) {
-            return false;
-        }
-        ItemStack item = matrix[index];
-        int amount = item.getAmount() - extra;
-        if (amount <= 0) {
-            matrix[index] = null;
-        } else {
-            item.setAmount(amount);
-        }
-        return true;
     }
 
     private int matchedAmount(JsonElement element, ItemStack item) {
@@ -1086,9 +1471,17 @@ public class RecipeModule implements Module, Listener {
             return false;
         }
         if (!element.isJsonObject()) {
-            return item.getType() == material(element.getAsString());
+            String reference = element.getAsString();
+            if (isCustomItemReference(reference) && customContentService != null) {
+                return customContentService.matchesItemReference(item, reference);
+            }
+            return item.getType() == material(reference);
         }
         JsonObject object = element.getAsJsonObject();
+        String reference = itemReference(object);
+        if (!reference.isBlank() && customContentService != null && !customContentService.matchesItemReference(item, reference)) {
+            return false;
+        }
         String contentId = contentId(object);
         if (!contentId.isBlank() && customContentService != null) {
             String identified = customContentService.identifyItem(item);
@@ -1096,7 +1489,19 @@ public class RecipeModule implements Module, Listener {
                 return false;
             }
         }
+        String provider = ResourceJson.string(object, "provider", "");
+        String externalId = ResourceJson.string(object, "externalId", ResourceJson.string(object, "external_id", ResourceJson.string(object, "nexo", "")));
+        if (provider.isBlank() && !externalId.isBlank()) {
+            provider = "nexo";
+        }
+        if (!provider.isBlank() && !externalId.isBlank() && customContentService != null
+            && !customContentService.matchesItemReference(item, "provider:" + provider + ':' + externalId)) {
+            return false;
+        }
         String materialName = ResourceJson.string(object, "material", ResourceJson.string(object, "item", ""));
+        if (isCustomItemReference(materialName)) {
+            materialName = "";
+        }
         if (!materialName.isBlank() && item.getType() != material(materialName)) {
             return false;
         }
@@ -1183,13 +1588,19 @@ public class RecipeModule implements Module, Listener {
     }
 
     private boolean cooldownReady(String recipeId, Player player, int seconds) {
+        return cooldownReady(recipeId, player, seconds, true);
+    }
+
+    private boolean cooldownReady(String recipeId, Player player, int seconds, boolean commit) {
         String key = recipeId + ':' + player.getUniqueId();
         long now = System.currentTimeMillis();
         long readyAt = cooldowns.getOrDefault(key, 0L);
         if (readyAt > now) {
             return false;
         }
-        cooldowns.put(key, now + seconds * 1000L);
+        if (commit) {
+            cooldowns.put(key, now + seconds * 1000L);
+        }
         return true;
     }
 
@@ -1260,6 +1671,14 @@ public class RecipeModule implements Module, Listener {
         return ResourceJson.string(object, "contentId", ResourceJson.string(object, "customContentId", ResourceJson.string(object, "customContent", "")));
     }
 
+    private boolean isCustomItemReference(String reference) {
+        if (reference == null) {
+            return false;
+        }
+        String normalized = reference.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("content:") || normalized.startsWith("provider:");
+    }
+
     private NamespacedKey namespacedKey(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -1293,5 +1712,8 @@ public class RecipeModule implements Module, Listener {
     private NamespacedKey key(JsonObject definition) {
         String id = ResourceJson.string(definition, "id", "recipe");
         return new NamespacedKey(context.getPlugin(), id.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_"));
+    }
+
+    private record IngredientUse(int slot, int amount) {
     }
 }

@@ -116,7 +116,7 @@ public class CustomContentService {
             String label = definition.getDisplayName() != null && !definition.getDisplayName().isBlank()
                 ? definition.getDisplayName()
                 : definition.getId();
-            items.add(new OptionCatalogItem(value, label, contentType, "", "ReSync", Map.of()));
+            items.add(new OptionCatalogItem(value, label, contentType, "", "ReSync", ItemStackPreviewMetadata.fromDefinition(this, definition)));
         }
         CustomContentProvider nexo = providers.get("nexo");
         if (nexo instanceof NexoContentProvider nexoProvider && nexoProvider.isAvailable()) {
@@ -124,6 +124,7 @@ public class CustomContentService {
             providerIds.addAll(nexoProvider.itemIds());
             providerIds.addAll(nexoProvider.armorIds());
             providerIds.addAll(nexoProvider.blockIds());
+            providerIds.addAll(nexoProvider.furnitureIds());
             for (String externalId : providerIds) {
                 if (externalId == null || externalId.isBlank()) {
                     continue;
@@ -132,7 +133,8 @@ public class CustomContentService {
                 if (!values.add(value)) {
                     continue;
                 }
-                items.add(new OptionCatalogItem(value, externalId, "", "", "Providers", Map.of()));
+                ItemStack previewStack = nexoProvider.createExternalItem(externalId, 1);
+                items.add(new OptionCatalogItem(value, externalId, "", "", "Providers", ItemStackPreviewMetadata.fromStack(previewStack)));
             }
         }
         for (Material material : Material.values()) {
@@ -211,10 +213,9 @@ public class CustomContentService {
         if (reference.startsWith("content:")) {
             return createItem(reference.substring("content:".length()), amount);
         }
-        if (reference.startsWith("provider:nexo:")) {
-            ensureNexoProvider();
-            CustomContentProvider provider = providers.get("nexo");
-            return provider instanceof NexoContentProvider nexo ? nexo.createExternalItem(reference.substring("provider:nexo:".length()), amount) : null;
+        ProviderReference providerReference = parseProviderReference(reference);
+        if (providerReference != null) {
+            return createProviderReferencedItem(providerReference, amount);
         }
         Material material = Material.matchMaterial(reference);
         return material != null && material.isItem() && !material.isAir() ? new ItemStack(material, Math.max(1, amount)) : null;
@@ -227,10 +228,9 @@ public class CustomContentService {
         if (reference.startsWith("content:")) {
             return reference.substring("content:".length()).equalsIgnoreCase(identifyItem(item));
         }
-        if (reference.startsWith("provider:nexo:")) {
-            ensureNexoProvider();
-            CustomContentProvider provider = providers.get("nexo");
-            return provider instanceof NexoContentProvider nexo && nexo.matchesExternalItem(item, reference.substring("provider:nexo:".length()));
+        ProviderReference providerReference = parseProviderReference(reference);
+        if (providerReference != null) {
+            return matchesProviderItemReference(item, providerReference);
         }
         Material material = Material.matchMaterial(reference);
         return material != null && item.getType() == material;
@@ -243,13 +243,75 @@ public class CustomContentService {
         if (reference.startsWith("content:")) {
             return reference.substring("content:".length()).equalsIgnoreCase(identifyBlock(location));
         }
-        if (reference.startsWith("provider:nexo:")) {
-            ensureNexoProvider();
-            CustomContentProvider provider = providers.get("nexo");
-            return provider instanceof NexoContentProvider nexo && nexo.matchesExternalBlock(location, reference.substring("provider:nexo:".length()));
+        ProviderReference providerReference = parseProviderReference(reference);
+        if (providerReference != null) {
+            return matchesProviderBlockReference(location, providerReference);
         }
         Material material = Material.matchMaterial(reference);
         return material != null && location.getBlock().getType() == material;
+    }
+
+    private ItemStack createProviderReferencedItem(ProviderReference reference, int amount) {
+        if (reference == null) {
+            return null;
+        }
+        ensureProvider(reference.providerId());
+        CustomContentProvider provider = providers.get(reference.providerId().toLowerCase(Locale.ROOT));
+        if (provider instanceof NexoContentProvider nexo && nexo.isAvailable()) {
+            return nexo.createExternalItem(reference.externalId(), amount);
+        }
+        return null;
+    }
+
+    private boolean matchesProviderItemReference(ItemStack item, ProviderReference reference) {
+        if (reference == null) {
+            return false;
+        }
+        ensureProvider(reference.providerId());
+        CustomContentProvider provider = providers.get(reference.providerId().toLowerCase(Locale.ROOT));
+        return provider instanceof NexoContentProvider nexo
+            && nexo.isAvailable()
+            && nexo.matchesExternalItem(item, reference.externalId());
+    }
+
+    private boolean matchesProviderBlockReference(Location location, ProviderReference reference) {
+        if (reference == null) {
+            return false;
+        }
+        ensureProvider(reference.providerId());
+        CustomContentProvider provider = providers.get(reference.providerId().toLowerCase(Locale.ROOT));
+        return provider instanceof NexoContentProvider nexo
+            && nexo.isAvailable()
+            && nexo.matchesExternalBlock(location, reference.externalId());
+    }
+
+    private ProviderReference parseProviderReference(String reference) {
+        if (reference == null || !reference.startsWith("provider:")) {
+            return null;
+        }
+        String remainder = reference.substring("provider:".length());
+        int split = remainder.indexOf(':');
+        if (split <= 0 || split >= remainder.length() - 1) {
+            return null;
+        }
+        String providerId = remainder.substring(0, split);
+        String externalId = remainder.substring(split + 1);
+        if (providerId.isBlank() || externalId.isBlank()) {
+            return null;
+        }
+        return new ProviderReference(providerId, externalId);
+    }
+
+    private void ensureProvider(String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return;
+        }
+        if ("nexo".equalsIgnoreCase(providerId)) {
+            ensureNexoProvider();
+        }
+    }
+
+    private record ProviderReference(String providerId, String externalId) {
     }
 
     public String identifyItem(ItemStack item) {

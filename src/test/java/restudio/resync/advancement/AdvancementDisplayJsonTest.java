@@ -16,6 +16,14 @@ class AdvancementDisplayJsonTest {
     }
 
     @Test
+    void normalizesBlockBackgroundTexturePath() {
+        assertEquals(
+            "minecraft:block/sand",
+            AdvancementDisplayJson.background("minecraft:textures/block/sand.png")
+        );
+    }
+
+    @Test
     void wrapsPlainTitleInTextComponent() {
         var component = AdvancementDisplayJson.textComponent(JsonParser.parseString("\"Hello\""));
         assertTrue(component.isJsonObject());

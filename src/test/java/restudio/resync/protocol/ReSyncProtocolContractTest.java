@@ -20,8 +20,8 @@ class ReSyncProtocolContractTest {
         assertEquals(0x35, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE_ACK);
         assertEquals(0x36, ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_REQUEST);
         assertEquals(0x44, ReSyncProtocolContract.FLOW_PACKET_JOB);
-        assertEquals(0xAD, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_REQUEST);
-        assertEquals(0xB3, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK);
+        assertEquals((byte) 0xAD, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_REQUEST);
+        assertEquals((byte) 0xB3, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK);
     }
 
     @Test

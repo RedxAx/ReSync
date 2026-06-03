@@ -31,6 +31,12 @@ final class AdvancementDisplayJson {
         if (value.regionMatches(true, 0, prefix, 0, prefix.length())) {
             value = value.substring(prefix.length());
         }
+        if (value.regionMatches(true, 0, "minecraft:textures/", 0, "minecraft:textures/".length())) {
+            value = "minecraft:" + value.substring("minecraft:textures/".length());
+        }
+        if (value.regionMatches(true, 0, "textures/", 0, "textures/".length())) {
+            value = value.substring("textures/".length());
+        }
         if (value.endsWith(".png")) {
             value = value.substring(0, value.length() - 4);
         }

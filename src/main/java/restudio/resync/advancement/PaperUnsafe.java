@@ -9,7 +9,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-final class PaperUnsafe {
+public final class PaperUnsafe {
     private static volatile boolean resolved;
     private static Method loadAdvancement;
     private static Method loadAdvancementPersist;
@@ -25,7 +25,7 @@ final class PaperUnsafe {
         return loadAdvancement != null && removeAdvancement != null;
     }
 
-    static boolean serializeItemAsJsonSupported() {
+    public static boolean serializeItemAsJsonSupported() {
         resolve();
         return serializeItemAsJson != null;
     }
@@ -70,7 +70,7 @@ final class PaperUnsafe {
         }
     }
 
-    static JsonObject serializeItemAsJson(ItemStack item) {
+    public static JsonObject serializeItemAsJson(ItemStack item) {
         resolve();
         require(serializeItemAsJson, "serializeItemAsJson");
         try {

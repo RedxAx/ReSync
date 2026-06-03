@@ -10,6 +10,7 @@ import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import restudio.resync.Log;
 import restudio.resync.customcontent.CustomContentService;
 
 import java.util.ArrayList;
@@ -212,8 +213,9 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
         if (item != null && !item.getType().isAir()) {
             return AdvancementIconJson.fromResolved(item);
         }
-        if (reference.startsWith("content:") || reference.startsWith("provider:")) {
-            throw new IllegalArgumentException("Unknown advancement icon " + reference);
+        if (reference != null && (reference.startsWith("content:") || reference.startsWith("provider:"))) {
+            Log.warn("Unresolved advancement icon " + reference + ", using stone fallback");
+            return AdvancementIconJson.fromReference("minecraft:stone");
         }
         return AdvancementIconJson.fromReference(reference);
     }

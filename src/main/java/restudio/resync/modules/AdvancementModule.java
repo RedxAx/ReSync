@@ -44,6 +44,7 @@ import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.advancement.AdvancementRuntimeBridge;
@@ -105,12 +106,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     @Override
     public void start(ModuleContext context) {
         Bukkit.getPluginManager().registerEvents(this, context.getPlugin());
-        Map<String, JsonObject> trees = trees(null, null);
-        if (!trees.isEmpty() && bridge.supported()) {
-            validator.validate(trees);
-            bridge.replace(trees);
-            Bukkit.getOnlinePlayers().forEach(player -> sync(player, trees));
-        }
+        reloadAdvancements();
+        Bukkit.getScheduler().runTaskLater(context.getPlugin(), this::reloadAdvancements, 40L);
         pollingTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> Bukkit.getOnlinePlayers().forEach(player -> {
             dispatch(player, "held_item", null, Map.of("event.item", player.getInventory().getItemInMainHand()));
             dispatch(player, "permission", null, Map.of());
@@ -165,6 +162,16 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         sync(event.getPlayer(), trees(null, null));
+    }
+
+    @EventHandler
+    public void onPluginEnable(PluginEnableEvent event) {
+        if (plugin == null || !bridge.supported()) {
+            return;
+        }
+        if ("Nexo".equalsIgnoreCase(event.getPlugin().getName())) {
+            Bukkit.getScheduler().runTask(plugin, this::reloadAdvancements);
+        }
     }
 
     @EventHandler
@@ -466,6 +473,19 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private void sync(Player player, Map<String, JsonObject> trees) {
         fingerprints.reconcile(player, trees);
         bridge.sync(player);
+    }
+
+    private void reloadAdvancements() {
+        if (!bridge.supported()) {
+            return;
+        }
+        Map<String, JsonObject> trees = trees(null, null);
+        if (trees.isEmpty()) {
+            return;
+        }
+        validator.validate(trees);
+        replaceSynchronously(trees);
+        Bukkit.getOnlinePlayers().forEach(player -> sync(player, trees));
     }
 
     private void replaceSynchronously(Map<String, JsonObject> trees) {

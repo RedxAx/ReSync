@@ -63,6 +63,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.text.ReTextService;
 
@@ -1634,15 +1635,24 @@ public class RecipeModule implements Module, Listener {
 
     private boolean flowPredicate(JsonObject definition, Player player) {
         String flowId = ResourceJson.string(ResourceJson.object(definition, "conditions"), "flowPredicate", "");
-        if (flowId.isBlank() || flowStorage == null || flowExecutor == null) {
-            return true;
-        }
+        JsonObject conditions = ResourceJson.object(definition, "conditions");
         Map<String, Object> vars = new HashMap<>();
         vars.put("event.recipe", recipeId(definition));
-        return FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
+        boolean flowPass = true;
+        if (!flowId.isBlank() && flowStorage != null && flowExecutor != null) {
+            flowPass = FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
+        }
+        return flowPass && FunctionCallSupport.evaluate(flowStorage, flowExecutor, ResourceJson.object(conditions, "predicate"), player, null, vars);
     }
 
     private void dispatchFlow(JsonObject definition, String trigger, Player player, Event event, Map<String, Object> vars) {
+        Map<String, Object> eventVars = new HashMap<>();
+        if (vars != null) {
+            eventVars.putAll(vars);
+        }
+        eventVars.put("event.trigger", "recipe_" + trigger);
+        FunctionCallSupport.execute(flowStorage, flowExecutor, ResourceJson.object(definition, trigger + "Action"), player, event, eventVars);
+        FunctionCallSupport.execute(flowStorage, flowExecutor, ResourceJson.object(definition, trigger + "Function"), player, event, eventVars);
         String flowId = ResourceJson.string(definition, trigger + "Flow", ResourceJson.string(definition, "flowId", ""));
         if (flowId.isBlank() || flowStorage == null || flowExecutor == null) {
             return;
@@ -1651,11 +1661,6 @@ public class RecipeModule implements Module, Listener {
         if (graph == null) {
             return;
         }
-        Map<String, Object> eventVars = new HashMap<>();
-        if (vars != null) {
-            eventVars.putAll(vars);
-        }
-        eventVars.put("event.trigger", "recipe_" + trigger);
         flowExecutor.execute(graph, findStartNode(graph), player, event, eventVars);
     }
 

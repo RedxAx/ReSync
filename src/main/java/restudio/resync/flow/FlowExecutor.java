@@ -93,6 +93,33 @@ public class FlowExecutor {
             .thenApply(v -> runtime.getNodeOutput(outputNodeId, outputPin));
     }
 
+    public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
+                                                                  Map<String, Object> inputs, Map<String, Object> eventVars) {
+        if (functionGraph == null || !functionGraph.isFunction()) {
+            return CompletableFuture.completedFuture(Map.of());
+        }
+        FlowGraph callable = FlowSerializer.deserialize(FlowSerializer.serialize(functionGraph));
+        FlowRuntime runtime = new FlowRuntime(new FlowGraph(), typeAdapter, globalVariables, eventVars);
+        String callerNodeId = "__function_call";
+        runtime.callFunction(callable, callerNodeId, inputs != null ? inputs : Map.of());
+        String startNodeId = runtime.findFunctionStartNodeId();
+        CompletableFuture<Void> future = startNodeId == null ? CompletableFuture.completedFuture(null) : execute(runtime, startNodeId, player, event, 0);
+        return future.thenApply(v -> {
+            while (runtime.getCallDepth() > 0) {
+                runtime.returnFromFunction(Collections.emptyMap());
+            }
+            Map<String, Object> outputs = new HashMap<>();
+            if (callable.getFunctionOutputs() != null) {
+                for (FlowGraph.FunctionParameter output : callable.getFunctionOutputs()) {
+                    if (output != null && output.getName() != null && !output.getName().isBlank()) {
+                        outputs.put(output.getName(), runtime.getNodeOutput(callerNodeId, output.getName()));
+                    }
+                }
+            }
+            return outputs;
+        }).whenComplete((result, ex) -> runtime.cleanupThreadLocals());
+    }
+
     public void addExecutionListener(FlowExecutionListener listener) {
         if (listener != null) {
             executionListeners.add(listener);

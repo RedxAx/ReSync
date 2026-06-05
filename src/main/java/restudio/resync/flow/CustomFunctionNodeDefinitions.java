@@ -59,7 +59,7 @@ public final class CustomFunctionNodeDefinitions {
                 if (param == null || param.getName() == null || param.getName().isBlank()) {
                     continue;
                 }
-                builder.input(param.getName(), NodeDefinition.PinType.DATA, normalizeType(param.getType()));
+                builder.input(parameterPin(param, NodeDefinition.PinDirection.INPUT));
             }
         }
 
@@ -71,7 +71,7 @@ public final class CustomFunctionNodeDefinitions {
                 if (param == null || param.getName() == null || param.getName().isBlank()) {
                     continue;
                 }
-                builder.output(param.getName(), NodeDefinition.PinType.DATA, normalizeType(param.getType()));
+                builder.output(parameterPin(param, NodeDefinition.PinDirection.OUTPUT));
             }
         }
 
@@ -112,5 +112,30 @@ public final class CustomFunctionNodeDefinitions {
             return FlowDataType.ANY;
         }
         return type;
+    }
+
+    private static NodeDefinition.PinDefinition parameterPin(FlowGraph.FunctionParameter parameter, NodeDefinition.PinDirection direction) {
+        NodeDefinition.PinBuilder builder = new NodeDefinition.PinBuilder(parameter.getName(), NodeDefinition.PinType.DATA, direction, normalizeType(parameter.getType()));
+        NodeDefinition.WidgetType widget = widget(parameter.getWidget(), parameter.getOptionsSource());
+        if (widget != null) {
+            builder.widget(widget);
+        }
+        if (parameter.getOptionsSource() != null && !parameter.getOptionsSource().isBlank()) {
+            builder.optionsSource(parameter.getOptionsSource());
+        }
+        if (parameter.getDefaultValue() != null && !parameter.getDefaultValue().isBlank()) {
+            builder.defaultValue(parameter.getDefaultValue());
+        }
+        return builder.build();
+    }
+
+    private static NodeDefinition.WidgetType widget(String widget, String optionsSource) {
+        if (widget != null && !widget.isBlank()) {
+            try {
+                return NodeDefinition.WidgetType.valueOf(widget.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return optionsSource != null && !optionsSource.isBlank() ? NodeDefinition.WidgetType.SEARCHABLE_LIST : null;
     }
 }

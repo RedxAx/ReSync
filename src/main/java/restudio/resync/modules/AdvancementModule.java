@@ -37,6 +37,7 @@ import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.event.player.PlayerItemMendEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRecipeDiscoverEvent;
 import org.bukkit.event.player.PlayerShearEntityEvent;
@@ -59,6 +60,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.flow.data.FlowGraph;
 
@@ -112,6 +114,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
             dispatch(player, "held_item", null, Map.of("event.item", player.getInventory().getItemInMainHand()));
             dispatch(player, "permission", null, Map.of());
             dispatch(player, "in_biome", null, Map.of("event.biome", player.getLocation().getBlock().getBiome().getKey().toString()));
+            pollQuestCompletion(player);
         }), 20, 20);
     }
 
@@ -162,6 +165,14 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         sync(event.getPlayer(), trees(null, null));
+    }
+
+    @EventHandler
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        String command = normalizeCommand(event.getMessage());
+        if (!command.isBlank()) {
+            completeCommandQuest(event.getPlayer(), event, command);
+        }
     }
 
     @EventHandler
@@ -400,12 +411,69 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
                     if (!FlowPredicateSupport.evaluate(flowStorage, flowExecutor, text(criterion, "predicateFlowId"), player, event, vars)) {
                         continue;
                     }
-                    boolean completed = service.complete(player, treeEntry.getKey(), nodeEntry.getKey());
-                    if (service.grant(player, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey()) && !completed && service.complete(player, treeEntry.getKey(), nodeEntry.getKey())) {
-                        complete(node, player, event, vars);
+                    if (!FunctionCallSupport.evaluate(flowStorage, flowExecutor, object(criterion, "predicate"), player, event, vars)) {
+                        continue;
                     }
+                    grantAndComplete(node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterionEntry.getKey(), vars);
                 }
             }
+        }
+    }
+
+    private void pollQuestCompletion(Player player) {
+        if (player == null || flowStorage == null || flowExecutor == null) {
+            return;
+        }
+        for (Map.Entry<String, JsonObject> treeEntry : trees(null, null).entrySet()) {
+            JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
+            for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
+                JsonObject node = nodeEntry.getValue().getAsJsonObject();
+                if (!bool(node, "enabled", true) || service.complete(player, treeEntry.getKey(), nodeEntry.getKey())) {
+                    continue;
+                }
+                JsonObject questCompletion = object(node, "questCompletion");
+                String flowId = text(questCompletion, "flowId");
+                JsonObject predicate = object(questCompletion, "predicate");
+                String type = text(questCompletion, "type");
+                if (!"Flow".equals(type) && !"Function".equals(type) || "Flow".equals(type) && flowId.isBlank() || "Function".equals(type) && !hasFunctionCall(predicate)) {
+                    continue;
+                }
+                String criterion = firstCriterion(node);
+                Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterion, "flow", Map.of());
+                boolean flowPass = flowId.isBlank() || FlowPredicateSupport.evaluate(flowStorage, flowExecutor, flowId, player, null, vars);
+                if (flowPass && FunctionCallSupport.evaluate(flowStorage, flowExecutor, predicate, player, null, vars)) {
+                    grantAndComplete(node, player, null, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
+                }
+            }
+        }
+    }
+
+    private void completeCommandQuest(Player player, Event event, String command) {
+        if (player == null || command.isBlank()) {
+            return;
+        }
+        for (Map.Entry<String, JsonObject> treeEntry : trees(null, null).entrySet()) {
+            JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
+            for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
+                JsonObject node = nodeEntry.getValue().getAsJsonObject();
+                if (!bool(node, "enabled", true) || service.complete(player, treeEntry.getKey(), nodeEntry.getKey())) {
+                    continue;
+                }
+                JsonObject questCompletion = object(node, "questCompletion");
+                if (!"Command".equals(text(questCompletion, "type")) || !command.equals(normalizeCommand(text(questCompletion, "command")))) {
+                    continue;
+                }
+                String criterion = firstCriterion(node);
+                Map<String, Object> vars = eventVars(player, treeEntry.getKey(), nodeEntry.getKey(), criterion, "command", Map.of("event.command", command));
+                grantAndComplete(node, player, event, treeEntry.getKey(), nodeEntry.getKey(), criterion, vars);
+            }
+        }
+    }
+
+    private void grantAndComplete(JsonObject node, Player player, Event event, String tree, String nodeId, String criterion, Map<String, Object> vars) {
+        boolean completed = service.complete(player, tree, nodeId);
+        if (service.grant(player, tree, nodeId, criterion) && !completed && service.complete(player, tree, nodeId)) {
+            complete(node, player, event, vars);
         }
     }
 
@@ -427,6 +495,8 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         if (!actionBar.isBlank()) {
             player.sendActionBar(Component.text(actionBar));
         }
+        FunctionCallSupport.execute(flowStorage, flowExecutor, object(onComplete, "action"), player, event, vars);
+        FunctionCallSupport.execute(flowStorage, flowExecutor, object(onComplete, "function"), player, event, vars);
         String flowId = text(onComplete, "flowId");
         if (flowId.isBlank() || flowStorage == null || flowExecutor == null) {
             return;
@@ -449,6 +519,15 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
         vars.put("event.criterion", criterion);
         vars.put("event.trigger", trigger);
         return vars;
+    }
+
+    private String firstCriterion(JsonObject node) {
+        JsonObject criteria = object(node, "criteria");
+        return criteria.keySet().stream().findFirst().orElse("impossible");
+    }
+
+    private boolean hasFunctionCall(JsonObject call) {
+        return call != null && (call.has("graph") && call.get("graph").isJsonObject() || !text(call, "functionId").isBlank() && !"none".equalsIgnoreCase(text(call, "functionId")));
     }
 
     private Map<String, JsonObject> trees(String replacementId, JsonObject replacement) {
@@ -543,6 +622,17 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
 
     private String text(JsonObject value, String key) {
         return value != null && value.has(key) && !value.get(key).isJsonNull() ? value.get(key).getAsString() : "";
+    }
+
+    private String normalizeCommand(String command) {
+        if (command == null) {
+            return "";
+        }
+        String normalized = command.trim();
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1).trim();
+        }
+        return normalized;
     }
 
     private boolean bool(JsonObject value, String key, boolean fallback) {

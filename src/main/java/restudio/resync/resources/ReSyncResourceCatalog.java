@@ -25,6 +25,7 @@ public final class ReSyncResourceCatalog {
     public static final String RECIPE_DEFINITION = "recipe_definition";
     public static final String TEXT_TEMPLATE = "text_template";
     public static final String ADVANCEMENT_TREE = "advancement_tree";
+    public static final String DIALOG = "dialog";
     public static final String WORLDGEN = "worldgen";
     public static final String WORLD = "world";
     private static final Map<String, ReSyncManagedResource> BY_TYPE = new LinkedHashMap<>();
@@ -50,6 +51,7 @@ public final class ReSyncResourceCatalog {
         register(new ReSyncManagedResource(RECIPE_DEFINITION, "Recipe Definition", "Content/Recipes", new ReSyncManagedResource.FlowPackets((byte) 0x9F, (byte) 0xA0, (byte) 0xA1, (byte) 0xA2, (byte) 0xA3, (byte) 0xA4, (byte) 0xA5), true));
         register(new ReSyncManagedResource(TEXT_TEMPLATE, "Text Template", "Text/Templates", new ReSyncManagedResource.FlowPackets((byte) 0xA6, (byte) 0xA7, (byte) 0xA8, (byte) 0xA9, (byte) 0xAA, (byte) 0xAB, (byte) 0xAC), true));
         register(new ReSyncManagedResource(ADVANCEMENT_TREE, "Advancement Tree", "Content/Advancements", new ReSyncManagedResource.FlowPackets((byte) 0xAD, (byte) 0xAE, (byte) 0xAF, (byte) 0xB0, (byte) 0xB1, (byte) 0xB2, (byte) 0xB3), true));
+        register(new ReSyncManagedResource(DIALOG, "Dialog", "Content/Dialogs", new ReSyncManagedResource.FlowPackets((byte) 0xB4, (byte) 0xB5, (byte) 0xB6, (byte) 0xB7, (byte) 0xB8, (byte) 0xB9, (byte) 0xBA), true));
         register(new ReSyncManagedResource(WORLDGEN, "WorldGen", "WorldGen", null, true));
         register(new ReSyncManagedResource(WORLD, "World", "Worlds", null, true));
     }

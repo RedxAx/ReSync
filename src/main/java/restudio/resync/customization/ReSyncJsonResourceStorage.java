@@ -56,6 +56,7 @@ public class ReSyncJsonResourceStorage {
     public JsonObject get(String type, String id) {
         JsonAssetStore<JsonObject> store = stores.get(type);
         JsonObject value = store != null ? store.get(id) : null;
+        normalizeAssetId(value, id);
         if (value != null && ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
             return motdProfileForClient(value);
         }
@@ -72,6 +73,7 @@ public class ReSyncJsonResourceStorage {
         if (store == null) {
             throw new IllegalArgumentException("Unknown resource type: " + type);
         }
+        normalizeAssetId(value, id(value));
         if (ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
             prepareMotdIcon(value);
         }
@@ -138,7 +140,8 @@ public class ReSyncJsonResourceStorage {
             ReSyncResourceCatalog.MESSAGE_RULE,
             ReSyncResourceCatalog.RECIPE_DEFINITION,
             ReSyncResourceCatalog.TEXT_TEMPLATE,
-            ReSyncResourceCatalog.ADVANCEMENT_TREE
+            ReSyncResourceCatalog.ADVANCEMENT_TREE,
+            ReSyncResourceCatalog.DIALOG
         );
     }
 
@@ -147,6 +150,13 @@ public class ReSyncJsonResourceStorage {
             return "";
         }
         return value.get("id").getAsString();
+    }
+
+    private void normalizeAssetId(JsonObject value, String id) {
+        if (value == null || id == null || id.isBlank()) {
+            return;
+        }
+        value.addProperty("id", id);
     }
 
     private String folder(JsonObject value, String defaultFolder) {
@@ -170,6 +180,7 @@ public class ReSyncJsonResourceStorage {
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> "recipes";
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> "text-templates";
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> "advancement-trees";
+            case ReSyncResourceCatalog.DIALOG -> "dialogs";
             default -> type;
         };
     }

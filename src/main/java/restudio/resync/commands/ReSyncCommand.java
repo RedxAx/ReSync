@@ -18,6 +18,7 @@ import restudio.resync.ReSync;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
+import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
@@ -342,7 +343,41 @@ public class ReSyncCommand implements TabExecutor {
             sendError(sender, "Resource Not Found", id);
             return true;
         }
+        if (ReSyncResourceCatalog.DIALOG.equals(type)) {
+            return applyDialogResource(sender, storage, id, args);
+        }
         sendError(sender, "Unsupported Resource Apply", prettyResourceType(type));
+        return true;
+    }
+
+    private boolean applyDialogResource(CommandSender sender, ReSyncJsonResourceStorage storage, String id, String[] args) {
+        Player target;
+        if (args.length >= 5 && args[4] != null && !args[4].isBlank()) {
+            target = Bukkit.getPlayerExact(args[4]);
+            if (target == null) {
+                sendError(sender, "Player Not Found", args[4]);
+                return true;
+            }
+        } else if (sender instanceof Player player) {
+            target = player;
+        } else {
+            sendError(sender, "Player Required", "/resync resource apply dialog " + id + " <player>");
+            return true;
+        }
+        DialogService service = plugin.getReSyncServer().getModuleContext().getService(DialogService.class);
+        if (service == null) {
+            service = new DialogService(plugin, storage, getStorage(), plugin.getReSyncServer().getFlowExecutor());
+        }
+        if (!service.supported()) {
+            sendError(sender, "Dialog API Unavailable", "Paper 1.21.7+ is required");
+            return true;
+        }
+        if (!service.show(target, id)) {
+            String reason = service.lastError();
+            sendError(sender, "Dialog Failed", reason == null || reason.isBlank() ? id : reason);
+            return true;
+        }
+        sendSuccess(sender, "Dialog Shown", id);
         return true;
     }
 
@@ -365,6 +400,9 @@ public class ReSyncCommand implements TabExecutor {
         }
         if (args.length == 6 && "set".equalsIgnoreCase(args[1])) {
             return filter(resourceValueOptions(resourceTypeAlias(args[2]), args[4]), args[5]);
+        }
+        if (args.length == 5 && "apply".equalsIgnoreCase(args[1]) && ReSyncResourceCatalog.DIALOG.equals(resourceTypeAlias(args[2]))) {
+            return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[4]);
         }
         return List.of();
     }
@@ -398,13 +436,14 @@ public class ReSyncCommand implements TabExecutor {
             case "recipe", "recipe_definition" -> ReSyncResourceCatalog.RECIPE_DEFINITION;
             case "text", "template", "text_template" -> ReSyncResourceCatalog.TEXT_TEMPLATE;
             case "advancement", "advancements", "advancement_tree" -> ReSyncResourceCatalog.ADVANCEMENT_TREE;
+            case "dialog", "dialogs" -> ReSyncResourceCatalog.DIALOG;
             default -> type.toLowerCase(Locale.ROOT);
         };
     }
 
     private List<String> resourceTypeOptions(ReSyncJsonResourceStorage storage) {
         List<String> values = new ArrayList<>(storage.resourceTypes());
-        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement"));
+        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement", "dialog"));
         return values;
     }
 
@@ -419,6 +458,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors");
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
+            case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
     }
@@ -438,6 +478,15 @@ public class ReSyncCommand implements TabExecutor {
         }
         if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type) && "mode".equalsIgnoreCase(field)) {
             return List.of("frames", "typing", "scroll", "gradient", "blink", "random", "conditional");
+        }
+        if (ReSyncResourceCatalog.DIALOG.equals(type) && "type".equalsIgnoreCase(field)) {
+            return List.of("minecraft:notice", "minecraft:confirmation", "minecraft:multi_action", "minecraft:dialog_list");
+        }
+        if (ReSyncResourceCatalog.DIALOG.equals(type) && "after_action".equalsIgnoreCase(field)) {
+            return List.of("close", "none", "wait_for_response");
+        }
+        if (ReSyncResourceCatalog.DIALOG.equals(type) && ("pause".equalsIgnoreCase(field) || "can_close_with_escape".equalsIgnoreCase(field))) {
+            return booleanOptions();
         }
         return List.of();
     }
@@ -493,6 +542,28 @@ public class ReSyncCommand implements TabExecutor {
                 root.add("requirements", new JsonArray());
                 nodes.add("root", root);
                 resource.add("nodes", nodes);
+            }
+            case ReSyncResourceCatalog.DIALOG -> {
+                resource.addProperty("displayName", id);
+                resource.addProperty("type", "minecraft:multi_action");
+                resource.addProperty("title", id);
+                resource.addProperty("external_title", id);
+                resource.add("body", new JsonArray());
+                resource.add("inputs", new JsonArray());
+                resource.addProperty("can_close_with_escape", true);
+                resource.addProperty("pause", true);
+                resource.addProperty("after_action", "close");
+                resource.addProperty("columns", 1);
+                JsonArray actions = new JsonArray();
+                JsonObject button = new JsonObject();
+                button.addProperty("label", "Button");
+                button.addProperty("width", 150);
+                JsonObject resync = new JsonObject();
+                resync.addProperty("actionMode", "None");
+                resync.addProperty("predicateMode", "None");
+                button.add("resync", resync);
+                actions.add(button);
+                resource.add("actions", actions);
             }
             default -> resource.addProperty("displayName", id);
         }
@@ -2986,5 +3057,17 @@ public class ReSyncCommand implements TabExecutor {
 
     private void sendUsageLine(CommandSender sender, String usage) {
         sender.sendMessage("§f  " + usage);
+    }
+
+    private String text(JsonObject object, String key, String fallback) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            String value = object.get(key).getAsString();
+            return value == null || value.isBlank() ? fallback : value;
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 }

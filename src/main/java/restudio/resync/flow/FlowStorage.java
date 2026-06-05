@@ -978,6 +978,7 @@ public class FlowStorage {
         changed |= ensureFolder(metadata, "Content/Armor", "Content", 1);
         changed |= ensureFolder(metadata, "Content/Blocks", "Content", 2);
         changed |= ensureFolder(metadata, "Content/Advancements", "Content", 3);
+        changed |= ensureFolder(metadata, "Content/Dialogs", "Content", 4);
         changed |= ensureFolder(metadata, "GUIs", "", 2);
         changed |= ensureFolder(metadata, "Customization", "", 3);
         changed |= ensureFolder(metadata, "Customization/Scoreboards", "Customization", 0);
@@ -1202,6 +1203,7 @@ public class FlowStorage {
             case "gui" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.GUI);
             case "scoreboard" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.SCOREBOARD);
             case "tab" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.TAB);
+            case "dialog" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.DIALOG);
             case "worldgen" -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.WORLDGEN);
             default -> ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.FLOW);
         };

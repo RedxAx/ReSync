@@ -12,6 +12,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.core.Session;
+import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.FlowExecutor;
@@ -229,6 +230,7 @@ public class FlowRuntimeModule implements Module {
         context.registerService(FlowDebugService.class, debugService);
         context.registerService(FlowModule.class, delegate);
         context.registerService(GuiManager.class, guiManager);
+        context.registerService(DialogService.class, new DialogService(context.getPlugin(), context.getRequiredService(ReSyncJsonResourceStorage.class), storage, executor));
         context.registerService(FlowRuntimeModule.class, this);
         FlowRuntimeAccess.configure(context.getPlugin(), () -> storage, () -> executor != null ? executor.getGlobalVariables() : null);
         FlowPacketSender editStateSender = new FlowPacketSender(context.getCodec(), channelId, Set.of());

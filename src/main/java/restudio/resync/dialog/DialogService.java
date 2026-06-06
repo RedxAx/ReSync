@@ -12,6 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.FlowExecutor;
@@ -82,16 +83,17 @@ public class DialogService {
     }
 
     private Object buildDialog(Player player, String dialogId, JsonObject dialog) throws ReflectiveOperationException {
+        ReSyncProtocolContract.DialogResource resource = ReSyncProtocolContract.dialogResource(dialog, dialogId);
         Object base = api.dialogBaseCreate.invoke(null,
-            Component.text(text(dialog, "title", text(dialog, "displayName", dialogId))),
-            externalTitle(dialog),
-            bool(dialog, "can_close_with_escape", true),
-            bool(dialog, "pause", true),
-            afterAction(text(dialog, "after_action", "close")),
-            body(dialog),
-            inputs(dialog)
+            Component.text(resource.title()),
+            externalTitle(resource),
+            resource.canCloseWithEscape(),
+            resource.pause(),
+            afterAction(resource.afterAction()),
+            body(resource),
+            inputs(resource)
         );
-        Object type = dialogType(player, dialogId, dialog);
+        Object type = dialogType(player, dialogId, resource);
         return api.dialogCreate.invoke(null, (java.util.function.Consumer<Object>) builderFactory -> {
             try {
                 Object builder = invoke(builderFactory, "empty");
@@ -103,8 +105,8 @@ public class DialogService {
         });
     }
 
-    private Component externalTitle(JsonObject dialog) {
-        String title = text(dialog, "external_title", text(dialog, "displayName", ""));
+    private Component externalTitle(ReSyncProtocolContract.DialogResource resource) {
+        String title = resource.externalTitle();
         return title.isBlank() ? null : Component.text(title);
     }
 
@@ -117,9 +119,9 @@ public class DialogService {
         return Enum.valueOf(api.afterActionClass.asSubclass(Enum.class), name);
     }
 
-    private List<Object> body(JsonObject dialog) throws ReflectiveOperationException {
+    private List<Object> body(ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
-        for (JsonObject block : objectArray(dialog, "body")) {
+        for (JsonObject block : resource.body()) {
             String type = text(block, "type", "minecraft:plain_message");
             if ("minecraft:item".equals(type)) {
                 values.add(itemBody(block));
@@ -128,7 +130,7 @@ public class DialogService {
             }
         }
         if (values.isEmpty()) {
-            values.add(plainBody(text(dialog, "title", text(dialog, "displayName", "")), 200));
+            values.add(plainBody(resource.title(), 200));
         }
         return values;
     }
@@ -156,9 +158,9 @@ public class DialogService {
         return api.dialogBodyPlain.invoke(null, Component.text(text == null ? "" : text), Math.clamp(width, 1, 1024));
     }
 
-    private List<Object> inputs(JsonObject dialog) throws ReflectiveOperationException {
+    private List<Object> inputs(ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
-        for (JsonObject input : objectArray(dialog, "inputs")) {
+        for (JsonObject input : resource.inputs()) {
             String type = text(input, "type", "minecraft:text");
             String key = text(input, "key", "input_" + values.size());
             Component label = Component.text(text(input, "label", key));
@@ -206,16 +208,16 @@ public class DialogService {
         return api.multilineCreate.invoke(null, maxLines, height);
     }
 
-    private Object dialogType(Player player, String dialogId, JsonObject dialog) throws ReflectiveOperationException {
-        List<Object> actions = actions(player, dialogId, dialog);
-        String type = text(dialog, "type", "minecraft:multi_action");
+    private Object dialogType(Player player, String dialogId, ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
+        List<Object> actions = actions(player, dialogId, resource);
+        String type = resource.type();
         if ("minecraft:notice".equals(type)) {
             return actions.isEmpty() ? api.typeNoticeDefault.invoke(null) : api.typeNotice.invoke(null, actions.getFirst());
         }
         if ("minecraft:confirmation".equals(type)) {
-            return api.typeConfirmation.invoke(null, actionAt(actions, 0, player, dialogId, dialog), actionAt(actions, 1, player, dialogId, dialog));
+            return api.typeConfirmation.invoke(null, actionAt(actions, 0, player, dialogId, resource.json()), actionAt(actions, 1, player, dialogId, resource.json()));
         }
-        return api.typeMulti.invoke(null, actions, null, Math.max(1, integer(dialog, "columns", 1)));
+        return api.typeMulti.invoke(null, actions, null, Math.max(1, resource.columns()));
     }
 
     private Object actionAt(List<Object> actions, int index, Player player, String dialogId, JsonObject dialog) throws ReflectiveOperationException {
@@ -227,9 +229,10 @@ public class DialogService {
         return actionButton(player, dialogId, dialog, action, index);
     }
 
-    private List<Object> actions(Player player, String dialogId, JsonObject dialog) throws ReflectiveOperationException {
+    private List<Object> actions(Player player, String dialogId, ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
-        List<JsonObject> configured = objectArray(dialog, "actions");
+        JsonObject dialog = resource.json();
+        List<JsonObject> configured = resource.actions();
         if (configured.isEmpty()) {
             JsonObject close = new JsonObject();
             close.addProperty("text", "Close");

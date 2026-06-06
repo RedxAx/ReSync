@@ -129,20 +129,7 @@ public class ReSyncJsonResourceStorage {
     }
 
     public static List<String> resourceTypesStatic() {
-        return List.of(
-            ReSyncResourceCatalog.CHAT_CHANNEL,
-            ReSyncResourceCatalog.CHAT_FORMAT,
-            ReSyncResourceCatalog.CHAT_RULE,
-            ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT,
-            ReSyncResourceCatalog.MENTION_STYLE,
-            ReSyncResourceCatalog.IGNORE_LIST,
-            ReSyncResourceCatalog.MOTD_PROFILE,
-            ReSyncResourceCatalog.MESSAGE_RULE,
-            ReSyncResourceCatalog.RECIPE_DEFINITION,
-            ReSyncResourceCatalog.TEXT_TEMPLATE,
-            ReSyncResourceCatalog.ADVANCEMENT_TREE,
-            ReSyncResourceCatalog.DIALOG
-        );
+        return ReSyncResourceCatalog.jsonStorageTypes();
     }
 
     private String id(JsonObject value) {

@@ -6,13 +6,19 @@ public final class ReSyncManagedResource {
     private final String defaultFolder;
     private final FlowPackets flowPackets;
     private final boolean enabled;
+    private final boolean jsonStorageSupported;
 
     public ReSyncManagedResource(String typeId, String displayName, String defaultFolder, FlowPackets flowPackets, boolean enabled) {
+        this(typeId, displayName, defaultFolder, flowPackets, enabled, false);
+    }
+
+    public ReSyncManagedResource(String typeId, String displayName, String defaultFolder, FlowPackets flowPackets, boolean enabled, boolean jsonStorageSupported) {
         this.typeId = typeId;
         this.displayName = displayName;
         this.defaultFolder = defaultFolder;
         this.flowPackets = flowPackets;
         this.enabled = enabled;
+        this.jsonStorageSupported = jsonStorageSupported;
     }
 
     public String typeId() {
@@ -33,6 +39,10 @@ public final class ReSyncManagedResource {
 
     public boolean enabled() {
         return enabled;
+    }
+
+    public boolean jsonStorageSupported() {
+        return jsonStorageSupported;
     }
 
     public boolean hasFlowPackets() {

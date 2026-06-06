@@ -121,13 +121,19 @@ public final class FunctionCallSupport {
         }
         String id = type.getId();
         if ("item".equals(id) || "material".equals(id)) {
-            return valueFromVars(vars, "event.item", "event.output", "event.source", "item", "output");
+            return valueFromVars(vars, "event.item", "event.output", "event.source", "clickedItem", "craftedItem", "cookedItem", "sourceItem", "item", "output", "source");
         }
         if ("entity".equals(id) || "living_entity".equals(id)) {
             return valueFromVars(vars, "event.entity", "event.target", "entity", "target");
         }
         if ("block".equals(id)) {
             return valueFromVars(vars, "event.block", "block");
+        }
+        if ("number".equals(id) || "seed".equals(id) || "float".equals(id)) {
+            return valueFromVars(vars, "event.slot", "slot", "event.amount", "amount");
+        }
+        if ("string".equals(id) || "component".equals(id)) {
+            return valueFromVars(vars, "event.recipe", "recipe", "event.world", "world", "event.permission", "permission");
         }
         return null;
     }
@@ -162,6 +168,30 @@ public final class FunctionCallSupport {
             String text = element.getAsString();
             if ("$player".equals(text) || "$event.player".equals(text)) {
                 return player;
+            }
+            if ("$clickedItem".equals(text)) {
+                return valueFromVars(vars, "clickedItem", "event.item", "item");
+            }
+            if ("$craftedItem".equals(text)) {
+                return valueFromVars(vars, "craftedItem", "event.output", "output");
+            }
+            if ("$cookedItem".equals(text)) {
+                return valueFromVars(vars, "cookedItem", "event.output", "output");
+            }
+            if ("$sourceItem".equals(text)) {
+                return valueFromVars(vars, "sourceItem", "event.source", "source");
+            }
+            if ("$recipe".equals(text)) {
+                return valueFromVars(vars, "recipe", "event.recipe");
+            }
+            if ("$world".equals(text)) {
+                return player != null ? player.getWorld().getName() : valueFromVars(vars, "world", "event.world");
+            }
+            if ("$slot".equals(text)) {
+                return valueFromVars(vars, "slot", "event.slot");
+            }
+            if ("$amount".equals(text)) {
+                return valueFromVars(vars, "amount", "event.amount");
             }
             if (text.startsWith("$") && vars != null) {
                 return vars.get(text.substring(1));

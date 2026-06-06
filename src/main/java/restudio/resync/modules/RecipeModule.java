@@ -1651,6 +1651,18 @@ public class RecipeModule implements Module, Listener {
             eventVars.putAll(vars);
         }
         eventVars.put("event.trigger", "recipe_" + trigger);
+        eventVars.put("recipe", recipeId(definition));
+        eventVars.put("player", player);
+        if (eventVars.containsKey("event.output")) {
+            eventVars.put(trigger.equals("cooked") ? "cookedItem" : "craftedItem", eventVars.get("event.output"));
+            eventVars.put("item", eventVars.get("event.output"));
+            eventVars.put("output", eventVars.get("event.output"));
+        }
+        if (eventVars.containsKey("event.source")) {
+            eventVars.put("sourceItem", eventVars.get("event.source"));
+            eventVars.put("source", eventVars.get("event.source"));
+        }
+        dispatchCommands(definition, trigger, player, eventVars);
         FunctionCallSupport.execute(flowStorage, flowExecutor, ResourceJson.object(definition, trigger + "Action"), player, event, eventVars);
         FunctionCallSupport.execute(flowStorage, flowExecutor, ResourceJson.object(definition, trigger + "Function"), player, event, eventVars);
         String flowId = ResourceJson.string(definition, trigger + "Flow", ResourceJson.string(definition, "flowId", ""));
@@ -1662,6 +1674,35 @@ public class RecipeModule implements Module, Listener {
             return;
         }
         flowExecutor.execute(graph, findStartNode(graph), player, event, eventVars);
+    }
+
+    private void dispatchCommands(JsonObject definition, String trigger, Player player, Map<String, Object> vars) {
+        for (String command : ResourceJson.strings(definition, trigger + "Commands")) {
+            String prepared = substituteCommand(command, player, vars);
+            if (!prepared.isBlank()) {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), prepared);
+            }
+        }
+    }
+
+    private String substituteCommand(String command, Player player, Map<String, Object> vars) {
+        if (command == null) {
+            return "";
+        }
+        String prepared = command.trim();
+        if (prepared.startsWith("/")) {
+            prepared = prepared.substring(1);
+        }
+        if (player != null) {
+            prepared = prepared.replace("{player}", player.getName()).replace("$player", player.getName());
+        }
+        if (vars != null) {
+            for (Map.Entry<String, Object> entry : vars.entrySet()) {
+                String value = entry.getValue() != null ? String.valueOf(entry.getValue()) : "";
+                prepared = prepared.replace("{" + entry.getKey() + "}", value).replace("$" + entry.getKey(), value);
+            }
+        }
+        return prepared;
     }
 
     private String findStartNode(FlowGraph graph) {

@@ -271,6 +271,10 @@ public class GuiManager implements Listener {
                     }
                     break;
                 }
+                if (el.getAction() != null && !el.getAction().isEmpty()) {
+                    FunctionCallSupport.execute(storage, executor, el.getAction(), player, event, createClickEventVariables(event, player));
+                    break;
+                }
                 String flowId = el.getFlowId();
                 if (flowId != null) {
                     FlowGraph graph = storage.getGraph(flowId);
@@ -326,6 +330,10 @@ public class GuiManager implements Listener {
         eventVars.put("event.action", event.getAction().name());
         eventVars.put("event.item", event.getCurrentItem());
         eventVars.put("event.cursor_item", event.getCursor());
+        eventVars.put("player", player);
+        eventVars.put("clickedItem", event.getCurrentItem());
+        eventVars.put("item", event.getCurrentItem());
+        eventVars.put("slot", event.getSlot());
         return eventVars;
     }
 

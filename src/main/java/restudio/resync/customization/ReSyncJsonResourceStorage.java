@@ -156,12 +156,7 @@ public class ReSyncJsonResourceStorage {
 
     private String legacyFolder(String type) {
         return switch (type) {
-            case ReSyncResourceCatalog.CHAT_CHANNEL -> "chat-channels";
-            case ReSyncResourceCatalog.CHAT_FORMAT -> "chat-formats";
-            case ReSyncResourceCatalog.CHAT_RULE -> "chat-rules";
-            case ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT -> "private-message-formats";
-            case ReSyncResourceCatalog.MENTION_STYLE -> "mention-styles";
-            case ReSyncResourceCatalog.IGNORE_LIST -> "ignore-lists";
+            case ReSyncResourceCatalog.CHAT -> "chat";
             case ReSyncResourceCatalog.MOTD_PROFILE -> "motd-profiles";
             case ReSyncResourceCatalog.MESSAGE_RULE -> "message-rules";
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> "recipes";

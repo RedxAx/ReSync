@@ -1,6 +1,5 @@
 package restudio.resync.modules;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.audience.Audience;
@@ -23,6 +22,7 @@ import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customization.ResourceJson;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.messages.MessageLogService;
 import restudio.resync.modules.chat.event.ReSyncChannelJoinEvent;
 import restudio.resync.modules.chat.event.ReSyncChannelLeaveEvent;
 import restudio.resync.modules.chat.event.ReSyncChannelSendEvent;
@@ -49,11 +49,13 @@ public class ChatModule implements Module, Listener {
     private ReTextService text;
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
+    private MessageLogService messageLog;
     private Plugin plugin;
     private final Map<UUID, UUID> conversations = new HashMap<>();
     private final Map<UUID, Set<String>> channelMembership = new HashMap<>();
     private final Map<UUID, Map<String, Long>> channelCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> spyTargets = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> ignoredPlayers = new ConcurrentHashMap<>();
     private final Set<UUID> spies = new HashSet<>();
     private final GsonComponentSerializer gsonComponent = GsonComponentSerializer.gson();
     private final PlainTextComponentSerializer plainText = PlainTextComponentSerializer.plainText();
@@ -70,6 +72,7 @@ public class ChatModule implements Module, Listener {
         text = context.getRequiredService(ReTextService.class);
         flowStorage = context.getService(FlowStorage.class);
         flowExecutor = context.getService(FlowExecutor.class);
+        messageLog = context.getService(MessageLogService.class);
         context.registerService(ChatModule.class, this);
     }
 
@@ -112,7 +115,7 @@ public class ChatModule implements Module, Listener {
             return;
         }
         if (!ruleResult.redirectChannel().isBlank()) {
-            JsonObject redirected = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, ruleResult.redirectChannel());
+            JsonObject redirected = getChannel(ruleResult.redirectChannel());
             if (redirected != null) {
                 channel = redirected;
             }
@@ -205,7 +208,7 @@ public class ChatModule implements Module, Listener {
         rawMessage = ruleResult.message();
         conversations.put(sender.getUniqueId(), target.getUniqueId());
         conversations.put(target.getUniqueId(), sender.getUniqueId());
-        JsonObject format = firstEnabled(ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT);
+        JsonObject format = firstChatSection("privateMessages");
         String senderFormat = ResourceJson.string(format, "sender", "<gray>To <white>{receiver}</white>: <message>");
         String receiverFormat = ResourceJson.string(format, "receiver", "<gray>From <white>{sender}</white>: <message>");
         String spyFormat = ResourceJson.string(format, "spy", "<gray>Spy <white>{sender}</white> -> <white>{receiver}</white>: <message>");
@@ -213,8 +216,7 @@ public class ChatModule implements Module, Listener {
         sender.sendMessage(text.render(senderFormat.replace("{receiver}", target.getName()).replace("{sender}", sender.getName()).replace("{message}", mentionedMessage), sender, sender));
         target.sendMessage(text.render(receiverFormat.replace("{receiver}", target.getName()).replace("{sender}", sender.getName()).replace("{message}", mentionedMessage), sender, target));
         Bukkit.getPluginManager().callEvent(new ReSyncPrivateMessageEvent(sender, target, rawMessage));
-        JsonObject formatResource = firstEnabled(ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT);
-        dispatchFlow(formatResource, "privateMessageFlow", sender, null, Map.of("event.message", rawMessage, "event.receiver", target));
+        dispatchFlow(format, "privateMessageFlow", sender, null, Map.of("event.message", rawMessage, "event.receiver", target));
         for (UUID spyId : spies) {
             Player spy = Bukkit.getPlayer(spyId);
             if (spy != null && !spy.equals(sender) && !spy.equals(target) && shouldSpy(spyId, sender, target)) {
@@ -224,8 +226,7 @@ public class ChatModule implements Module, Listener {
     }
 
     private void handleChannelAlias(PlayerCommandPreprocessEvent event, String message, String lower) {
-        for (String id : storage.listIds(ReSyncResourceCatalog.CHAT_CHANNEL)) {
-            JsonObject channel = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, id);
+        for (JsonObject channel : channelResources()) {
             for (String alias : ResourceJson.strings(channel, "quickAliases")) {
                 String normalized = alias.startsWith("/") ? alias.toLowerCase(Locale.ROOT) : "/" + alias.toLowerCase(Locale.ROOT);
                 if (lower.equals(normalized) || lower.startsWith(normalized + " ")) {
@@ -258,7 +259,7 @@ public class ChatModule implements Module, Listener {
             return false;
         }
         if (!ruleResult.redirectChannel().isBlank()) {
-            JsonObject redirected = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, ruleResult.redirectChannel());
+            JsonObject redirected = getChannel(ruleResult.redirectChannel());
             if (redirected != null) {
                 channel = redirected;
             }
@@ -286,7 +287,7 @@ public class ChatModule implements Module, Listener {
     }
 
     public boolean sendChannelMessage(Player sender, String channelId, String rawMessage) {
-        JsonObject channel = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, channelId);
+        JsonObject channel = getChannel(channelId);
         if (sender == null || channel == null) {
             return false;
         }
@@ -359,24 +360,18 @@ public class ChatModule implements Module, Listener {
     }
 
     private void toggleIgnore(Player player, String targetName) {
-        JsonObject ignoreList = storage.get(ReSyncResourceCatalog.IGNORE_LIST, player.getUniqueId().toString());
-        if (ignoreList == null) {
-            ignoreList = new JsonObject();
-            ignoreList.addProperty("id", player.getUniqueId().toString());
-        }
-        Set<String> ignored = new HashSet<>(ResourceJson.strings(ignoreList, "players"));
         Player target = Bukkit.getPlayerExact(targetName);
         String value = target != null ? target.getUniqueId().toString() : targetName;
+        Set<String> ignored = ignoredPlayers.computeIfAbsent(player.getUniqueId(), ignoredId -> ConcurrentHashMap.newKeySet());
         if (ignored.remove(value)) {
             player.sendMessage(text.render("<gray>Ignore Removed", player, player));
         } else {
             ignored.add(value);
             player.sendMessage(text.render("<green>Ignored", player, player));
         }
-        JsonArray array = new JsonArray();
-        ignored.forEach(array::add);
-        ignoreList.add("players", array);
-        storage.save(ReSyncResourceCatalog.IGNORE_LIST, ignoreList);
+        if (ignored.isEmpty()) {
+            ignoredPlayers.remove(player.getUniqueId());
+        }
     }
 
     private boolean shouldSpy(UUID spyId, Player sender, Player target) {
@@ -385,8 +380,28 @@ public class ChatModule implements Module, Listener {
     }
 
     private boolean isIgnoring(Player receiver, UUID senderId) {
-        JsonObject ignoreList = storage.get(ReSyncResourceCatalog.IGNORE_LIST, receiver.getUniqueId().toString());
-        return ResourceJson.strings(ignoreList, "players").contains(senderId.toString());
+        Player sender = Bukkit.getPlayer(senderId);
+        if (matchesIgnoredPlayer(new ArrayList<>(ignoredPlayers.getOrDefault(receiver.getUniqueId(), Set.of())), senderId, sender)) {
+            return true;
+        }
+        for (JsonObject profile : chatProfiles()) {
+            JsonObject ignore = section(profile, "ignore");
+            if (matchesIgnoredPlayer(ResourceJson.strings(ignore, "players"), senderId, sender)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesIgnoredPlayer(List<String> values, UUID senderId, Player sender) {
+        String uuid = senderId != null ? senderId.toString() : "";
+        String name = sender != null ? sender.getName() : "";
+        for (String value : values) {
+            if ((!uuid.isBlank() && uuid.equalsIgnoreCase(value)) || (!name.isBlank() && name.equalsIgnoreCase(value))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isMuted(Player sender, JsonObject channel) {
@@ -398,13 +413,13 @@ public class ChatModule implements Module, Listener {
         JsonObject best = null;
         int bestPriority = Integer.MIN_VALUE;
         Set<String> joined = channelMembership.getOrDefault(sender.getUniqueId(), Set.of());
-        for (String id : storage.listIds(ReSyncResourceCatalog.CHAT_CHANNEL)) {
-            JsonObject channel = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, id);
+        for (JsonObject channel : channelResources()) {
             if (!ResourceJson.bool(channel, "enabled", true)) {
                 continue;
             }
+            String channelId = resourceId(channel);
             boolean autoJoin = ResourceJson.bool(channel, "autojoin", ResourceJson.bool(channel, "default", true));
-            if (!joined.isEmpty() && !joined.contains(id) || joined.isEmpty() && !autoJoin) {
+            if (!joined.isEmpty() && !joined.contains(channelId) || joined.isEmpty() && !autoJoin) {
                 continue;
             }
             String joinPermission = ResourceJson.string(channel, "joinPermission", "");
@@ -421,7 +436,7 @@ public class ChatModule implements Module, Listener {
     }
 
     private void joinChannel(Player player, String channelId) {
-        JsonObject channel = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, channelId);
+        JsonObject channel = getChannel(channelId);
         if (channel == null) {
             player.sendMessage(text.render("<red>Channel Missing", player, player));
             return;
@@ -445,7 +460,7 @@ public class ChatModule implements Module, Listener {
                 channelMembership.remove(player.getUniqueId());
             }
         }
-        JsonObject channel = storage.get(ReSyncResourceCatalog.CHAT_CHANNEL, channelId);
+        JsonObject channel = getChannel(channelId);
         player.sendMessage(text.render(ResourceJson.string(channel, "leaveMessage", "<gray>Channel Left"), player, player));
         Bukkit.getPluginManager().callEvent(new ReSyncChannelLeaveEvent(player, channelId));
         dispatchFlow(channel, "leaveFlow", player, null, Map.of("event.channel", channelId));
@@ -567,14 +582,16 @@ public class ChatModule implements Module, Listener {
     }
 
     private void sendPlayerMessage(Player player, Component message) {
+        if (messageLog != null && !Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
+            messageLog.record("chat", player, plainText.serialize(message), gsonComponent.serialize(message), "native");
+        }
         player.spigot().sendMessage(ChatMessageType.SYSTEM, ComponentSerializer.parse(gsonComponent.serialize(message)));
     }
 
     private ChatRuleResult applyChatRules(Player sender, String message, Event event, JsonObject channel) {
         String result = message;
         String redirectChannel = "";
-        for (JsonObject rule : storage.listIds(ReSyncResourceCatalog.CHAT_RULE).stream()
-            .map(id -> storage.get(ReSyncResourceCatalog.CHAT_RULE, id))
+        for (JsonObject rule : chatRules().stream()
             .filter(rule -> ResourceJson.bool(rule, "enabled", true))
             .sorted((left, right) -> Integer.compare(ResourceJson.integer(right, "priority", 0), ResourceJson.integer(left, "priority", 0)))
             .toList()) {
@@ -646,7 +663,7 @@ public class ChatModule implements Module, Listener {
     }
 
     private String applyMentions(String message, Player sender, String channelId, boolean fireEvent) {
-        JsonObject style = firstEnabled(ReSyncResourceCatalog.MENTION_STYLE);
+        JsonObject style = firstChatSection("mention");
         String template = ResourceJson.string(style, "template", "<yellow>@{player}</yellow>");
         String result = message;
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -665,22 +682,111 @@ public class ChatModule implements Module, Listener {
     private JsonObject formatFor(JsonObject channel) {
         String override = ResourceJson.string(channel, "format", "");
         if (!override.isBlank()) {
-            JsonObject format = storage.get(ReSyncResourceCatalog.CHAT_FORMAT, override);
+            JsonObject format = profileSection(override, "format");
             if (format != null) {
                 return format;
             }
         }
-        return firstEnabled(ReSyncResourceCatalog.CHAT_FORMAT);
+        JsonObject inlineFormat = section(channel, "__format");
+        if (inlineFormat != null) {
+            return inlineFormat;
+        }
+        return firstChatSection("format");
     }
 
-    private JsonObject firstEnabled(String type) {
-        for (String id : storage.listIds(type)) {
-            JsonObject resource = storage.get(type, id);
-            if (ResourceJson.bool(resource, "enabled", true)) {
-                return resource;
+    private List<JsonObject> chatProfiles() {
+        List<JsonObject> profiles = new ArrayList<>();
+        for (String id : storage.listIds(ReSyncResourceCatalog.CHAT)) {
+            JsonObject profile = storage.get(ReSyncResourceCatalog.CHAT, id);
+            if (profile != null && ResourceJson.bool(profile, "enabled", true)) {
+                profiles.add(profile);
+            }
+        }
+        return profiles;
+    }
+
+    private List<JsonObject> channelResources() {
+        List<JsonObject> channels = new ArrayList<>();
+        for (JsonObject profile : chatProfiles()) {
+            JsonObject channel = section(profile, "channel");
+            if (channel == null) {
+                continue;
+            }
+            JsonObject copy = channel.deepCopy();
+            String id = ResourceJson.string(profile, "id", "");
+            if (!id.isBlank()) {
+                copy.addProperty("id", id);
+            }
+            if (!copy.has("displayName") && profile.has("displayName")) {
+                copy.add("displayName", profile.get("displayName"));
+            }
+            copy.addProperty("enabled", ResourceJson.bool(profile, "enabled", true));
+            JsonObject format = section(profile, "format");
+            if (format != null) {
+                copy.add("__format", format.deepCopy());
+            }
+            channels.add(copy);
+        }
+        return channels;
+    }
+
+    private JsonObject getChannel(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        for (JsonObject channel : channelResources()) {
+            if (id.equals(ResourceJson.string(channel, "id", ""))) {
+                return channel;
             }
         }
         return null;
+    }
+
+    private List<JsonObject> chatRules() {
+        List<JsonObject> rules = new ArrayList<>();
+        for (JsonObject profile : chatProfiles()) {
+            JsonObject rule = section(profile, "rule");
+            if (rule == null) {
+                continue;
+            }
+            JsonObject copy = rule.deepCopy();
+            String id = ResourceJson.string(profile, "id", "");
+            if (!id.isBlank()) {
+                copy.addProperty("id", id);
+            }
+            if (!copy.has("priority") && profile.has("priority")) {
+                copy.add("priority", profile.get("priority"));
+            }
+            copy.addProperty("enabled", ResourceJson.bool(profile, "enabled", true));
+            rules.add(copy);
+        }
+        return rules;
+    }
+
+    private JsonObject firstChatSection(String sectionName) {
+        for (JsonObject profile : chatProfiles()) {
+            JsonObject value = section(profile, sectionName);
+            if (value != null) {
+                JsonObject copy = value.deepCopy();
+                String id = ResourceJson.string(profile, "id", "");
+                if (!id.isBlank()) {
+                    copy.addProperty("id", id);
+                }
+                copy.addProperty("enabled", ResourceJson.bool(profile, "enabled", true));
+                return copy;
+            }
+        }
+        return null;
+    }
+
+    private JsonObject profileSection(String profileId, String sectionName) {
+        JsonObject profile = storage.get(ReSyncResourceCatalog.CHAT, profileId);
+        JsonObject value = section(profile, sectionName);
+        return value != null && ResourceJson.bool(profile, "enabled", true) ? value.deepCopy() : null;
+    }
+
+    private JsonObject section(JsonObject parent, String key) {
+        return parent != null && key != null && parent.has(key) && parent.get(key).isJsonObject() ? parent.getAsJsonObject(key) : null;
     }
 
     private String stripSection(JsonObject rule, String message) {

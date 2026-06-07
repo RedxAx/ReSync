@@ -29,7 +29,7 @@ class CustomizationResourceCatalogTest {
 
     @Test
     void planResourceTypesUseExpectedAssetFolders() {
-        assertEquals("Customization/Chat", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.CHAT_CHANNEL));
+        assertEquals("Customization/Chat", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.CHAT));
         assertEquals("Customization/MOTDs", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.MOTD_PROFILE));
         assertEquals("Customization/Messages", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.MESSAGE_RULE));
         assertEquals("Content/Recipes", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.RECIPE_DEFINITION));
@@ -41,5 +41,7 @@ class CustomizationResourceCatalogTest {
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xB3));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xB4));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xBA));
+        assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0x67));
+        assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0x6D));
     }
 }

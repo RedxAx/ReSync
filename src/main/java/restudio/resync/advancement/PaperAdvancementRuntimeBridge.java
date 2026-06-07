@@ -134,14 +134,47 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
                 continue;
             }
             JsonObject nodes = treeEntry.getValue().getAsJsonObject("nodes");
-            for (Map.Entry<String, JsonElement> nodeEntry : nodes.entrySet()) {
-                JsonObject node = nodeEntry.getValue().getAsJsonObject();
+            for (String nodeId : orderedNodeIds(treeEntry.getKey(), nodes)) {
+                JsonObject node = nodes.getAsJsonObject(nodeId);
                 if (bool(node, "enabled", true)) {
-                    result.put(key(treeEntry.getKey(), nodeEntry.getKey()), nativeDefinition(treeEntry.getKey(), node));
+                    result.put(key(treeEntry.getKey(), nodeId), nativeDefinition(treeEntry.getKey(), node));
                 }
             }
         }
         return result;
+    }
+
+    private List<String> orderedNodeIds(String treeId, JsonObject nodes) {
+        LinkedHashSet<String> ordered = new LinkedHashSet<>();
+        for (Map.Entry<String, JsonElement> entry : nodes.entrySet()) {
+            if (entry.getValue().isJsonObject() && bool(entry.getValue().getAsJsonObject(), "enabled", true)) {
+                appendNodeWithParents(treeId, nodes, entry.getKey(), ordered, new LinkedHashSet<>());
+            }
+        }
+        return new ArrayList<>(ordered);
+    }
+
+    private void appendNodeWithParents(String treeId, JsonObject nodes, String nodeId, LinkedHashSet<String> ordered, Set<String> visiting) {
+        if (nodeId == null || nodeId.isBlank() || ordered.contains(nodeId) || !nodes.has(nodeId) || !nodes.get(nodeId).isJsonObject() || !visiting.add(nodeId)) {
+            return;
+        }
+        String parent = localParent(treeId, text(nodes.getAsJsonObject(nodeId), "parent"));
+        if (!parent.isBlank()) {
+            appendNodeWithParents(treeId, nodes, parent, ordered, visiting);
+        }
+        ordered.add(nodeId);
+        visiting.remove(nodeId);
+    }
+
+    private String localParent(String treeId, String parent) {
+        if (parent.isBlank() || parent.contains(":")) {
+            return "";
+        }
+        if (!parent.contains("/")) {
+            return parent;
+        }
+        String[] parts = parent.split("/", 2);
+        return parts.length == 2 && parts[0].equals(treeId) ? parts[1] : "";
     }
 
     private JsonObject nativeDefinition(String treeId, JsonObject node) {

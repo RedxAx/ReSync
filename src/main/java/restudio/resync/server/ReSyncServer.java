@@ -24,6 +24,7 @@ import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.memory.MemoryMonitor;
+import restudio.resync.messages.MessageLogService;
 import restudio.resync.modules.ChunkTransportModule;
 import restudio.resync.modules.ChatModule;
 import restudio.resync.modules.AdvancementModule;
@@ -157,6 +158,7 @@ public class ReSyncServer {
         moduleContext.registerService(OptionCatalogRegistry.class, new OptionCatalogRegistry());
         moduleContext.registerService(ReSyncExtensionData.class, new ReSyncExtensionData());
         moduleContext.registerService(ReSyncJsonResourceStorage.class, jsonResourceStorage);
+        moduleContext.registerService(MessageLogService.class, new MessageLogService());
         ReTextService reTextService = new ReTextService(jsonResourceStorage);
         moduleContext.registerService(ReTextService.class, reTextService);
         jsonResourceStorage.addListener((type, id, value, deleted) -> {

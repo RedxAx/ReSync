@@ -20,6 +20,7 @@ import restudio.resync.customization.ResourceJson;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.messages.MessageLogService;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.text.ReTextService;
 
@@ -38,6 +39,7 @@ public class MessageRewriteModule implements Module, Listener {
     private ReTextService text;
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
+    private MessageLogService messageLog;
     private boolean protocolLibAvailable;
     private Object protocolBridge;
     private final PlainTextComponentSerializer plainText = PlainTextComponentSerializer.plainText();
@@ -54,6 +56,7 @@ public class MessageRewriteModule implements Module, Listener {
         text = context.getRequiredService(ReTextService.class);
         flowStorage = context.getService(FlowStorage.class);
         flowExecutor = context.getService(FlowExecutor.class);
+        messageLog = context.getService(MessageLogService.class);
         protocolLibAvailable = Bukkit.getPluginManager().isPluginEnabled("ProtocolLib");
         context.registerService(MessageRewriteModule.class, this);
     }
@@ -140,6 +143,9 @@ public class MessageRewriteModule implements Module, Listener {
     }
 
     private String rewrite(String source, Player target, String original, String originalJson, String hook) {
+        if (messageLog != null) {
+            messageLog.record(source, target, original, originalJson, hook);
+        }
         JsonObject rule = storage.listIds(ReSyncResourceCatalog.MESSAGE_RULE).stream()
             .map(id -> storage.get(ReSyncResourceCatalog.MESSAGE_RULE, id))
             .filter(candidate -> ResourceJson.bool(candidate, "enabled", true))

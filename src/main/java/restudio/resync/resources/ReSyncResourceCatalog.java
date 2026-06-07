@@ -17,12 +17,7 @@ public final class ReSyncResourceCatalog {
     public static final String TAB = "tab";
     public static final String CUSTOM_CONTENT = "custom_content";
     public static final String PROJECT_METADATA = "project_metadata";
-    public static final String CHAT_CHANNEL = "chat_channel";
-    public static final String CHAT_FORMAT = "chat_format";
-    public static final String CHAT_RULE = "chat_rule";
-    public static final String PRIVATE_MESSAGE_FORMAT = "private_message_format";
-    public static final String MENTION_STYLE = "mention_style";
-    public static final String IGNORE_LIST = "ignore_list";
+    public static final String CHAT = "chat";
     public static final String MOTD_PROFILE = "motd_profile";
     public static final String MESSAGE_RULE = "message_rule";
     public static final String RECIPE_DEFINITION = "recipe_definition";

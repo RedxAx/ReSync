@@ -425,12 +425,7 @@ public class ReSyncCommand implements TabExecutor {
             return "";
         }
         return switch (type.toLowerCase(Locale.ROOT)) {
-            case "channel", "chat", "chat_channel" -> ReSyncResourceCatalog.CHAT_CHANNEL;
-            case "chatformat", "chat_format", "format" -> ReSyncResourceCatalog.CHAT_FORMAT;
-            case "chatrule", "chat_rule" -> ReSyncResourceCatalog.CHAT_RULE;
-            case "pm", "private_message", "private_message_format" -> ReSyncResourceCatalog.PRIVATE_MESSAGE_FORMAT;
-            case "mention", "mention_style" -> ReSyncResourceCatalog.MENTION_STYLE;
-            case "ignore", "ignore_list" -> ReSyncResourceCatalog.IGNORE_LIST;
+            case "chat" -> ReSyncResourceCatalog.CHAT;
             case "motd", "motd_profile" -> ReSyncResourceCatalog.MOTD_PROFILE;
             case "message", "message_rule" -> ReSyncResourceCatalog.MESSAGE_RULE;
             case "recipe", "recipe_definition" -> ReSyncResourceCatalog.RECIPE_DEFINITION;
@@ -454,6 +449,7 @@ public class ReSyncCommand implements TabExecutor {
     private List<String> resourceFieldOptions(String type) {
         return switch (type) {
             case ReSyncResourceCatalog.MOTD_PROFILE -> List.of("line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers");
+            case ReSyncResourceCatalog.CHAT -> List.of("displayName", "channel.prefix", "format.template", "channel.range", "channel.speakPermission", "channel.readPermission", "channel.allowMiniMessage", "channel.miniMessagePermission", "rule.contains", "rule.action", "rule.replacement", "rule.channel", "rule.flowId", "privateMessages.sender", "privateMessages.receiver", "privateMessages.spy", "privateMessages.privateMessageFlow", "mention.template", "mention.mentionFlow", "ignore.players", "enabled");
             case ReSyncResourceCatalog.MESSAGE_RULE -> List.of("source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission", "players", "flowPredicate", "flowId");
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors");
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
@@ -473,8 +469,11 @@ public class ReSyncCommand implements TabExecutor {
         if (ReSyncResourceCatalog.MESSAGE_RULE.equals(type) && "action".equalsIgnoreCase(field)) {
             return List.of("replace_section", "replace", "append", "prepend", "remove", "flow");
         }
+        if (ReSyncResourceCatalog.CHAT.equals(type) && "rule.action".equalsIgnoreCase(field)) {
+            return List.of("block", "replace", "flow", "channel");
+        }
         if (ReSyncResourceCatalog.MESSAGE_RULE.equals(type) && "source".equalsIgnoreCase(field)) {
-            return List.of("join", "quit", "kick", "death", "title", "actionbar", "bossbar", "openScreen", "packetText", "system");
+            return List.of("chat", "join", "quit", "kick", "death", "title", "actionbar", "bossbar", "openScreen", "packetText", "system");
         }
         if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type) && "mode".equalsIgnoreCase(field)) {
             return List.of("frames", "typing", "scroll", "gradient", "blink", "random", "conditional");
@@ -497,6 +496,37 @@ public class ReSyncCommand implements TabExecutor {
         resource.addProperty("enabled", true);
         resource.addProperty("folder", ReSyncResourceCatalog.defaultFolder(type));
         switch (type) {
+            case ReSyncResourceCatalog.CHAT -> {
+                resource.addProperty("displayName", id);
+                JsonObject channel = new JsonObject();
+                channel.addProperty("priority", 0);
+                channel.addProperty("defaultChannel", true);
+                channel.addProperty("autojoin", true);
+                channel.addProperty("prefix", "<gray>[Chat]</gray> ");
+                channel.addProperty("format", "");
+                channel.addProperty("range", -1);
+                channel.addProperty("allowMiniMessage", false);
+                resource.add("channel", channel);
+                JsonObject format = new JsonObject();
+                format.addProperty("template", "{prefix}{sender}: {message}");
+                resource.add("format", format);
+                JsonObject rule = new JsonObject();
+                rule.addProperty("contains", "");
+                rule.addProperty("action", "replace");
+                rule.addProperty("replacement", "{message}");
+                resource.add("rule", rule);
+                JsonObject privateMessages = new JsonObject();
+                privateMessages.addProperty("sender", "<gray>To <white>{receiver}</white>: <message>");
+                privateMessages.addProperty("receiver", "<gray>From <white>{sender}</white>: <message>");
+                privateMessages.addProperty("spy", "<gray>Spy <white>{sender}</white> -> <white>{receiver}</white>: <message>");
+                resource.add("privateMessages", privateMessages);
+                JsonObject mention = new JsonObject();
+                mention.addProperty("template", "<yellow>@{player}</yellow>");
+                resource.add("mention", mention);
+                JsonObject ignore = new JsonObject();
+                ignore.add("players", new JsonArray());
+                resource.add("ignore", ignore);
+            }
             case ReSyncResourceCatalog.MOTD_PROFILE -> {
                 resource.addProperty("priority", 0);
                 resource.addProperty("line1", "<green>ReSync Server");

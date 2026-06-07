@@ -83,6 +83,7 @@ import restudio.resync.flow.registry.NodeDefinitionLoader;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeDefinitionValidator;
 import restudio.resync.flow.triggers.TriggerRegistry;
+import restudio.resync.messages.MessageLogService;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.messages.DataMessage;
@@ -211,7 +212,7 @@ public class FlowRuntimeModule implements Module {
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class), context.getService(ReSyncJsonResourceStorage.class));
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class), context.getService(ReSyncJsonResourceStorage.class), context.getService(MessageLogService.class));
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);

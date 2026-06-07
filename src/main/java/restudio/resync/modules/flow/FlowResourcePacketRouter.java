@@ -2,7 +2,9 @@ package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
@@ -16,22 +18,33 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.TabListService;
+import restudio.resync.messages.MessageLogService;
+import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 public class FlowResourcePacketRouter {
     private final List<FlowResourcePacketHandler<?>> handlers = new ArrayList<>();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final MessageLogService messageLogService;
+    private final FlowPacketSender sender;
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender) {
-        this(storage, customContentStorage, null, sender);
+        this(storage, customContentStorage, null, sender, null);
     }
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender) {
+        this(storage, customContentStorage, jsonResourceStorage, sender, null);
+    }
+
+    public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService) {
+        this.sender = sender;
+        this.messageLogService = messageLogService;
         handlers.add(new FlowResourcePacketHandler<>(guiAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(scoreboardAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(tabAdapter(storage, sender), sender));
@@ -45,12 +58,77 @@ public class FlowResourcePacketRouter {
     }
 
     public boolean handle(Session session, byte packetId, ByteBuffer buffer) {
+        if (packetId == ReSyncProtocolContract.MESSAGE_LOG_PACKET_REQUEST) {
+            handleMessageLogRequest(session, buffer);
+            return true;
+        }
         for (FlowResourcePacketHandler<?> handler : handlers) {
             if (handler.handle(session, packetId, buffer)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private void handleMessageLogRequest(Session session, ByteBuffer buffer) {
+        JsonObject request = readJsonObject(buffer);
+        int page = intValue(request, "page", 0);
+        int pageSize = intValue(request, "pageSize", 20);
+        String query = stringValue(request, "query");
+        String source = stringValue(request, "source");
+        JsonObject payload = messageLogService != null ? messageLogService.page(page, pageSize, query, source) : emptyMessageLogPage(page, pageSize, query, source);
+        sender.sendJsonPayload(session, ReSyncProtocolContract.MESSAGE_LOG_PACKET_RESPONSE, gson.toJson(payload), "MESSAGE_LOG_TOO_LARGE", "Message log page exceeds maximum size");
+    }
+
+    private JsonObject readJsonObject(ByteBuffer buffer) {
+        if (buffer == null || !buffer.hasRemaining()) {
+            return new JsonObject();
+        }
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+        String json = new String(bytes, StandardCharsets.UTF_8);
+        if (json.isBlank()) {
+            return new JsonObject();
+        }
+        try {
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            return root != null ? root : new JsonObject();
+        } catch (Exception ignored) {
+            return new JsonObject();
+        }
+    }
+
+    private int intValue(JsonObject json, String key, int fallback) {
+        if (json == null || key == null || !json.has(key) || json.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return json.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private String stringValue(JsonObject json, String key) {
+        if (json == null || key == null || !json.has(key) || json.get(key).isJsonNull()) {
+            return "";
+        }
+        try {
+            return json.get(key).getAsString();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private JsonObject emptyMessageLogPage(int page, int pageSize, String query, String source) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("page", Math.max(0, page));
+        payload.addProperty("pageSize", Math.max(1, pageSize));
+        payload.addProperty("total", 0);
+        payload.addProperty("query", query != null ? query : "");
+        payload.addProperty("source", source != null ? source : "");
+        payload.add("entries", new JsonArray());
+        return payload;
     }
 
     private FlowResourceAdapter<GuiDefinition> guiAdapter(FlowStorage storage, FlowPacketSender sender) {

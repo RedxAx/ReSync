@@ -24,6 +24,10 @@ class ReSyncProtocolContractTest {
         assertEquals((byte) 0xB3, ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK);
         assertEquals((byte) 0xB4, ReSyncProtocolContract.DIALOG_PACKET_REQUEST);
         assertEquals((byte) 0xBA, ReSyncProtocolContract.DIALOG_PACKET_SAVE_ACK);
+        assertEquals((byte) 0xBB, ReSyncProtocolContract.MESSAGE_LOG_PACKET_REQUEST);
+        assertEquals((byte) 0xBC, ReSyncProtocolContract.MESSAGE_LOG_PACKET_RESPONSE);
+        assertEquals((byte) 0x67, ReSyncProtocolContract.CHAT_PACKET_REQUEST);
+        assertEquals((byte) 0x6D, ReSyncProtocolContract.CHAT_PACKET_SAVE_ACK);
     }
 
     @Test
@@ -42,5 +46,7 @@ class ReSyncProtocolContractTest {
         assertEquals(ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.ADVANCEMENT_TREE).flowPackets().saveAck());
         assertEquals(ReSyncProtocolContract.DIALOG_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.DIALOG).flowPackets().request());
         assertEquals(ReSyncProtocolContract.DIALOG_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.DIALOG).flowPackets().saveAck());
+        assertEquals(ReSyncProtocolContract.CHAT_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CHAT).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.CHAT_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CHAT).flowPackets().saveAck());
     }
 }

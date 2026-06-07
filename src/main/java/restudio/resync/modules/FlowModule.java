@@ -25,6 +25,7 @@ import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
+import restudio.resync.messages.MessageLogService;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
@@ -84,11 +85,18 @@ public class FlowModule implements Module {
                       FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
                       PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
                       ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService, extensionData, optionCatalogRegistry, jsonResourceStorage, null);
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService) {
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions);
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
-        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, jsonResourceStorage, sender);
+        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, jsonResourceStorage, sender, messageLogService);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService, optionCatalogRegistry);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData);

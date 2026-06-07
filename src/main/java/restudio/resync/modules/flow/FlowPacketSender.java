@@ -89,6 +89,10 @@ public class FlowPacketSender {
         sendJsonPacket(session, packetId, json, displayName.toUpperCase().replace(' ', '_') + "_TOO_LARGE", displayName + " data exceeds maximum size");
     }
 
+    public void sendJsonPayload(Session session, byte packetId, String json, String errorCode, String errorMessage) {
+        sendJsonPacket(session, packetId, json, errorCode, errorMessage);
+    }
+
     public void sendFlowSaveAck(Session session, String flowId) {
         sendIdAck(session, (byte) 0x07, flowId);
     }

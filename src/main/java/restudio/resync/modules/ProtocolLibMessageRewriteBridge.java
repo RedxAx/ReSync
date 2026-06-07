@@ -13,6 +13,8 @@ import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class ProtocolLibMessageRewriteBridge implements AutoCloseable {
@@ -23,7 +25,17 @@ public class ProtocolLibMessageRewriteBridge implements AutoCloseable {
 
     public ProtocolLibMessageRewriteBridge(MessageRewriteModule module, ModuleContext context) {
         this.module = module;
-        packetAdapter = new PacketAdapter(context.getPlugin(), ListenerPriority.NORMAL,
+        packetAdapter = new PacketAdapter(context.getPlugin(), ListenerPriority.NORMAL, packetTypes()) {
+            @Override
+            public void onPacketSending(PacketEvent event) {
+                rewritePacket(event);
+            }
+        };
+        ProtocolLibrary.getProtocolManager().addPacketListener(packetAdapter);
+    }
+
+    private PacketType[] packetTypes() {
+        List<PacketType> types = new ArrayList<>(List.of(
             PacketType.Play.Server.CHAT,
             PacketType.Play.Server.DISGUISED_CHAT,
             PacketType.Play.Server.SET_TITLE_TEXT,
@@ -31,13 +43,20 @@ public class ProtocolLibMessageRewriteBridge implements AutoCloseable {
             PacketType.Play.Server.SET_ACTION_BAR_TEXT,
             PacketType.Play.Server.BOSS,
             PacketType.Play.Server.OPEN_WINDOW
-        ) {
-            @Override
-            public void onPacketSending(PacketEvent event) {
-                rewritePacket(event);
+        ));
+        addPacketType(types, "SYSTEM_CHAT");
+        addPacketType(types, "PLAYER_CHAT");
+        return types.toArray(PacketType[]::new);
+    }
+
+    private void addPacketType(List<PacketType> types, String name) {
+        try {
+            Object value = PacketType.Play.Server.class.getField(name).get(null);
+            if (value instanceof PacketType type) {
+                types.add(type);
             }
-        };
-        ProtocolLibrary.getProtocolManager().addPacketListener(packetAdapter);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override

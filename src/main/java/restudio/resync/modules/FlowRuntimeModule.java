@@ -231,10 +231,17 @@ public class FlowRuntimeModule implements Module {
         context.registerService(FlowDebugService.class, debugService);
         context.registerService(FlowModule.class, delegate);
         context.registerService(GuiManager.class, guiManager);
-        context.registerService(DialogService.class, new DialogService(context.getPlugin(), context.getRequiredService(ReSyncJsonResourceStorage.class), storage, executor));
         context.registerService(FlowRuntimeModule.class, this);
         FlowRuntimeAccess.configure(context.getPlugin(), () -> storage, () -> executor != null ? executor.getGlobalVariables() : null);
         FlowPacketSender editStateSender = new FlowPacketSender(context.getCodec(), channelId, Set.of());
+        context.registerService(DialogService.class, new DialogService(
+            context.getPlugin(),
+            context.getRequiredService(ReSyncJsonResourceStorage.class),
+            storage,
+            executor,
+            editStateSender::sendEditTargetState,
+            context.getRequiredService(PlayerSessionLinkService.class)
+        ));
         ScoreboardTemplateManager.configureEditStateBridge(editStateSender::sendEditTargetState, context.getRequiredService(PlayerSessionLinkService.class));
         CustomContentAccess.configure(customContentStorage, customContentService);
     }

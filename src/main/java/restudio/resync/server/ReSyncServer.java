@@ -18,6 +18,7 @@ import restudio.resync.core.ConnectionState;
 import restudio.resync.core.Session;
 import restudio.resync.core.SessionManager;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
@@ -380,6 +381,10 @@ public class ReSyncServer {
             guiManager.sendOpenGuiState(player, session);
         }
         ScoreboardTemplateManager.sendActiveState(player, session);
+        DialogService dialogService = moduleContext.getService(DialogService.class);
+        if (dialogService != null) {
+            dialogService.sendActiveState(player, session);
+        }
     }
 
     private void completeHandshake(ConnectionInfo info, HandshakeRequest req, ClientIdentity identity) {

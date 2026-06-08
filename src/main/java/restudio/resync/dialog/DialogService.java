@@ -13,12 +13,14 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.contracts.ReSyncProtocolContract;
+import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.CustomEventManager;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.lang.reflect.InvocationHandler;
@@ -30,20 +32,32 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DialogService {
     private final JavaPlugin plugin;
     private final ReSyncJsonResourceStorage storage;
     private final FlowStorage flowStorage;
     private final FlowExecutor flowExecutor;
+    private final EditTargetStateSender editTargetStateSender;
+    private final PlayerSessionLinkService sessionLinkService;
+    private final Map<UUID, String> activeDialogs = new ConcurrentHashMap<>();
     private final DialogApi api;
     private String lastError = "";
 
     public DialogService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, FlowStorage flowStorage, FlowExecutor flowExecutor) {
+        this(plugin, storage, flowStorage, flowExecutor, null, null);
+    }
+
+    public DialogService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, FlowStorage flowStorage, FlowExecutor flowExecutor,
+                         EditTargetStateSender editTargetStateSender, PlayerSessionLinkService sessionLinkService) {
         this.plugin = plugin;
         this.storage = storage;
         this.flowStorage = flowStorage;
         this.flowExecutor = flowExecutor;
+        this.editTargetStateSender = editTargetStateSender;
+        this.sessionLinkService = sessionLinkService;
         this.api = DialogApi.load();
     }
 
@@ -75,6 +89,7 @@ public class DialogService {
             }
             show.setAccessible(true);
             show.invoke(player, paperDialog);
+            publishEditState(player, dialogId);
             return true;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             lastError = exception.getClass().getSimpleName() + ": " + (exception.getMessage() == null ? "Dialog Build Failed" : exception.getMessage());
@@ -103,6 +118,25 @@ public class DialogService {
                 throw new IllegalStateException(exception);
             }
         });
+    }
+
+    private void publishEditState(Player player, String dialogId) {
+        if (editTargetStateSender == null || sessionLinkService == null || player == null || dialogId == null || dialogId.isBlank()) {
+            return;
+        }
+        activeDialogs.put(player.getUniqueId(), dialogId);
+        Session session = sessionLinkService.getLinkedSession(player.getUniqueId());
+        sendActiveState(player, session);
+    }
+
+    public void sendActiveState(Player player, Session session) {
+        if (editTargetStateSender == null || player == null || session == null) {
+            return;
+        }
+        String dialogId = activeDialogs.get(player.getUniqueId());
+        if (dialogId != null && !dialogId.isBlank()) {
+            editTargetStateSender.send(session, true, ReSyncResourceCatalog.DIALOG, dialogId, null);
+        }
     }
 
     private Component externalTitle(ReSyncProtocolContract.DialogResource resource) {
@@ -548,5 +582,10 @@ public class DialogService {
         boolean supported() {
             return dialogCreate != null;
         }
+    }
+
+    @FunctionalInterface
+    public interface EditTargetStateSender {
+        void send(Session session, boolean editable, String type, String resourceId, String flowId);
     }
 }

@@ -91,6 +91,14 @@ public class TriggerRegistry {
         save();
     }
 
+    public synchronized void removeFlowBindings(String flowId) {
+        if (flowId == null) {
+            return;
+        }
+        bindings.values().removeIf(binding -> flowId.equals(binding.getFlowId()));
+        save();
+    }
+
     public synchronized void replaceFlowBindings(String flowId, TriggerType type, List<TriggerBinding> newBindings) {
         if (flowId == null || type == null) {
             return;

@@ -41,4 +41,18 @@ class TriggerRegistryCompatibilityTest {
         assertEquals(1, reloaded.getBindings().size());
         assertEquals("flow:command", reloaded.getBindings().getFirst().getId());
     }
+
+    @Test
+    void removeFlowBindingsRemovesEveryBindingTypeForFlow() {
+        TriggerRegistry registry = new TriggerRegistry(tempDir.resolve("triggers.json").toFile());
+        TriggerBinding eventBinding = new TriggerBinding("flow:event", "flow", TriggerType.EVENT, "player_join");
+        TriggerBinding commandBinding = new TriggerBinding("flow:command", "flow", TriggerType.COMMAND, "hello");
+        TriggerBinding otherBinding = new TriggerBinding("other:command", "other", TriggerType.COMMAND, "other");
+
+        registry.setBindings(List.of(eventBinding, commandBinding, otherBinding));
+        registry.removeFlowBindings("flow");
+
+        assertEquals(1, registry.getBindings().size());
+        assertEquals("other:command", registry.getBindings().getFirst().getId());
+    }
 }

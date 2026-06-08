@@ -67,19 +67,34 @@ class ReTextTemplateTest {
         assertEquals("abc", scrollTemplate.frame(null, null, 0));
         assertEquals("bcd", scrollTemplate.frame(null, null, 100));
 
-        JsonObject gradient = new JsonObject();
-        gradient.addProperty("id", "gradient");
-        gradient.addProperty("mode", "gradient");
-        gradient.addProperty("frameMillis", 100);
-        gradient.addProperty("text", "Name");
-        JsonArray colors = new JsonArray();
-        colors.add("red");
-        colors.add("blue");
-        gradient.add("colors", colors);
-        ReTextService.ReTextTemplate gradientTemplate = ReTextService.ReTextTemplate.fromJson(gradient);
+        JsonObject pulse = new JsonObject();
+        pulse.addProperty("id", "pulse");
+        pulse.addProperty("mode", "pulse");
+        pulse.addProperty("frameMillis", 100);
+        pulse.addProperty("text", "Name");
+        pulse.addProperty("color", "red");
+        pulse.addProperty("secondaryColor", "blue");
+        ReTextService.ReTextTemplate pulseTemplate = ReTextService.ReTextTemplate.fromJson(pulse);
 
-        assertNotNull(gradientTemplate);
-        assertEquals("<gradient:red:blue>Name</gradient>", gradientTemplate.frame(null, null, 0));
-        assertEquals("<gradient:blue:red>Name</gradient>", gradientTemplate.frame(null, null, 100));
+        assertNotNull(pulseTemplate);
+        assertEquals("<red>Name</red>", pulseTemplate.frame(null, null, 0));
+        assertEquals("<blue>Name</blue>", pulseTemplate.frame(null, null, 100));
+    }
+
+    @Test
+    void scrollModePreservesMiniMessageTags() {
+        JsonObject scroll = new JsonObject();
+        scroll.addProperty("id", "styled_scroll");
+        scroll.addProperty("mode", "scroll");
+        scroll.addProperty("frameMillis", 100);
+        scroll.addProperty("text", "<red>abcdef</red>");
+        scroll.addProperty("width", 3);
+        ReTextService.ReTextTemplate scrollTemplate = ReTextService.ReTextTemplate.fromJson(scroll);
+
+        assertNotNull(scrollTemplate);
+        assertEquals("<red>abc</red>", scrollTemplate.frame(null, null, 0));
+        assertEquals("<red>bcd</red>", scrollTemplate.frame(null, null, 100));
+        assertEquals("<red>cde</red>", scrollTemplate.frame(null, null, 200));
+        assertEquals("<red>def</red>", scrollTemplate.frame(null, null, 300));
     }
 }

@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ReTextService {
-    private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation:([^%]+)%", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation[:_]([^%]+)%", Pattern.CASE_INSENSITIVE);
     private static final Pattern MINIMESSAGE_PATTERN = Pattern.compile("<[^>]+>");
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.builder()
@@ -65,10 +65,9 @@ public class ReTextService {
 
     public String renderPlain(String input, Player subject, Player viewer, long timeMillis) {
         String text = normalize(input);
-        text = applyTemplate(text, subject, viewer, timeMillis);
+        text = applyAnimations(text, subject, viewer, timeMillis);
         text = ReSyncPlaceholderUtil.apply(subject, text, true);
         text = applyLuckPermsMeta(subject, text);
-        text = applyAnimations(text, subject, viewer, timeMillis);
         return ReSyncPlaceholderUtil.apply(viewer != null ? viewer : subject, text, true);
     }
 
@@ -106,29 +105,37 @@ public class ReTextService {
         if (id == null || id.isBlank()) {
             return null;
         }
-        ReTextTemplate cached = templateCache.get(id);
+        String templateId = resolveTemplateId(id);
+        ReTextTemplate cached = templateCache.get(templateId);
         if (cached != null) {
             return cached;
         }
-        JsonObject json = storage.get(ReSyncResourceCatalog.TEXT_TEMPLATE, id);
+        JsonObject json = storage.get(ReSyncResourceCatalog.TEXT_TEMPLATE, templateId);
         ReTextTemplate template = ReTextTemplate.fromJson(json);
         if (template != null) {
-            templateCache.put(id, template);
+            templateCache.put(templateId, template);
         }
         return template;
     }
 
-    public void clearTemplateCache() {
-        templateCache.clear();
+    private String resolveTemplateId(String id) {
+        String clean = id == null ? "" : id.trim();
+        if (clean.isBlank()) {
+            return clean;
+        }
+        if (storage.get(ReSyncResourceCatalog.TEXT_TEMPLATE, clean) != null) {
+            return clean;
+        }
+        for (String existing : storage.listIds(ReSyncResourceCatalog.TEXT_TEMPLATE)) {
+            if (existing.equalsIgnoreCase(clean)) {
+                return existing;
+            }
+        }
+        return clean;
     }
 
-    private String applyTemplate(String input, Player subject, Player viewer, long timeMillis) {
-        if (!input.startsWith("@")) {
-            return input;
-        }
-        String id = input.substring(1);
-        ReTextTemplate template = template(id);
-        return template != null ? template.frame(subject, viewer, timeMillis) : input;
+    public void clearTemplateCache() {
+        templateCache.clear();
     }
 
     private String applyAnimations(String input, Player subject, Player viewer, long timeMillis) {
@@ -136,7 +143,7 @@ public class ReTextService {
         StringBuffer out = new StringBuffer();
         while (matcher.find()) {
             ReTextTemplate template = template(matcher.group(1));
-            String replacement = template != null ? template.frame(subject, viewer, timeMillis) : "";
+            String replacement = template != null ? template.frame(subject, viewer, timeMillis) : matcher.group();
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);
@@ -190,12 +197,18 @@ public class ReTextService {
         private final int visibleCharacters;
         private final List<String> colors;
         private final String text;
+        private final String color;
+        private final String secondaryColor;
 
         public ReTextTemplate(String id, List<String> frames, long frameMillis, String mode) {
-            this(id, frames, frameMillis, mode, 16, 0, List.of(), frames == null || frames.isEmpty() ? "" : frames.getFirst());
+            this(id, frames, frameMillis, mode, 16, 0, List.of(), frames == null || frames.isEmpty() ? "" : frames.getFirst(), "yellow", "white");
         }
 
         public ReTextTemplate(String id, List<String> frames, long frameMillis, String mode, int width, int visibleCharacters, List<String> colors, String text) {
+            this(id, frames, frameMillis, mode, width, visibleCharacters, colors, text, "yellow", "white");
+        }
+
+        public ReTextTemplate(String id, List<String> frames, long frameMillis, String mode, int width, int visibleCharacters, List<String> colors, String text, String color, String secondaryColor) {
             this.id = id;
             this.frames = frames == null || frames.isEmpty() ? List.of("") : List.copyOf(frames);
             this.frameMillis = Math.max(1L, frameMillis);
@@ -204,6 +217,8 @@ public class ReTextService {
             this.visibleCharacters = Math.max(0, visibleCharacters);
             this.colors = colors == null ? List.of() : List.copyOf(colors);
             this.text = text == null ? "" : text;
+            this.color = color == null || color.isBlank() ? "yellow" : color;
+            this.secondaryColor = secondaryColor == null || secondaryColor.isBlank() ? "white" : secondaryColor;
         }
 
         public String id() {
@@ -213,12 +228,15 @@ public class ReTextService {
         public String frame(Player subject, Player viewer, long timeMillis) {
             String normalizedMode = mode.toLowerCase(Locale.ROOT);
             return switch (normalizedMode) {
-                case "random", "choice" -> randomFrame(subject, timeMillis);
                 case "blink" -> blinkFrame(timeMillis);
                 case "typing" -> typingFrame(timeMillis);
                 case "scroll", "scrolling" -> scrollingFrame(timeMillis);
-                case "gradient" -> gradientFrame(timeMillis);
-                case "conditional" -> conditionalFrame(subject, viewer, timeMillis);
+                case "bounce" -> bounceFrame(timeMillis);
+                case "pulse" -> pulseFrame(timeMillis);
+                case "rainbow" -> rainbowFrame(timeMillis);
+                case "wave" -> waveFrame(timeMillis);
+                case "wipe" -> wipeFrame(timeMillis);
+                case "sparkle" -> sparkleFrame(timeMillis);
                 default -> sequenceFrame(timeMillis);
             };
         }
@@ -228,47 +246,230 @@ public class ReTextService {
             return frames.get(index);
         }
 
-        private String randomFrame(Player subject, long timeMillis) {
-            int seed = subject != null ? subject.getUniqueId().hashCode() : Long.hashCode(timeMillis / frameMillis);
-            return frames.get(Math.floorMod(seed, frames.size()));
-        }
-
         private String blinkFrame(long timeMillis) {
             return Math.floorMod(timeMillis / frameMillis, 2) == 0 ? frames.getFirst() : "";
         }
 
         private String typingFrame(long timeMillis) {
             String value = !text.isBlank() ? text : frames.getFirst();
-            int length = value.length();
+            int length = visibleLength(value);
             int visible = (int) Math.floorMod(timeMillis / frameMillis, length + 1);
             int maxVisible = visibleCharacters > 0 ? Math.min(visibleCharacters, visible) : visible;
-            return value.substring(0, Math.min(length, maxVisible));
+            return formattedSlice(value, 0, Math.min(length, maxVisible));
         }
 
         private String scrollingFrame(long timeMillis) {
             String value = !text.isBlank() ? text : frames.getFirst();
-            String padded = value + " ".repeat(width);
-            int start = (int) Math.floorMod(timeMillis / frameMillis, padded.length());
-            String doubled = padded + padded;
-            return doubled.substring(start, Math.min(start + width, doubled.length()));
-        }
-
-        private String gradientFrame(long timeMillis) {
-            String value = !text.isBlank() ? text : frames.getFirst();
-            if (colors.size() < 2) {
+            int length = visibleLength(value);
+            if (length <= width) {
                 return value;
             }
-            int phase = (int) Math.floorMod(timeMillis / frameMillis, colors.size());
-            String first = colors.get(phase);
-            String second = colors.get((phase + 1) % colors.size());
-            return "<gradient:" + first + ":" + second + ">" + value + "</gradient>";
+            int span = length + width;
+            int start = (int) Math.floorMod(timeMillis / frameMillis, span);
+            return formattedWindow(value, start, width);
         }
 
-        private String conditionalFrame(Player subject, Player viewer, long timeMillis) {
-            if (frames.size() < 2) {
-                return sequenceFrame(timeMillis);
+        private String bounceFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            int length = visibleLength(value);
+            if (length <= width) {
+                return value;
             }
-            return subject != null && viewer != null && subject.getUniqueId().equals(viewer.getUniqueId()) ? frames.getFirst() : frames.get(1);
+            int maxStart = length - width;
+            int cycle = Math.max(1, maxStart * 2);
+            int step = (int) Math.floorMod(timeMillis / frameMillis, cycle);
+            int start = step <= maxStart ? step : cycle - step;
+            return formattedSlice(value, start, start + width);
+        }
+
+        private String pulseFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            String active = Math.floorMod(timeMillis / frameMillis, 2) == 0 ? color : secondaryColor;
+            return tag(active, value);
+        }
+
+        private String rainbowFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            int phase = (int) Math.floorMod(timeMillis / frameMillis, 32);
+            return "<rainbow:" + phase + ">" + value + "</rainbow>";
+        }
+
+        private String waveFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            List<String> palette = colors.isEmpty() ? List.of(color, secondaryColor) : colors;
+            int phase = (int) Math.floorMod(timeMillis / frameMillis, palette.size());
+            StringBuilder out = new StringBuilder();
+            for (VisibleChar visible : visibleChars(value)) {
+                String active = palette.get(Math.floorMod(visible.index() + phase, palette.size()));
+                out.append(tag(active, visible.text()));
+            }
+            return out.toString();
+        }
+
+        private String wipeFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            int length = visibleLength(value);
+            int cap = visibleCharacters > 0 ? Math.min(visibleCharacters, length) : length;
+            int visible = (int) Math.floorMod(timeMillis / frameMillis, cap + 1);
+            return formattedSlice(value, 0, visible);
+        }
+
+        private String sparkleFrame(long timeMillis) {
+            String value = !text.isBlank() ? text : frames.getFirst();
+            List<VisibleChar> chars = visibleChars(value);
+            if (chars.isEmpty()) {
+                return value;
+            }
+            int active = (int) Math.floorMod(timeMillis / frameMillis, chars.size());
+            StringBuilder out = new StringBuilder();
+            for (VisibleChar visible : chars) {
+                out.append(visible.index() == active ? tag(color, visible.text()) : tag(secondaryColor, visible.text()));
+            }
+            return out.toString();
+        }
+
+        private String formattedWindow(String value, int start, int size) {
+            StringBuilder out = new StringBuilder();
+            int textStart = Math.max(0, start);
+            int textEnd = Math.min(visibleLength(value), start + size);
+            int leftPad = Math.max(0, -start);
+            int rightPad = Math.max(0, start + size - visibleLength(value));
+            out.append(" ".repeat(leftPad));
+            if (textEnd > textStart) {
+                out.append(formattedSlice(value, textStart, textEnd));
+            }
+            out.append(" ".repeat(rightPad));
+            return out.toString();
+        }
+
+        private String formattedSlice(String value, int start, int end) {
+            if (value == null || value.isEmpty() || end <= start) {
+                return "";
+            }
+            List<TextPart> parts = textParts(value);
+            StringBuilder out = new StringBuilder();
+            List<String> openTags = new ArrayList<>();
+            int visible = 0;
+            boolean startTagsEmitted = false;
+            for (TextPart part : parts) {
+                if (part.tag()) {
+                    if (visible < start) {
+                        applyTagState(openTags, part.text());
+                    }
+                    if (visible >= start && visible < end) {
+                        if (visible == start && !startTagsEmitted) {
+                            for (String tag : openTags) {
+                                out.append(tag);
+                            }
+                            startTagsEmitted = true;
+                        }
+                        out.append(part.text());
+                        applyTagState(openTags, part.text());
+                    }
+                    continue;
+                }
+                for (int offset = 0; offset < part.text().length(); offset++) {
+                    if (visible == start && !startTagsEmitted) {
+                        for (String tag : openTags) {
+                            out.append(tag);
+                        }
+                        startTagsEmitted = true;
+                    }
+                    if (visible >= start && visible < end) {
+                        out.append(part.text().charAt(offset));
+                    }
+                    visible++;
+                    if (visible >= end) {
+                        break;
+                    }
+                }
+                if (visible >= end) {
+                    break;
+                }
+            }
+            for (int i = openTags.size() - 1; i >= 0; i--) {
+                out.append(closeTag(openTags.get(i)));
+            }
+            return out.toString();
+        }
+
+        private int visibleLength(String value) {
+            int length = 0;
+            for (TextPart part : textParts(value)) {
+                if (!part.tag()) {
+                    length += part.text().length();
+                }
+            }
+            return length;
+        }
+
+        private List<VisibleChar> visibleChars(String value) {
+            List<VisibleChar> chars = new ArrayList<>();
+            int index = 0;
+            for (TextPart part : textParts(value)) {
+                if (part.tag()) {
+                    continue;
+                }
+                for (int i = 0; i < part.text().length(); i++) {
+                    chars.add(new VisibleChar(index, String.valueOf(part.text().charAt(i))));
+                    index++;
+                }
+            }
+            return chars;
+        }
+
+        private List<TextPart> textParts(String value) {
+            List<TextPart> parts = new ArrayList<>();
+            if (value == null || value.isEmpty()) {
+                return parts;
+            }
+            Matcher matcher = MINIMESSAGE_PATTERN.matcher(value);
+            int index = 0;
+            while (matcher.find()) {
+                if (matcher.start() > index) {
+                    parts.add(new TextPart(false, value.substring(index, matcher.start())));
+                }
+                parts.add(new TextPart(true, matcher.group()));
+                index = matcher.end();
+            }
+            if (index < value.length()) {
+                parts.add(new TextPart(false, value.substring(index)));
+            }
+            return parts;
+        }
+
+        private void applyTagState(List<String> openTags, String tag) {
+            String name = tagName(tag);
+            if (name.isBlank() || tag.startsWith("</")) {
+                openTags.removeIf(open -> tagName(open).equals(name));
+                return;
+            }
+            if (tag.endsWith("/>") || name.startsWith("click") || name.startsWith("hover")) {
+                return;
+            }
+            openTags.add(tag);
+        }
+
+        private String tagName(String tag) {
+            String clean = tag == null ? "" : tag.replace("<", "").replace(">", "").replace("/", "").trim();
+            int split = clean.indexOf(':');
+            return split >= 0 ? clean.substring(0, split).toLowerCase(Locale.ROOT) : clean.toLowerCase(Locale.ROOT);
+        }
+
+        private String closeTag(String tag) {
+            String name = tagName(tag);
+            return name.isBlank() ? "" : "</" + name + ">";
+        }
+
+        private String tag(String tag, String value) {
+            if (tag == null || tag.isBlank()) {
+                return value;
+            }
+            String clean = tag.trim();
+            if (clean.startsWith("<") && clean.endsWith(">")) {
+                return clean + value + closeTag(clean);
+            }
+            return "<" + clean + ">" + value + "</" + tagName(clean) + ">";
         }
 
         public static ReTextTemplate fromJson(JsonObject json) {
@@ -305,7 +506,15 @@ public class ReTextService {
                 }
             }
             String text = json.has("text") && !json.get("text").isJsonNull() ? json.get("text").getAsString() : frames.getFirst();
-            return new ReTextTemplate(json.get("id").getAsString(), frames, frameMillis, mode, width, visibleCharacters, colors, text);
+            String color = json.has("color") && !json.get("color").isJsonNull() ? json.get("color").getAsString() : "yellow";
+            String secondaryColor = json.has("secondaryColor") && !json.get("secondaryColor").isJsonNull() ? json.get("secondaryColor").getAsString() : "white";
+            return new ReTextTemplate(json.get("id").getAsString(), frames, frameMillis, mode, width, visibleCharacters, colors, text, color, secondaryColor);
+        }
+
+        private record TextPart(boolean tag, String text) {
+        }
+
+        private record VisibleChar(int index, String text) {
         }
     }
 }

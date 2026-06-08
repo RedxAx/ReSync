@@ -166,7 +166,7 @@ public class FlowBlueprintPacketHandler {
                 }
             }
             if (triggerRegistry != null) {
-                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
+                triggerRegistry.removeFlowBindings(flowId);
             }
             if (globalTriggers != null) {
                 globalTriggers.refreshBindings();

@@ -451,7 +451,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.MOTD_PROFILE -> List.of("line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers");
             case ReSyncResourceCatalog.CHAT -> List.of("displayName", "channel.prefix", "format.template", "channel.range", "channel.speakPermission", "channel.readPermission", "channel.allowMiniMessage", "channel.miniMessagePermission", "rule.contains", "rule.action", "rule.replacement", "rule.channel", "rule.flowId", "privateMessages.sender", "privateMessages.receiver", "privateMessages.spy", "privateMessages.privateMessageFlow", "mention.template", "mention.mentionFlow", "ignore.players", "enabled");
             case ReSyncResourceCatalog.MESSAGE_RULE -> List.of("source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission", "players", "flowPredicate", "flowId");
-            case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors");
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors", "color", "secondaryColor");
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
@@ -476,7 +476,7 @@ public class ReSyncCommand implements TabExecutor {
             return List.of("chat", "join", "quit", "kick", "death", "title", "actionbar", "bossbar", "openScreen", "packetText", "system");
         }
         if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type) && "mode".equalsIgnoreCase(field)) {
-            return List.of("frames", "typing", "scroll", "gradient", "blink", "random", "conditional");
+            return List.of("frames", "typing", "scroll", "bounce", "blink", "pulse", "rainbow", "wave", "wipe", "sparkle");
         }
         if (ReSyncResourceCatalog.DIALOG.equals(type) && "type".equalsIgnoreCase(field)) {
             return List.of("minecraft:notice", "minecraft:confirmation", "minecraft:multi_action", "minecraft:dialog_list");

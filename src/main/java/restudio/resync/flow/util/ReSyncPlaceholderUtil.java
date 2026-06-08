@@ -38,11 +38,23 @@ public final class ReSyncPlaceholderUtil {
         StringBuffer out = new StringBuffer();
         while (matcher.find()) {
             String token = matcher.group(1);
+            if (isTextTemplateToken(token)) {
+                matcher.appendReplacement(out, Matcher.quoteReplacement(matcher.group()));
+                continue;
+            }
             String replacement = resolveToken(globals, contextPlayer, token);
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);
         return out.toString();
+    }
+
+    private static boolean isTextTemplateToken(String token) {
+        if (token == null) {
+            return false;
+        }
+        String normalized = token.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("animation:") || normalized.startsWith("animation_");
     }
 
     private static String resolveToken(Map<String, Object> globals, Player contextPlayer, String token) {

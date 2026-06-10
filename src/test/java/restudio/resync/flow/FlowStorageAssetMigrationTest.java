@@ -76,9 +76,9 @@ class FlowStorageAssetMigrationTest {
         Path migratedRecipe = assets.resolve("Content").resolve("Recipes").resolve("Custom").resolve("special.json");
         String project = Files.readString(assets.resolve("project.json"));
 
-        assertFalse(Files.exists(command));
-        assertFalse(Files.exists(gui));
-        assertFalse(Files.exists(recipe));
+        assertTrue(Files.exists(command));
+        assertTrue(Files.exists(gui));
+        assertTrue(Files.exists(recipe));
         assertTrue(Files.exists(migratedCommand));
         assertTrue(Files.exists(migratedGui));
         assertTrue(Files.exists(migratedRecipe));
@@ -121,7 +121,7 @@ class FlowStorageAssetMigrationTest {
         String project = Files.readString(assets.resolve("project.json"));
 
         assertTrue(Files.exists(existing));
-        assertFalse(Files.exists(legacy));
+        assertTrue(Files.exists(legacy));
         assertTrue(Files.exists(migrated));
         assertTrue(Files.readString(existing).contains("\"resourceType\": \"scoreboard\"") || Files.readString(existing).contains("\"resourceType\":\"scoreboard\""));
         assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));

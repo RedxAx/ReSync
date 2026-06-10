@@ -70,6 +70,10 @@ public final class AssetFileFormat {
         }
     }
 
+    public static void copyTyped(Path source, Path target, String type) throws IOException {
+        StorageSafety.writeUtf8Atomic(target, withResourceType(StorageSafety.readUtf8(source), type));
+    }
+
     public static String typedConflictFolder(String folder, String type) {
         String normalized = folder != null ? folder.replace('\\', '/').replaceAll("/+", "/").trim() : "";
         while (normalized.startsWith("/")) {

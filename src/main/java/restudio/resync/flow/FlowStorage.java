@@ -51,6 +51,8 @@ public class FlowStorage {
     private final Map<String, ScoreboardDefinition> scoreboardCache = new ConcurrentHashMap<>();
     private final Map<String, TabDefinition> tabCache = new ConcurrentHashMap<>();
     private final Map<String, String> projectMetadataCache = new ConcurrentHashMap<>();
+    private final Map<String, Path> assetFileIndex = new ConcurrentHashMap<>();
+    private volatile boolean assetFileIndexReady;
     private volatile String defaultScoreboardId;
     private volatile boolean defaultScoreboardUsePapi = true;
     private volatile String defaultTabId;
@@ -119,6 +121,7 @@ public class FlowStorage {
             String json = FlowSerializer.serialize(graph);
             StorageSafety.writeUtf8Atomic(file, AssetFileFormat.withResourceType(json, type));
             deleteAssetDuplicates("flow", safeId, file);
+            assetFileIndex.put(assetIndexKey(type, safeId), file);
             graphCache.put(safeId, graph);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save flow: " + safeId, e);
@@ -132,6 +135,7 @@ public class FlowStorage {
         }
         try {
             deleteResourceFiles(flowDir, "flow", safeId);
+            invalidateAssetFileIndex();
             graphCache.remove(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete flow: " + safeId, e);
@@ -179,6 +183,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeGui(gui);
             StorageSafety.writeUtf8Atomic(file, AssetFileFormat.withResourceType(json, "gui"));
             deleteAssetDuplicates("gui", safeId, file);
+            assetFileIndex.put(assetIndexKey("gui", safeId), file);
             guiCache.put(safeId, gui);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save GUI: " + safeId, e);
@@ -192,6 +197,7 @@ public class FlowStorage {
         }
         try {
             deleteResourceFiles(guiDir, "gui", safeId);
+            invalidateAssetFileIndex();
             guiCache.remove(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete GUI: " + safeId, e);
@@ -239,6 +245,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeScoreboard(scoreboard);
             StorageSafety.writeUtf8Atomic(file, AssetFileFormat.withResourceType(json, "scoreboard"));
             deleteAssetDuplicates("scoreboard", safeId, file);
+            assetFileIndex.put(assetIndexKey("scoreboard", safeId), file);
             scoreboardCache.put(safeId, scoreboard);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save scoreboard: " + safeId, e);
@@ -252,6 +259,7 @@ public class FlowStorage {
         }
         try {
             deleteResourceFiles(scoreboardDir, "scoreboard", safeId);
+            invalidateAssetFileIndex();
             scoreboardCache.remove(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete scoreboard: " + safeId, e);
@@ -299,6 +307,7 @@ public class FlowStorage {
             String json = FlowSerializer.serializeTab(tab);
             StorageSafety.writeUtf8Atomic(file, AssetFileFormat.withResourceType(json, "tab"));
             deleteAssetDuplicates("tab", safeId, file);
+            assetFileIndex.put(assetIndexKey("tab", safeId), file);
             tabCache.put(safeId, tab);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save tab: " + safeId, e);
@@ -312,6 +321,7 @@ public class FlowStorage {
         }
         try {
             deleteResourceFiles(tabDir, "tab", safeId);
+            invalidateAssetFileIndex();
             tabCache.remove(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete tab: " + safeId, e);
@@ -352,6 +362,7 @@ public class FlowStorage {
             StorageSafety.writeUtf8Atomic(assetsDir.toPath().resolve(safeId + ".json"), json);
             projectMetadataCache.put(safeId, json);
             syncAssetsFromProjectMetadata(json);
+            invalidateAssetFileIndex();
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save project metadata: " + safeId, e);
         }
@@ -506,6 +517,7 @@ public class FlowStorage {
         scoreboardCache.clear();
         tabCache.clear();
         projectMetadataCache.clear();
+        invalidateAssetFileIndex();
     }
 
     private String projectMetadataId(String id) {
@@ -719,29 +731,68 @@ public class FlowStorage {
     }
 
     private Path findAssetResourceFile(String type, String id) {
-        Path root = assetsDir.toPath();
-        if (!Files.exists(root)) {
+        if (!Files.exists(assetsDir.toPath())) {
             return null;
         }
-        try (Stream<Path> paths = Files.walk(root)) {
-            Path legacy = null;
-            for (Path path : paths.filter(Files::isRegularFile).toList()) {
-                AssetResourceName asset = parseAssetResourceName(path);
-                if (asset == null || !assetFileMatches(type, id, asset)) {
-                    continue;
-                }
-                if (AssetFileFormat.isIdOnlyFileName(path.getFileName().toString())) {
-                    return path;
-                }
-                if (legacy == null) {
-                    legacy = path;
+        Map<String, Path> index = assetFiles();
+        if (!"flow".equals(type)) {
+            return index.get(assetIndexKey(type, id));
+        }
+        Path flow = index.get(assetIndexKey("flow", id));
+        if (flow != null) {
+            return flow;
+        }
+        Path function = index.get(assetIndexKey("function", id));
+        if (function != null) {
+            return function;
+        }
+        return index.get(assetIndexKey("command", id));
+    }
+
+    private Map<String, Path> assetFiles() {
+        if (!assetFileIndexReady) {
+            synchronized (this) {
+                if (!assetFileIndexReady) {
+                    rebuildAssetFileIndex();
+                    assetFileIndexReady = true;
                 }
             }
-            return legacy;
-        } catch (IOException e) {
-            Log.warn("Failed to search assets for " + type + ": " + id + " - " + e.getMessage());
-            return null;
         }
+        return assetFileIndex;
+    }
+
+    private void invalidateAssetFileIndex() {
+        assetFileIndexReady = false;
+        assetFileIndex.clear();
+    }
+
+    private void rebuildAssetFileIndex() {
+        assetFileIndex.clear();
+        Path root = assetsDir.toPath();
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                AssetResourceName asset = parseAssetResourceName(path);
+                if (asset == null || safeId(asset.id(), "index asset") == null) {
+                    continue;
+                }
+                String key = assetIndexKey(asset.type(), asset.id());
+                Path existing = assetFileIndex.get(key);
+                if (AssetFileFormat.isIdOnlyFileName(path.getFileName().toString())) {
+                    assetFileIndex.put(key, path);
+                } else if (existing == null || !AssetFileFormat.isIdOnlyFileName(existing.getFileName().toString())) {
+                    assetFileIndex.put(key, path);
+                }
+            }
+        } catch (IOException e) {
+            Log.warn("Failed to index assets: " + e.getMessage());
+        }
+    }
+
+    private String assetIndexKey(String type, String id) {
+        return type + "\n" + id;
     }
 
     private Path assetResourceFile(ResourceEntrySnapshot resource) {
@@ -892,6 +943,7 @@ public class FlowStorage {
         if (assetFile != null) {
             deleteAssetFile(assetFile);
         }
+        deleteMatchingAssetFiles(type, id);
     }
 
     private void deleteAssetFile(Path file) throws IOException {
@@ -903,12 +955,28 @@ public class FlowStorage {
         Files.deleteIfExists(target);
     }
 
+    private void deleteMatchingAssetFiles(String type, String id) throws IOException {
+        Path root = assetsDir.toPath();
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                AssetResourceName asset = parseAssetResourceName(path);
+                if (assetFileMatches(type, id, asset)) {
+                    deleteAssetFile(path);
+                }
+            }
+        }
+    }
+
     private void syncAssetsFromProjectMetadata(String json) {
         ProjectMetadataSnapshot metadata = parseProjectMetadata(json);
         if (metadata == null) {
             return;
         }
         try {
+            invalidateAssetFileIndex();
             Files.createDirectories(assetsDir.toPath());
             for (FolderEntrySnapshot folder : metadata.folders()) {
                 Files.createDirectories(safeAssetFolder(folder.path));
@@ -928,13 +996,16 @@ public class FlowStorage {
                 StorageSafety.writeUtf8Atomic(assetsDir.toPath().resolve("project.json"), updatedJson);
                 projectMetadataCache.put("project", updatedJson);
             }
+            invalidateAssetFileIndex();
         } catch (IOException | IllegalArgumentException e) {
+            invalidateAssetFileIndex();
             Log.warn("Failed to sync assets: " + e.getMessage());
         }
     }
 
     private void migrateLegacyAssets() {
         try {
+            invalidateAssetFileIndex();
             ProjectMetadataSnapshot metadata = loadMigrationMetadata();
             Set<String> commandFlowIds = loadCommandFlowIds();
             boolean changed = ensureDefaultFolders(metadata);
@@ -953,7 +1024,9 @@ public class FlowStorage {
             }
             syncAssetsFromProjectMetadata(gson.toJson(metadata));
             cleanupLegacyAssetDirectories();
+            invalidateAssetFileIndex();
         } catch (IOException | IllegalArgumentException e) {
+            invalidateAssetFileIndex();
             Log.warn("Failed to migrate legacy assets: " + e.getMessage());
         }
     }
@@ -989,7 +1062,6 @@ public class FlowStorage {
                 if (Files.exists(target) && !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
                     String targetType = AssetFileFormat.readResourceType(target);
                     if (type.equals(targetType)) {
-                        Files.deleteIfExists(file);
                         continue;
                     }
                     folder = conflictFolderForType(type, id, 1);
@@ -997,13 +1069,12 @@ public class FlowStorage {
                     target = safeAssetFolder(folder).resolve(AssetFileFormat.idOnlyFileName(id));
                     if (Files.exists(target) && type.equals(AssetFileFormat.readResourceType(target))) {
                         changed |= ensureAssetResource(metadata, type, id, id, folder);
-                        Files.deleteIfExists(file);
                         continue;
                     }
                 }
                 changed |= ensureAssetResource(metadata, type, id, id, folder);
                 if (AssetFileFormat.needsRewrite(file, type) || !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
-                    AssetFileFormat.rewriteTyped(file, target, type);
+                    AssetFileFormat.copyTyped(file, target, type);
                 }
             }
         }
@@ -1315,7 +1386,6 @@ public class FlowStorage {
                 if (Files.exists(target)) {
                     String targetType = AssetFileFormat.readResourceType(target);
                     if (resource.type.equals(targetType)) {
-                        Files.deleteIfExists(currentAsset);
                         continue;
                     }
                     String folder = conflictFolderForType(resource.type, safeId, 1);
@@ -1323,27 +1393,26 @@ public class FlowStorage {
                     target = assetResourceFile(resource);
                     changed = true;
                 }
-                AssetFileFormat.rewriteTyped(currentAsset, target, resource.type);
+                AssetFileFormat.copyTyped(currentAsset, target, resource.type);
                 continue;
             } else if (currentAsset != null) {
-                AssetFileFormat.rewriteTyped(currentAsset, currentAsset, resource.type);
+                AssetFileFormat.copyTyped(currentAsset, currentAsset, resource.type);
                 continue;
             }
             if (legacyDirectory.exists()) {
                 Path legacy = jsonFile(legacyDirectory, safeId, "sync assets");
                 if (legacy != null && Files.exists(legacy) && !Files.exists(target)) {
-                    AssetFileFormat.rewriteTyped(legacy, target, resource.type);
+                    AssetFileFormat.copyTyped(legacy, target, resource.type);
                 } else if (legacy != null && Files.exists(legacy)) {
                     String targetType = AssetFileFormat.readResourceType(target);
                     if (resource.type.equals(targetType)) {
-                        Files.deleteIfExists(legacy);
                         continue;
                     }
                     String folder = conflictFolderForType(resource.type, safeId, 1);
                     resource.path = normalizeAssetPath(folder);
                     target = assetResourceFile(resource);
                     changed = true;
-                    AssetFileFormat.rewriteTyped(legacy, target, resource.type);
+                    AssetFileFormat.copyTyped(legacy, target, resource.type);
                 }
             }
         }
@@ -1478,21 +1547,36 @@ public class FlowStorage {
 
     private List<String> listResourceIds(File legacyDirectory, String type) {
         Set<String> ids = new HashSet<>();
-        Path root = assetsDir.toPath();
-        if (Files.exists(root)) {
-            try (Stream<Path> paths = Files.walk(root)) {
-                paths
-                        .filter(Files::isRegularFile)
-                        .map(this::parseAssetResourceName)
-                        .filter(asset -> assetListFileMatches(type, asset))
-                        .map(AssetResourceName::id)
-                        .filter(id -> safeId(id, "list") != null)
-                        .forEach(ids::add);
-            } catch (IOException e) {
-                Log.warn("Failed to list assets for " + type + ": " + e.getMessage());
+        for (String key : assetFiles().keySet()) {
+            AssetResourceName asset = assetFromIndexKey(key);
+            if (assetListFileMatches(type, asset) && safeId(asset.id(), "list") != null) {
+                ids.add(asset.id());
+            }
+        }
+        if (legacyDirectory.exists()) {
+            File[] files = legacyDirectory.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    String name = file.getName();
+                    String id = name.substring(0, name.length() - 5);
+                    if (safeId(id, "list") != null) {
+                        ids.add(id);
+                    }
+                }
             }
         }
         return ids.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    private AssetResourceName assetFromIndexKey(String key) {
+        if (key == null) {
+            return null;
+        }
+        int separator = key.indexOf('\n');
+        if (separator <= 0 || separator >= key.length() - 1) {
+            return null;
+        }
+        return new AssetResourceName(key.substring(0, separator), key.substring(separator + 1));
     }
 
     private boolean assetListFileMatches(String type, AssetResourceName asset) {

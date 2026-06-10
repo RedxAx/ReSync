@@ -99,7 +99,7 @@ class JsonAssetStoreTest {
         store.migrateLegacyAssets();
 
         Path migrated = folder.resolve("main.json");
-        assertFalse(Files.exists(legacy));
+        assertTrue(Files.exists(legacy));
         assertTrue(Files.exists(migrated));
         assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));
         assertEquals("main", store.listIds().getFirst());
@@ -127,7 +127,7 @@ class JsonAssetStoreTest {
 
         Path migrated = tempDir.resolve("assets").resolve("GUIs").resolve("gui").resolve("main.json");
         assertTrue(Files.exists(existing));
-        assertFalse(Files.exists(legacy));
+        assertTrue(Files.exists(legacy));
         assertTrue(Files.exists(migrated));
         assertTrue(Files.readString(existing).contains("\"resourceType\":\"scoreboard\""));
         assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));

@@ -24,6 +24,7 @@ import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
@@ -92,7 +93,8 @@ public class DialogService {
             publishEditState(player, dialogId);
             return true;
         } catch (ReflectiveOperationException | RuntimeException exception) {
-            lastError = exception.getClass().getSimpleName() + ": " + (exception.getMessage() == null ? "Dialog Build Failed" : exception.getMessage());
+            Throwable cause = unwrap(exception);
+            lastError = cause.getClass().getSimpleName() + ": " + (cause.getMessage() == null ? "Dialog Build Failed" : cause.getMessage());
             return false;
         }
     }
@@ -103,7 +105,7 @@ public class DialogService {
             Component.text(resource.title()),
             externalTitle(resource),
             resource.canCloseWithEscape(),
-            resource.pause(),
+            pause(resource),
             afterAction(resource.afterAction()),
             body(resource),
             inputs(resource)
@@ -151,6 +153,10 @@ public class DialogService {
             default -> "CLOSE";
         };
         return Enum.valueOf(api.afterActionClass.asSubclass(Enum.class), name);
+    }
+
+    private boolean pause(ReSyncProtocolContract.DialogResource resource) {
+        return !"none".equalsIgnoreCase(resource.afterAction()) && resource.pause();
     }
 
     private List<Object> body(ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
@@ -279,13 +285,19 @@ public class DialogService {
     }
 
     private Object actionButton(Player player, String dialogId, JsonObject dialog, JsonObject action, int index) throws ReflectiveOperationException {
-        Object dialogAction = api.actionCustom.invoke(null, callback(player, dialogId, dialog, action, index), callbackOptions());
+        Object dialogAction = noopAction(action) ? null : api.actionCustom.invoke(null, callback(player, dialogId, dialog, action, index), callbackOptions());
         return api.actionButtonCreate.invoke(null,
             Component.text(text(action, "label", text(action, "text", "Action"))),
             tooltip(action),
             Math.clamp(integer(action, "width", 150), 1, 1024),
             dialogAction
         );
+    }
+
+    private boolean noopAction(JsonObject action) {
+        JsonObject resync = object(action, "resync");
+        String mode = text(resync, "actionMode", text(action, "actionMode", ""));
+        return (mode.isBlank() || "None".equals(mode)) && object(action, "action") == null;
     }
 
     private Component tooltip(JsonObject action) {
@@ -471,6 +483,17 @@ public class DialogService {
             return method.getReturnType() == Void.TYPE ? null : result;
         }
         throw new NoSuchMethodException(name);
+    }
+
+    private static Throwable unwrap(Throwable throwable) {
+        Throwable current = throwable;
+        while (current instanceof InvocationTargetException exception && exception.getCause() != null) {
+            current = exception.getCause();
+        }
+        if (current instanceof IllegalStateException exception && exception.getCause() != null) {
+            return unwrap(exception.getCause());
+        }
+        return current;
     }
 
     private List<JsonObject> objectArray(JsonObject object, String key) {

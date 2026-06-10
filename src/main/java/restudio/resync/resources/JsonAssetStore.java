@@ -6,7 +6,6 @@ import restudio.resync.storage.StorageSafety;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -95,10 +94,21 @@ public class JsonAssetStore<T> {
         }
         try {
             Path target = findAssetFile(safeId);
+            Path oldTarget = target;
             if (target == null) {
                 target = defaultAssetFile(safeId, value);
+            } else if (!AssetFileFormat.isIdOnlyFileName(target.getFileName().toString())) {
+                target = target.getParent().resolve(AssetFileFormat.idOnlyFileName(safeId));
             }
-            StorageSafety.writeUtf8Atomic(target, writer.write(value));
+            if ((oldTarget == null || !oldTarget.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize()))
+                    && Files.exists(target)
+                    && !typeId.equals(AssetFileFormat.readResourceType(target))) {
+                target = conflictAssetFile(safeId, 1);
+            }
+            StorageSafety.writeUtf8Atomic(target, AssetFileFormat.withResourceType(writer.write(value), typeId));
+            if (oldTarget != null && !oldTarget.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
+                Files.deleteIfExists(oldTarget);
+            }
             cache.put(safeId, value);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to save " + typeId + ": " + safeId, exception);
@@ -131,9 +141,10 @@ public class JsonAssetStore<T> {
         Set<String> ids = new HashSet<>(cache.keySet());
         if (Files.exists(assetsRoot)) {
             try (Stream<Path> paths = Files.walk(assetsRoot)) {
-                paths.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().startsWith(typeId + "__") && path.getFileName().toString().endsWith(".json"))
-                    .map(path -> path.getFileName().toString())
-                    .map(name -> name.substring((typeId + "__").length(), name.length() - 5))
+                paths.filter(path -> Files.isRegularFile(path))
+                    .map(this::assetName)
+                    .filter(name -> typeId.equals(name.type()))
+                    .map(AssetName::id)
                     .filter(id -> safeId(id, "list") != null)
                     .forEach(ids::add);
             } catch (IOException exception) {
@@ -144,6 +155,7 @@ public class JsonAssetStore<T> {
     }
 
     public void migrateLegacyAssets() {
+        migrateAssetRootFiles();
         if (legacyDirectory == null || !Files.exists(legacyDirectory)) {
             return;
         }
@@ -161,16 +173,57 @@ public class JsonAssetStore<T> {
                     Log.warn("Failed to read legacy " + typeId + " asset: " + id + " - " + exception.getMessage());
                 }
                 Path target = defaultAssetFile(id, value);
-                if (!Files.exists(target)) {
-                    Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    Files.deleteIfExists(file);
+                String json = AssetFileFormat.withResourceType(StorageSafety.readUtf8(file), typeId);
+                if (Files.exists(target)) {
+                    String targetType = AssetFileFormat.readResourceType(target);
+                    if (!typeId.equals(targetType)) {
+                        target = conflictAssetFile(id, 1);
+                    }
                 }
+                if (Files.exists(target) && typeId.equals(AssetFileFormat.readResourceType(target))) {
+                    Files.deleteIfExists(file);
+                    continue;
+                }
+                StorageSafety.writeUtf8Atomic(target, json);
+                Files.deleteIfExists(file);
             }
         } catch (IOException exception) {
             Log.warn("Failed to migrate " + typeId + " assets: " + exception.getMessage());
         }
         deleteLegacyDirectory();
+    }
+
+    private void migrateAssetRootFiles() {
+        if (!Files.exists(assetsRoot)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(assetsRoot)) {
+            for (Path file : paths.filter(Files::isRegularFile).toList()) {
+                AssetName asset = assetName(file);
+                if (!typeId.equals(asset.type()) || safeId(asset.id(), "migrate") == null) {
+                    continue;
+                }
+                Path target = file.getParent().resolve(AssetFileFormat.idOnlyFileName(asset.id()));
+                if (file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize()) && !AssetFileFormat.needsRewrite(file, typeId)) {
+                    continue;
+                }
+                if (Files.exists(target) && !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
+                    String targetType = AssetFileFormat.readResourceType(target);
+                    if (typeId.equals(targetType)) {
+                        Files.deleteIfExists(file);
+                        continue;
+                    }
+                    target = conflictAssetFile(asset.id(), 1);
+                    if (Files.exists(target) && typeId.equals(AssetFileFormat.readResourceType(target))) {
+                        Files.deleteIfExists(file);
+                        continue;
+                    }
+                }
+                AssetFileFormat.rewriteTyped(file, target, typeId);
+            }
+        } catch (IOException exception) {
+            Log.warn("Failed to migrate " + typeId + " assets root: " + exception.getMessage());
+        }
     }
 
     public void clearCache() {
@@ -182,9 +235,21 @@ public class JsonAssetStore<T> {
         if (safeId == null || !Files.exists(assetsRoot)) {
             return null;
         }
-        String fileName = typeId + "__" + safeId + ".json";
         try (Stream<Path> paths = Files.walk(assetsRoot)) {
-            return paths.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().equals(fileName)).findFirst().orElse(null);
+            Path legacy = null;
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                AssetName asset = assetName(path);
+                if (!typeId.equals(asset.type()) || !safeId.equals(asset.id())) {
+                    continue;
+                }
+                if (AssetFileFormat.isIdOnlyFileName(path.getFileName().toString())) {
+                    return path;
+                }
+                if (legacy == null) {
+                    legacy = path;
+                }
+            }
+            return legacy;
         } catch (IOException exception) {
             Log.warn("Failed to search " + typeId + " assets: " + safeId + " - " + exception.getMessage());
             return null;
@@ -193,7 +258,17 @@ public class JsonAssetStore<T> {
 
     private Path defaultAssetFile(String id, T value) throws IOException {
         String folder = value != null && folderResolver != null ? folderResolver.folder(value) : defaultFolder;
-        Path target = safeAssetFolder(folder == null ? defaultFolder : folder).resolve(typeId + "__" + id + ".json");
+        Path target = safeAssetFolder(folder == null ? defaultFolder : folder).resolve(AssetFileFormat.idOnlyFileName(id));
+        Files.createDirectories(target.getParent());
+        return target;
+    }
+
+    private Path conflictAssetFile(String id, int index) throws IOException {
+        String suffix = index <= 1 ? typeId : typeId + "_" + index;
+        Path target = safeAssetFolder(AssetFileFormat.typedConflictFolder(defaultFolder, suffix)).resolve(AssetFileFormat.idOnlyFileName(id));
+        if (Files.exists(target) && !typeId.equals(AssetFileFormat.readResourceType(target))) {
+            return conflictAssetFile(id, index + 1);
+        }
         Files.createDirectories(target.getParent());
         return target;
     }
@@ -265,6 +340,28 @@ public class JsonAssetStore<T> {
         } catch (IllegalArgumentException exception) {
             Log.warn("Rejected unsafe " + typeId + " id during " + action + ": " + id);
             return null;
+        }
+    }
+
+    private AssetName assetName(Path path) {
+        String fileName = path != null && path.getFileName() != null ? path.getFileName().toString() : "";
+        if (!fileName.endsWith(".json")) {
+            return AssetName.empty();
+        }
+        int separator = fileName.indexOf("__");
+        if (separator > 0) {
+            String type = fileName.substring(0, separator);
+            String id = fileName.substring(separator + 2, fileName.length() - 5);
+            return new AssetName(type, id);
+        }
+        String type = AssetFileFormat.readResourceType(path);
+        String id = AssetFileFormat.idFromIdOnlyFileName(fileName);
+        return new AssetName(type, id);
+    }
+
+    private record AssetName(String type, String id) {
+        private static AssetName empty() {
+            return new AssetName("", "");
         }
     }
 }

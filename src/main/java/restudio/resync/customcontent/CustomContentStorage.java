@@ -18,10 +18,7 @@ import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -29,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 public class CustomContentStorage {
     private final File contentDir;
@@ -201,42 +197,6 @@ public class CustomContentStorage {
         }
     }
 
-    private CustomContentDefinition loadFromFile(Path file, String safeId) {
-        try {
-            CustomContentDefinition definition = gson.fromJson(StorageSafety.readUtf8(file), CustomContentDefinition.class);
-            if (definition != null && safeId(definition.getId(), "load") != null) {
-                cache.put(definition.getId(), definition);
-            }
-            return definition;
-        } catch (IOException e) {
-            Log.warn("Failed to load custom content: " + safeId + " - " + e.getMessage());
-            return null;
-        }
-    }
-
-    private Path findAssetFile(String id) {
-        String fileName = "custom_content__" + id + ".json";
-        Path root = assetsDir.toPath();
-        if (!root.toFile().exists()) {
-            return null;
-        }
-        try (Stream<Path> paths = java.nio.file.Files.walk(root)) {
-            return paths
-                    .filter(path -> java.nio.file.Files.isRegularFile(path) && path.getFileName().toString().equals(fileName))
-                    .findFirst()
-                    .orElse(null);
-        } catch (IOException e) {
-            Log.warn("Failed to search custom content assets: " + id + " - " + e.getMessage());
-            return null;
-        }
-    }
-
-    private Path defaultAssetFile(CustomContentDefinition definition) throws IOException {
-        Path target = assetsDir.toPath().resolve(defaultFolder(definition)).resolve("custom_content__" + definition.getId() + ".json");
-        Files.createDirectories(target.getParent());
-        return target;
-    }
-
     private String defaultFolder(CustomContentDefinition definition) {
         return switch (definition != null && definition.getType() != null ? definition.getType().toLowerCase() : "item") {
             case "armor" -> "Content/Armor";
@@ -247,47 +207,5 @@ public class CustomContentStorage {
 
     private void migrateLegacyAssets() {
         assetStore.migrateLegacyAssets();
-    }
-
-    private void migrateLegacyFile(Path file, String id) {
-        try {
-            CustomContentDefinition definition = gson.fromJson(StorageSafety.readUtf8(file), CustomContentDefinition.class);
-            String folder = switch (definition != null && definition.getType() != null ? definition.getType().toLowerCase() : "item") {
-                case "armor" -> "Content/Armor";
-                case "block" -> "Content/Blocks";
-                default -> "Content/Items";
-            };
-            Path target = assetsDir.toPath().resolve(folder).resolve("custom_content__" + id + ".json");
-            Files.createDirectories(target.getParent());
-            if (!Files.exists(target)) {
-                Files.move(file, target, StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                Files.deleteIfExists(file);
-            }
-        } catch (IOException e) {
-            Log.warn("Failed to migrate custom content asset: " + id + " - " + e.getMessage());
-        }
-    }
-
-    private void deleteLegacyDirectory() {
-        if (!contentDir.exists()) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(contentDir.toPath())) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
-            }
-        } catch (IOException e) {
-            Log.warn("Failed to delete legacy custom content directory: " + e.getMessage());
-        }
-    }
-
-    private void deleteAssetFile(Path file) throws IOException {
-        Path root = assetsDir.toPath().toAbsolutePath().normalize();
-        Path target = file.toAbsolutePath().normalize();
-        if (!target.startsWith(root) || target.getParent() == null || !target.getFileName().toString().endsWith(".json")) {
-            throw new IOException("Unsafe custom content assets delete target: " + file);
-        }
-        Files.deleteIfExists(target);
     }
 }

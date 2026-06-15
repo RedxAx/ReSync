@@ -9,6 +9,7 @@ import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -91,7 +92,7 @@ public final class FunctionCallSupport {
                 if (parameter == null || parameter.getName() == null || parameter.getName().isBlank() || inputs.containsKey(parameter.getName())) {
                     continue;
                 }
-                Object contextValue = contextValue(parameter.getType(), player, vars);
+                Object contextValue = contextValue(parameter, player, vars);
                 if (contextValue != null) {
                     inputs.put(parameter.getName(), coerce(contextValue, parameter.getType()));
                 }
@@ -109,19 +110,33 @@ public final class FunctionCallSupport {
         return inputs;
     }
 
-    private static Object contextValue(FlowDataType type, Player player, Map<String, Object> vars) {
+    private static Object contextValue(FlowGraph.FunctionParameter parameter, Player player, Map<String, Object> vars) {
+        FlowDataType type = parameter != null ? parameter.getType() : null;
         if (type == null) {
             return null;
         }
+        String name = parameter.getName() != null ? parameter.getName().toLowerCase(Locale.ROOT) : "";
         if (FlowDataType.BOOLEAN.isAssignableFrom(type)) {
-            return false;
+            Object value;
+            if (name.contains("right")) {
+                value = valueFromVars(vars, "rightClick");
+            } else if (name.contains("left")) {
+                value = valueFromVars(vars, "leftClick");
+            } else if (name.contains("shift") || name.contains("sneak")) {
+                value = valueFromVars(vars, "shifting", "sneaking", "shiftClick");
+            } else if (name.contains("success")) {
+                value = valueFromVars(vars, "success", "event.success");
+            } else {
+                value = valueFromVars(vars, "success", "event.success", "rightClick", "leftClick", "shifting", "sneaking", "shiftClick");
+            }
+            return value != null ? value : false;
         }
         if (FlowDataType.PLAYER.isAssignableFrom(type)) {
             return player != null ? player : valueFromVars(vars, "event.player", "player");
         }
         String id = type.getId();
         if ("item".equals(id) || "material".equals(id)) {
-            return valueFromVars(vars, "event.item", "event.output", "event.source", "clickedItem", "craftedItem", "cookedItem", "sourceItem", "item", "output", "source");
+            return valueFromVars(vars, "tradedItem", "resultItem", "event.item", "event.output", "event.source", "clickedItem", "craftedItem", "cookedItem", "sourceItem", "item", "output", "source");
         }
         if ("entity".equals(id) || "living_entity".equals(id)) {
             return valueFromVars(vars, "event.entity", "event.target", "entity", "target");
@@ -129,11 +144,14 @@ public final class FunctionCallSupport {
         if ("block".equals(id)) {
             return valueFromVars(vars, "event.block", "block");
         }
+        if ("location".equals(id)) {
+            return valueFromVars(vars, "event.location", "location");
+        }
         if ("number".equals(id) || "seed".equals(id) || "float".equals(id)) {
             return valueFromVars(vars, "event.slot", "slot", "event.amount", "amount");
         }
         if ("string".equals(id) || "component".equals(id)) {
-            return valueFromVars(vars, "event.recipe", "recipe", "event.world", "world", "event.permission", "permission");
+            return valueFromVars(vars, "npcId", "profileId", "event.id", "hook", "event.recipe", "recipe", "event.world", "world", "event.permission", "permission");
         }
         return null;
     }
@@ -180,6 +198,36 @@ public final class FunctionCallSupport {
             }
             if ("$sourceItem".equals(text)) {
                 return valueFromVars(vars, "sourceItem", "event.source", "source");
+            }
+            if ("$tradedItem".equals(text)) {
+                return valueFromVars(vars, "tradedItem", "event.item", "event.output", "resultItem");
+            }
+            if ("$resultItem".equals(text)) {
+                return valueFromVars(vars, "resultItem", "event.output", "tradedItem");
+            }
+            if ("$location".equals(text) || "$event.location".equals(text)) {
+                return valueFromVars(vars, "location", "event.location");
+            }
+            if ("$npcId".equals(text)) {
+                return valueFromVars(vars, "npcId", "event.id");
+            }
+            if ("$profileId".equals(text)) {
+                return valueFromVars(vars, "profileId", "event.id");
+            }
+            if ("$hook".equals(text)) {
+                return valueFromVars(vars, "hook");
+            }
+            if ("$success".equals(text)) {
+                return valueFromVars(vars, "success", "event.success");
+            }
+            if ("$rightClick".equals(text)) {
+                return valueFromVars(vars, "rightClick");
+            }
+            if ("$leftClick".equals(text)) {
+                return valueFromVars(vars, "leftClick");
+            }
+            if ("$shifting".equals(text) || "$sneaking".equals(text) || "$shiftClick".equals(text)) {
+                return valueFromVars(vars, "shifting", "sneaking", "shiftClick");
             }
             if ("$recipe".equals(text)) {
                 return valueFromVars(vars, "recipe", "event.recipe");

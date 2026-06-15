@@ -192,8 +192,8 @@ public class LootTableService {
         if (stack != null) {
             return stack;
         }
-        Material material = Material.matchMaterial(reference);
-        return material != null && material.isItem() && !material.isAir() ? new ItemStack(material, Math.max(1, amount)) : null;
+        Material material = RuntimeMaterialResolver.itemMaterial(reference);
+        return material != null ? new ItemStack(material, Math.max(1, amount)) : null;
     }
 
     private boolean conditionsPass(JsonObject entry, Map<String, Object> context) {

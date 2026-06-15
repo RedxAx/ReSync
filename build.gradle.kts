@@ -11,6 +11,7 @@ version = "1.3.0"
 
 repositories {
     mavenCentral()
+    maven("https://repo.codemc.io/repository/maven-releases/")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
@@ -31,8 +32,10 @@ dependencies {
     implementation("io.javalin:javalin:6.7.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("com.github.retrooper:packetevents-spigot:2.12.1")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.0.0")
     testImplementation("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
 }
 
@@ -235,6 +238,8 @@ tasks {
         relocate("com.google.gson", "restudio.resync.libs.gson")
         relocate("kotlin", "restudio.resync.libs.kotlin")
         relocate("org.java_websocket", "restudio.resync.libs.websocket")
+        relocate("com.github.retrooper.packetevents", "restudio.resync.libs.packetevents.api")
+        relocate("io.github.retrooper.packetevents", "restudio.resync.libs.packetevents.impl")
     }
 
     processResources {

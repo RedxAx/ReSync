@@ -1,0 +1,154 @@
+[
+  {
+    "id": "loot.generate",
+    "displayName": "Generate Loot",
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_generate" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "loot_table", "dataType": "string", "options": { "source": "server:resync:loot_table" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "loot.give",
+    "displayName": "Give Loot",
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_give" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "loot_table", "dataType": "string", "options": { "source": "server:resync:loot_table" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "loot.fill_container",
+    "displayName": "Fill Container",
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_fill_container" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "loot_table", "dataType": "string", "options": { "source": "server:resync:loot_table" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "village.apply_trade_profile",
+    "displayName": "Apply Trade Profile",
+    "category": "VILLAGE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "village_apply_trade_profile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "profile_id", "dataType": "string", "options": { "source": "server:resync:village_profile" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "village.open_trades",
+    "displayName": "Open Trades",
+    "category": "VILLAGE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "village_open_trades" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "profile_id", "dataType": "string", "options": { "source": "server:resync:village_profile" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "npc.spawn",
+    "displayName": "Spawn NPC",
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_spawn" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "string", "options": { "source": "server:resync:npc_definition" } },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "npc.despawn",
+    "displayName": "Despawn NPC",
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_despawn" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "string", "options": { "source": "server:resync:npc_definition" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "npc.open",
+    "displayName": "Open NPC",
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_open" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "npc_id", "dataType": "string", "options": { "source": "server:resync:npc_definition" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "npc.set_profile",
+    "displayName": "Set NPC Trade",
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_set_profile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "string", "options": { "source": "server:resync:npc_definition" } },
+      { "name": "profile_id", "dataType": "string", "options": { "source": "server:resync:village_profile" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  }
+]

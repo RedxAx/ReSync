@@ -26,6 +26,12 @@ class ReSyncProtocolContractTest {
         assertEquals((byte) 0xBA, ReSyncProtocolContract.DIALOG_PACKET_SAVE_ACK);
         assertEquals((byte) 0xBB, ReSyncProtocolContract.MESSAGE_LOG_PACKET_REQUEST);
         assertEquals((byte) 0xBC, ReSyncProtocolContract.MESSAGE_LOG_PACKET_RESPONSE);
+        assertEquals((byte) 0xBD, ReSyncProtocolContract.VILLAGE_PROFILE_PACKET_REQUEST);
+        assertEquals((byte) 0xC3, ReSyncProtocolContract.VILLAGE_PROFILE_PACKET_SAVE_ACK);
+        assertEquals((byte) 0xC4, ReSyncProtocolContract.NPC_DEFINITION_PACKET_REQUEST);
+        assertEquals((byte) 0xCA, ReSyncProtocolContract.NPC_DEFINITION_PACKET_SAVE_ACK);
+        assertEquals((byte) 0xCB, ReSyncProtocolContract.LOOT_TABLE_PACKET_REQUEST);
+        assertEquals((byte) 0xD1, ReSyncProtocolContract.LOOT_TABLE_PACKET_SAVE_ACK);
         assertEquals((byte) 0x67, ReSyncProtocolContract.CHAT_PACKET_REQUEST);
         assertEquals((byte) 0x6D, ReSyncProtocolContract.CHAT_PACKET_SAVE_ACK);
     }
@@ -46,6 +52,12 @@ class ReSyncProtocolContractTest {
         assertEquals(ReSyncProtocolContract.ADVANCEMENT_TREE_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.ADVANCEMENT_TREE).flowPackets().saveAck());
         assertEquals(ReSyncProtocolContract.DIALOG_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.DIALOG).flowPackets().request());
         assertEquals(ReSyncProtocolContract.DIALOG_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.DIALOG).flowPackets().saveAck());
+        assertEquals(ReSyncProtocolContract.VILLAGE_PROFILE_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.VILLAGE_PROFILE).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.VILLAGE_PROFILE_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.VILLAGE_PROFILE).flowPackets().saveAck());
+        assertEquals(ReSyncProtocolContract.NPC_DEFINITION_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.NPC_DEFINITION).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.NPC_DEFINITION_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.NPC_DEFINITION).flowPackets().saveAck());
+        assertEquals(ReSyncProtocolContract.LOOT_TABLE_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.LOOT_TABLE).flowPackets().request());
+        assertEquals(ReSyncProtocolContract.LOOT_TABLE_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.LOOT_TABLE).flowPackets().saveAck());
         assertEquals(ReSyncProtocolContract.CHAT_PACKET_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CHAT).flowPackets().request());
         assertEquals(ReSyncProtocolContract.CHAT_PACKET_SAVE_ACK, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CHAT).flowPackets().saveAck());
     }

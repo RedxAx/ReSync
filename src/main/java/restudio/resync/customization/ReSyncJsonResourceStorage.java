@@ -163,6 +163,9 @@ public class ReSyncJsonResourceStorage {
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> "text-templates";
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> "advancement-trees";
             case ReSyncResourceCatalog.DIALOG -> "dialogs";
+            case ReSyncResourceCatalog.VILLAGE_PROFILE -> "village-profiles";
+            case ReSyncResourceCatalog.NPC_DEFINITION -> "npcs";
+            case ReSyncResourceCatalog.LOOT_TABLE -> "loot-tables";
             default -> type;
         };
     }

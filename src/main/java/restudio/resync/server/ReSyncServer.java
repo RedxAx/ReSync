@@ -36,6 +36,7 @@ import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleRegistry;
 import restudio.resync.modules.MotdModule;
+import restudio.resync.modules.PlayerNpcPacketModule;
 import restudio.resync.modules.PlayerTrackingModule;
 import restudio.resync.modules.RecipeModule;
 import restudio.resync.modules.WorldManagementModule;
@@ -61,6 +62,7 @@ import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.queue.RateLimiter;
 import restudio.resync.queue.RequestQueue;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.runtime.RuntimeNotificationService;
 import restudio.resync.security.ClientAuthorizer;
 import restudio.resync.security.ClientIdentity;
 import restudio.resync.server.ReSyncConfig;
@@ -160,6 +162,7 @@ public class ReSyncServer {
         moduleContext.registerService(ReSyncExtensionData.class, new ReSyncExtensionData());
         moduleContext.registerService(ReSyncJsonResourceStorage.class, jsonResourceStorage);
         moduleContext.registerService(MessageLogService.class, new MessageLogService());
+        moduleContext.registerService(RuntimeNotificationService.class, new RuntimeNotificationService(moduleContext));
         ReTextService reTextService = new ReTextService(jsonResourceStorage);
         moduleContext.registerService(ReTextService.class, reTextService);
         jsonResourceStorage.addListener((type, id, value, deleted) -> {
@@ -180,6 +183,7 @@ public class ReSyncServer {
 
     private void registerModules() {
         moduleRegistry.registerModule(new ChunkTransportModule());
+        moduleRegistry.registerModule(new PlayerNpcPacketModule());
         moduleRegistry.registerModule(new FlowRuntimeModule());
         moduleRegistry.registerModule(new ChatModule());
         moduleRegistry.registerModule(new MotdModule());

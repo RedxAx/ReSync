@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.ReSyncExtensionData;
 import restudio.resync.api.ReSyncExtensionManager;
 import restudio.resync.customcontent.CustomContentAccess;
@@ -61,6 +62,7 @@ import restudio.resync.flow.handler.generic.PermissionHandler;
 import restudio.resync.flow.handler.generic.PlaceholderHandler;
 import restudio.resync.flow.handler.generic.PlayerActionHandler;
 import restudio.resync.flow.handler.generic.RandomHandler;
+import restudio.resync.flow.handler.generic.ReSyncRuntimeResourceHandler;
 import restudio.resync.flow.handler.generic.RegionHandler;
 import restudio.resync.flow.handler.generic.RestoredNodeHandler;
 import restudio.resync.flow.handler.generic.ScheduleHandler;
@@ -89,6 +91,13 @@ import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
+import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.runtime.LootTableService;
+import restudio.resync.runtime.NpcService;
+import restudio.resync.runtime.PlayerNpcRuntime;
+import restudio.resync.runtime.ReSyncRuntimeContentAccess;
+import restudio.resync.runtime.RuntimeFlowDispatcher;
+import restudio.resync.runtime.VillageProfileService;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -111,6 +120,9 @@ public class FlowRuntimeModule implements Module {
     private CustomContentStorage customContentStorage;
     private CustomContentService customContentService;
     private CustomContentListener customContentListener;
+    private LootTableService lootTableService;
+    private VillageProfileService villageProfileService;
+    private NpcService npcService;
     private FlowTraceService traceService;
     private FlowDebugService debugService;
     private BukkitTask tickTask;
@@ -180,6 +192,7 @@ public class FlowRuntimeModule implements Module {
         new WorldActionHandler().registerTo(handlerRegistry);
         new BlockActionHandler().registerTo(handlerRegistry);
         new InventoryActionHandler().registerTo(handlerRegistry);
+        new ReSyncRuntimeResourceHandler().registerTo(handlerRegistry);
         new MiscHandler().registerTo(handlerRegistry);
         new RestoredNodeHandler().registerTo(handlerRegistry);
         JsonFamilyHandler.registerFamilies(handlerRegistry);
@@ -206,13 +219,19 @@ public class FlowRuntimeModule implements Module {
         executor.setDebugService(debugService);
         customContentService = new CustomContentService(customContentStorage, storage, executor);
         customContentListener = new CustomContentListener(customContentStorage, customContentService);
+        ReSyncJsonResourceStorage jsonResourceStorage = context.getRequiredService(ReSyncJsonResourceStorage.class);
+        RuntimeFlowDispatcher runtimeFlowDispatcher = new RuntimeFlowDispatcher(storage, executor);
+        lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher);
+        villageProfileService = new VillageProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
         globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry);
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher());
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), context.getService(OptionCatalogRegistry.class), context.getService(ReSyncJsonResourceStorage.class), context.getService(MessageLogService.class));
+        OptionCatalogRegistry optionCatalogRegistry = context.getService(OptionCatalogRegistry.class);
+        registerResourceCatalogs(optionCatalogRegistry, jsonResourceStorage);
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), optionCatalogRegistry, jsonResourceStorage, context.getService(MessageLogService.class));
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);
@@ -230,20 +249,35 @@ public class FlowRuntimeModule implements Module {
         context.registerService(FlowTraceService.class, traceService);
         context.registerService(FlowDebugService.class, debugService);
         context.registerService(FlowModule.class, delegate);
+        context.registerService(LootTableService.class, lootTableService);
+        context.registerService(VillageProfileService.class, villageProfileService);
         context.registerService(GuiManager.class, guiManager);
         context.registerService(FlowRuntimeModule.class, this);
         FlowRuntimeAccess.configure(context.getPlugin(), () -> storage, () -> executor != null ? executor.getGlobalVariables() : null);
         FlowPacketSender editStateSender = new FlowPacketSender(context.getCodec(), channelId, Set.of());
-        context.registerService(DialogService.class, new DialogService(
+        DialogService dialogService = new DialogService(
             context.getPlugin(),
             context.getRequiredService(ReSyncJsonResourceStorage.class),
             storage,
             executor,
             editStateSender::sendEditTargetState,
             context.getRequiredService(PlayerSessionLinkService.class)
-        ));
+        );
+        context.registerService(DialogService.class, dialogService);
+        npcService = new NpcService(context.getPlugin(), jsonResourceStorage, customContentService, runtimeFlowDispatcher, villageProfileService, lootTableService, dialogService, context.getService(PlayerNpcRuntime.class));
+        context.registerService(NpcService.class, npcService);
+        jsonResourceStorage.addListener((type, id, value, deleted) -> {
+            if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
+                Bukkit.getScheduler().runTask(context.getPlugin(), () -> npcService.reload(id, value, deleted));
+                return;
+            }
+            if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type)) {
+                Bukkit.getScheduler().runTask(context.getPlugin(), () -> villageProfileService.reload(id, deleted));
+            }
+        });
         ScoreboardTemplateManager.configureEditStateBridge(editStateSender::sendEditTargetState, context.getRequiredService(PlayerSessionLinkService.class));
         CustomContentAccess.configure(customContentStorage, customContentService);
+        ReSyncRuntimeContentAccess.configure(lootTableService, villageProfileService, npcService);
     }
 
     public void reloadNodeDefinitions() {
@@ -306,6 +340,7 @@ public class FlowRuntimeModule implements Module {
         new WorldActionHandler().registerTo(handlerRegistry);
         new BlockActionHandler().registerTo(handlerRegistry);
         new InventoryActionHandler().registerTo(handlerRegistry);
+        new ReSyncRuntimeResourceHandler().registerTo(handlerRegistry);
         new MiscHandler().registerTo(handlerRegistry);
         new RestoredNodeHandler().registerTo(handlerRegistry);
         JsonFamilyHandler.registerFamilies(handlerRegistry);
@@ -368,6 +403,9 @@ public class FlowRuntimeModule implements Module {
         Bukkit.getPluginManager().registerEvents(scoreboardRuntimeListener, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(guiManager, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(customContentListener, context.getPlugin());
+        Bukkit.getPluginManager().registerEvents(villageProfileService, context.getPlugin());
+        Bukkit.getPluginManager().registerEvents(npcService, context.getPlugin());
+        npcService.spawnStartupNpcs();
         TabListService.startUpdater();
         tickTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
             systemEventListener.tick();
@@ -409,9 +447,45 @@ public class FlowRuntimeModule implements Module {
         if (customContentListener != null) {
             HandlerList.unregisterAll(customContentListener);
         }
+        if (villageProfileService != null) {
+            HandlerList.unregisterAll(villageProfileService);
+        }
+        if (npcService != null) {
+            HandlerList.unregisterAll(npcService);
+        }
         FlowRuntimeAccess.clear();
         ScoreboardTemplateManager.clearEditStateBridge();
         CustomContentAccess.clear();
+        ReSyncRuntimeContentAccess.clear();
+    }
+
+    private void registerResourceCatalogs(OptionCatalogRegistry registry, ReSyncJsonResourceStorage storage) {
+        if (registry == null || storage == null) {
+            return;
+        }
+        registerResourceCatalog(registry, storage, ReSyncResourceCatalog.LOOT_TABLE);
+        registerResourceCatalog(registry, storage, ReSyncResourceCatalog.VILLAGE_PROFILE);
+        registerResourceCatalog(registry, storage, ReSyncResourceCatalog.NPC_DEFINITION);
+        registerResourceCatalog(registry, storage, ReSyncResourceCatalog.DIALOG);
+    }
+
+    private void registerResourceCatalog(OptionCatalogRegistry registry, ReSyncJsonResourceStorage storage, String type) {
+        registry.register(new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "server:resync:" + type;
+            }
+
+            @Override
+            public String revision() {
+                return type + ":" + storage.listIds(type).size();
+            }
+
+            @Override
+            public List<String> values() {
+                return storage.listIds(type);
+            }
+        });
     }
 
     @Override

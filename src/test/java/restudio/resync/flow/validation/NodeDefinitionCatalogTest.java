@@ -26,7 +26,7 @@ class NodeDefinitionCatalogTest {
             }
         }
 
-        assertEquals(1232, count);
+        assertEquals(1241, count);
     }
 
     @Test

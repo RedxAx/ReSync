@@ -1,7 +1,7 @@
 package restudio.resync.runtime;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -18,7 +18,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
-import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -29,6 +28,7 @@ import restudio.resync.dialog.DialogService;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -43,13 +43,22 @@ public class NpcService implements Listener {
     private final LootTableService lootTableService;
     private final DialogService dialogService;
     private final Map<String, UUID> activeNpcs = new ConcurrentHashMap<>();
+    private final PlayerNpcRuntime playerNpcRuntime;
     private final NamespacedKey npcIdKey;
 
     public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, VillageProfileService villageProfileService, LootTableService lootTableService, DialogService dialogService) {
-        this(plugin, storage, customContentService, dispatcher, villageProfileService, lootTableService, dialogService, new NamespacedKey(plugin, "resync_npc_id"));
+        this(plugin, storage, customContentService, dispatcher, villageProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null);
+    }
+
+    public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, VillageProfileService villageProfileService, LootTableService lootTableService, DialogService dialogService, PlayerNpcRuntime playerNpcRuntime) {
+        this(plugin, storage, customContentService, dispatcher, villageProfileService, lootTableService, dialogService, playerNpcRuntime, new NamespacedKey(plugin, "resync_npc_id"));
     }
 
     NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, VillageProfileService villageProfileService, LootTableService lootTableService, DialogService dialogService, NamespacedKey npcIdKey) {
+        this(plugin, storage, customContentService, dispatcher, villageProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null, npcIdKey);
+    }
+
+    NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, VillageProfileService villageProfileService, LootTableService lootTableService, DialogService dialogService, PlayerNpcRuntime playerNpcRuntime, NamespacedKey npcIdKey) {
         this.plugin = plugin;
         this.storage = storage;
         this.customContentService = customContentService;
@@ -57,7 +66,11 @@ public class NpcService implements Listener {
         this.villageProfileService = villageProfileService;
         this.lootTableService = lootTableService;
         this.dialogService = dialogService;
+        this.playerNpcRuntime = playerNpcRuntime;
         this.npcIdKey = npcIdKey;
+        if (plugin != null) {
+            plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickFollowPlayers, 2L, 2L);
+        }
     }
 
     public JsonObject get(String id) {
@@ -73,24 +86,46 @@ public class NpcService implements Listener {
         if (active != null && !active.isDead()) {
             return active;
         }
-        EntityType type = entityType(text(definition, "entityType"));
-        Entity entity = location.getWorld().spawnEntity(location, type);
+        if (playerEntityType(definition)) {
+            if (playerNpcRuntime == null || !playerNpcRuntime.available()) {
+                return null;
+            }
+            boolean spawned = playerNpcRuntime.spawn(id, definition, location);
+            if (spawned) {
+                dispatch(id, "spawnAction", null, null, location, null);
+            }
+            return null;
+        }
+        EntityType type = spawnEntityType(definition);
+        if (type == null) {
+            return null;
+        }
+        Entity entity;
+        try {
+            entity = location.getWorld().spawnEntity(location, type);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
         activeNpcs.put(id, entity.getUniqueId());
         entity.getPersistentDataContainer().set(npcIdKey, PersistentDataType.STRING, id);
         applyDefinition(entity, definition);
-        dispatch(id, "spawnFlow", null, entity, location, null);
+        dispatch(id, "spawnAction", null, entity, location, null);
         return entity;
     }
 
     public boolean despawn(String id) {
         UUID uuid = activeNpcs.remove(id);
         if (uuid == null || plugin.getServer().getEntity(uuid) == null) {
-            return false;
+            boolean packetDespawned = playerNpcRuntime != null && playerNpcRuntime.despawn(id);
+            if (packetDespawned) {
+                dispatch(id, "despawnAction", null, null, null, null);
+            }
+            return packetDespawned;
         }
         Entity entity = plugin.getServer().getEntity(uuid);
         Location location = entity.getLocation();
         entity.remove();
-        dispatch(id, "despawnFlow", null, entity, location, null);
+        dispatch(id, "despawnAction", null, entity, location, null);
         return true;
     }
 
@@ -99,51 +134,18 @@ public class NpcService implements Listener {
         if (definition == null) {
             return false;
         }
-        String dialog = text(definition, "dialog");
-        if (player != null && dialogService != null && !dialog.isBlank() && dialogService.show(player, dialog)) {
-            return true;
-        }
-        String tradeProfile = text(definition, "tradeProfile");
+        String tradeProfile = link(definition, "tradeProfile");
         if (player != null && !tradeProfile.isBlank()) {
             Entity entity = activeEntity(id);
-            if (entity instanceof Villager villager) {
-                return villageProfileService.openTrades(player, villager, tradeProfile);
+            if (entity != null) {
+                return villageProfileService.openTrades(player, entity, tradeProfile);
             }
+            return villageProfileService.openVirtualTrades(player, tradeProfile);
         }
         return false;
     }
 
     public void spawnStartupNpcs() {
-        if (storage == null) {
-            return;
-        }
-        for (String id : storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION)) {
-            JsonObject definition = get(id);
-            if (definition == null || !"startup".equalsIgnoreCase(text(definition, "spawnMode"))) {
-                continue;
-            }
-            Location location = location(definition);
-            if (location != null) {
-                spawn(id, location);
-            }
-        }
-    }
-
-    @EventHandler
-    public void onChunkLoad(ChunkLoadEvent event) {
-        if (storage == null || event == null) {
-            return;
-        }
-        for (String id : storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION)) {
-            JsonObject definition = get(id);
-            if (definition == null || !"chunk".equalsIgnoreCase(text(definition, "spawnMode"))) {
-                continue;
-            }
-            Location location = location(definition);
-            if (location != null && sameChunk(event.getChunk(), location)) {
-                spawn(id, location);
-            }
-        }
     }
 
     public boolean setProfile(String id, String profileId) {
@@ -151,16 +153,77 @@ public class NpcService implements Listener {
         return entity instanceof Villager villager && villageProfileService.apply(villager, profileId);
     }
 
-    private Entity activeEntity(String id) {
-        UUID uuid = activeNpcs.get(id);
-        return uuid != null ? plugin.getServer().getEntity(uuid) : null;
+    public void reload(String id, JsonObject definition, boolean deleted) {
+        if (id == null || id.isBlank()) {
+            return;
+        }
+        if (deleted || definition == null || !bool(definition, "enabled", true)) {
+            despawn(id);
+            return;
+        }
+        if (playerEntityType(definition)) {
+            Entity entity = activeEntity(id);
+            Location configured = location(definition);
+            if (entity != null && !entity.isDead()) {
+                Location spawnLocation = configured != null ? configured : entity.getLocation();
+                entity.remove();
+                activeNpcs.remove(id);
+                if (playerNpcRuntime != null && playerNpcRuntime.available() && playerNpcRuntime.spawn(id, definition, spawnLocation)) {
+                    dispatch(id, "spawnAction", null, null, spawnLocation, null);
+                }
+                return;
+            }
+            if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
+                playerNpcRuntime.reload(id, definition, false, configured);
+                return;
+            }
+            return;
+        }
+        if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
+            Location packetLocation = playerNpcRuntime.location(id);
+            playerNpcRuntime.despawn(id);
+            Location configured = location(definition);
+            Location spawnLocation = configured != null ? configured : packetLocation;
+            if (spawnLocation != null) {
+                spawn(id, spawnLocation);
+            }
+            return;
+        }
+        Entity entity = activeEntity(id);
+        if (entity == null || entity.isDead()) {
+            return;
+        }
+        EntityType nextType = spawnEntityType(definition);
+        if (nextType == null) {
+            despawn(id);
+            return;
+        }
+        Location location = location(definition);
+        if (entity.getType() != nextType) {
+            Location spawnLocation = location != null ? location : entity.getLocation();
+            entity.remove();
+            activeNpcs.remove(id);
+            spawn(id, spawnLocation);
+            return;
+        }
+        if (location != null) {
+            entity.teleport(location);
+        }
+        applyDefinition(entity, definition);
     }
 
-    private boolean sameChunk(Chunk chunk, Location location) {
-        return chunk != null && location != null && location.getWorld() != null
-            && chunk.getWorld().equals(location.getWorld())
-            && chunk.getX() == location.getBlockX() >> 4
-            && chunk.getZ() == location.getBlockZ() >> 4;
+    public boolean isActive(String id) {
+        Entity entity = activeEntity(id);
+        return entity != null && !entity.isDead() || playerNpcRuntime != null && playerNpcRuntime.isActive(id);
+    }
+
+    public String playerNpcUnavailableReason() {
+        return playerNpcRuntime != null ? playerNpcRuntime.unavailableReason() : "Player NPC runtime unavailable";
+    }
+
+    private Entity activeEntity(String id) {
+        UUID uuid = activeNpcs.get(id);
+        return uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
     }
 
     private Location location(JsonObject definition) {
@@ -188,12 +251,16 @@ public class NpcService implements Listener {
         if (!displayName.isBlank()) {
             entity.setCustomName(displayName);
             entity.setCustomNameVisible(true);
+        } else {
+            entity.setCustomName(null);
+            entity.setCustomNameVisible(false);
         }
         entity.setInvulnerable(bool(definition, "invulnerable", true));
+        entity.setGravity(bool(definition, "gravity", true));
         if (entity instanceof LivingEntity living) {
             EntityEquipment equipment = living.getEquipment();
-            if (equipment != null && definition.has("equipment") && definition.get("equipment").isJsonObject()) {
-                JsonObject gear = definition.getAsJsonObject("equipment");
+            if (equipment != null) {
+                JsonObject gear = definition.has("equipment") && definition.get("equipment").isJsonObject() ? definition.getAsJsonObject("equipment") : new JsonObject();
                 equipment.setItemInMainHand(item(text(gear, "mainHand")));
                 equipment.setItemInOffHand(item(text(gear, "offHand")));
                 equipment.setHelmet(item(text(gear, "helmet")));
@@ -205,9 +272,68 @@ public class NpcService implements Listener {
         if (entity instanceof Mob mob) {
             mob.setAI(bool(definition, "ai", false));
         }
-        if (entity instanceof Villager villager && !text(definition, "tradeProfile").isBlank()) {
-            villageProfileService.apply(villager, text(definition, "tradeProfile"));
+        if (entity instanceof Villager villager) {
+            String tradeProfile = link(definition, "tradeProfile");
+            if (tradeProfile.isBlank()) {
+                villager.setRecipes(List.of());
+            } else {
+                villageProfileService.apply(villager, tradeProfile);
+            }
         }
+    }
+
+    private void tickFollowPlayers() {
+        for (Map.Entry<String, UUID> entry : activeNpcs.entrySet()) {
+            Entity entity = activeEntity(entry.getKey());
+            JsonObject definition = get(entry.getKey());
+            if (entity == null || entity.isDead() || definition == null || !bool(definition, "followPlayer", false)) {
+                continue;
+            }
+            Player target = nearestPlayer(entity.getLocation(), decimal(definition, "followRange", 12.0));
+            if (target == null) {
+                continue;
+            }
+            Location next = entity.getLocation();
+            LookAngles angles = lookAt(next, target.getEyeLocation());
+            next.setYaw(smoothAngle(next.getYaw(), angles.yaw(), 0.35F));
+            next.setPitch(smoothAngle(next.getPitch(), angles.pitch(), 0.35F));
+            entity.setRotation(next.getYaw(), next.getPitch());
+        }
+    }
+
+    private Player nearestPlayer(Location origin, double range) {
+        if (origin == null || origin.getWorld() == null || range <= 0) {
+            return null;
+        }
+        double maxDistanceSquared = range * range;
+        Player nearest = null;
+        double nearestDistance = maxDistanceSquared;
+        for (Player player : origin.getWorld().getPlayers()) {
+            if (player == null || player.isDead() || !player.isOnline()) {
+                continue;
+            }
+            double distance = player.getLocation().distanceSquared(origin);
+            if (distance <= nearestDistance) {
+                nearest = player;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    private LookAngles lookAt(Location origin, Location target) {
+        double dx = target.getX() - origin.getX();
+        double dy = target.getY() - (origin.getY() + 1.62);
+        double dz = target.getZ() - origin.getZ();
+        double horizontal = Math.sqrt(dx * dx + dz * dz);
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        float pitch = (float) Math.toDegrees(-Math.atan2(dy, horizontal));
+        return new LookAngles(yaw, Math.clamp(pitch, -90F, 90F));
+    }
+
+    private float smoothAngle(float current, float target, float factor) {
+        float delta = ((target - current + 540F) % 360F) - 180F;
+        return current + delta * factor;
     }
 
     private ItemStack item(String reference) {
@@ -218,8 +344,8 @@ public class NpcService implements Listener {
         if (stack != null) {
             return stack;
         }
-        Material material = Material.matchMaterial(reference);
-        return material != null && material.isItem() && !material.isAir() ? new ItemStack(material, 1) : null;
+        Material material = RuntimeMaterialResolver.itemMaterial(reference);
+        return material != null ? new ItemStack(material, 1) : null;
     }
 
     @EventHandler
@@ -228,7 +354,14 @@ public class NpcService implements Listener {
         if (id.isBlank()) {
             return;
         }
-        dispatch(id, "interactFlow", event.getPlayer(), event.getRightClicked(), event.getRightClicked().getLocation(), event);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("rightClick", true);
+        variables.put("leftClick", false);
+        variables.put("shifting", event.getPlayer().isSneaking());
+        variables.put("sneaking", event.getPlayer().isSneaking());
+        variables.put("shiftClick", event.getPlayer().isSneaking());
+        variables.put("success", true);
+        dispatchInteraction(id, false, event.getPlayer(), event.getRightClicked(), event.getRightClicked().getLocation(), event, variables);
         open(event.getPlayer(), id);
     }
 
@@ -239,7 +372,18 @@ public class NpcService implements Listener {
             return;
         }
         Player player = event.getDamager() instanceof Player damager ? damager : null;
-        dispatch(id, "damageFlow", player, event.getEntity(), event.getEntity().getLocation(), event);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("rightClick", false);
+        variables.put("leftClick", true);
+        variables.put("shifting", player != null && player.isSneaking());
+        variables.put("sneaking", player != null && player.isSneaking());
+        variables.put("shiftClick", player != null && player.isSneaking());
+        variables.put("success", true);
+        JsonObject definition = get(id);
+        if (bool(definition, "invulnerable", true)) {
+            event.setCancelled(true);
+        }
+        dispatchInteraction(id, true, player, event.getEntity(), event.getEntity().getLocation(), event, variables);
     }
 
     @EventHandler
@@ -249,24 +393,105 @@ public class NpcService implements Listener {
             return;
         }
         JsonObject definition = get(id);
-        String lootTable = definition != null ? text(definition, "lootTable") : "";
+        String lootTable = definition != null ? link(definition, "lootTable") : "";
         if (!lootTable.isBlank() && lootTableService != null) {
             event.getDrops().clear();
             event.getDrops().addAll(lootTableService.generate(lootTable, lootTableService.context(event.getEntity().getKiller(), event.getEntity(), event.getEntity().getLocation())));
         }
         activeNpcs.remove(id);
-        dispatch(id, "deathFlow", event.getEntity().getKiller(), event.getEntity(), event.getEntity().getLocation(), event);
     }
 
     void dispatch(String id, String hook, Player player, Entity entity, Location location, Event event) {
+        dispatch(id, hook, player, entity, location, event, Map.of());
+    }
+
+    void dispatch(String id, String hook, Player player, Entity entity, Location location, Event event, Map<String, Object> extraVariables) {
         JsonObject definition = get(id);
-        String flowId = definition != null && definition.has("hooks") && definition.get("hooks").isJsonObject()
-            ? text(definition.getAsJsonObject("hooks"), hook)
-            : "";
-        if (flowId.isBlank() || dispatcher == null) {
+        JsonObject hooks = definition != null && definition.has("hooks") && definition.get("hooks").isJsonObject() ? definition.getAsJsonObject("hooks") : null;
+        if (hooks == null || dispatcher == null) {
             return;
         }
-        dispatcher.dispatch(flowId, player, event, hookVariables(id, player, entity, location));
+        Map<String, Object> variables = hookVariables(id, player, entity, location);
+        if (extraVariables != null) {
+            variables.putAll(extraVariables);
+        }
+        variables.put("hook", hook);
+        if (hooks.has(hook) && dispatchHookElement(hooks.get(hook), player, event, variables)) {
+            return;
+        }
+        String legacyHook = hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook;
+        String flowId = text(hooks, legacyHook);
+        if (!flowId.isBlank()) {
+            dispatcher.dispatch(flowId, player, event, variables);
+        }
+    }
+
+    private boolean dispatchHookElement(JsonElement element, Player player, Event event, Map<String, Object> variables) {
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
+        if (element.isJsonObject()) {
+            dispatcher.dispatchFunction(element.getAsJsonObject(), player, event, variables);
+            return true;
+        }
+        if (element.isJsonArray()) {
+            boolean dispatched = false;
+            for (JsonElement entry : element.getAsJsonArray()) {
+                dispatched |= dispatchHookElement(entry, player, event, variables);
+            }
+            return dispatched;
+        }
+        if (element.isJsonPrimitive()) {
+            String flowId = element.getAsString();
+            if (!flowId.isBlank() && !"none".equalsIgnoreCase(flowId)) {
+                dispatcher.dispatch(flowId, player, event, variables);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void dispatchInteraction(String id, boolean leftClick, Player player, Entity entity, Location location, Event event, Map<String, Object> variables) {
+        String primary = leftClick ? "leftClickAction" : "rightClickAction";
+        if (hasHook(id, primary)) {
+            dispatch(id, primary, player, entity, location, event, variables);
+        }
+    }
+
+    private boolean hasHook(String id, String hook) {
+        JsonObject definition = get(id);
+        JsonObject hooks = definition != null && definition.has("hooks") && definition.get("hooks").isJsonObject() ? definition.getAsJsonObject("hooks") : null;
+        if (hooks == null || hook == null || hook.isBlank()) {
+            return false;
+        }
+        if (hooks.has(hook) && !hooks.get(hook).isJsonNull()) {
+            JsonElement element = hooks.get(hook);
+            if (element.isJsonObject()) {
+                return true;
+            }
+            if (element.isJsonArray()) {
+                return element.getAsJsonArray().size() > 0;
+            }
+        }
+        if (hooks.has(hook) && hooks.get(hook).isJsonPrimitive() && !hooks.get(hook).getAsString().isBlank() && !"none".equalsIgnoreCase(hooks.get(hook).getAsString())) {
+            return true;
+        }
+        String legacyHook = hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook;
+        return !text(hooks, legacyHook).isBlank();
+    }
+
+    public void packetInteract(String id, Player player, Location location, boolean leftClick, boolean shifting) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("rightClick", !leftClick);
+        variables.put("leftClick", leftClick);
+        variables.put("shifting", shifting);
+        variables.put("sneaking", shifting);
+        variables.put("shiftClick", shifting);
+        variables.put("success", true);
+        dispatchInteraction(id, leftClick, player, null, location, null, variables);
+        if (!leftClick) {
+            open(player, id);
+        }
     }
 
     static Map<String, Object> hookVariables(String id, Player player, Entity entity, Location location) {
@@ -275,7 +500,22 @@ public class NpcService implements Listener {
         variables.put("player", player);
         variables.put("entity", entity);
         variables.put("location", location);
+        variables.put("event.id", id);
+        variables.put("event.entity", entity);
+        variables.put("event.target", entity);
+        variables.put("event.location", location);
         return variables;
+    }
+
+    private String link(JsonObject definition, String key) {
+        if (definition != null && definition.has("links") && definition.get("links").isJsonObject()) {
+            String value = text(definition.getAsJsonObject("links"), key);
+            if (!value.isBlank() && !"none".equalsIgnoreCase(value)) {
+                return value;
+            }
+        }
+        String value = text(definition, key);
+        return "none".equalsIgnoreCase(value) ? "" : value;
     }
 
     private String npcId(Entity entity) {
@@ -288,10 +528,32 @@ public class NpcService implements Listener {
 
     private EntityType entityType(String value) {
         try {
-            return EntityType.valueOf(value.toUpperCase(Locale.ROOT));
+            return EntityType.valueOf(enumName(value));
         } catch (Exception ignored) {
             return EntityType.VILLAGER;
         }
+    }
+
+    private boolean playerEntityType(JsonObject definition) {
+        String type = text(definition, "entityType");
+        return "player".equalsIgnoreCase(type) || "minecraft:player".equalsIgnoreCase(type);
+    }
+
+    private EntityType spawnEntityType(JsonObject definition) {
+        String type = text(definition, "entityType");
+        if (playerEntityType(definition)) {
+            return null;
+        }
+        return entityType(type);
+    }
+
+    private String enumName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        int namespace = value.indexOf(':');
+        String local = namespace >= 0 ? value.substring(namespace + 1) : value;
+        return local.replace('-', '_').toUpperCase(Locale.ROOT);
     }
 
     private String text(JsonObject object, String key) {
@@ -315,5 +577,8 @@ public class NpcService implements Listener {
         } catch (Exception ignored) {
             return fallback;
         }
+    }
+
+    private record LookAngles(float yaw, float pitch) {
     }
 }

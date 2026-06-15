@@ -10,6 +10,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.ScoreboardDefinition;
@@ -23,6 +24,9 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.modules.FlowRuntimeModule;
+import restudio.resync.runtime.LootTableService;
+import restudio.resync.runtime.NpcService;
+import restudio.resync.runtime.VillageProfileService;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.world.WorldGameRuleDescriptor;
@@ -73,6 +77,8 @@ public class ReSyncCommand implements TabExecutor {
             case "portal" -> handlePortal(sender, args);
             case "flow" -> handleFlow(sender, args);
             case "item" -> handleItem(sender, args);
+            case "npc" -> handleNpc(sender, args);
+            case "village", "villager", "trade" -> handleVillage(sender, args);
             case "resource" -> handleResource(sender, args);
             default -> {
                 sendUsage(sender);
@@ -84,7 +90,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item", "resource"), args[0]);
+            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item", "npc", "village", "resource"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -94,6 +100,8 @@ public class ReSyncCommand implements TabExecutor {
             case "portal" -> tabCompletePortal(args);
             case "flow" -> tabCompleteFlow(args);
             case "item" -> tabCompleteItem(args);
+            case "npc" -> tabCompleteNpc(args);
+            case "village", "villager", "trade" -> tabCompleteVillage(args);
             case "resource" -> tabCompleteResource(args);
             default -> List.of();
         };
@@ -195,6 +203,179 @@ public class ReSyncCommand implements TabExecutor {
         }
         if (args.length == 5 && "give".equalsIgnoreCase(args[1])) {
             return filter(List.of("1", "8", "16", "32", "64"), args[4]);
+        }
+        return List.of();
+    }
+
+    private boolean handleNpc(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync npc list");
+            sendUsageLine(sender, "/resync npc spawn <npcId> [player]");
+            sendUsageLine(sender, "/resync npc despawn <npcId>");
+            sendUsageLine(sender, "/resync npc open <npcId> [player]");
+            sendUsageLine(sender, "/resync npc trade <npcId> <profileId>");
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        NpcService service = plugin.getReSyncServer().getModuleContext().getService(NpcService.class);
+        if (storage == null || service == null) {
+            sendError(sender, "NPC System Unavailable");
+            return true;
+        }
+        if ("list".equals(action)) {
+            List<String> ids = storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            sendInfo(sender, "NPCs", ids.isEmpty() ? "None" : String.join(", ", ids));
+            return true;
+        }
+        String id = requiredArg(sender, args, 2, "/resync npc " + action + " <npcId>");
+        if (id == null) {
+            return true;
+        }
+        if (storage.get(ReSyncResourceCatalog.NPC_DEFINITION, id) == null) {
+            sendError(sender, "NPC Not Found", id);
+            return true;
+        }
+        return switch (action) {
+            case "spawn" -> {
+                Player target = targetPlayerArg(sender, args, 3, "/resync npc spawn " + id + " [player]");
+                if (target != null) {
+                    service.spawn(id, target.getLocation());
+                }
+                if (target != null && service.isActive(id)) {
+                    sendSuccess(sender, "NPC Spawned", id);
+                } else if (target != null) {
+                    sendError(sender, "NPC Spawn Failed", service.playerNpcUnavailableReason());
+                }
+                yield true;
+            }
+            case "despawn" -> {
+                if (service.despawn(id)) {
+                    sendSuccess(sender, "NPC Despawned", id);
+                } else {
+                    sendError(sender, "NPC Not Active", id);
+                }
+                yield true;
+            }
+            case "open" -> {
+                Player target = targetPlayerArg(sender, args, 3, "/resync npc open " + id + " [player]");
+                if (target != null && service.open(target, id)) {
+                    sendSuccess(sender, "NPC Opened", id);
+                } else if (target != null) {
+                    sendError(sender, "NPC Open Failed", id);
+                }
+                yield true;
+            }
+            case "trade", "profile" -> {
+                String profileId = requiredArg(sender, args, 3, "/resync npc trade " + id + " <profileId>");
+                if (profileId == null) {
+                    yield true;
+                }
+                if (storage.get(ReSyncResourceCatalog.VILLAGE_PROFILE, profileId) == null) {
+                    sendError(sender, "Village Profile Not Found", profileId);
+                    yield true;
+                }
+                if (service.setProfile(id, profileId)) {
+                    sendSuccess(sender, "NPC Trade Set", id + " -> " + profileId);
+                } else {
+                    sendError(sender, "NPC Trade Failed", id);
+                }
+                yield true;
+            }
+            default -> {
+                sendUsageLine(sender, "/resync npc <list|spawn|despawn|open|trade> ...");
+                yield true;
+            }
+        };
+    }
+
+    private List<String> tabCompleteNpc(String[] args) {
+        if (args.length == 2) {
+            return filter(List.of("list", "spawn", "despawn", "open", "trade"), args[1]);
+        }
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        if (storage == null) {
+            return List.of();
+        }
+        if (args.length == 3 && List.of("spawn", "despawn", "open", "trade").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION), args[2]);
+        }
+        if (args.length == 4 && List.of("spawn", "open").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(onlinePlayers(), args[3]);
+        }
+        if (args.length == 4 && "trade".equalsIgnoreCase(args[1])) {
+            return filter(storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE), args[3]);
+        }
+        return List.of();
+    }
+
+    private Player targetPlayerArg(CommandSender sender, String[] args, int index, String usage) {
+        if (args.length > index && args[index] != null && !args[index].isBlank()) {
+            Player target = Bukkit.getPlayerExact(args[index]);
+            if (target == null) {
+                sendError(sender, "Player Not Found", args[index]);
+                return null;
+            }
+            return target;
+        }
+        if (sender instanceof Player player) {
+            return player;
+        }
+        sendError(sender, "Player Required", usage);
+        return null;
+    }
+
+    private boolean handleVillage(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync village list");
+            sendUsageLine(sender, "/resync village apply <profileId>");
+            sendUsageLine(sender, "/resync village spawn <profileId> [player]");
+            sendUsageLine(sender, "/resync village open <profileId> [player]");
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        if (storage == null) {
+            sendError(sender, "Village System Unavailable");
+            return true;
+        }
+        if ("list".equals(action)) {
+            List<String> ids = storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            sendInfo(sender, "Village Profiles", ids.isEmpty() ? "None" : String.join(", ", ids));
+            return true;
+        }
+        if (!List.of("apply", "spawn", "open").contains(action)) {
+            sendUsageLine(sender, "/resync village <list|apply|spawn|open> ...");
+            return true;
+        }
+        String id = requiredArg(sender, args, 2, "/resync village " + action + " <profileId>");
+        if (id == null) {
+            return true;
+        }
+        if (storage.get(ReSyncResourceCatalog.VILLAGE_PROFILE, id) == null) {
+            sendError(sender, "Village Profile Not Found", id);
+            return true;
+        }
+        return switch (action) {
+            case "spawn" -> spawnVillageResource(sender, id, args);
+            case "open" -> openVillageResource(sender, id, args);
+            default -> applyVillageResource(sender, id);
+        };
+    }
+
+    private List<String> tabCompleteVillage(String[] args) {
+        if (args.length == 2) {
+            return filter(List.of("list", "apply", "spawn", "open"), args[1]);
+        }
+        ReSyncJsonResourceStorage storage = getJsonResourceStorage();
+        if (storage == null) {
+            return List.of();
+        }
+        if (args.length == 3 && List.of("apply", "spawn", "open").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE), args[2]);
+        }
+        if (args.length == 4 && List.of("spawn", "open").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(onlinePlayers(), args[3]);
         }
         return List.of();
     }
@@ -346,8 +527,127 @@ public class ReSyncCommand implements TabExecutor {
         if (ReSyncResourceCatalog.DIALOG.equals(type)) {
             return applyDialogResource(sender, storage, id, args);
         }
+        if (ReSyncResourceCatalog.LOOT_TABLE.equals(type)) {
+            return applyLootResource(sender, id, args);
+        }
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
+            return applyNpcResource(sender, id, args);
+        }
+        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type)) {
+            return applyVillageResource(sender, id);
+        }
         sendError(sender, "Unsupported Resource Apply", prettyResourceType(type));
         return true;
+    }
+
+    private boolean applyLootResource(CommandSender sender, String id, String[] args) {
+        Player target = resourceTargetPlayer(sender, args, "/resync resource apply loot " + id + " <player>");
+        if (target == null) {
+            return true;
+        }
+        LootTableService service = plugin.getReSyncServer().getModuleContext().getService(LootTableService.class);
+        if (service == null) {
+            sendError(sender, "Loot Service Unavailable", id);
+            return true;
+        }
+        service.give(target, id);
+        sendSuccess(sender, "Loot Given", id);
+        return true;
+    }
+
+    private boolean applyNpcResource(CommandSender sender, String id, String[] args) {
+        Player target = resourceTargetPlayer(sender, args, "/resync resource apply npc " + id + " <player>");
+        if (target == null) {
+            return true;
+        }
+        NpcService service = plugin.getReSyncServer().getModuleContext().getService(NpcService.class);
+        if (service == null) {
+            sendError(sender, "NPC Service Unavailable", id);
+            return true;
+        }
+        service.spawn(id, target.getLocation());
+        if (service.isActive(id)) {
+            sendSuccess(sender, "NPC Spawned", id);
+        } else {
+            sendError(sender, "NPC Spawn Failed", service.playerNpcUnavailableReason());
+        }
+        return true;
+    }
+
+    private boolean applyVillageResource(CommandSender sender, String id) {
+        if (!(sender instanceof Player player)) {
+            sendError(sender, "Villager Target Required", "/resync resource apply village " + id);
+            return true;
+        }
+        Villager villager = player.getNearbyEntities(8, 8, 8).stream()
+            .filter(Villager.class::isInstance)
+            .map(Villager.class::cast)
+            .min((first, second) -> Double.compare(first.getLocation().distanceSquared(player.getLocation()), second.getLocation().distanceSquared(player.getLocation())))
+            .orElse(null);
+        if (villager == null) {
+            sendError(sender, "Villager Target Required", "/resync resource apply village " + id);
+            return true;
+        }
+        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        if (service == null || !service.apply(villager, id)) {
+            sendError(sender, "Village Apply Failed", id);
+            return true;
+        }
+        sendSuccess(sender, "Village Applied", id);
+        return true;
+    }
+
+    private boolean spawnVillageResource(CommandSender sender, String id, String[] args) {
+        Player target = targetPlayerArg(sender, args, 3, "/resync village spawn " + id + " [player]");
+        if (target == null) {
+            return true;
+        }
+        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        if (service == null) {
+            sendError(sender, "Village Service Unavailable", id);
+            return true;
+        }
+        Villager villager = service.spawn(target.getLocation(), id);
+        if (villager == null) {
+            sendError(sender, "Village Spawn Failed", id);
+            return true;
+        }
+        sendSuccess(sender, "Village Spawned", id);
+        return true;
+    }
+
+    private boolean openVillageResource(CommandSender sender, String id, String[] args) {
+        Player target = targetPlayerArg(sender, args, 3, "/resync village open " + id + " [player]");
+        if (target == null) {
+            return true;
+        }
+        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        if (service == null) {
+            sendError(sender, "Village Service Unavailable", id);
+            return true;
+        }
+        if (!service.openVirtualTrades(target, id)) {
+            sendError(sender, "Village Open Failed", id);
+            return true;
+        }
+        sendSuccess(sender, "Village Opened", id);
+        return true;
+    }
+
+    private Player resourceTargetPlayer(CommandSender sender, String[] args, String usage) {
+        if (args.length >= 5 && args[4] != null && !args[4].isBlank()) {
+            Player target = Bukkit.getPlayerExact(args[4]);
+            if (target == null) {
+                sendError(sender, "Player Not Found", args[4]);
+                return null;
+            }
+            return target;
+        }
+        if (sender instanceof Player player) {
+            return player;
+        }
+        sendError(sender, "Player Required", usage);
+        return null;
     }
 
     private boolean applyDialogResource(CommandSender sender, ReSyncJsonResourceStorage storage, String id, String[] args) {
@@ -401,7 +701,7 @@ public class ReSyncCommand implements TabExecutor {
         if (args.length == 6 && "set".equalsIgnoreCase(args[1])) {
             return filter(resourceValueOptions(resourceTypeAlias(args[2]), args[4]), args[5]);
         }
-        if (args.length == 5 && "apply".equalsIgnoreCase(args[1]) && ReSyncResourceCatalog.DIALOG.equals(resourceTypeAlias(args[2]))) {
+        if (args.length == 5 && "apply".equalsIgnoreCase(args[1]) && List.of(ReSyncResourceCatalog.DIALOG, ReSyncResourceCatalog.LOOT_TABLE, ReSyncResourceCatalog.NPC_DEFINITION).contains(resourceTypeAlias(args[2]))) {
             return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[4]);
         }
         return List.of();
@@ -432,13 +732,16 @@ public class ReSyncCommand implements TabExecutor {
             case "text", "template", "text_template" -> ReSyncResourceCatalog.TEXT_TEMPLATE;
             case "advancement", "advancements", "advancement_tree" -> ReSyncResourceCatalog.ADVANCEMENT_TREE;
             case "dialog", "dialogs" -> ReSyncResourceCatalog.DIALOG;
+            case "village", "trade", "village_profile" -> ReSyncResourceCatalog.VILLAGE_PROFILE;
+            case "npc", "npcs", "npc_definition" -> ReSyncResourceCatalog.NPC_DEFINITION;
+            case "loot", "loot_table" -> ReSyncResourceCatalog.LOOT_TABLE;
             default -> type.toLowerCase(Locale.ROOT);
         };
     }
 
     private List<String> resourceTypeOptions(ReSyncJsonResourceStorage storage) {
         List<String> values = new ArrayList<>(storage.resourceTypes());
-        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement", "dialog"));
+        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement", "dialog", "village", "trade", "npc", "loot"));
         return values;
     }
 
@@ -455,6 +758,9 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
+            case ReSyncResourceCatalog.VILLAGE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
+            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "tradeProfile", "lootTable", "equipment", "hooks.spawnAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.despawnAction");
+            case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
     }
@@ -485,6 +791,18 @@ public class ReSyncCommand implements TabExecutor {
             return List.of("close", "none", "wait_for_response");
         }
         if (ReSyncResourceCatalog.DIALOG.equals(type) && ("pause".equalsIgnoreCase(field) || "can_close_with_escape".equalsIgnoreCase(field))) {
+            return booleanOptions();
+        }
+        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type) && "profession".equalsIgnoreCase(field)) {
+            return List.of("none", "armorer", "butcher", "cartographer", "cleric", "farmer", "fisherman", "fletcher", "leatherworker", "librarian", "mason", "nitwit", "shepherd", "toolsmith", "weaponsmith");
+        }
+        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type) && "villagerType".equalsIgnoreCase(field)) {
+            return List.of("plains", "desert", "jungle", "savanna", "snow", "swamp", "taiga");
+        }
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && "spawnMode".equalsIgnoreCase(field)) {
+            return List.of("manual");
+        }
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && ("ai".equalsIgnoreCase(field) || "gravity".equalsIgnoreCase(field) || "invulnerable".equalsIgnoreCase(field) || "followPlayer".equalsIgnoreCase(field))) {
             return booleanOptions();
         }
         return List.of();
@@ -595,19 +913,59 @@ public class ReSyncCommand implements TabExecutor {
                 actions.add(button);
                 resource.add("actions", actions);
             }
+            case ReSyncResourceCatalog.VILLAGE_PROFILE -> {
+                resource.addProperty("displayName", id);
+                resource.addProperty("profession", "librarian");
+                resource.addProperty("villagerType", "plains");
+                resource.addProperty("level", 1);
+                resource.addProperty("maxUses", 12);
+                resource.addProperty("restockTicks", 24000);
+                resource.addProperty("lootTable", "");
+                resource.add("offers", new JsonArray());
+                resource.add("hooks", new JsonObject());
+            }
+            case ReSyncResourceCatalog.NPC_DEFINITION -> {
+                resource.addProperty("displayName", id);
+                resource.addProperty("entityType", "villager");
+                resource.addProperty("spawnMode", "manual");
+                resource.addProperty("ai", false);
+                resource.addProperty("gravity", true);
+                resource.addProperty("invulnerable", true);
+                resource.addProperty("followPlayer", false);
+                resource.addProperty("followRange", 12);
+                resource.addProperty("tradeProfile", "");
+                resource.addProperty("lootTable", "");
+                resource.add("equipment", new JsonObject());
+                resource.add("hooks", new JsonObject());
+            }
+            case ReSyncResourceCatalog.LOOT_TABLE -> {
+                resource.addProperty("displayName", id);
+                JsonArray pools = new JsonArray();
+                JsonObject pool = new JsonObject();
+                pool.addProperty("rolls", 1);
+                JsonArray entries = new JsonArray();
+                JsonObject entry = new JsonObject();
+                entry.addProperty("item", "minecraft:stone");
+                entry.addProperty("minAmount", 1);
+                entry.addProperty("maxAmount", 1);
+                entry.addProperty("weight", 1);
+                entry.addProperty("chance", 100);
+                entries.add(entry);
+                pool.add("entries", entries);
+                pools.add(pool);
+                resource.add("pools", pools);
+                JsonObject hooks = new JsonObject();
+                hooks.addProperty("beforeRollFlow", "");
+                hooks.addProperty("afterRollFlow", "");
+                hooks.addProperty("deniedRollFlow", "");
+                resource.add("hooks", hooks);
+            }
             default -> resource.addProperty("displayName", id);
         }
         return resource;
     }
 
     private void putResourceValue(JsonObject resource, String field, String value) {
-        if (field.contains(".")) {
-            String[] parts = field.split("\\.", 2);
-            JsonObject object = resource.has(parts[0]) && resource.get(parts[0]).isJsonObject() ? resource.getAsJsonObject(parts[0]) : new JsonObject();
-            resource.add(parts[0], object);
-            putResourceValue(object, parts[1], value);
-            return;
-        }
         if (arrayResourceField(field)) {
             JsonArray array = new JsonArray();
             for (String part : value.split("\\|")) {
@@ -619,25 +977,118 @@ public class ReSyncCommand implements TabExecutor {
             resource.add(field, array);
             return;
         }
+        JsonPathParent parent = jsonPathParent(resource, field, true);
+        if (parent == null) {
+            return;
+        }
         if (value == null || value.isBlank() || "none".equalsIgnoreCase(value)) {
-            resource.remove(field);
+            removeJsonPath(resource, field);
             return;
         }
         if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
-            resource.addProperty(field, Boolean.parseBoolean(value));
+            setJsonPathValue(parent, new JsonPrimitive(Boolean.parseBoolean(value)));
             return;
         }
         Integer integer = parseInt(value);
         if (integer != null) {
-            resource.addProperty(field, integer);
+            setJsonPathValue(parent, new JsonPrimitive(integer));
             return;
         }
-        resource.addProperty(field, value);
+        setJsonPathValue(parent, new JsonPrimitive(value));
+    }
+
+    private JsonPathParent jsonPathParent(JsonObject resource, String field, boolean create) {
+        if (resource == null || field == null || field.isBlank()) {
+            return null;
+        }
+        String[] parts = field.split("\\.");
+        JsonElement current = resource;
+        for (int i = 0; i < parts.length - 1; i++) {
+            String part = parts[i];
+            boolean nextArray = isIndex(parts[i + 1]);
+            if (current.isJsonObject()) {
+                JsonObject object = current.getAsJsonObject();
+                if (!object.has(part) || object.get(part).isJsonNull() || (!object.get(part).isJsonObject() && !object.get(part).isJsonArray())) {
+                    if (!create) {
+                        return null;
+                    }
+                    object.add(part, nextArray ? new JsonArray() : new JsonObject());
+                }
+                current = object.get(part);
+            } else if (current.isJsonArray() && isIndex(part)) {
+                JsonArray array = current.getAsJsonArray();
+                int index = Integer.parseInt(part);
+                while (create && array.size() <= index) {
+                    array.add(nextArray ? new JsonArray() : new JsonObject());
+                }
+                if (index >= array.size()) {
+                    return null;
+                }
+                JsonElement child = array.get(index);
+                if (child == null || child.isJsonNull() || (!child.isJsonObject() && !child.isJsonArray())) {
+                    if (!create) {
+                        return null;
+                    }
+                    child = nextArray ? new JsonArray() : new JsonObject();
+                    array.set(index, child);
+                }
+                current = child;
+            } else {
+                return null;
+            }
+        }
+        return current.isJsonObject() ? new JsonPathParent(current.getAsJsonObject(), null, parts[parts.length - 1])
+            : current.isJsonArray() ? new JsonPathParent(null, current.getAsJsonArray(), parts[parts.length - 1])
+            : null;
+    }
+
+    private void setJsonPathValue(JsonPathParent parent, JsonElement value) {
+        if (parent.object() != null) {
+            parent.object().add(parent.key(), value);
+            return;
+        }
+        if (parent.array() != null && isIndex(parent.key())) {
+            int index = Integer.parseInt(parent.key());
+            while (parent.array().size() <= index) {
+                parent.array().add(new JsonObject());
+            }
+            parent.array().set(index, value);
+        }
+    }
+
+    private void removeJsonPath(JsonObject resource, String field) {
+        JsonPathParent parent = jsonPathParent(resource, field, false);
+        if (parent == null) {
+            return;
+        }
+        if (parent.object() != null) {
+            parent.object().remove(parent.key());
+        } else if (parent.array() != null && isIndex(parent.key())) {
+            int index = Integer.parseInt(parent.key());
+            if (index < parent.array().size()) {
+                parent.array().remove(index);
+            }
+        }
+    }
+
+    private boolean isIndex(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private record JsonPathParent(JsonObject object, JsonArray array, String key) {
     }
 
     private boolean arrayResourceField(String field) {
         return switch (field) {
-            case "frames", "colors", "shape", "ingredients", "nodes", "temporaryNodes", "parents", "tracks", "prefixes", "suffixes", "players", "sources" -> true;
+            case "frames", "colors", "shape", "ingredients", "nodes", "temporaryNodes", "parents", "tracks", "prefixes", "suffixes", "players", "sources", "offers", "pools" -> true;
             default -> false;
         };
     }

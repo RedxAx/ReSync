@@ -186,6 +186,7 @@ public class GuiManager implements Listener {
         };
         if (FlowRuntimeAccess.getPlugin() != null) {
             Bukkit.getScheduler().runTask(FlowRuntimeAccess.getPlugin(), task);
+            Bukkit.getScheduler().runTaskLater(FlowRuntimeAccess.getPlugin(), task, 1L);
         } else {
             task.run();
         }

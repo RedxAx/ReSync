@@ -607,6 +607,28 @@
     }
   },
   {
+    "id": "string.template",
+    "displayName": "String Template",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "template",
+        "dataType": "string",
+        "widget": "MULTILINE"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "template"
+    }
+  },
+  {
     "id": "string.substring",
     "displayName": "Substring",
     "category": "DATA",

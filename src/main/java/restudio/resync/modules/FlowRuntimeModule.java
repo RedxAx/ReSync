@@ -451,6 +451,7 @@ public class FlowRuntimeModule implements Module {
             HandlerList.unregisterAll(villageProfileService);
         }
         if (npcService != null) {
+            npcService.shutdown();
             HandlerList.unregisterAll(npcService);
         }
         FlowRuntimeAccess.clear();

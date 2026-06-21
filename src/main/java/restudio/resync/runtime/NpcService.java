@@ -22,6 +22,7 @@ import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.dialog.DialogService;
@@ -45,6 +46,7 @@ public class NpcService implements Listener {
     private final Map<String, UUID> activeNpcs = new ConcurrentHashMap<>();
     private final PlayerNpcRuntime playerNpcRuntime;
     private final NamespacedKey npcIdKey;
+    private BukkitTask followTask;
 
     public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, VillageProfileService villageProfileService, LootTableService lootTableService, DialogService dialogService) {
         this(plugin, storage, customContentService, dispatcher, villageProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null);
@@ -69,7 +71,7 @@ public class NpcService implements Listener {
         this.playerNpcRuntime = playerNpcRuntime;
         this.npcIdKey = npcIdKey;
         if (plugin != null) {
-            plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickFollowPlayers, 2L, 2L);
+            followTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickFollowPlayers, 2L, 2L);
         }
     }
 
@@ -146,6 +148,13 @@ public class NpcService implements Listener {
     }
 
     public void spawnStartupNpcs() {
+    }
+
+    public void shutdown() {
+        if (followTask != null) {
+            followTask.cancel();
+            followTask = null;
+        }
     }
 
     public boolean setProfile(String id, String profileId) {

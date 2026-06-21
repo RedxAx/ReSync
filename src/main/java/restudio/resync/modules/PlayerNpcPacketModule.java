@@ -127,9 +127,17 @@ public class PlayerNpcPacketModule implements Module {
 
     private void assertSupported(PacketEventsAPI<Plugin> api) {
         ServerVersion version = api.getServerManager().getVersion();
-        if (version == ServerVersion.ERROR || version.isNewerThan(ServerVersion.V_26_1_2)) {
+        if (isUnsupportedServerVersion(version)) {
             throw new IllegalStateException("PacketEvents does not support " + version.getReleaseName());
         }
+    }
+
+    private boolean isUnsupportedServerVersion(ServerVersion version) {
+        return version == ServerVersion.ERROR || version.isNewerThan(maxSupportedServerVersion());
+    }
+
+    private ServerVersion maxSupportedServerVersion() {
+        return ServerVersion.V_26_1_2;
     }
 
     private void assertCompatibility() {

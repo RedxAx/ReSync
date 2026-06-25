@@ -12,6 +12,7 @@ import restudio.resync.customcontent.CustomContentListener;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.customization.ReSyncJsonResourceStorage.ResourceListener;
 import restudio.resync.core.Session;
 import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.CustomFunctionNodeDefinitions;
@@ -127,6 +128,8 @@ public class FlowRuntimeModule implements Module {
     private FlowDebugService debugService;
     private BukkitTask tickTask;
     private ModuleContext moduleContext;
+    private ReSyncJsonResourceStorage jsonResourceStorage;
+    private ResourceListener jsonResourceListener;
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -144,58 +147,7 @@ public class FlowRuntimeModule implements Module {
         FlowRegistry flowRegistry = new FlowRegistry();
         flowRegistry.setHandlerRegistry(handlerRegistry);
         propertyRegistry = new PropertyRegistry();
-        new AbilityEffectHandler().registerTo(handlerRegistry);
-        new GenericMathHandler().registerTo(handlerRegistry);
-        new GenericStringHandler().registerTo(handlerRegistry);
-        new GenericListHandler().registerTo(handlerRegistry);
-        new GenericMapHandler().registerTo(handlerRegistry);
-        new VariableHandler().registerTo(handlerRegistry);
-        new LogicHandler().registerTo(handlerRegistry);
-        new ConversionHandler().registerTo(handlerRegistry);
-        new DebugHandler().registerTo(handlerRegistry);
-        new DiscordHandler().registerTo(handlerRegistry);
-        new ChatHandler().registerTo(handlerRegistry);
-        if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
-            new EconomyHandler().registerTo(handlerRegistry);
-        }
-        new FileHandler().registerTo(handlerRegistry);
-        new FlowControlHandler().registerTo(handlerRegistry);
-        new HttpHandler().registerTo(handlerRegistry);
-        new JsonHandler().registerTo(handlerRegistry);
-        new LocationHandler().registerTo(handlerRegistry);
-        new MenuHandler().registerTo(handlerRegistry);
-        new ParticleHandler().registerTo(handlerRegistry);
-        if (Bukkit.getPluginManager().getPlugin("LuckPerms") != null) {
-            new PermissionHandler().registerTo(handlerRegistry);
-        }
-        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            new PlaceholderHandler().registerTo(handlerRegistry);
-        }
-        new RandomHandler().registerTo(handlerRegistry);
-        new RegionHandler().registerTo(handlerRegistry);
-        new ScoreboardHandler().registerTo(handlerRegistry);
-        new SoundHandler().registerTo(handlerRegistry);
-        new ServerHandler().registerTo(handlerRegistry);
-        new TeamHandler().registerTo(handlerRegistry);
-        new TextFormatHandler().registerTo(handlerRegistry);
-        new ScheduleHandler().registerTo(handlerRegistry);
-        new TitleHandler().registerTo(handlerRegistry);
-        new TimeHandler().registerTo(handlerRegistry);
-        new UuidHandler().registerTo(handlerRegistry);
-        new ColorHandler().registerTo(handlerRegistry);
-        new CustomEventHandler().registerTo(handlerRegistry);
-        new CustomContentHandler().registerTo(handlerRegistry);
-        new VariableScopeHandler().registerTo(handlerRegistry);
-        new FunctionHandler().registerTo(handlerRegistry);
-        new PlayerActionHandler().registerTo(handlerRegistry);
-        new EntityActionHandler().registerTo(handlerRegistry);
-        new WorldActionHandler().registerTo(handlerRegistry);
-        new BlockActionHandler().registerTo(handlerRegistry);
-        new InventoryActionHandler().registerTo(handlerRegistry);
-        new ReSyncRuntimeResourceHandler().registerTo(handlerRegistry);
-        new MiscHandler().registerTo(handlerRegistry);
-        new RestoredNodeHandler().registerTo(handlerRegistry);
-        JsonFamilyHandler.registerFamilies(handlerRegistry);
+        registerNodeHandlers(handlerRegistry);
         TypeRegistry typeRegistry = new TypeRegistry();
         restudio.flow.data.FlowDataObjectAdapter.setTypeRegistry(typeRegistry);
         NodeDefinitionRegistry nodeDefinitionRegistry = new NodeDefinitionRegistry();
@@ -219,7 +171,7 @@ public class FlowRuntimeModule implements Module {
         executor.setDebugService(debugService);
         customContentService = new CustomContentService(customContentStorage, storage, executor);
         customContentListener = new CustomContentListener(customContentStorage, customContentService);
-        ReSyncJsonResourceStorage jsonResourceStorage = context.getRequiredService(ReSyncJsonResourceStorage.class);
+        jsonResourceStorage = context.getRequiredService(ReSyncJsonResourceStorage.class);
         RuntimeFlowDispatcher runtimeFlowDispatcher = new RuntimeFlowDispatcher(storage, executor);
         lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher);
         villageProfileService = new VillageProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
@@ -266,7 +218,7 @@ public class FlowRuntimeModule implements Module {
         context.registerService(DialogService.class, dialogService);
         npcService = new NpcService(context.getPlugin(), jsonResourceStorage, customContentService, runtimeFlowDispatcher, villageProfileService, lootTableService, dialogService, context.getService(PlayerNpcRuntime.class));
         context.registerService(NpcService.class, npcService);
-        jsonResourceStorage.addListener((type, id, value, deleted) -> {
+        jsonResourceListener = (type, id, value, deleted) -> {
             if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
                 Bukkit.getScheduler().runTask(context.getPlugin(), () -> npcService.reload(id, value, deleted));
                 return;
@@ -274,7 +226,8 @@ public class FlowRuntimeModule implements Module {
             if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type)) {
                 Bukkit.getScheduler().runTask(context.getPlugin(), () -> villageProfileService.reload(id, deleted));
             }
-        });
+        };
+        jsonResourceStorage.addListener(jsonResourceListener);
         ScoreboardTemplateManager.configureEditStateBridge(editStateSender::sendEditTargetState, context.getRequiredService(PlayerSessionLinkService.class));
         CustomContentAccess.configure(customContentStorage, customContentService);
         ReSyncRuntimeContentAccess.configure(lootTableService, villageProfileService, npcService);
@@ -292,6 +245,56 @@ public class FlowRuntimeModule implements Module {
         nodeDefinitionRegistry.clear();
         handlerRegistry.clear();
         propertyRegistry.clear();
+        registerNodeHandlers(handlerRegistry);
+        NodeDefinitionLoader jsonLoader = new NodeDefinitionLoader();
+        NodeDefinitionValidator validator = new NodeDefinitionValidator(handlerRegistry, true);
+        jsonLoader.setValidator(validator);
+        List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
+        classpathDefs.removeIf(this::isUnavailable);
+        jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
+        Path nodesDir = moduleContext.getPlugin().getDataFolder().toPath().resolve("nodes");
+        if (Files.exists(nodesDir)) {
+            List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
+            jsonDefs.removeIf(this::isUnavailable);
+            jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
+        }
+        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
+        if (extensionManager != null) {
+            extensionManager.reloadExtensions();
+        }
+        if (delegate != null) {
+            delegate.refreshCustomFunctionDefinitions();
+        }
+    }
+
+    public Map<String, Object> nodeRegistryDiagnostics() {
+        NodeDefinitionRegistry nodeDefinitionRegistry = moduleContext.getRequiredService(NodeDefinitionRegistry.class);
+        Map<String, Object> diagnostics = new HashMap<>();
+        List<String> definitionSets = nodeDefinitionRegistry.getPluginIds();
+        definitionSets.sort(String.CASE_INSENSITIVE_ORDER);
+        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
+        List<String> externalPlugins = extensionManager != null ? new ArrayList<>(extensionManager.getPluginIds()) : new ArrayList<>();
+        externalPlugins.sort(String.CASE_INSENSITIVE_ORDER);
+        diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
+        diagnostics.put("definitionSets", definitionSets.size());
+        diagnostics.put("definitionSetIds", definitionSets);
+        diagnostics.put("externalNodePlugins", externalPlugins.size());
+        diagnostics.put("externalNodePluginIds", externalPlugins);
+        diagnostics.put("checksum", delegate != null ? delegate.getNodeRegistryChecksum() : "");
+        diagnostics.put("flowClients", delegate != null ? delegate.getSubscribedSessionCount() : 0);
+        return diagnostics;
+    }
+
+    public FlowTraceService getTraceService() {
+        return traceService;
+    }
+
+    private boolean isUnavailable(NodeDefinition def) {
+        NodeDefinition.Availability availability = def.getAvailability();
+        return availability != null && availability.getPlugin() != null && Bukkit.getPluginManager().getPlugin(availability.getPlugin()) == null;
+    }
+
+    private void registerNodeHandlers(HandlerRegistry handlerRegistry) {
         new AbilityEffectHandler().registerTo(handlerRegistry);
         new GenericMathHandler().registerTo(handlerRegistry);
         new GenericStringHandler().registerTo(handlerRegistry);
@@ -344,52 +347,6 @@ public class FlowRuntimeModule implements Module {
         new MiscHandler().registerTo(handlerRegistry);
         new RestoredNodeHandler().registerTo(handlerRegistry);
         JsonFamilyHandler.registerFamilies(handlerRegistry);
-        NodeDefinitionLoader jsonLoader = new NodeDefinitionLoader();
-        NodeDefinitionValidator validator = new NodeDefinitionValidator(handlerRegistry, true);
-        jsonLoader.setValidator(validator);
-        List<NodeDefinition> classpathDefs = jsonLoader.loadFromClasspath("nodes");
-        classpathDefs.removeIf(this::isUnavailable);
-        jsonLoader.validateAndRegister(classpathDefs, nodeDefinitionRegistry, handlerRegistry, "json-classpath");
-        Path nodesDir = moduleContext.getPlugin().getDataFolder().toPath().resolve("nodes");
-        if (Files.exists(nodesDir)) {
-            List<NodeDefinition> jsonDefs = jsonLoader.loadFromDirectory(nodesDir);
-            jsonDefs.removeIf(this::isUnavailable);
-            jsonLoader.validateAndRegister(jsonDefs, nodeDefinitionRegistry, handlerRegistry, "json");
-        }
-        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
-        if (extensionManager != null) {
-            extensionManager.reloadExtensions();
-        }
-        if (delegate != null) {
-            delegate.refreshCustomFunctionDefinitions();
-        }
-    }
-
-    public Map<String, Object> nodeRegistryDiagnostics() {
-        NodeDefinitionRegistry nodeDefinitionRegistry = moduleContext.getRequiredService(NodeDefinitionRegistry.class);
-        Map<String, Object> diagnostics = new HashMap<>();
-        List<String> definitionSets = nodeDefinitionRegistry.getPluginIds();
-        definitionSets.sort(String.CASE_INSENSITIVE_ORDER);
-        ReSyncExtensionManager extensionManager = moduleContext.getService(ReSyncExtensionManager.class);
-        List<String> externalPlugins = extensionManager != null ? new ArrayList<>(extensionManager.getPluginIds()) : new ArrayList<>();
-        externalPlugins.sort(String.CASE_INSENSITIVE_ORDER);
-        diagnostics.put("definitions", nodeDefinitionRegistry.getAllDefinitions().size());
-        diagnostics.put("definitionSets", definitionSets.size());
-        diagnostics.put("definitionSetIds", definitionSets);
-        diagnostics.put("externalNodePlugins", externalPlugins.size());
-        diagnostics.put("externalNodePluginIds", externalPlugins);
-        diagnostics.put("checksum", delegate != null ? delegate.getNodeRegistryChecksum() : "");
-        diagnostics.put("flowClients", delegate != null ? delegate.getSubscribedSessionCount() : 0);
-        return diagnostics;
-    }
-
-    public FlowTraceService getTraceService() {
-        return traceService;
-    }
-
-    private boolean isUnavailable(NodeDefinition def) {
-        NodeDefinition.Availability availability = def.getAvailability();
-        return availability != null && availability.getPlugin() != null && Bukkit.getPluginManager().getPlugin(availability.getPlugin()) == null;
     }
 
     @Override
@@ -449,6 +406,10 @@ public class FlowRuntimeModule implements Module {
         }
         if (villageProfileService != null) {
             HandlerList.unregisterAll(villageProfileService);
+        }
+        if (jsonResourceStorage != null && jsonResourceListener != null) {
+            jsonResourceStorage.removeListener(jsonResourceListener);
+            jsonResourceListener = null;
         }
         if (npcService != null) {
             npcService.shutdown();

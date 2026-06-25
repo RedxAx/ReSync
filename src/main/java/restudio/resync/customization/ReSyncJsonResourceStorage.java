@@ -112,6 +112,10 @@ public class ReSyncJsonResourceStorage {
         }
     }
 
+    public void removeListener(ResourceListener listener) {
+        listeners.remove(listener);
+    }
+
     public void addInterceptor(ResourceMutationInterceptor interceptor) {
         if (interceptor != null) {
             interceptors.add(interceptor);

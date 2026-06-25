@@ -137,6 +137,17 @@ class NodeDefinitionCatalogTest {
         }
     }
 
+    @Test
+    void stringIndexNodesUseStringHandlerOperations() throws Exception {
+        JsonObject indexOf = findNode("string.json", "string.index_of");
+        JsonObject lastIndexOf = findNode("string.json", "string.last_index_of");
+
+        assertEquals("GenericStringHandler", indexOf.get("handler").getAsString());
+        assertEquals("index_of", indexOf.getAsJsonObject("handlerConfig").get("operation").getAsString());
+        assertEquals("GenericStringHandler", lastIndexOf.get("handler").getAsString());
+        assertEquals("last_index_of", lastIndexOf.getAsJsonObject("handlerConfig").get("operation").getAsString());
+    }
+
     private JsonObject findNode(String fileName, String id) throws Exception {
         Path file = Path.of("src", "main", "resources", "nodes", "migrated", fileName);
         JsonElement element = JsonParser.parseString(Files.readString(file));

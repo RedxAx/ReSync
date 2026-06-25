@@ -121,13 +121,15 @@ public class GenericStringHandler implements NodeHandler {
             ctx.setOutput(node, "result", value != null ? value.length() : 0);
         });
         operations.put("reverse", (ctx, node) -> {
-            String value = ctx.getInputValue(node, "value", String.class, "");
-            ctx.setOutput(node, "result", value != null ? new StringBuilder(value).reverse().toString() : "");
+            String text = getStringInput(ctx, node, "text", "value");
+            String reversed = text != null ? new StringBuilder(text).reverse().toString() : "";
+            setStringOutput(ctx, node, reversed, "reversed", "result");
         });
         operations.put("repeat", (ctx, node) -> {
-            String value = ctx.getInputValue(node, "value", String.class, "");
+            String text = getStringInput(ctx, node, "text", "value");
             Integer count = ctx.getInputValue(node, "count", Integer.class, 1);
-            ctx.setOutput(node, "result", value != null && count > 0 ? value.repeat(count) : "");
+            String repeated = text != null && count > 0 ? text.repeat(count) : "";
+            setStringOutput(ctx, node, repeated, "repeated", "result");
         });
         operations.put("contains", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
@@ -161,6 +163,11 @@ public class GenericStringHandler implements NodeHandler {
             String value = ctx.getInputValue(node, "value", String.class, "");
             String other = ctx.getInputValue(node, "other", String.class, "");
             ctx.setOutput(node, "result", value != null && other != null && value.equalsIgnoreCase(other));
+        });
+        operations.put("index_of", (ctx, node) -> {
+            String value = ctx.getInputValue(node, "value", String.class, "");
+            String substring = ctx.getInputValue(node, "substring", String.class, "");
+            ctx.setOutput(node, "index", value != null && substring != null ? value.indexOf(substring) : -1);
         });
         operations.put("last_index_of", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
@@ -436,6 +443,16 @@ public class GenericStringHandler implements NodeHandler {
             String text = ctx.getInputValue(node, "text", String.class, "");
             ctx.setOutput(node, "is_email", text != null && !text.isEmpty() && text.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"));
         });
+    }
+
+    private static String getStringInput(FlowContext ctx, FlowNode node, String primaryPin, String legacyPin) {
+        String primary = ctx.getInputValue(node, primaryPin, String.class, null);
+        return primary != null ? primary : ctx.getInputValue(node, legacyPin, String.class, "");
+    }
+
+    private static void setStringOutput(FlowContext ctx, FlowNode node, String value, String primaryPin, String legacyPin) {
+        ctx.setOutput(node, primaryPin, value);
+        ctx.setOutput(node, legacyPin, value);
     }
 
     private static String hash(String text, String algorithm) {

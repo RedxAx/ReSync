@@ -614,7 +614,7 @@
       {
         "name": "template",
         "dataType": "string",
-        "widget": "MULTILINE"
+        "widget": "TEXT"
       }
     ],
     "outputs": [

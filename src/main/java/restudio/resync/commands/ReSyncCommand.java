@@ -759,7 +759,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
             case ReSyncResourceCatalog.VILLAGE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
-            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "tradeProfile", "lootTable", "equipment", "hooks.spawnAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.despawnAction");
+            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "skin.username", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "tradeProfile", "lootTable", "equipment", "hooks.spawnAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.despawnAction");
             case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
@@ -935,6 +935,9 @@ public class ReSyncCommand implements TabExecutor {
                 resource.addProperty("followRange", 12);
                 resource.addProperty("tradeProfile", "");
                 resource.addProperty("lootTable", "");
+                JsonObject skin = new JsonObject();
+                skin.addProperty("username", "");
+                resource.add("skin", skin);
                 resource.add("equipment", new JsonObject());
                 resource.add("hooks", new JsonObject());
             }

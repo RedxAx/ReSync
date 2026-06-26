@@ -10,6 +10,8 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.protocol.player.Equipment;
+import com.github.retrooper.packetevents.protocol.player.EquipmentSlot;
 import com.github.retrooper.packetevents.protocol.player.GameMode;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
@@ -19,6 +21,7 @@ import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
@@ -31,6 +34,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -41,8 +45,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.util.TextFormatter;
 
 import java.net.URI;
@@ -50,6 +57,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -401,6 +409,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             send(player, new WrapperPlayServerEntityHeadLook(npc.entityId(), npc.location().getYaw()));
             send(player, new WrapperPlayServerEntityRotation(npc.entityId(), npc.location().getYaw(), npc.location().getPitch(), bool(npc.definition(), "gravity", true)));
             send(player, new WrapperPlayServerEntityMetadata(npc.entityId(), metadata(npc)));
+            sendEquipment(player, npc);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 try {
                     send(player, new WrapperPlayServerPlayerInfoRemove(List.of(npc.profile().getUUID())));
@@ -465,6 +474,55 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             new EntityData<>(5, EntityDataTypes.BOOLEAN, !bool(npc.definition(), "gravity", true)),
             new EntityData<>(skinLayerIndex, EntityDataTypes.BYTE, (byte) 0x7F)
         );
+    }
+
+    private void sendEquipment(Player player, PacketNpc npc) {
+        List<Equipment> equipment = equipment(npc.definition());
+        if (equipment.isEmpty()) {
+            return;
+        }
+        if (packetEvents.getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_16)) {
+            send(player, new WrapperPlayServerEntityEquipment(npc.entityId(), equipment));
+            return;
+        }
+        for (Equipment entry : equipment) {
+            send(player, new WrapperPlayServerEntityEquipment(npc.entityId(), List.of(entry)));
+        }
+    }
+
+    private List<Equipment> equipment(JsonObject definition) {
+        JsonObject gear = definition != null && definition.has("equipment") && definition.get("equipment").isJsonObject() ? definition.getAsJsonObject("equipment") : new JsonObject();
+        List<Equipment> equipment = new ArrayList<>();
+        addEquipment(equipment, EquipmentSlot.MAIN_HAND, gear, "mainHand");
+        addEquipment(equipment, EquipmentSlot.OFF_HAND, gear, "offHand");
+        addEquipment(equipment, EquipmentSlot.HELMET, gear, "helmet");
+        addEquipment(equipment, EquipmentSlot.CHEST_PLATE, gear, "chestplate");
+        addEquipment(equipment, EquipmentSlot.LEGGINGS, gear, "leggings");
+        addEquipment(equipment, EquipmentSlot.BOOTS, gear, "boots");
+        return equipment;
+    }
+
+    private void addEquipment(List<Equipment> equipment, EquipmentSlot slot, JsonObject gear, String key) {
+        ItemStack item = item(text(gear, key));
+        if (item != null && !item.getType().isAir()) {
+            var packetItem = SpigotConversionUtil.fromBukkitItemStack(item);
+            if (packetItem != null && !packetItem.isEmpty()) {
+                equipment.add(new Equipment(slot, packetItem));
+            }
+        }
+    }
+
+    private ItemStack item(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return null;
+        }
+        CustomContentService service = CustomContentAccess.getService();
+        ItemStack stack = service != null ? service.createReferencedItem(reference, 1) : null;
+        if (stack != null) {
+            return stack;
+        }
+        Material material = RuntimeMaterialResolver.itemMaterial(reference);
+        return material != null ? new ItemStack(material, 1) : null;
     }
 
     private EnumSet<WrapperPlayServerPlayerInfoUpdate.Action> playerInfoActions() {

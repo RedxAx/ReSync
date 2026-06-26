@@ -103,6 +103,7 @@ import restudio.resync.runtime.VillageProfileService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -440,7 +441,7 @@ public class FlowRuntimeModule implements Module {
 
             @Override
             public String revision() {
-                return type + ":" + storage.listIds(type).size();
+                return resourceCatalogRevision(type, storage.listIds(type));
             }
 
             @Override
@@ -448,6 +449,12 @@ public class FlowRuntimeModule implements Module {
                 return storage.listIds(type);
             }
         });
+    }
+
+    static String resourceCatalogRevision(String type, List<String> ids) {
+        List<String> sortedIds = new ArrayList<>(ids != null ? ids : List.of());
+        sortedIds.sort(String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder()));
+        return type + ":" + sortedIds.size() + ":" + String.join(",", sortedIds);
     }
 
     @Override

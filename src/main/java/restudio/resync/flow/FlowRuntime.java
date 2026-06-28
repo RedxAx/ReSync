@@ -105,6 +105,10 @@ public class FlowRuntime {
     }
 
     private Object resolveInputRaw(FlowNode node, String pinName) {
+        return resolveInputRaw(node, pinName, new HashSet<>());
+    }
+
+    private Object resolveInputRaw(FlowNode node, String pinName, Set<String> resolvingTemplates) {
         String nodeId = findNodeId(node);
         if (nodeId == null) return null;
 
@@ -115,10 +119,88 @@ public class FlowRuntime {
         }
 
         if (node.getInputValues() != null && node.getInputValues().containsKey(pinName)) {
-            return node.getInputValues().get(pinName);
+            Object value = node.getInputValues().get(pinName);
+            if (value instanceof String text) {
+                return renderStringTemplate(node, pinName, text, resolvingTemplates);
+            }
+            return value;
         }
 
         return null;
+    }
+
+    private String renderStringTemplate(FlowNode node, String pinName, String template, Set<String> resolvingTemplates) {
+        if (template == null || template.isEmpty()) {
+            return "";
+        }
+        String nodeId = findNodeId(node);
+        String key = nodeId + ":" + pinName;
+        if (!resolvingTemplates.add(key)) {
+            return template;
+        }
+        try {
+            StringBuilder result = new StringBuilder();
+            int index = 0;
+            while (index < template.length()) {
+                char current = template.charAt(index);
+                if (current == '{') {
+                    if (index + 1 < template.length() && template.charAt(index + 1) == '{') {
+                        result.append('{');
+                        index += 2;
+                        continue;
+                    }
+                    int end = template.indexOf('}', index + 1);
+                    if (end > index + 1) {
+                        String name = template.substring(index + 1, end).trim();
+                        if (isTemplateName(name)) {
+                            if (isTemplateReservedInput(pinName, name)) {
+                                result.append('{').append(name).append('}');
+                            } else {
+                                Object value = resolveInputRaw(node, name, resolvingTemplates);
+                                if (value != null) {
+                                    result.append(value);
+                                }
+                            }
+                            index = end + 1;
+                            continue;
+                        }
+                    }
+                } else if (current == '}' && index + 1 < template.length() && template.charAt(index + 1) == '}') {
+                    result.append('}');
+                    index += 2;
+                    continue;
+                }
+                result.append(current);
+                index++;
+            }
+            return result.toString();
+        } finally {
+            resolvingTemplates.remove(key);
+        }
+    }
+
+    private boolean isTemplateReservedInput(String pinName, String name) {
+        if (name == null || name.isBlank()) {
+            return true;
+        }
+        return name.equals(pinName);
+    }
+
+    private boolean isTemplateName(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        char first = name.charAt(0);
+        if (!Character.isLetter(first) && first != '_') {
+            return false;
+        }
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Object getVariable(String name) {

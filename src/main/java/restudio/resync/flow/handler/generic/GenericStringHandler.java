@@ -40,7 +40,7 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("template", (ctx, node) -> {
             String template = ctx.getInputValue(node, TEMPLATE_INPUT, String.class, "");
-            ctx.setOutput(node, "result", renderTemplate(template, name -> ctx.getInputValue(node, name)));
+            ctx.setOutput(node, "result", template);
         });
         operations.put("substring", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
@@ -466,68 +466,6 @@ public class GenericStringHandler implements NodeHandler {
         } catch (Exception e) {
             return "";
         }
-    }
-
-    private interface TemplateValueResolver {
-        Object resolve(String name);
-    }
-
-    private static String renderTemplate(String template, TemplateValueResolver resolver) {
-        if (template == null || template.isEmpty()) {
-            return "";
-        }
-        StringBuilder result = new StringBuilder();
-        int index = 0;
-        while (index < template.length()) {
-            char current = template.charAt(index);
-            if (current == '{') {
-                if (index + 1 < template.length() && template.charAt(index + 1) == '{') {
-                    result.append('{');
-                    index += 2;
-                    continue;
-                }
-                int end = template.indexOf('}', index + 1);
-                if (end > index + 1) {
-                    String name = template.substring(index + 1, end).trim();
-                    if (isTemplateName(name)) {
-                        if (TEMPLATE_INPUT.equals(name)) {
-                            result.append('{').append(name).append('}');
-                        } else {
-                            Object value = resolver.resolve(name);
-                            if (value != null) {
-                                result.append(value);
-                            }
-                        }
-                        index = end + 1;
-                        continue;
-                    }
-                }
-            } else if (current == '}' && index + 1 < template.length() && template.charAt(index + 1) == '}') {
-                result.append('}');
-                index += 2;
-                continue;
-            }
-            result.append(current);
-            index++;
-        }
-        return result.toString();
-    }
-
-    private static boolean isTemplateName(String name) {
-        if (name == null || name.isBlank()) {
-            return false;
-        }
-        char first = name.charAt(0);
-        if (!Character.isLetter(first) && first != '_') {
-            return false;
-        }
-        for (int i = 1; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (!Character.isLetterOrDigit(c) && c != '_') {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static String soundex(String text) {

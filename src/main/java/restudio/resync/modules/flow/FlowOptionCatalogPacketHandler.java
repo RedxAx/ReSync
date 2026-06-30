@@ -1,12 +1,14 @@
 package restudio.resync.modules.flow;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.World;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.block.Biome;
+import org.bukkit.DyeColor;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.Recipe;
@@ -15,8 +17,10 @@ import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.core.Session;
 
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -28,6 +32,7 @@ public class FlowOptionCatalogPacketHandler {
     private final FlowPacketSender sender;
     private final CustomContentService customContentService;
     private final OptionCatalogRegistry optionCatalogRegistry;
+    private final ItemAttributeSchemaService itemAttributeSchemaService = new ItemAttributeSchemaService();
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
         this(sender, customContentService, null);
@@ -50,6 +55,13 @@ public class FlowOptionCatalogPacketHandler {
         byte[] sourceBytes = new byte[sourceLength];
         buffer.get(sourceBytes);
         String sourceId = new String(sourceBytes, StandardCharsets.UTF_8);
+        String normalized = normalize(sourceId);
+        if (normalized.equals("item_attribute_schema") || normalized.startsWith("item_attribute_schema:")) {
+            String material = normalized.equals("item_attribute_schema") ? "" : normalized.substring("item_attribute_schema:".length());
+            List<OptionCatalogItem> items = itemAttributeSchemaService.catalog(material);
+            sender.sendOptionCatalog(session, sourceId, items.stream().map(OptionCatalogItem::value).toList(), items, itemAttributeSchemaService.revision(material));
+            return;
+        }
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
             sender.sendOptionCatalog(session, sourceId, provider.values(), provider.items(), provider.revision());
@@ -73,14 +85,46 @@ public class FlowOptionCatalogPacketHandler {
             case "advancement" -> advancements();
             case "biome" -> registryKeys(Registry.BIOME);
             case "difficulty" -> List.of("peaceful", "easy", "normal", "hard");
+            case "attribute" -> registryKeysByField("ATTRIBUTE");
+            case "banner_pattern" -> registryKeysByField("BANNER_PATTERN");
+            case "damage_type" -> registryKeysByField("DAMAGE_TYPE");
+            case "dye_color" -> enumNames(DyeColor.values());
             case "enchantment" -> registryKeys(Registry.ENCHANTMENT);
             case "entity_type" -> enumNames(EntityType.values());
+            case "axolotl_variant" -> List.of("lucy", "wild", "gold", "cyan", "blue");
+            case "cat_variant" -> registryKeysByField("CAT_VARIANT");
+            case "cat_sound_variant" -> registryKeysByField("CAT_SOUND_VARIANT");
+            case "chicken_variant" -> registryKeysByField("CHICKEN_VARIANT");
+            case "chicken_sound_variant" -> registryKeysByField("CHICKEN_SOUND_VARIANT");
+            case "cow_variant" -> registryKeysByField("COW_VARIANT");
+            case "cow_sound_variant" -> registryKeysByField("COW_SOUND_VARIANT");
+            case "fox_variant" -> List.of("red", "snow");
+            case "frog_variant" -> registryKeysByField("FROG_VARIANT");
+            case "horse_variant" -> List.of("white", "creamy", "chestnut", "brown", "black", "gray", "dark_brown");
+            case "llama_variant" -> List.of("creamy", "white", "brown", "gray");
+            case "mooshroom_variant" -> List.of("red", "brown");
+            case "painting_variant" -> registryKeysByFields("PAINTING_VARIANT", "ART");
+            case "parrot_variant" -> List.of("red_blue", "blue", "green", "yellow_blue", "gray");
+            case "pig_variant" -> registryKeysByField("PIG_VARIANT");
+            case "pig_sound_variant" -> registryKeysByField("PIG_SOUND_VARIANT");
+            case "rabbit_variant" -> List.of("brown", "white", "black", "white_splotched", "gold", "salt", "evil");
+            case "salmon_size" -> List.of("small", "medium", "large");
+            case "tropical_fish_pattern" -> List.of("kob", "sunstreak", "snooper", "dasher", "brinely", "spotty", "flopper", "stripey", "glitter", "blockfish", "betty", "clayfish");
+            case "villager_type" -> registryKeysByField("VILLAGER_TYPE");
+            case "wolf_variant" -> registryKeysByField("WOLF_VARIANT");
+            case "wolf_sound_variant" -> registryKeysByField("WOLF_SOUND_VARIANT");
+            case "zombie_nautilus_variant" -> registryKeysByField("ZOMBIE_NAUTILUS_VARIANT");
             case "gamemode" -> List.of("survival", "creative", "adventure", "spectator");
             case "material" -> enumNames(Material.values());
             case "block" -> blocks();
+            case "instrument" -> registryKeysByField("INSTRUMENT");
+            case "jukebox_song" -> registryKeysByField("JUKEBOX_SONG");
+            case "trim_material" -> registryKeysByField("TRIM_MATERIAL");
+            case "trim_pattern" -> registryKeysByField("TRIM_PATTERN");
             case "loot_table" -> registryKeys(Registry.LOOT_TABLES);
             case "recipe" -> recipes();
             case "particle" -> registryKeys(Registry.PARTICLE_TYPE);
+            case "potion" -> potionTypes();
             case "potion_effect" -> potionEffects();
             case "sound" -> registryKeys(Registry.SOUNDS);
             case "world" -> Bukkit.getWorlds().stream().map(World::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
@@ -141,6 +185,28 @@ public class FlowOptionCatalogPacketHandler {
         return values;
     }
 
+    private List<String> potionTypes() {
+        List<String> values = new ArrayList<>();
+        try {
+            Class<?> type = Class.forName("org.bukkit.potion.PotionType");
+            Object[] constants = type.isEnum() ? type.getEnumConstants() : new Object[0];
+            for (Object constant : constants) {
+                String key = keyedValue(constant);
+                values.add(key != null && !key.isBlank() ? key : "minecraft:" + constant.toString().toLowerCase(Locale.ROOT));
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+        }
+        values.sort(String.CASE_INSENSITIVE_ORDER);
+        return values;
+    }
+
+    private String keyedValue(Object value) {
+        if (!(value instanceof Keyed keyed) || keyed.getKey() == null) {
+            return "";
+        }
+        return keyed.getKey().toString();
+    }
+
     private List<String> blocks() {
         List<String> values = new ArrayList<>();
         for (Material material : Material.values()) {
@@ -160,18 +226,47 @@ public class FlowOptionCatalogPacketHandler {
     }
 
     private void addRecipeKey(List<String> values, Recipe recipe) {
-        if (recipe instanceof org.bukkit.Keyed keyed) {
+        if (recipe instanceof Keyed keyed) {
             values.add(keyed.getKey().toString());
         }
     }
 
-    private <T extends org.bukkit.Keyed> List<String> registryKeys(Registry<T> registry) {
+    private <T extends Keyed> List<String> registryKeys(Registry<T> registry) {
         List<String> values = new ArrayList<>();
         for (T value : registry) {
             values.add(value.getKey().toString());
         }
         values.sort(String.CASE_INSENSITIVE_ORDER);
         return values;
+    }
+
+    private List<String> registryKeysByField(String fieldName) {
+        List<String> values = new ArrayList<>();
+        try {
+            Field field = Registry.class.getField(fieldName);
+            Object registry = field.get(null);
+            if (registry instanceof Iterable<?> iterable) {
+                for (Object value : iterable) {
+                    String key = keyedValue(value);
+                    if (!key.isBlank()) {
+                        values.add(key);
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+        }
+        values.sort(String.CASE_INSENSITIVE_ORDER);
+        return values;
+    }
+
+    private List<String> registryKeysByFields(String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            List<String> values = registryKeysByField(fieldName);
+            if (!values.isEmpty()) {
+                return values;
+            }
+        }
+        return List.of();
     }
 
     private <E extends Enum<E>> List<String> enumNames(E[] values) {

@@ -43,6 +43,13 @@ public class CustomContentValidator {
         if (definition.getVersion() < 0) {
             errors.add("Version must be >= 0");
         }
+        if (definition.getComponents() != null) {
+            for (String componentId : definition.getComponents().keySet()) {
+                if (componentId == null || !componentId.trim().toLowerCase(Locale.ROOT).matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) {
+                    errors.add("Component id must be namespaced: " + componentId);
+                }
+            }
+        }
         Set<String> abilityIds = new HashSet<>();
         for (CustomAbilityBinding ability : definition.getAbilities()) {
             if (ability == null) {

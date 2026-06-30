@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("net.luckperms:api:5.4")
     compileOnly("me.clip:placeholderapi:2.11.6")
@@ -30,13 +30,15 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-core:2.25.4")
     implementation("org.slf4j:slf4j-jdk14:2.0.17")
     implementation("io.javalin:javalin:6.7.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7")
     implementation("com.github.retrooper:packetevents-spigot:2.12.1")
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-    testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.0.0")
-    testImplementation("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
+    testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.99.0")
+    testImplementation("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
+    testImplementation("com.google.code.gson:gson:2.10.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
 }
 
 val targetJavaVersion = 21
@@ -235,11 +237,13 @@ tasks {
         relocate("io.javalin", "restudio.resync.libs.javalin")
         relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
         relocate("org.slf4j", "restudio.resync.libs.slf4j")
-        relocate("com.google.gson", "restudio.resync.libs.gson")
         relocate("kotlin", "restudio.resync.libs.kotlin")
         relocate("org.java_websocket", "restudio.resync.libs.websocket")
         relocate("com.github.retrooper.packetevents", "restudio.resync.libs.packetevents.api")
         relocate("io.github.retrooper.packetevents", "restudio.resync.libs.packetevents.impl")
+        dependencies {
+            exclude(dependency("com.google.code.gson:gson:.*"))
+        }
     }
 
     processResources {
@@ -252,7 +256,7 @@ tasks {
     }
 
     runServer {
-        minecraftVersion("1.21")
+        minecraftVersion("1.21.10")
     }
 
     test {
@@ -262,7 +266,7 @@ tasks {
     val validateNodeDefinitions by registering(JavaExec::class) {
         group = "verification"
         description = "Validate migrated node JSON definitions against source handler contracts"
-        classpath = sourceSets["main"].runtimeClasspath
+        classpath = sourceSets["main"].runtimeClasspath + sourceSets["main"].compileClasspath
         mainClass.set("restudio.resync.flow.validation.NodeDefinitionBuildValidator")
         args(projectDir.absolutePath)
         workingDir = projectDir

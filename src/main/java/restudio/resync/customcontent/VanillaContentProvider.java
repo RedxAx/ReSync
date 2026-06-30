@@ -30,6 +30,7 @@ public class VanillaContentProvider implements CustomContentProvider {
     private final Gson gson = new Gson();
     private final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
     private final Map<String, String> blocks = new HashMap<>();
+    private final ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
 
     public VanillaContentProvider() {
         loadBlocks();
@@ -62,6 +63,7 @@ public class VanillaContentProvider implements CustomContentProvider {
             }
             item.setItemMeta(meta);
         }
+        item = applyComponents(item, definition);
         return stampItem(item, definition);
     }
 
@@ -126,6 +128,18 @@ public class VanillaContentProvider implements CustomContentProvider {
 
     public Map<String, String> getPlacedBlocks() {
         return new HashMap<>(blocks);
+    }
+
+    private ItemStack applyComponents(ItemStack item, CustomContentDefinition definition) {
+        if (definition.getComponents() == null || definition.getComponents().isEmpty()) {
+            return item;
+        }
+        try {
+            return attributeSchemaService.applyComponents(item, definition.getComponents());
+        } catch (RuntimeException failure) {
+            Log.warn("Failed to apply custom content components for " + definition.getId() + ": " + failure.getMessage());
+            return item;
+        }
     }
 
     private String blockKey(Location location) {

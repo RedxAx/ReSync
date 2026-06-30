@@ -20,19 +20,24 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.core.Session;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class FlowOptionCatalogPacketHandler {
     private final FlowPacketSender sender;
     private final CustomContentService customContentService;
     private final OptionCatalogRegistry optionCatalogRegistry;
     private final ItemAttributeSchemaService itemAttributeSchemaService = new ItemAttributeSchemaService();
+    private final Map<String, CatalogSnapshot> customContentCatalogSnapshots = new HashMap<>();
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
         this(sender, customContentService, null);
@@ -74,6 +79,108 @@ public class FlowOptionCatalogPacketHandler {
             return;
         }
         sender.sendOptionCatalog(session, sourceId, values(sourceId), revision(sourceId));
+    }
+
+    public void broadcastCustomContentCatalogs() {
+        for (CatalogSnapshot snapshot : customContentCatalogSnapshots()) {
+            customContentCatalogSnapshots.put(snapshot.sourceId(), snapshot);
+            snapshot.broadcast(sender);
+        }
+    }
+
+    public void broadcastChangedCustomContentCatalogs() {
+        for (CatalogSnapshot snapshot : customContentCatalogSnapshots()) {
+            CatalogSnapshot previous = customContentCatalogSnapshots.get(snapshot.sourceId());
+            if (snapshot.equals(previous)) {
+                continue;
+            }
+            customContentCatalogSnapshots.put(snapshot.sourceId(), snapshot);
+            snapshot.broadcast(sender);
+        }
+    }
+
+    private List<CatalogSnapshot> customContentCatalogSnapshots() {
+        List<CatalogSnapshot> snapshots = new ArrayList<>();
+        for (String sourceId : List.of(
+            "server:custom_content:recipe_item",
+            "server:custom_content:provider",
+            "server:custom_content:nexo_item",
+            "server:custom_content:nexo_block",
+            "server:custom_content:nexo_furniture",
+            "server:custom_content:nexo_armor"
+        )) {
+            snapshots.add(customContentCatalogSnapshot(sourceId));
+        }
+        return snapshots;
+    }
+
+    private CatalogSnapshot customContentCatalogSnapshot(String sourceId) {
+        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
+        if (provider != null) {
+            return new CatalogSnapshot(sourceId, provider.values(), provider.items(), provider.revision());
+        }
+        if ("custom_content_recipe_item".equals(normalize(sourceId)) && customContentService != null) {
+            List<OptionCatalogItem> items = customContentService.recipeItemCatalog();
+            return new CatalogSnapshot(sourceId, items.stream().map(OptionCatalogItem::value).toList(), items, "recipe_item:" + Bukkit.getVersion());
+        }
+        return new CatalogSnapshot(sourceId, values(sourceId), List.of(), revision(sourceId));
+    }
+
+    private record CatalogSnapshot(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision) {
+        CatalogSnapshot {
+            sourceId = sourceId != null ? sourceId : "";
+            values = values != null ? List.copyOf(values) : List.of();
+            items = items != null ? items.stream().map(FlowOptionCatalogPacketHandler::normalizeCatalogItem).toList() : List.of();
+            revision = revision != null ? revision : "";
+        }
+
+        private void broadcast(FlowPacketSender sender) {
+            sender.broadcastOptionCatalog(sourceId, values, items, revision);
+        }
+    }
+
+    private static OptionCatalogItem normalizeCatalogItem(OptionCatalogItem item) {
+        if (item == null) {
+            return new OptionCatalogItem("");
+        }
+        return new OptionCatalogItem(item.value(), item.label(), item.description(), item.icon(), item.group(), normalizeCatalogMetadata(item.metadata()));
+    }
+
+    private static Map<String, Object> normalizeCatalogMetadata(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
+            normalized.put(entry.getKey(), normalizeCatalogMetadataValue(entry.getValue()));
+        }
+        return normalized;
+    }
+
+    private static Object normalizeCatalogMetadataValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        Class<?> type = value.getClass();
+        if (type.isArray()) {
+            int length = Array.getLength(value);
+            List<Object> normalized = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                normalized.add(normalizeCatalogMetadataValue(Array.get(value, i)));
+            }
+            return normalized;
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(FlowOptionCatalogPacketHandler::normalizeCatalogMetadataValue).toList();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                normalized.put(String.valueOf(entry.getKey()), normalizeCatalogMetadataValue(entry.getValue()));
+            }
+            return normalized;
+        }
+        return value;
     }
 
     private List<String> values(String sourceId) {

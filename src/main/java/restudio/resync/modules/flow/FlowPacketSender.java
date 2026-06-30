@@ -271,6 +271,12 @@ public class FlowPacketSender {
         sendRaw(session, buffer.array(), true);
     }
 
+    public void broadcastOptionCatalog(String sourceId, List<String> values, List<?> items, String revision) {
+        for (Session session : subscribedSessions) {
+            sendOptionCatalog(session, sourceId, values, items, revision);
+        }
+    }
+
     public void sendTraceSnapshot(Session session, List<FlowTraceRecord> records) {
         sendTracePacket(session, (byte) 0x41, records == null ? List.of() : records);
     }

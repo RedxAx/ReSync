@@ -184,7 +184,7 @@ public class FlowRuntimeModule implements Module {
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         OptionCatalogRegistry optionCatalogRegistry = context.getService(OptionCatalogRegistry.class);
         registerResourceCatalogs(optionCatalogRegistry, jsonResourceStorage);
-        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), optionCatalogRegistry, jsonResourceStorage, context.getService(MessageLogService.class));
+        delegate = new FlowModule(storage, context.getCodec(), channelId, triggerRegistry, globalTriggers, flowRegistry, nodeDefinitionRegistry, propertyRegistry, customContentStorage, customContentService, context.getService(ReSyncExtensionData.class), optionCatalogRegistry, jsonResourceStorage, context.getService(MessageLogService.class), context.getRequiredService(PlayerSessionLinkService.class));
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);

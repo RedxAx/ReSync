@@ -760,7 +760,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
             case ReSyncResourceCatalog.VILLAGE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
             case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "skin.username", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "tradeProfile", "lootTable", "equipment", "hooks.spawnAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.despawnAction");
-            case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
+            case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool", "trigger.overrideDrops", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
     }
@@ -943,6 +943,14 @@ public class ReSyncCommand implements TabExecutor {
             }
             case ReSyncResourceCatalog.LOOT_TABLE -> {
                 resource.addProperty("displayName", id);
+                resource.addProperty("enabled", true);
+                JsonObject trigger = new JsonObject();
+                trigger.addProperty("event", "none");
+                trigger.addProperty("target", "");
+                trigger.addProperty("entity", "");
+                trigger.addProperty("tool", "");
+                trigger.addProperty("overrideDrops", true);
+                resource.add("trigger", trigger);
                 JsonArray pools = new JsonArray();
                 JsonObject pool = new JsonObject();
                 pool.addProperty("rolls", 1);

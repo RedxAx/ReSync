@@ -361,6 +361,7 @@ public class FlowRuntimeModule implements Module {
         Bukkit.getPluginManager().registerEvents(scoreboardRuntimeListener, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(guiManager, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(customContentListener, context.getPlugin());
+        Bukkit.getPluginManager().registerEvents(lootTableService, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(villageProfileService, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(npcService, context.getPlugin());
         npcService.spawnStartupNpcs();
@@ -404,6 +405,9 @@ public class FlowRuntimeModule implements Module {
         }
         if (customContentListener != null) {
             HandlerList.unregisterAll(customContentListener);
+        }
+        if (lootTableService != null) {
+            HandlerList.unregisterAll(lootTableService);
         }
         if (villageProfileService != null) {
             HandlerList.unregisterAll(villageProfileService);

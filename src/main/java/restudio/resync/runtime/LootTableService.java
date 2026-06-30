@@ -6,10 +6,21 @@ import com.google.gson.JsonObject;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -24,7 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
-public class LootTableService {
+public class LootTableService implements Listener {
     private final ReSyncJsonResourceStorage storage;
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
@@ -49,12 +60,23 @@ public class LootTableService {
     }
 
     public List<ItemStack> generate(String id, Map<String, Object> context) {
+        return generate(id, context, null);
+    }
+
+    public List<ItemStack> generate(String id, Map<String, Object> context, Event event) {
         JsonObject table = get(id);
+        Map<String, Object> rollContext = new HashMap<>();
+        if (context != null) {
+            rollContext.putAll(context);
+        }
+        if (id != null && !id.isBlank()) {
+            rollContext.putIfAbsent("lootTable", id);
+        }
         if (table == null || !bool(table, "enabled", true)) {
-            dispatch(table, "deniedRollFlow", context, List.of(), null);
+            dispatch(table, "deniedRollFlow", rollContext, List.of(), event);
             return List.of();
         }
-        dispatch(table, "beforeRollFlow", context, List.of(), null);
+        dispatch(table, "beforeRollFlow", rollContext, List.of(), event);
         List<ItemStack> result = new ArrayList<>();
         JsonArray pools = array(table, "pools");
         for (JsonElement poolElement : pools) {
@@ -65,15 +87,89 @@ public class LootTableService {
             int rolls = Math.max(0, integer(pool, "rolls", 1));
             JsonArray entries = array(pool, "entries");
             for (int i = 0; i < rolls; i++) {
-                ItemStack item = roll(entries, context);
+                ItemStack item = roll(entries, rollContext);
                 if (item != null) {
                     result.add(item);
                 }
             }
         }
         List<ItemStack> items = List.copyOf(result);
-        dispatch(table, items.isEmpty() ? "deniedRollFlow" : "afterRollFlow", context, items, null);
+        dispatch(table, items.isEmpty() ? "deniedRollFlow" : "afterRollFlow", rollContext, items, event);
         return items;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        Location location = event.getBlock().getLocation();
+        Map<String, Object> context = context(event.getPlayer(), null, location);
+        context.put("event.type", "block_break");
+        context.put("event.block", event.getBlock());
+        context.put("event.item", event.getPlayer().getInventory().getItemInMainHand());
+        TriggeredLootResult result = triggeredLoot("block_break", context, event, event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand(), null, location);
+        if (result.overrideDrops()) {
+            event.setDropItems(false);
+        }
+        dropNaturally(location, result.items());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        Location location = event.getBlockPlaced().getLocation();
+        ItemStack item = event.getItemInHand();
+        Map<String, Object> context = context(event.getPlayer(), null, location);
+        context.put("event.type", "block_place");
+        context.put("event.block", event.getBlockPlaced());
+        context.put("event.item", item);
+        TriggeredLootResult result = triggeredLoot("block_place", context, event, event.getPlayer(), item, null, location);
+        dropNaturally(location, result.items());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityDeath(EntityDeathEvent event) {
+        Player killer = event.getEntity().getKiller();
+        ItemStack tool = killer != null ? killer.getInventory().getItemInMainHand() : null;
+        Map<String, Object> context = context(killer, event.getEntity(), event.getEntity().getLocation());
+        context.put("event.type", "entity_death");
+        context.put("event.entity", event.getEntity());
+        context.put("event.killer", killer);
+        context.put("event.item", tool);
+        TriggeredLootResult result = triggeredLoot("entity_death", context, event, killer, tool, event.getEntity(), event.getEntity().getLocation());
+        if (result.overrideDrops()) {
+            event.getDrops().clear();
+        }
+        event.getDrops().addAll(result.items());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        ItemStack item = event.getItem();
+        if (item == null || event.getAction() == Action.PHYSICAL) {
+            return;
+        }
+        Location location = event.getClickedBlock() != null ? event.getClickedBlock().getLocation() : event.getPlayer().getLocation();
+        Map<String, Object> context = context(event.getPlayer(), null, location);
+        context.put("event.type", "item_use");
+        context.put("event.block", event.getClickedBlock());
+        context.put("event.item", item);
+        TriggeredLootResult result = triggeredLoot("item_use", context, event, event.getPlayer(), item, null, location);
+        dropNaturally(location, result.items());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        ItemStack item = player.getInventory().getItemInMainHand();
+        Map<String, Object> context = context(player, event.getEntity(), event.getEntity().getLocation());
+        context.put("event.type", "item_hit_entity");
+        context.put("event.entity", event.getEntity());
+        context.put("event.item", item);
+        TriggeredLootResult result = triggeredLoot("item_hit_entity", context, event, player, item, event.getEntity(), event.getEntity().getLocation());
+        dropNaturally(event.getEntity().getLocation(), result.items());
     }
 
     public List<ItemStack> give(Player player, String id) {
@@ -119,6 +215,114 @@ public class LootTableService {
         return context;
     }
 
+    private TriggeredLootResult triggeredLoot(String eventType, Map<String, Object> context, Event event, Player player, ItemStack item, Entity entity, Location location) {
+        if (storage == null || eventType == null) {
+            return new TriggeredLootResult(false, List.of());
+        }
+        List<ItemStack> items = new ArrayList<>();
+        boolean overrideDrops = false;
+        for (String id : storage.listIds(ReSyncResourceCatalog.LOOT_TABLE)) {
+            JsonObject table = get(id);
+            if (table == null || !bool(table, "enabled", true)) {
+                continue;
+            }
+            for (JsonObject trigger : triggers(table)) {
+                if (!triggerMatches(trigger, eventType, player, item, entity, location)) {
+                    continue;
+                }
+                overrideDrops |= bool(trigger, "overrideDrops", false);
+                Map<String, Object> variables = new HashMap<>(context != null ? context : Map.of());
+                variables.put("lootTable", id);
+                variables.put("lootEvent", eventType);
+                items.addAll(generate(id, variables, event));
+            }
+        }
+        return new TriggeredLootResult(overrideDrops, List.copyOf(items));
+    }
+
+    private List<JsonObject> triggers(JsonObject table) {
+        List<JsonObject> result = new ArrayList<>();
+        JsonObject trigger = object(table, "trigger");
+        if (trigger != null) {
+            result.add(trigger);
+        }
+        JsonArray links = array(table, "links");
+        for (JsonElement element : links) {
+            if (element != null && element.isJsonObject()) {
+                result.add(element.getAsJsonObject());
+            }
+        }
+        return result;
+    }
+
+    private boolean triggerMatches(JsonObject trigger, String eventType, Player player, ItemStack item, Entity entity, Location location) {
+        String configuredEvent = text(trigger, "event");
+        if (configuredEvent.isBlank() || "none".equalsIgnoreCase(configuredEvent) || !configuredEvent.equalsIgnoreCase(eventType)) {
+            return false;
+        }
+        String target = text(trigger, "target");
+        String tool = text(trigger, "tool");
+        return switch (eventType) {
+            case "block_break" -> matchesBlockTarget(location, target) && matchesTool(player, item, tool);
+            case "block_place" -> (matchesBlockTarget(location, target) || matchesItemTarget(item, target)) && matchesTool(player, item, tool);
+            case "entity_death" -> matchesEntityTarget(entity, target) && matchesTool(player, item, tool);
+            case "item_use", "item_hit_entity" -> matchesItemTarget(item, firstFilled(target, tool)) && matchesEntityTarget(entity, text(trigger, "entity"));
+            default -> false;
+        };
+    }
+
+    private boolean matchesTool(Player player, ItemStack item, String tool) {
+        if (tool == null || tool.isBlank() || "none".equalsIgnoreCase(tool)) {
+            return true;
+        }
+        ItemStack held = item != null ? item : player != null ? player.getInventory().getItemInMainHand() : null;
+        return matchesItemTarget(held, tool);
+    }
+
+    private boolean matchesItemTarget(ItemStack item, String target) {
+        if (target == null || target.isBlank() || "none".equalsIgnoreCase(target)) {
+            return true;
+        }
+        if (customContentService != null && customContentService.matchesItemReference(item, target)) {
+            return true;
+        }
+        Material material = RuntimeMaterialResolver.itemMaterial(target);
+        return material != null && item != null && item.getType() == material;
+    }
+
+    private boolean matchesBlockTarget(Location location, String target) {
+        if (target == null || target.isBlank() || "none".equalsIgnoreCase(target)) {
+            return true;
+        }
+        if (customContentService != null && customContentService.matchesBlockReference(location, target)) {
+            return true;
+        }
+        Material material = material(target);
+        return material != null && location != null && location.getBlock().getType() == material;
+    }
+
+    private boolean matchesEntityTarget(Entity entity, String target) {
+        if (target == null || target.isBlank() || "none".equalsIgnoreCase(target)) {
+            return true;
+        }
+        return entity != null && entity.getType().name().equalsIgnoreCase(stripNamespace(target));
+    }
+
+    private void dropNaturally(Location location, List<ItemStack> items) {
+        if (location == null || items == null || items.isEmpty()) {
+            return;
+        }
+        World world = location.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (ItemStack item : items) {
+            if (item != null && !item.getType().isAir()) {
+                world.dropItemNaturally(location, item);
+            }
+        }
+    }
+
     private void dispatch(JsonObject table, String hook, Map<String, Object> context, List<ItemStack> items, Event event) {
         String flowId = table != null && table.has("hooks") && table.get("hooks").isJsonObject()
             ? text(table.getAsJsonObject("hooks"), hook)
@@ -130,7 +334,7 @@ public class LootTableService {
         if (context != null) {
             variables.putAll(context);
         }
-        variables.put("lootTable", text(table, "id"));
+        variables.put("lootTable", firstFilled(text(table, "id"), String.valueOf(variables.getOrDefault("lootTable", ""))));
         variables.put("items", items);
         Player player = variables.get("player") instanceof Player value ? value : null;
         dispatcher.dispatch(flowId, player, event, variables);
@@ -285,6 +489,18 @@ public class LootTableService {
         return value != null && value.contains(":") ? value.substring(value.indexOf(':') + 1) : value;
     }
 
+    private Material material(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return null;
+        }
+        String value = stripNamespace(reference).replace('-', '_').toUpperCase(Locale.ROOT);
+        try {
+            return Material.valueOf(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     private void applyComponents(ItemStack stack, JsonObject entry) {
         JsonObject components = object(entry, "components");
         if (components == null) {
@@ -399,6 +615,15 @@ public class LootTableService {
         return "";
     }
 
+    private String firstFilled(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
     private int integer(JsonObject object, String key, int fallback) {
         try {
             return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsInt() : fallback;
@@ -478,5 +703,8 @@ public class LootTableService {
         } catch (Exception ignored) {
             return fallback;
         }
+    }
+
+    private record TriggeredLootResult(boolean overrideDrops, List<ItemStack> items) {
     }
 }

@@ -264,13 +264,19 @@ public class WorldGenDatapackCompiler {
     }
 
     private List<String> vanillaVegetalFeatures(Biome biome) {
-        return switch (biome) {
-            case FOREST, BIRCH_FOREST, DARK_FOREST -> List.of("minecraft:forest_flowers", "minecraft:trees_plains", "minecraft:flower_default", "minecraft:patch_grass_forest");
-            case DESERT -> List.of("minecraft:patch_dead_bush", "minecraft:patch_cactus_desert");
-            case SAVANNA, SAVANNA_PLATEAU -> List.of("minecraft:trees_savanna", "minecraft:patch_grass_savanna");
-            case SNOWY_PLAINS, ICE_SPIKES -> List.of("minecraft:patch_grass_plain");
-            default -> List.of("minecraft:trees_plains", "minecraft:flower_plain", "minecraft:patch_grass_plain");
-        };
+        if (biome == Biome.FOREST || biome == Biome.BIRCH_FOREST || biome == Biome.DARK_FOREST) {
+            return List.of("minecraft:forest_flowers", "minecraft:trees_plains", "minecraft:flower_default", "minecraft:patch_grass_forest");
+        }
+        if (biome == Biome.DESERT) {
+            return List.of("minecraft:patch_dead_bush", "minecraft:patch_cactus_desert");
+        }
+        if (biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
+            return List.of("minecraft:trees_savanna", "minecraft:patch_grass_savanna");
+        }
+        if (biome == Biome.SNOWY_PLAINS || biome == Biome.ICE_SPIKES) {
+            return List.of("minecraft:patch_grass_plain");
+        }
+        return List.of("minecraft:trees_plains", "minecraft:flower_plain", "minecraft:patch_grass_plain");
     }
 
     private Map<String, Object> effects(Biome biome) {
@@ -481,12 +487,16 @@ public class WorldGenDatapackCompiler {
         if (profile != null) {
             return profile.getTemperature();
         }
-        return switch (biome) {
-            case DESERT -> 2.0f;
-            case SAVANNA, SAVANNA_PLATEAU -> 1.2f;
-            case SNOWY_PLAINS, ICE_SPIKES -> 0.0f;
-            default -> 0.8f;
-        };
+        if (biome == Biome.DESERT) {
+            return 2.0f;
+        }
+        if (biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
+            return 1.2f;
+        }
+        if (biome == Biome.SNOWY_PLAINS || biome == Biome.ICE_SPIKES) {
+            return 0.0f;
+        }
+        return 0.8f;
     }
 
     private float downfall(WorldGenProject project, String biomeId, Biome biome) {
@@ -494,12 +504,13 @@ public class WorldGenDatapackCompiler {
         if (profile != null) {
             return profile.getHumidity();
         }
-        return switch (biome) {
-            case DESERT -> 0.0f;
-            case SAVANNA, SAVANNA_PLATEAU -> 0.0f;
-            case FOREST, BIRCH_FOREST, DARK_FOREST -> 0.8f;
-            default -> 0.4f;
-        };
+        if (biome == Biome.DESERT || biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
+            return 0.0f;
+        }
+        if (biome == Biome.FOREST || biome == Biome.BIRCH_FOREST || biome == Biome.DARK_FOREST) {
+            return 0.8f;
+        }
+        return 0.4f;
     }
 
     private WorldGenBiomeProfile profile(WorldGenProject project, String biomeId) {

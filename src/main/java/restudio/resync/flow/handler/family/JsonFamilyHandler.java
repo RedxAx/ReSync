@@ -286,8 +286,8 @@ public class JsonFamilyHandler implements NodeHandler {
         if (!(entity instanceof LivingEntity living)) {
             return 0.0;
         }
-        return living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null
-            ? living.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue()
+        return living.getAttribute(Attribute.MAX_HEALTH) != null
+            ? living.getAttribute(Attribute.MAX_HEALTH).getValue()
             : 0.0;
     }
 

@@ -45,8 +45,8 @@ public final class WorldPlayerStateCodec {
             } catch (IllegalArgumentException ignored) {
             }
         }
-        double maxHealth = player.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null
-            ? player.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue()
+        double maxHealth = player.getAttribute(Attribute.MAX_HEALTH) != null
+            ? player.getAttribute(Attribute.MAX_HEALTH).getValue()
             : 20.0;
         double health = state.getHealth();
         if (health <= 0) {

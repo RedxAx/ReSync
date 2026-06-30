@@ -36,6 +36,7 @@ public class FlowResourcePacketRouter {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final MessageLogService messageLogService;
     private final FlowPacketSender sender;
+    private final Runnable customContentCatalogRefresh;
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender) {
         this(storage, customContentStorage, null, sender, null);
@@ -46,8 +47,13 @@ public class FlowResourcePacketRouter {
     }
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService) {
+        this(storage, customContentStorage, jsonResourceStorage, sender, messageLogService, null);
+    }
+
+    public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh) {
         this.sender = sender;
         this.messageLogService = messageLogService;
+        this.customContentCatalogRefresh = customContentCatalogRefresh;
         handlers.add(new FlowResourcePacketHandler<>(guiAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(scoreboardAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(tabAdapter(storage, sender), sender));
@@ -411,7 +417,23 @@ public class FlowResourcePacketRouter {
             public String deleteErrorCode() {
                 return "CONTENT_DELETE_FAILED";
             }
+
+            @Override
+            public void afterSave(Session session, CustomContentDefinition value) {
+                refreshCustomContentCatalogs();
+            }
+
+            @Override
+            public void afterDelete(Session session, String id) {
+                refreshCustomContentCatalogs();
+            }
         };
+    }
+
+    private void refreshCustomContentCatalogs() {
+        if (customContentCatalogRefresh != null) {
+            customContentCatalogRefresh.run();
+        }
     }
 
     private FlowResourceAdapter<String> projectMetadataAdapter(FlowStorage storage, FlowPacketSender sender) {

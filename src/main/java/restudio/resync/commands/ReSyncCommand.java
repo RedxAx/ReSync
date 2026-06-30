@@ -24,6 +24,7 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.modules.FlowRuntimeModule;
+import restudio.resync.modules.FlowModule;
 import restudio.resync.runtime.LootTableService;
 import restudio.resync.runtime.NpcService;
 import restudio.resync.runtime.VillageProfileService;
@@ -76,6 +77,7 @@ public class ReSyncCommand implements TabExecutor {
             case "world" -> handleWorld(sender, args);
             case "portal" -> handlePortal(sender, args);
             case "flow" -> handleFlow(sender, args);
+            case "quickedit" -> handleQuickEdit(sender);
             case "item" -> handleItem(sender, args);
             case "npc" -> handleNpc(sender, args);
             case "village", "villager", "trade" -> handleVillage(sender, args);
@@ -90,7 +92,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "item", "npc", "village", "resource"), args[0]);
+            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "quickedit", "item", "npc", "village", "resource"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -99,6 +101,7 @@ public class ReSyncCommand implements TabExecutor {
             case "world" -> tabCompleteWorld(args);
             case "portal" -> tabCompletePortal(args);
             case "flow" -> tabCompleteFlow(args);
+            case "quickedit" -> List.of();
             case "item" -> tabCompleteItem(args);
             case "npc" -> tabCompleteNpc(args);
             case "village", "villager", "trade" -> tabCompleteVillage(args);
@@ -122,6 +125,25 @@ public class ReSyncCommand implements TabExecutor {
         sendInfo(sender, "Open Connections", String.valueOf(status.get("openConnections")));
         sendInfo(sender, "Queue", status.get("queueMaxGlobalRequests") + " global / " + status.get("queueMaxRequestsPerClient") + " per client");
         sendInfo(sender, "Memory", status.get("sessionMemoryBytes") + "/" + status.get("sessionMemoryLimitBytes"));
+        return true;
+    }
+
+    private boolean handleQuickEdit(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sendError(sender, "Players Only");
+            return true;
+        }
+        FlowModule module = flowModule();
+        if (module == null) {
+            sendError(sender, "Flow Module Not Initialized");
+            return true;
+        }
+        FlowModule.QuickEditResult result = module.startQuickEdit(player);
+        if (result.success()) {
+            sendSuccess(sender, result.message());
+        } else {
+            sendError(sender, result.message());
+        }
         return true;
     }
 
@@ -1246,6 +1268,14 @@ public class ReSyncCommand implements TabExecutor {
             return null;
         }
         return server.getModuleContext().getService(FlowRuntimeModule.class);
+    }
+
+    private FlowModule flowModule() {
+        ReSyncServer server = plugin.getReSyncServer();
+        if (server == null || server.getModuleContext() == null) {
+            return null;
+        }
+        return server.getModuleContext().getService(FlowModule.class);
     }
 
     private String shortChecksum(String checksum) {
@@ -3483,6 +3513,7 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync tab interval [ticks]");
         sendUsageLine(sender, "/resync item list");
         sendUsageLine(sender, "/resync item give <player> <itemId> [amount]");
+        sendUsageLine(sender, "/resync quickedit");
         sendUsageLine(sender, "/resync resource types");
         sendUsageLine(sender, "/resync resource list <type>");
         sendUsageLine(sender, "/resync resource create <type> <id>");

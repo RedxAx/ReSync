@@ -79,32 +79,32 @@ public class EntityActionHandler implements NodeHandler {
         operations.put("entity_set_damage", (ctx, node) -> {
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double damage = ctx.getInputValue(node, "damage", Double.class, 1.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE) != null) {
-                living.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE).setBaseValue(damage);
+            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.ATTACK_DAMAGE) != null) {
+                living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(damage);
             }
         });
 
         operations.put("entity_set_armor_value", (ctx, node) -> {
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double armor = ctx.getInputValue(node, "armor", Double.class, 0.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_ARMOR) != null) {
-                living.getAttribute(Attribute.GENERIC_ARMOR).setBaseValue(armor);
+            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.ARMOR) != null) {
+                living.getAttribute(Attribute.ARMOR).setBaseValue(armor);
             }
         });
 
         operations.put("entity_set_follow_range", (ctx, node) -> {
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double range = ctx.getInputValue(node, "range", Double.class, 32.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_FOLLOW_RANGE) != null) {
-                living.getAttribute(Attribute.GENERIC_FOLLOW_RANGE).setBaseValue(range);
+            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.FOLLOW_RANGE) != null) {
+                living.getAttribute(Attribute.FOLLOW_RANGE).setBaseValue(range);
             }
         });
 
         operations.put("entity_set_knockback_resistance", (ctx, node) -> {
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double resistance = ctx.getInputValue(node, "resistance", Double.class, 0.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_KNOCKBACK_RESISTANCE) != null) {
-                living.getAttribute(Attribute.GENERIC_KNOCKBACK_RESISTANCE).setBaseValue(resistance);
+            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null) {
+                living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(resistance);
             }
         });
 
@@ -390,10 +390,10 @@ public class EntityActionHandler implements NodeHandler {
                         }
                     }
                     case "max_health" -> {
-                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
+                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.MAX_HEALTH) != null) {
                             if ("set".equalsIgnoreCase(action)) {
                                 double maxHealth = numberValue;
-                                living.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(maxHealth);
+                                living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHealth);
                                 success = true;
                             } else if ("get".equalsIgnoreCase(action)) {
                                 result = living.getMaxHealth();
@@ -402,13 +402,13 @@ public class EntityActionHandler implements NodeHandler {
                         }
                     }
                     case "speed" -> {
-                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED) != null) {
+                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.MOVEMENT_SPEED) != null) {
                             if ("set".equalsIgnoreCase(action)) {
                                 double speed = numberValue;
-                                living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
+                                living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(speed);
                                 success = true;
                             } else if ("get".equalsIgnoreCase(action)) {
-                                result = living.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).getBaseValue();
+                                result = living.getAttribute(Attribute.MOVEMENT_SPEED).getBaseValue();
                                 success = true;
                             }
                         }
@@ -676,8 +676,8 @@ public class EntityActionHandler implements NodeHandler {
             Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             if (entity instanceof LivingEntity living) {
                 double maxHealth = 0.0;
-                if (living.getAttribute(Attribute.GENERIC_MAX_HEALTH) != null) {
-                    maxHealth = living.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue();
+                if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+                    maxHealth = living.getAttribute(Attribute.MAX_HEALTH).getValue();
                 }
                 ctx.setOutput(node, "health", living.getHealth());
                 ctx.setOutput(node, "max_health", maxHealth);

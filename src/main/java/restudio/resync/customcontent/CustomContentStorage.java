@@ -39,6 +39,7 @@ public class CustomContentStorage {
             .registerTypeAdapter(FlowDataObject.class, new FlowDataObjectAdapter())
             .create();
     private final CustomContentValidator validator = new CustomContentValidator();
+    private final ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
 
     public CustomContentStorage(JavaPlugin plugin) {
         this(plugin.getDataFolder());
@@ -97,6 +98,10 @@ public class CustomContentStorage {
         List<String> errors = validator.validate(definition);
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException(String.join("; ", errors));
+        }
+        List<Map<String, Object>> componentErrors = attributeSchemaService.validate(definition.getMaterial(), definition.getComponents());
+        if (!componentErrors.isEmpty()) {
+            throw new ItemAttributeValidationException(componentErrors);
         }
         try {
             assetStore.save(definition);

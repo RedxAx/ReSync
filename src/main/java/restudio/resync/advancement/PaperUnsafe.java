@@ -16,6 +16,7 @@ public final class PaperUnsafe {
     private static Method loadAdvancements;
     private static Method removeAdvancement;
     private static Method serializeItemAsJson;
+    private static Method deserializeItemFromJson;
 
     private PaperUnsafe() {
     }
@@ -28,6 +29,11 @@ public final class PaperUnsafe {
     public static boolean serializeItemAsJsonSupported() {
         resolve();
         return serializeItemAsJson != null;
+    }
+
+    public static boolean itemJsonRoundTripSupported() {
+        resolve();
+        return serializeItemAsJson != null && deserializeItemFromJson != null;
     }
 
     static void loadAdvancement(NamespacedKey key, String advancementJson, boolean persist) {
@@ -80,6 +86,16 @@ public final class PaperUnsafe {
         }
     }
 
+    public static ItemStack deserializeItemFromJson(JsonObject item) {
+        resolve();
+        require(deserializeItemFromJson, "deserializeItemFromJson");
+        try {
+            return (ItemStack) deserializeItemFromJson.invoke(Bukkit.getUnsafe(), item);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("Failed to deserialize item from JSON", unwrap(failure));
+        }
+    }
+
     private static void resolve() {
         if (resolved) {
             return;
@@ -90,17 +106,25 @@ public final class PaperUnsafe {
             }
             try {
                 Object unsafe = Bukkit.getUnsafe();
+                if (unsafe == null) {
+                    return;
+                }
                 loadAdvancement = method(unsafe, "loadAdvancement", NamespacedKey.class, String.class);
                 loadAdvancementPersist = method(unsafe, "loadAdvancement", NamespacedKey.class, String.class, boolean.class);
                 loadAdvancements = method(unsafe, "loadAdvancements", Map.class, boolean.class);
                 removeAdvancement = method(unsafe, "removeAdvancement", NamespacedKey.class);
                 serializeItemAsJson = method(unsafe, "serializeItemAsJson", ItemStack.class);
+                deserializeItemFromJson = method(unsafe, "deserializeItemFromJson", JsonObject.class);
             } catch (Throwable ignored) {
                 loadAdvancement = null;
                 loadAdvancementPersist = null;
                 loadAdvancements = null;
                 removeAdvancement = null;
                 serializeItemAsJson = null;
+                deserializeItemFromJson = null;
+                if (Bukkit.getServer() == null) {
+                    return;
+                }
             }
             resolved = true;
         }

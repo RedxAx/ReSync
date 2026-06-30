@@ -81,17 +81,14 @@ public final class ItemStackPreviewMetadata {
             }
             JsonObject components = serialized.getAsJsonObject("components");
             Map<String, Object> result = new LinkedHashMap<>();
-            copyComponent(components, result, CUSTOM_MODEL_DATA);
-            copyComponent(components, result, "minecraft:item_model");
+            for (Map.Entry<String, JsonElement> entry : components.entrySet()) {
+                if (entry.getKey() != null && !entry.getKey().isBlank() && !entry.getValue().isJsonNull()) {
+                    result.put(entry.getKey(), jsonToMap(entry.getValue()));
+                }
+            }
             return result;
         } catch (RuntimeException ignored) {
             return Map.of();
-        }
-    }
-
-    private static void copyComponent(JsonObject source, Map<String, Object> target, String key) {
-        if (source.has(key) && !source.get(key).isJsonNull()) {
-            target.put(key, jsonToMap(source.get(key)));
         }
     }
 

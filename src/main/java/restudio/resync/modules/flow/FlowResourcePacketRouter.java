@@ -14,6 +14,8 @@ import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customcontent.CustomContentValidator;
+import restudio.resync.customcontent.ItemAttributeSchemaService;
+import restudio.resync.customcontent.ItemAttributeValidationException;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
@@ -27,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class FlowResourcePacketRouter {
     private final List<FlowResourcePacketHandler<?>> handlers = new ArrayList<>();
@@ -339,6 +342,7 @@ public class FlowResourcePacketRouter {
 
     private FlowResourceAdapter<CustomContentDefinition> customContentAdapter(CustomContentStorage storage, FlowPacketSender sender) {
         CustomContentValidator validator = new CustomContentValidator();
+        ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
         return new FlowResourceAdapter<>() {
             @Override
             public ReSyncManagedResource descriptor() {
@@ -370,6 +374,10 @@ public class FlowResourcePacketRouter {
                 List<String> errors = validator.validate(value);
                 if (!errors.isEmpty()) {
                     throw new IllegalArgumentException(String.join("; ", errors));
+                }
+                List<Map<String, Object>> componentErrors = attributeSchemaService.validate(value.getMaterial(), value.getComponents());
+                if (!componentErrors.isEmpty()) {
+                    throw new ItemAttributeValidationException(componentErrors);
                 }
                 storage.save(value);
             }

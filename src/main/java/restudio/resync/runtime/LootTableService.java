@@ -17,6 +17,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -105,7 +106,7 @@ public class LootTableService implements Listener {
         context.put("event.type", "block_break");
         context.put("event.block", event.getBlock());
         context.put("event.item", event.getPlayer().getInventory().getItemInMainHand());
-        TriggeredLootResult result = triggeredLoot("block_break", context, event, event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand(), null, location);
+        TriggeredLootResult result = triggeredLoot("block_break", context, event, event.getPlayer(), event.getPlayer().getInventory().getItemInMainHand(), null, location, null);
         if (result.overrideDrops()) {
             event.setDropItems(false);
         }
@@ -120,7 +121,7 @@ public class LootTableService implements Listener {
         context.put("event.type", "block_place");
         context.put("event.block", event.getBlockPlaced());
         context.put("event.item", item);
-        TriggeredLootResult result = triggeredLoot("block_place", context, event, event.getPlayer(), item, null, location);
+        TriggeredLootResult result = triggeredLoot("block_place", context, event, event.getPlayer(), item, null, location, null);
         dropNaturally(location, result.items());
     }
 
@@ -128,12 +129,14 @@ public class LootTableService implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         Player killer = event.getEntity().getKiller();
         ItemStack tool = killer != null ? killer.getInventory().getItemInMainHand() : null;
+        EntityDamageEvent damageEvent = event.getEntity().getLastDamageCause();
         Map<String, Object> context = context(killer, event.getEntity(), event.getEntity().getLocation());
         context.put("event.type", "entity_death");
         context.put("event.entity", event.getEntity());
         context.put("event.killer", killer);
         context.put("event.item", tool);
-        TriggeredLootResult result = triggeredLoot("entity_death", context, event, killer, tool, event.getEntity(), event.getEntity().getLocation());
+        putDamageContext(context, damageEvent);
+        TriggeredLootResult result = triggeredLoot("entity_death", context, event, killer, tool, event.getEntity(), event.getEntity().getLocation(), damageEvent);
         if (result.overrideDrops()) {
             event.getDrops().clear();
         }
@@ -154,7 +157,7 @@ public class LootTableService implements Listener {
         context.put("event.type", "item_use");
         context.put("event.block", event.getClickedBlock());
         context.put("event.item", item);
-        TriggeredLootResult result = triggeredLoot("item_use", context, event, event.getPlayer(), item, null, location);
+        TriggeredLootResult result = triggeredLoot("item_use", context, event, event.getPlayer(), item, null, location, null);
         dropNaturally(location, result.items());
     }
 
@@ -168,7 +171,8 @@ public class LootTableService implements Listener {
         context.put("event.type", "item_hit_entity");
         context.put("event.entity", event.getEntity());
         context.put("event.item", item);
-        TriggeredLootResult result = triggeredLoot("item_hit_entity", context, event, player, item, event.getEntity(), event.getEntity().getLocation());
+        putDamageContext(context, event);
+        TriggeredLootResult result = triggeredLoot("item_hit_entity", context, event, player, item, event.getEntity(), event.getEntity().getLocation(), event);
         dropNaturally(event.getEntity().getLocation(), result.items());
     }
 
@@ -215,7 +219,7 @@ public class LootTableService implements Listener {
         return context;
     }
 
-    private TriggeredLootResult triggeredLoot(String eventType, Map<String, Object> context, Event event, Player player, ItemStack item, Entity entity, Location location) {
+    private TriggeredLootResult triggeredLoot(String eventType, Map<String, Object> context, Event event, Player player, ItemStack item, Entity entity, Location location, EntityDamageEvent damageEvent) {
         if (storage == null || eventType == null) {
             return new TriggeredLootResult(false, List.of());
         }
@@ -227,7 +231,7 @@ public class LootTableService implements Listener {
                 continue;
             }
             for (JsonObject trigger : triggers(table)) {
-                if (!triggerMatches(trigger, eventType, player, item, entity, location)) {
+                if (!triggerMatches(trigger, eventType, player, item, entity, location, damageEvent)) {
                     continue;
                 }
                 overrideDrops |= bool(trigger, "overrideDrops", false);
@@ -255,7 +259,7 @@ public class LootTableService implements Listener {
         return result;
     }
 
-    private boolean triggerMatches(JsonObject trigger, String eventType, Player player, ItemStack item, Entity entity, Location location) {
+    private boolean triggerMatches(JsonObject trigger, String eventType, Player player, ItemStack item, Entity entity, Location location, EntityDamageEvent damageEvent) {
         String configuredEvent = text(trigger, "event");
         if (configuredEvent.isBlank() || "none".equalsIgnoreCase(configuredEvent) || !configuredEvent.equalsIgnoreCase(eventType)) {
             return false;
@@ -263,20 +267,106 @@ public class LootTableService implements Listener {
         String target = text(trigger, "target");
         String tool = text(trigger, "tool");
         return switch (eventType) {
-            case "block_break" -> matchesBlockTarget(location, target) && matchesTool(player, item, tool);
-            case "block_place" -> (matchesBlockTarget(location, target) || matchesItemTarget(item, target)) && matchesTool(player, item, tool);
-            case "entity_death" -> matchesEntityTarget(entity, target) && matchesTool(player, item, tool);
-            case "item_use", "item_hit_entity" -> matchesItemTarget(item, firstFilled(target, tool)) && matchesEntityTarget(entity, text(trigger, "entity"));
+            case "block_break" -> matchesBlockTarget(location, target) && matchesTool(player, item, tool, damageEvent);
+            case "block_place" -> (matchesBlockTarget(location, target) || matchesItemTarget(item, target)) && matchesTool(player, item, tool, damageEvent);
+            case "entity_death" -> matchesEntityTarget(entity, target) && matchesTool(player, item, tool, damageEvent);
+            case "item_use" -> matchesItemTarget(item, firstFilled(target, tool));
+            case "item_hit_entity" -> matchesItemTarget(item, target) && matchesTool(player, item, tool, damageEvent) && matchesEntityTarget(entity, text(trigger, "entity"));
             default -> false;
         };
     }
 
-    private boolean matchesTool(Player player, ItemStack item, String tool) {
+    private boolean matchesTool(Player player, ItemStack item, String tool, EntityDamageEvent damageEvent) {
         if (tool == null || tool.isBlank() || "none".equalsIgnoreCase(tool)) {
             return true;
         }
+        if (isDamageTypeReference(tool)) {
+            return matchesDamageType(damageEvent, tool);
+        }
         ItemStack held = item != null ? item : player != null ? player.getInventory().getItemInMainHand() : null;
         return matchesItemTarget(held, tool);
+    }
+
+    private void putDamageContext(Map<String, Object> context, EntityDamageEvent damageEvent) {
+        if (context == null || damageEvent == null) {
+            return;
+        }
+        context.put("event.damageCause", damageEvent.getCause().name().toLowerCase(Locale.ROOT));
+        String damageType = damageTypeKey(damageEvent);
+        if (!damageType.isBlank()) {
+            context.put("event.damageType", damageType);
+        }
+    }
+
+    private boolean isDamageTypeReference(String value) {
+        return value != null && (value.startsWith("damage_type:") || value.startsWith("damage:"));
+    }
+
+    private boolean matchesDamageType(EntityDamageEvent damageEvent, String reference) {
+        if (damageEvent == null) {
+            return false;
+        }
+        String expected = normalizeDamageType(damageTypeReference(reference));
+        if (expected.isBlank()) {
+            return true;
+        }
+        String cause = normalizeDamageType(damageEvent.getCause().name());
+        if (expected.equals(cause) || damageTypeAliases(expected).contains(cause) || damageTypeAliases(cause).contains(expected)) {
+            return true;
+        }
+        String key = normalizeDamageType(damageTypeKey(damageEvent));
+        return !key.isBlank() && (expected.equals(key) || damageTypeAliases(expected).contains(key) || damageTypeAliases(key).contains(expected));
+    }
+
+    private String damageTypeReference(String reference) {
+        if (reference == null) {
+            return "";
+        }
+        if (reference.startsWith("damage_type:")) {
+            return reference.substring("damage_type:".length());
+        }
+        if (reference.startsWith("damage:")) {
+            return reference.substring("damage:".length());
+        }
+        return reference;
+    }
+
+    private String damageTypeKey(EntityDamageEvent damageEvent) {
+        if (damageEvent == null) {
+            return "";
+        }
+        try {
+            Object source = damageEvent.getClass().getMethod("getDamageSource").invoke(damageEvent);
+            Object type = source != null ? source.getClass().getMethod("getDamageType").invoke(source) : null;
+            Object key = type != null ? type.getClass().getMethod("getKey").invoke(type) : null;
+            return key != null ? key.toString() : "";
+        } catch (ReflectiveOperationException ignored) {
+            return "";
+        }
+    }
+
+    private String normalizeDamageType(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("minecraft:")) {
+            normalized = normalized.substring("minecraft:".length());
+        }
+        return normalized.replace('-', '_');
+    }
+
+    private List<String> damageTypeAliases(String value) {
+        return switch (value) {
+            case "fire", "in_fire", "on_fire", "fire_tick" -> List.of("fire", "in_fire", "on_fire", "fire_tick");
+            case "fall", "fall_damage" -> List.of("fall", "fall_damage");
+            case "drown", "drowning" -> List.of("drown", "drowning");
+            case "explosion", "block_explosion", "entity_explosion" -> List.of("explosion", "block_explosion", "entity_explosion");
+            case "mob_attack", "entity_attack", "player_attack" -> List.of("mob_attack", "entity_attack", "player_attack");
+            case "arrow", "projectile", "trident" -> List.of("arrow", "projectile", "trident");
+            case "magic", "indirect_magic" -> List.of("magic", "indirect_magic");
+            default -> List.of(value);
+        };
     }
 
     private boolean matchesItemTarget(ItemStack item, String target) {

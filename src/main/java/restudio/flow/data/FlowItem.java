@@ -6,6 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import restudio.resync.flow.util.TextFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,10 +69,10 @@ public class FlowItem implements FlowDataObject {
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             if (displayName != null) {
-                meta.setDisplayName(displayName);
+                meta.displayName(TextFormatter.parseItemName(displayName));
             }
             if (lore != null) {
-                meta.setLore(lore);
+                meta.lore(lore.stream().map(TextFormatter::parseItemLore).toList());
             }
             if (customModelData != null) {
                 meta.setCustomModelData(customModelData);

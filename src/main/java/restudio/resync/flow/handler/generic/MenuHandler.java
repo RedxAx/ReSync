@@ -83,10 +83,10 @@ public class MenuHandler implements NodeHandler {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
                         if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parse(name));
+                            meta.displayName(TextFormatter.parseItemName(name));
                         }
                         if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseLines(lore));
+                            meta.lore(TextFormatter.parseItemLoreLines(lore));
                         }
                         item.setItemMeta(meta);
                     }
@@ -113,10 +113,10 @@ public class MenuHandler implements NodeHandler {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
                         if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parse(name));
+                            meta.displayName(TextFormatter.parseItemName(name));
                         }
                         if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseLines(lore));
+                            meta.lore(TextFormatter.parseItemLoreLines(lore));
                         }
                         item.setItemMeta(meta);
                     }
@@ -284,10 +284,10 @@ public class MenuHandler implements NodeHandler {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
                         if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parse(name));
+                            meta.displayName(TextFormatter.parseItemName(name));
                         }
                         if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseLines(lore));
+                            meta.lore(TextFormatter.parseItemLoreLines(lore));
                         }
                         item.setItemMeta(meta);
                     }
@@ -410,10 +410,10 @@ public class MenuHandler implements NodeHandler {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
                         if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parse(name));
+                            meta.displayName(TextFormatter.parseItemName(name));
                         }
                         if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseLines(lore));
+                            meta.lore(TextFormatter.parseItemLoreLines(lore));
                         }
                         item.setItemMeta(meta);
                     }

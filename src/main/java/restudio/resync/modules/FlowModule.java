@@ -36,6 +36,7 @@ import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
+import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.messages.MessageLogService;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
@@ -62,6 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FlowModule implements Module {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("flowLegacyHandler", "FlowLegacyHandler", "flow");
     private static final long CUSTOM_CONTENT_CATALOG_POLL_INTERVAL_MS = 2000L;
+    private static final long QUICK_EDIT_SESSION_TTL_MS = 30L * 60L * 1000L;
     private final FlowStorage storage;
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final FlowPacketSender sender;
@@ -129,7 +131,7 @@ public class FlowModule implements Module {
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService, optionCatalogRegistry);
-        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, jsonResourceStorage, sender, messageLogService, optionCatalogHandler::broadcastCustomContentCatalogs);
+        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService, optionCatalogHandler::broadcastCustomContentCatalogs);
         this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData);
     }
 
@@ -340,7 +342,7 @@ public class FlowModule implements Module {
         definition.setType("item");
         definition.setProvider("vanilla");
         definition.setMaterial(item.getType().name());
-        definition.setDisplayName(displayName(item));
+        definition.setDisplayName(customDisplayName(item));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             if (meta.hasLore() && meta.getLore() != null) {
@@ -358,23 +360,12 @@ public class FlowModule implements Module {
         return definition;
     }
 
-    private String displayName(ItemStack item) {
+    private String customDisplayName(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
         if (meta != null && meta.hasDisplayName()) {
             return meta.getDisplayName();
         }
-        String name = item.getType().name().toLowerCase().replace('_', ' ');
-        StringBuilder builder = new StringBuilder();
-        for (String part : name.split(" ")) {
-            if (part.isBlank()) {
-                continue;
-            }
-            if (!builder.isEmpty()) {
-                builder.append(' ');
-            }
-            builder.append(part.substring(0, 1).toUpperCase()).append(part.substring(1));
-        }
-        return builder.isEmpty() ? item.getType().name() : builder.toString();
+        return "";
     }
 
     private void handleQuickEditApply(Session session, ByteBuffer buffer) {
@@ -445,15 +436,41 @@ public class FlowModule implements Module {
         }
         ItemMeta meta = edited.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(definition.getDisplayName() != null && !definition.getDisplayName().isBlank() ? definition.getDisplayName() : null);
-            meta.setLore(definition.getLore() != null && !definition.getLore().isEmpty() ? definition.getLore() : null);
+            boolean hasNameComponent = hasAnyComponent(definition, "minecraft:custom_name", "minecraft:item_name");
+            boolean hasLoreComponent = hasAnyComponent(definition, "minecraft:lore");
+            if (!hasNameComponent) {
+                if (definition.getDisplayName() != null && !definition.getDisplayName().isBlank()) {
+                    meta.displayName(TextFormatter.parseItemName(definition.getDisplayName()));
+                } else {
+                    meta.displayName(null);
+                }
+            }
+            if (!hasLoreComponent) {
+                if (definition.getLore() != null && !definition.getLore().isEmpty()) {
+                    meta.lore(definition.getLore().stream().map(TextFormatter::parseItemLore).toList());
+                } else {
+                    meta.lore(null);
+                }
+            }
             meta.setCustomModelData(definition.getCustomModelData());
             edited.setItemMeta(meta);
         }
         player.getInventory().setItemInMainHand(edited);
-        quickEditSessions.remove(editSession.sessionId());
+        quickEditSessions.put(editSession.sessionId(), new QuickEditSession(editSession.sessionId(), editSession.playerId(), normalizedSnapshot(edited), System.currentTimeMillis()));
         sender.sendJsonPayload(session, (byte) 0x62, gson.toJson(Map.of("sessionId", editSession.sessionId(), "status", "applied")), "QUICK_EDIT_RESULT_TOO_LARGE", "Quick edit result exceeds maximum size");
         player.sendMessage("§8[ReSync] §aQuick Edit Applied");
+    }
+
+    private boolean hasAnyComponent(CustomContentDefinition definition, String... keys) {
+        if (definition == null || definition.getComponents() == null || definition.getComponents().isEmpty()) {
+            return false;
+        }
+        for (String key : keys) {
+            if (definition.getComponents().containsKey(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ItemStack normalizedSnapshot(ItemStack item) {
@@ -494,8 +511,8 @@ public class FlowModule implements Module {
     }
 
     private void pruneQuickEditSessions() {
-        long cutoff = System.currentTimeMillis() - 900000L;
-        quickEditSessions.entrySet().removeIf(entry -> entry.getValue().createdAt() < cutoff);
+        long cutoff = System.currentTimeMillis() - QUICK_EDIT_SESSION_TTL_MS;
+        quickEditSessions.entrySet().removeIf(entry -> entry.getValue().lastTouchedAt() < cutoff);
     }
 
     public record QuickEditResult(boolean success, String message) {
@@ -508,7 +525,7 @@ public class FlowModule implements Module {
         }
     }
 
-    private record QuickEditSession(String sessionId, UUID playerId, ItemStack originalItem, long createdAt) {
+    private record QuickEditSession(String sessionId, UUID playerId, ItemStack originalItem, long lastTouchedAt) {
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {

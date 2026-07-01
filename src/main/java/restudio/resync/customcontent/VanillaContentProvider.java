@@ -11,6 +11,7 @@ import org.bukkit.persistence.PersistentDataType;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.storage.StorageSafety;
 
 import java.io.File;
@@ -53,10 +54,10 @@ public class VanillaContentProvider implements CustomContentProvider {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             if (definition.getDisplayName() != null && !definition.getDisplayName().isBlank()) {
-                meta.setDisplayName(definition.getDisplayName());
+                meta.displayName(TextFormatter.parseItemName(definition.getDisplayName()));
             }
             if (definition.getLore() != null && !definition.getLore().isEmpty()) {
-                meta.setLore(definition.getLore());
+                meta.lore(definition.getLore().stream().map(TextFormatter::parseItemLore).toList());
             }
             if (definition.getCustomModelData() != null) {
                 meta.setCustomModelData(definition.getCustomModelData());
@@ -68,6 +69,14 @@ public class VanillaContentProvider implements CustomContentProvider {
     }
 
     public ItemStack stampItem(ItemStack item, CustomContentDefinition definition) {
+        return stampItem(item, definition, UUID.randomUUID().toString());
+    }
+
+    public ItemStack restampItem(ItemStack item, CustomContentDefinition definition, String instanceId) {
+        return stampItem(item, definition, instanceId != null && !instanceId.isBlank() ? instanceId : UUID.randomUUID().toString());
+    }
+
+    private ItemStack stampItem(ItemStack item, CustomContentDefinition definition, String instanceId) {
         if (item == null || definition == null) {
             return item;
         }
@@ -78,7 +87,7 @@ public class VanillaContentProvider implements CustomContentProvider {
         meta.getPersistentDataContainer().set(contentTypeKey, PersistentDataType.STRING, definition.getType());
         meta.getPersistentDataContainer().set(contentIdKey, PersistentDataType.STRING, definition.getId());
         meta.getPersistentDataContainer().set(contentVersionKey, PersistentDataType.INTEGER, definition.getVersion());
-        meta.getPersistentDataContainer().set(instanceIdKey, PersistentDataType.STRING, UUID.randomUUID().toString());
+        meta.getPersistentDataContainer().set(instanceIdKey, PersistentDataType.STRING, instanceId);
         item.setItemMeta(meta);
         return item;
     }
@@ -101,6 +110,30 @@ public class VanillaContentProvider implements CustomContentProvider {
         }
         ItemMeta meta = item.getItemMeta();
         return meta != null ? meta.getPersistentDataContainer().getOrDefault(instanceIdKey, PersistentDataType.STRING, "") : "";
+    }
+
+    public String getStampedContentId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return "";
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null ? meta.getPersistentDataContainer().getOrDefault(contentIdKey, PersistentDataType.STRING, "") : "";
+    }
+
+    public ItemStack clearStamp(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        meta.getPersistentDataContainer().remove(contentTypeKey);
+        meta.getPersistentDataContainer().remove(contentIdKey);
+        meta.getPersistentDataContainer().remove(contentVersionKey);
+        meta.getPersistentDataContainer().remove(instanceIdKey);
+        item.setItemMeta(meta);
+        return item;
     }
 
     @Override

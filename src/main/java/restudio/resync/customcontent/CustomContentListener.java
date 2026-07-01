@@ -15,13 +15,17 @@ import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.World;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import restudio.resync.ReSync;
 import restudio.flow.data.CustomContentDefinition;
 
 import java.util.HashMap;
@@ -198,8 +202,26 @@ public class CustomContentListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player player) {
-            org.bukkit.Bukkit.getScheduler().runTask(restudio.resync.ReSync.getInstance(), () -> scanArmor(player));
+            Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> scanArmor(player));
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        service.reconcilePlayerItems(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        service.reconcileInventoryItems(event.getInventory());
+        if (event.getPlayer() instanceof Player player) {
+            service.reconcilePlayerItems(player);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onChunkLoad(ChunkLoadEvent event) {
+        service.reconcileChunkItems(event.getChunk());
     }
 
     public void tick() {

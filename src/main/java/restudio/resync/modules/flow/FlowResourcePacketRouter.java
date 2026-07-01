@@ -12,6 +12,7 @@ import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customcontent.CustomContentValidator;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
@@ -39,25 +40,29 @@ public class FlowResourcePacketRouter {
     private final Runnable customContentCatalogRefresh;
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender) {
-        this(storage, customContentStorage, null, sender, null);
+        this(storage, customContentStorage, null, null, sender, null, null);
     }
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender) {
-        this(storage, customContentStorage, jsonResourceStorage, sender, null);
+        this(storage, customContentStorage, null, jsonResourceStorage, sender, null, null);
     }
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService) {
-        this(storage, customContentStorage, jsonResourceStorage, sender, messageLogService, null);
+        this(storage, customContentStorage, null, jsonResourceStorage, sender, messageLogService, null);
     }
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh) {
+        this(storage, customContentStorage, null, jsonResourceStorage, sender, messageLogService, customContentCatalogRefresh);
+    }
+
+    public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, CustomContentService customContentService, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh) {
         this.sender = sender;
         this.messageLogService = messageLogService;
         this.customContentCatalogRefresh = customContentCatalogRefresh;
         handlers.add(new FlowResourcePacketHandler<>(guiAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(scoreboardAdapter(storage, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(tabAdapter(storage, sender), sender));
-        handlers.add(new FlowResourcePacketHandler<>(customContentAdapter(customContentStorage, sender), sender));
+        handlers.add(new FlowResourcePacketHandler<>(customContentAdapter(customContentStorage, customContentService, sender), sender));
         handlers.add(new FlowResourcePacketHandler<>(projectMetadataAdapter(storage, sender), sender));
         if (jsonResourceStorage != null) {
             for (String type : jsonResourceStorage.resourceTypes()) {
@@ -346,7 +351,7 @@ public class FlowResourcePacketRouter {
         };
     }
 
-    private FlowResourceAdapter<CustomContentDefinition> customContentAdapter(CustomContentStorage storage, FlowPacketSender sender) {
+    private FlowResourceAdapter<CustomContentDefinition> customContentAdapter(CustomContentStorage storage, CustomContentService service, FlowPacketSender sender) {
         CustomContentValidator validator = new CustomContentValidator();
         ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
         return new FlowResourceAdapter<>() {
@@ -420,11 +425,17 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void afterSave(Session session, CustomContentDefinition value) {
+                if (service != null) {
+                    service.reconcileContentItems(value.getId());
+                }
                 refreshCustomContentCatalogs();
             }
 
             @Override
             public void afterDelete(Session session, String id) {
+                if (service != null) {
+                    service.clearContentItems(id);
+                }
                 refreshCustomContentCatalogs();
             }
         };

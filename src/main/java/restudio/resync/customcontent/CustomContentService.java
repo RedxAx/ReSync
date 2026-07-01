@@ -1,11 +1,16 @@
 package restudio.resync.customcontent;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.entity.Animals;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.CustomAbilityBinding;
 import restudio.flow.data.CustomContentGraphAdapter;
@@ -35,6 +40,7 @@ public class CustomContentService {
     private final Map<String, Integer> tickActivations = new ConcurrentHashMap<>();
     private final Map<String, CompiledContentDefinition> compiledDefinitions = new ConcurrentHashMap<>();
     private final VanillaContentProvider vanillaProvider;
+    private final CustomContentItemReconciler itemReconciler;
     private long currentTick;
 
     public CustomContentService(CustomContentStorage contentStorage, FlowStorage flowStorage, FlowExecutor executor) {
@@ -42,6 +48,7 @@ public class CustomContentService {
         this.flowStorage = flowStorage;
         this.executor = executor;
         this.vanillaProvider = new VanillaContentProvider();
+        this.itemReconciler = new CustomContentItemReconciler(contentStorage, this);
         registerProvider(vanillaProvider);
         if (Bukkit.getPluginManager().getPlugin("Nexo") != null) {
             registerProvider(new NexoContentProvider(contentStorage, vanillaProvider));
@@ -190,12 +197,21 @@ public class CustomContentService {
     }
 
     public CustomContentProvider providerFor(CustomContentDefinition definition) {
+        CustomContentProvider provider = availableProviderFor(definition);
+        return provider != null ? provider : vanillaProvider;
+    }
+
+    public CustomContentProvider availableProviderFor(CustomContentDefinition definition) {
         String providerId = definition != null && definition.getProvider() != null ? definition.getProvider() : "vanilla";
         CustomContentProvider provider = providers.get(providerId.toLowerCase(Locale.ROOT));
         if (provider == null || !provider.isAvailable()) {
-            return vanillaProvider;
+            return null;
         }
         return provider;
+    }
+
+    public boolean canCreateAuthoritativeItem(CustomContentDefinition definition) {
+        return availableProviderFor(definition) != null;
     }
 
     public ItemStack createItem(String contentId, int amount) {
@@ -204,6 +220,30 @@ public class CustomContentService {
             return null;
         }
         return providerFor(definition).createItem(definition, amount);
+    }
+
+    public void reconcileContentItems(String contentId) {
+        itemReconciler.reconcileContent(contentId);
+    }
+
+    public void reconcileAllItems() {
+        itemReconciler.reconcileAll();
+    }
+
+    public void clearContentItems(String contentId) {
+        itemReconciler.clearContent(contentId);
+    }
+
+    public void reconcilePlayerItems(Player player) {
+        itemReconciler.reconcilePlayer(player);
+    }
+
+    public void reconcileInventoryItems(Inventory inventory) {
+        itemReconciler.reconcileInventory(inventory);
+    }
+
+    public void reconcileChunkItems(Chunk chunk) {
+        itemReconciler.reconcileChunk(chunk);
     }
 
     public ItemStack createReferencedItem(String reference, int amount) {
@@ -474,13 +514,13 @@ public class CustomContentService {
             if ("player".equals(targetFilter) && !(target instanceof Player)) {
                 return false;
             }
-            if ("living entity".equals(targetFilter) && !(target instanceof org.bukkit.entity.LivingEntity)) {
+            if ("living entity".equals(targetFilter) && !(target instanceof LivingEntity)) {
                 return false;
             }
-            if ("hostile".equals(targetFilter) && !(target instanceof org.bukkit.entity.Monster)) {
+            if ("hostile".equals(targetFilter) && !(target instanceof Monster)) {
                 return false;
             }
-            if ("passive".equals(targetFilter) && !(target instanceof org.bukkit.entity.Animals)) {
+            if ("passive".equals(targetFilter) && !(target instanceof Animals)) {
                 return false;
             }
         }

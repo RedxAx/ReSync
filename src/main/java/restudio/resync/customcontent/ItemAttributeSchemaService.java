@@ -1,6 +1,7 @@
 package restudio.resync.customcontent;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -216,11 +217,57 @@ public class ItemAttributeSchemaService {
             if (entry.getValue() == null) {
                 patch.remove(id);
             } else {
-                patch.add(id, gson.toJsonTree(entry.getValue()));
+                patch.add(id, normalizeItemTextComponent(id, gson.toJsonTree(entry.getValue())));
             }
         }
         root.add("components", patch);
         return PaperUnsafe.deserializeItemFromJson(root);
+    }
+
+    private JsonElement normalizeItemTextComponent(String id, JsonElement value) {
+        return switch (id) {
+            case "minecraft:custom_name", "minecraft:item_name" -> normalizeTextComponent(value);
+            case "minecraft:lore" -> normalizeLoreComponent(value);
+            default -> value;
+        };
+    }
+
+    private JsonElement normalizeLoreComponent(JsonElement value) {
+        if (value == null || !value.isJsonArray()) {
+            return value;
+        }
+        JsonArray normalized = new JsonArray();
+        for (JsonElement element : value.getAsJsonArray()) {
+            normalized.add(normalizeTextComponent(element));
+        }
+        return normalized;
+    }
+
+    private JsonElement normalizeTextComponent(JsonElement value) {
+        if (value == null || value.isJsonNull()) {
+            return value;
+        }
+        if (value.isJsonObject()) {
+            JsonObject object = value.getAsJsonObject();
+            if (!object.has("italic")) {
+                object.addProperty("italic", false);
+            }
+            return object;
+        }
+        if (value.isJsonArray()) {
+            JsonArray normalized = new JsonArray();
+            for (JsonElement element : value.getAsJsonArray()) {
+                normalized.add(normalizeTextComponent(element));
+            }
+            return normalized;
+        }
+        if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+            JsonObject object = new JsonObject();
+            object.addProperty("text", value.getAsString());
+            object.addProperty("italic", false);
+            return object;
+        }
+        return value;
     }
 
     public Map<String, Object> componentsFromStack(ItemStack stack) {

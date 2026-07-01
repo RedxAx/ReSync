@@ -430,6 +430,27 @@ public class GlobalTriggers implements Listener {
         return null;
     }
 
+    public void shutdownRuntimeCommands() {
+        CommandMap commandMap = resolveCommandMap();
+        if (commandMap == null) {
+            runtimeCommands.clear();
+            commandTriggers.clear();
+            return;
+        }
+        Map<String, Command> knownCommands = resolveKnownCommands(commandMap);
+        String pluginPrefix = ReSync.getInstance().getName().toLowerCase(Locale.ROOT) + ":";
+        for (Map.Entry<String, RuntimeFlowCommand> entry : new ArrayList<>(runtimeCommands.entrySet())) {
+            RuntimeFlowCommand command = entry.getValue();
+            command.unregister(commandMap);
+            if (knownCommands != null) {
+                knownCommands.remove(entry.getKey(), command);
+                knownCommands.remove(pluginPrefix + entry.getKey(), command);
+            }
+        }
+        runtimeCommands.clear();
+        commandTriggers.clear();
+    }
+
     private void refreshRuntimeCommands() {
         CommandMap commandMap = resolveCommandMap();
         if (commandMap == null) {
@@ -456,9 +477,16 @@ public class GlobalTriggers implements Listener {
         }
 
         for (String commandLabel : desired) {
-            if (runtimeCommands.containsKey(commandLabel)) {
+            RuntimeFlowCommand current = runtimeCommands.get(commandLabel);
+            if (current != null && (knownCommands == null || knownCommands.get(commandLabel) == current || knownCommands.get(pluginPrefix + commandLabel) == current)) {
                 continue;
             }
+            if (current != null) {
+                current.unregister(commandMap);
+                runtimeCommands.remove(commandLabel);
+            }
+            removeKnownRuntimeCommand(commandMap, knownCommands, commandLabel);
+            removeKnownRuntimeCommand(commandMap, knownCommands, pluginPrefix + commandLabel);
             RuntimeFlowCommand command = new RuntimeFlowCommand(commandLabel);
             commandMap.register(ReSync.getInstance().getName().toLowerCase(Locale.ROOT), command);
             runtimeCommands.put(commandLabel, command);
@@ -466,6 +494,27 @@ public class GlobalTriggers implements Listener {
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
             onlinePlayer.updateCommands();
         }
+    }
+
+    private void removeKnownRuntimeCommand(CommandMap commandMap, Map<String, Command> knownCommands, String key) {
+        if (knownCommands == null || key == null) {
+            return;
+        }
+        Command command = knownCommands.get(key);
+        if (!isRuntimeFlowCommand(command)) {
+            return;
+        }
+        command.unregister(commandMap);
+        knownCommands.remove(key);
+    }
+
+    private boolean isRuntimeFlowCommand(Command command) {
+        if (command == null) {
+            return false;
+        }
+        return command instanceof RuntimeFlowCommand
+            || RuntimeFlowCommand.class.getName().equals(command.getClass().getName())
+            || "ReSync flow command".equals(command.getDescription());
     }
 
     public void refreshBindings() {

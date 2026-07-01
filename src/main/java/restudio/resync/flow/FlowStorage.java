@@ -1087,7 +1087,7 @@ public class FlowStorage {
         }
         try {
             return FlowSerializer.deserialize(StorageSafety.readUtf8(file));
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             Log.warn("Failed to inspect graph asset during migration: " + file.getFileName() + " - " + e.getMessage());
             return null;
         }
@@ -1344,27 +1344,59 @@ public class FlowStorage {
     private Set<String> loadCommandFlowIds() {
         Set<String> ids = new HashSet<>();
         File triggerFile = new File(configFile.getParentFile(), "triggers.json");
-        if (!triggerFile.exists()) {
+        if (triggerFile.exists()) {
+            try {
+                JsonElement element = gson.fromJson(Files.readString(triggerFile.toPath(), StandardCharsets.UTF_8), JsonElement.class);
+                if (element != null && element.isJsonArray()) {
+                    for (JsonElement bindingElement : element.getAsJsonArray()) {
+                        if (bindingElement == null || !bindingElement.isJsonObject()) {
+                            continue;
+                        }
+                        JsonObject binding = bindingElement.getAsJsonObject();
+                        JsonElement type = binding.get("type");
+                        JsonElement flowId = binding.get("flowId");
+                        if (type != null && flowId != null && "COMMAND".equalsIgnoreCase(type.getAsString()) && !flowId.getAsString().isBlank()) {
+                            ids.add(flowId.getAsString());
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                Log.warn("Failed to read command triggers during migration: " + e.getMessage());
+            }
+        }
+        ids.addAll(loadCommandFlowIdsFromStoredGraphs());
+        return ids;
+    }
+
+    private Set<String> loadCommandFlowIdsFromStoredGraphs() {
+        Set<String> ids = new HashSet<>();
+        if (flowDir.exists()) {
+            File[] files = flowDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (files != null) {
+                for (File file : files) {
+                    String id = file.getName().substring(0, file.getName().length() - 5);
+                    if (safeId(id, "load command graph") != null && graphHasCommandStartNode(readAssetFlow(file.toPath()))) {
+                        ids.add(id);
+                    }
+                }
+            }
+        }
+        Path root = assetsDir.toPath();
+        if (!Files.exists(root)) {
             return ids;
         }
-        try {
-            JsonElement element = gson.fromJson(Files.readString(triggerFile.toPath(), StandardCharsets.UTF_8), JsonElement.class);
-            if (element == null || !element.isJsonArray()) {
-                return ids;
-            }
-            for (JsonElement bindingElement : element.getAsJsonArray()) {
-                if (bindingElement == null || !bindingElement.isJsonObject()) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                AssetResourceName asset = parseAssetResourceName(path);
+                if (asset == null || !("flow".equals(asset.type()) || "function".equals(asset.type()) || "command".equals(asset.type()))) {
                     continue;
                 }
-                JsonObject binding = bindingElement.getAsJsonObject();
-                JsonElement type = binding.get("type");
-                JsonElement flowId = binding.get("flowId");
-                if (type != null && flowId != null && "COMMAND".equalsIgnoreCase(type.getAsString()) && !flowId.getAsString().isBlank()) {
-                    ids.add(flowId.getAsString());
+                if (safeId(asset.id(), "load command graph") != null && graphHasCommandStartNode(readAssetFlow(path))) {
+                    ids.add(asset.id());
                 }
             }
         } catch (IOException e) {
-            Log.warn("Failed to read command triggers during migration: " + e.getMessage());
+            Log.warn("Failed to scan command graphs during migration: " + e.getMessage());
         }
         return ids;
     }

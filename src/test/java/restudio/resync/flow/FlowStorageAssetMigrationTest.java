@@ -131,6 +131,49 @@ class FlowStorageAssetMigrationTest {
     }
 
     @Test
+    void migrationClassifiesCommandGraphsWithoutTriggerFile() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path command = assets.resolve("Blueprints").resolve("Flows").resolve("restartcommand.json");
+        Files.createDirectories(command.getParent());
+        Files.writeString(command, """
+            {
+              "id": "restartcommand",
+              "version": 1,
+              "resourceType": "flow",
+              "nodes": {
+                "start": {
+                  "type": "event.resync.command",
+                  "version": 1,
+                  "x": 0,
+                  "y": 0,
+                  "inputValues": {}
+                }
+              },
+              "connections": []
+            }
+            """);
+        Files.writeString(assets.resolve("project.json"), """
+            {
+              "serverId": "project",
+              "folders": [
+                { "path": "Blueprints", "parentPath": "", "name": "Blueprints", "sortOrder": 0 },
+                { "path": "Blueprints/Flows", "parentPath": "Blueprints", "name": "Flows", "sortOrder": 0 }
+              ],
+              "resources": [
+                { "type": "flow", "id": "restartcommand", "displayName": "restartcommand", "path": "Blueprints/Flows", "sortOrder": 0 }
+              ]
+            }
+            """);
+
+        new FlowStorage(tempDir.toFile());
+
+        String project = Files.readString(assets.resolve("project.json"));
+
+        assertTrue(project.contains("\"type\":\"command\",\"id\":\"restartcommand\""));
+        assertFalse(project.contains("\"type\":\"flow\",\"id\":\"restartcommand\""));
+    }
+
+    @Test
     void migrationKeepsRestoredLegacyAssetsWithSharedIds() throws Exception {
         Path assets = tempDir.resolve("assets");
         Path legacySourceAssets = tempDir.resolve("legacy-source-assets");

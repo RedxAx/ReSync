@@ -6,8 +6,10 @@ import restudio.resync.Log;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.customcontent.CustomContentAccess;
+import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowStorage;
@@ -22,6 +24,7 @@ import restudio.resync.jobs.JobRecord;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +53,7 @@ public class FlowBlueprintPacketHandler {
         this.globalTriggers = globalTriggers;
         this.definitionRegistry = definitionRegistry;
         this.sender = sender;
-        refreshAllEventBindings();
+        refreshAllGraphBindings();
     }
 
     public void handleRequest(Session session, ByteBuffer buffer) {
@@ -112,7 +115,19 @@ public class FlowBlueprintPacketHandler {
                 if (customContentStorage != null) {
                     previousContent = customContentStorage.getByFlow(flowId).stream()
                         .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
+                    CustomContentService customContentService = CustomContentAccess.getService();
                     customContentStorage.save(content);
+                    if (customContentService != null) {
+                        customContentService.reconcileContentItems(content.getId());
+                    }
+                    for (String previousContentId : previousContent.keySet()) {
+                        if (!previousContentId.equalsIgnoreCase(content.getId())) {
+                            customContentStorage.delete(previousContentId);
+                            if (customContentService != null) {
+                                customContentService.clearContentItems(previousContentId);
+                            }
+                        }
+                    }
                 }
                 Log.fine("Custom content saved from flow: " + content.getId());
                 sender.sendFlowSaveAck(session, flowId);
@@ -124,7 +139,7 @@ public class FlowBlueprintPacketHandler {
                 previousContent = customContentStorage.getByFlow(flowId).stream()
                     .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
             }
-            updateEventBindings(graph);
+            updateGraphBindings(graph);
             Log.fine("Flow saved: " + flowId);
             sender.sendFlowSaveAck(session, flowId);
             sender.succeedJob(job, flowId, "Saved");
@@ -163,6 +178,10 @@ public class FlowBlueprintPacketHandler {
                     .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
                 for (CustomContentDefinition definition : customContentStorage.getByFlow(flowId)) {
                     customContentStorage.delete(definition.getId());
+                    CustomContentService customContentService = CustomContentAccess.getService();
+                    if (customContentService != null) {
+                        customContentService.clearContentItems(definition.getId());
+                    }
                 }
             }
             if (triggerRegistry != null) {
@@ -209,14 +228,14 @@ public class FlowBlueprintPacketHandler {
         }
     }
 
-    private void refreshAllEventBindings() {
+    private void refreshAllGraphBindings() {
         if (triggerRegistry == null) {
             return;
         }
         for (String flowId : storage.listFlowIds()) {
             FlowGraph graph = storage.getGraph(flowId);
             if (graph != null) {
-                updateEventBindings(graph);
+                updateGraphBindings(graph);
             }
         }
         if (globalTriggers != null) {
@@ -224,26 +243,125 @@ public class FlowBlueprintPacketHandler {
         }
     }
 
-    private void updateEventBindings(FlowGraph graph) {
-        if (triggerRegistry == null || graph == null) {
+    private void updateGraphBindings(FlowGraph graph) {
+        if (triggerRegistry == null || graph == null || graph.getId() == null || graph.getId().isBlank() || graph.getNodes() == null) {
             return;
         }
+        updateEventBindings(graph);
+        updateCommandBindings(graph);
+        if (globalTriggers != null) {
+            globalTriggers.refreshBindings();
+        }
+    }
+
+    private void updateEventBindings(FlowGraph graph) {
         Set<String> contexts = new HashSet<>();
         for (var entry : graph.getNodes().entrySet()) {
-            String context = mapEventContext(entry.getValue().getType());
+            FlowNode node = entry.getValue();
+            if (node == null) {
+                continue;
+            }
+            String context = mapEventContext(node.getType());
             if (context != null) {
                 contexts.add(context);
             }
         }
         List<TriggerBinding> bindings = new ArrayList<>();
-        String flowId = graph.getId().toString();
+        String flowId = graph.getId();
         for (String context : contexts) {
             bindings.add(new TriggerBinding(flowId + ':' + context, flowId, TriggerType.EVENT, context));
         }
         triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, bindings);
-        if (globalTriggers != null) {
-            globalTriggers.refreshBindings();
+    }
+
+    private void updateCommandBindings(FlowGraph graph) {
+        String flowId = graph.getId();
+        List<TriggerBinding> existing = triggerRegistry.getBindings(TriggerType.COMMAND).stream()
+            .filter(binding -> flowId.equals(binding.getFlowId()))
+            .toList();
+        List<TriggerBinding> bindings = new ArrayList<>();
+        int index = 0;
+        for (var entry : graph.getNodes().entrySet()) {
+            FlowNode node = entry.getValue();
+            if (node == null || !isCommandNode(node.getType())) {
+                continue;
+            }
+            String bindingId = flowId + ":command:" + entry.getKey();
+            String context = commandContext(node, existing, bindingId, index);
+            if (context == null || context.isBlank()) {
+                continue;
+            }
+            bindings.add(new TriggerBinding(bindingId, flowId, TriggerType.COMMAND, context));
+            index++;
         }
+        triggerRegistry.replaceFlowBindings(flowId, TriggerType.COMMAND, bindings);
+    }
+
+    private boolean isCommandNode(String nodeType) {
+        if (nodeType == null) {
+            return false;
+        }
+        String normalized = nodeType.trim().toLowerCase(Locale.ROOT);
+        return "event.resync.command".equals(normalized) || "event:resync_command".equals(normalized);
+    }
+
+    private String commandContext(FlowNode node, List<TriggerBinding> existing, String bindingId, int index) {
+        Map<String, Object> values = new HashMap<>(node.getHandlerConfigValues());
+        if (node.getInputValues() != null) {
+            values.putAll(node.getInputValues());
+        }
+        String command = text(values, "command");
+        if (command.isBlank()) {
+            command = text(values, "label");
+        }
+        if (command.isBlank()) {
+            command = text(values, "name");
+        }
+        List<String> subcommands = stringList(values.get("subcommands"));
+        if (subcommands.isEmpty()) {
+            subcommands = stringList(values.get("allowedSubcommands"));
+        }
+        boolean structured = bool(values.get("structured"));
+        if (!command.isBlank()) {
+            return gson.toJson(Map.of("command", command, "subcommands", subcommands, "structured", structured));
+        }
+        for (TriggerBinding binding : existing) {
+            if (bindingId.equals(binding.getId()) && binding.getContext() != null && !binding.getContext().isBlank()) {
+                return binding.getContext();
+            }
+        }
+        if (index < existing.size() && existing.get(index).getContext() != null && !existing.get(index).getContext().isBlank()) {
+            return existing.get(index).getContext();
+        }
+        return "";
+    }
+
+    private String text(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value != null ? value.toString().trim() : "";
+    }
+
+    private boolean bool(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return value != null && Boolean.parseBoolean(value.toString());
+    }
+
+    private List<String> stringList(Object value) {
+        if (value instanceof List<?> list) {
+            List<String> result = new ArrayList<>();
+            for (Object entry : list) {
+                if (entry != null && !entry.toString().isBlank()) {
+                    result.add(entry.toString().trim());
+                }
+            }
+            return result;
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return List.of(text);
+        }
+        return List.of();
     }
 
     private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousTriggers) {

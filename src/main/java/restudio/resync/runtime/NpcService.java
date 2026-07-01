@@ -148,6 +148,22 @@ public class NpcService implements Listener {
     }
 
     public void spawnStartupNpcs() {
+        if (plugin == null || storage == null) {
+            return;
+        }
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            restorePersistedNpcEntities();
+            for (String id : storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION)) {
+                JsonObject definition = get(id);
+                if (definition == null || !bool(definition, "enabled", true)) {
+                    continue;
+                }
+                Location spawnLocation = location(definition);
+                if (spawnLocation != null && !isActive(id)) {
+                    spawn(id, spawnLocation);
+                }
+            }
+        }, 1L);
     }
 
     public void shutdown() {
@@ -233,6 +249,38 @@ public class NpcService implements Listener {
     private Entity activeEntity(String id) {
         UUID uuid = activeNpcs.get(id);
         return uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
+    }
+
+    private void restorePersistedNpcEntities() {
+        if (plugin == null) {
+            return;
+        }
+        for (World world : plugin.getServer().getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+                String id = npcId(entity);
+                if (id.isBlank()) {
+                    continue;
+                }
+                JsonObject definition = get(id);
+                EntityType expectedType = definition != null ? spawnEntityType(definition) : null;
+                if (definition == null || !bool(definition, "enabled", true) || expectedType == null || entity.getType() != expectedType) {
+                    entity.remove();
+                    activeNpcs.remove(id, entity.getUniqueId());
+                    continue;
+                }
+                Entity active = activeEntity(id);
+                if (active != null && !active.getUniqueId().equals(entity.getUniqueId())) {
+                    entity.remove();
+                    continue;
+                }
+                Location configured = location(definition);
+                if (configured != null) {
+                    entity.teleport(configured);
+                }
+                activeNpcs.put(id, entity.getUniqueId());
+                applyDefinition(entity, definition);
+            }
+        }
     }
 
     private Location location(JsonObject definition) {

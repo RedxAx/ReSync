@@ -364,6 +364,9 @@ public class FlowRuntimeModule implements Module {
         Bukkit.getPluginManager().registerEvents(lootTableService, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(villageProfileService, context.getPlugin());
         Bukkit.getPluginManager().registerEvents(npcService, context.getPlugin());
+        if (customContentService != null) {
+            customContentService.reconcileAllItems();
+        }
         npcService.spawnStartupNpcs();
         TabListService.startUpdater();
         tickTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
@@ -392,6 +395,7 @@ public class FlowRuntimeModule implements Module {
             executor.cancelPendingTasks();
         }
         if (globalTriggers != null) {
+            globalTriggers.shutdownRuntimeCommands();
             HandlerList.unregisterAll(globalTriggers);
         }
         if (systemEventListener != null) {

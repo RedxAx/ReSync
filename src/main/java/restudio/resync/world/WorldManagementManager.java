@@ -41,6 +41,7 @@ import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.generator.ChunkGenerator;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -77,6 +78,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 public class WorldManagementManager implements WorldManagementService, Listener {
     private static final String MODULE_ID = "worldManagement";
@@ -449,6 +451,27 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public void tick() {
+    }
+
+    public void reconcileStoredItems(UnaryOperator<ItemStack> transformer) {
+        if (transformer == null) {
+            return;
+        }
+        callSync(() -> {
+            boolean changed = false;
+            for (Map<String, WorldPlayerState> states : playerStates.values()) {
+                if (states == null) {
+                    continue;
+                }
+                for (WorldPlayerState state : states.values()) {
+                    changed |= reconcileStoredStateItems(state, transformer);
+                }
+            }
+            if (changed) {
+                persistPlayerStatesAsync();
+            }
+            return null;
+        });
     }
 
     @EventHandler
@@ -2826,6 +2849,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private record ClonePreparation(String source, String target, Path sourceFolder, Path targetFolder, WorldRegistryEntry sourceEntry, WorldOperationResult failure) {
     }
 
+    private record ItemStackTransform(String encoded, boolean changed) {
+    }
+
     private void publishSnapshotEvent() {
         publishMessage(WorldChannelMessage.event("snapshot", createSnapshotSync()));
     }
@@ -2926,6 +2952,48 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         persistInventoryGroups();
         persistSignPortals();
         persistPlayerStates();
+    }
+
+    private boolean reconcileStoredStateItems(WorldPlayerState state, UnaryOperator<ItemStack> transformer) {
+        if (state == null) {
+            return false;
+        }
+        boolean changed = false;
+        ItemStackTransform inventory = transformEncodedItems(state.getInventory(), 36, transformer);
+        if (inventory.changed()) {
+            state.setInventory(inventory.encoded());
+            changed = true;
+        }
+        ItemStackTransform armor = transformEncodedItems(state.getArmor(), 4, transformer);
+        if (armor.changed()) {
+            state.setArmor(armor.encoded());
+            changed = true;
+        }
+        ItemStackTransform offhand = transformEncodedItems(state.getOffhand(), 1, transformer);
+        if (offhand.changed()) {
+            state.setOffhand(offhand.encoded());
+            changed = true;
+        }
+        ItemStackTransform enderChest = transformEncodedItems(state.getEnderChest(), 54, transformer);
+        if (enderChest.changed()) {
+            state.setEnderChest(enderChest.encoded());
+            changed = true;
+        }
+        return changed;
+    }
+
+    private ItemStackTransform transformEncodedItems(String encoded, int fallbackSize, UnaryOperator<ItemStack> transformer) {
+        ItemStack[] items = WorldPlayerStateCodec.decodeItemStacks(encoded, fallbackSize);
+        boolean changed = false;
+        for (int index = 0; index < items.length; index++) {
+            ItemStack current = items[index];
+            ItemStack updated = transformer.apply(current);
+            if (updated != current) {
+                items[index] = updated;
+                changed = true;
+            }
+        }
+        return new ItemStackTransform(changed ? WorldPlayerStateCodec.encodeItemStacks(items) : encoded, changed);
     }
 
     private String sanitizeWorldName(String worldName) {

@@ -67,7 +67,7 @@ public final class WorldPlayerStateCodec {
         player.updateInventory();
     }
 
-    private static String encodeItemStacks(ItemStack[] items) {
+    public static String encodeItemStacks(ItemStack[] items) {
         if (items == null) {
             return "";
         }
@@ -86,7 +86,7 @@ public final class WorldPlayerStateCodec {
         }
     }
 
-    private static ItemStack[] decodeItemStacks(String encoded, int fallbackSize) {
+    public static ItemStack[] decodeItemStacks(String encoded, int fallbackSize) {
         if (encoded == null || encoded.isBlank()) {
             return new ItemStack[fallbackSize];
         }

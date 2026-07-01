@@ -944,7 +944,7 @@ public class PlayerActionHandler implements NodeHandler {
                 runSync(() -> {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
-                        meta.displayName(TextFormatter.parse(name));
+                        meta.displayName(TextFormatter.parseItemName(name));
                         item.setItemMeta(meta);
                     }
                 });
@@ -959,7 +959,7 @@ public class PlayerActionHandler implements NodeHandler {
                 runSync(() -> {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
-                        meta.lore(TextFormatter.parseLines(lore));
+                        meta.lore(TextFormatter.parseItemLoreLines(lore));
                         item.setItemMeta(meta);
                     }
                 });

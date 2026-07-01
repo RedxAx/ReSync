@@ -3,6 +3,8 @@ package restudio.resync.runtime;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -27,6 +29,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.ArrayList;
@@ -37,6 +40,7 @@ import java.util.Map;
 import java.util.Random;
 
 public class LootTableService implements Listener {
+    private static final GsonComponentSerializer COMPONENT_SERIALIZER = GsonComponentSerializer.gson();
     private final ReSyncJsonResourceStorage storage;
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
@@ -601,14 +605,14 @@ public class LootTableService implements Listener {
         }
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
-            String displayName = firstText(components, "displayName", "name", "minecraft:custom_name");
-            if (!displayName.isBlank()) {
-                meta.setDisplayName(displayName);
+            JsonElement displayName = firstComponent(components, "displayName", "name", "minecraft:custom_name", "minecraft:item_name");
+            if (displayName != null) {
+                meta.displayName(itemTextComponent(displayName, false));
             }
             JsonElement loreElement = components.has("minecraft:lore") ? components.get("minecraft:lore") : components.get("lore");
-            List<String> lore = stringList(loreElement);
+            List<Component> lore = itemLoreComponents(loreElement);
             if (!lore.isEmpty()) {
-                meta.setLore(lore);
+                meta.lore(lore);
             }
             Integer customModelData = optionalInteger(components, "customModelData");
             if (customModelData == null) {
@@ -705,6 +709,21 @@ public class LootTableService implements Listener {
         return "";
     }
 
+    private JsonElement firstComponent(JsonObject object, String... keys) {
+        if (object == null) {
+            return null;
+        }
+        for (String key : keys) {
+            if (object.has(key) && !object.get(key).isJsonNull()) {
+                JsonElement element = object.get(key);
+                if (!element.isJsonPrimitive() || !element.getAsString().isBlank()) {
+                    return element;
+                }
+            }
+        }
+        return null;
+    }
+
     private String firstFilled(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -785,6 +804,38 @@ public class LootTableService implements Listener {
             return text;
         }
         return text(object, "translate");
+    }
+
+    private Component itemTextComponent(JsonElement element, boolean lore) {
+        if (element == null || element.isJsonNull()) {
+            return Component.empty();
+        }
+        if (element.isJsonPrimitive()) {
+            return lore ? TextFormatter.parseItemLore(element.getAsString()) : TextFormatter.parseItemName(element.getAsString());
+        }
+        try {
+            return TextFormatter.applyItemTextDefaults(COMPONENT_SERIALIZER.deserialize(element.toString()));
+        } catch (RuntimeException ignored) {
+            String text = componentText(element);
+            return lore ? TextFormatter.parseItemLore(text) : TextFormatter.parseItemName(text);
+        }
+    }
+
+    private List<Component> itemLoreComponents(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return List.of();
+        }
+        List<Component> values = new ArrayList<>();
+        if (element.isJsonArray()) {
+            for (JsonElement value : element.getAsJsonArray()) {
+                if (value != null && !value.isJsonNull()) {
+                    values.add(itemTextComponent(value, true));
+                }
+            }
+        } else {
+            values.add(itemTextComponent(element, true));
+        }
+        return List.copyOf(values);
     }
 
     private boolean bool(JsonObject object, String key, boolean fallback) {

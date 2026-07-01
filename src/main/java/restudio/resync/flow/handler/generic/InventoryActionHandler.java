@@ -558,14 +558,14 @@ public class InventoryActionHandler implements NodeHandler {
                 if (Bukkit.isPrimaryThread()) {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
-                        meta.displayName(TextFormatter.parse(name));
+                        meta.displayName(TextFormatter.parseItemName(name));
                         item.setItemMeta(meta);
                     }
                 } else {
                     Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                         ItemMeta meta = item.getItemMeta();
                         if (meta != null) {
-                            meta.displayName(TextFormatter.parse(name));
+                            meta.displayName(TextFormatter.parseItemName(name));
                             item.setItemMeta(meta);
                         }
                     });
@@ -581,14 +581,14 @@ public class InventoryActionHandler implements NodeHandler {
                 if (Bukkit.isPrimaryThread()) {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
-                        meta.lore(TextFormatter.parseLines(lore));
+                        meta.lore(TextFormatter.parseItemLoreLines(lore));
                         item.setItemMeta(meta);
                     }
                 } else {
                     Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
                         ItemMeta meta = item.getItemMeta();
                         if (meta != null) {
-                            meta.lore(TextFormatter.parseLines(lore));
+                            meta.lore(TextFormatter.parseItemLoreLines(lore));
                             item.setItemMeta(meta);
                         }
                     });
@@ -605,7 +605,7 @@ public class InventoryActionHandler implements NodeHandler {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null) {
                         List<Component> loreList = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-                        loreList.add(TextFormatter.parse(loreLine));
+                        loreList.add(TextFormatter.parseItemLore(loreLine));
                         meta.lore(loreList);
                         item.setItemMeta(meta);
                     }
@@ -614,7 +614,7 @@ public class InventoryActionHandler implements NodeHandler {
                         ItemMeta meta = item.getItemMeta();
                         if (meta != null) {
                             List<Component> loreList = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-                            loreList.add(TextFormatter.parse(loreLine));
+                            loreList.add(TextFormatter.parseItemLore(loreLine));
                             meta.lore(loreList);
                             item.setItemMeta(meta);
                         }

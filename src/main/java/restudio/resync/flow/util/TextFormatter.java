@@ -1,6 +1,7 @@
 package restudio.resync.flow.util;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import restudio.resync.text.ReTextService;
@@ -53,11 +54,30 @@ public final class TextFormatter {
     }
 
     public static Component parseItemName(String text) {
-        return parseWithDefaults(text, DEFAULT_NAME_LEGACY_PREFIX, DEFAULT_NAME_MINI_PREFIX);
+        return withoutItemItalics(parseWithDefaults(text, DEFAULT_NAME_LEGACY_PREFIX, DEFAULT_NAME_MINI_PREFIX));
     }
 
     public static Component parseItemLore(String text) {
-        return parseWithDefaults(text, DEFAULT_LORE_LEGACY_PREFIX, DEFAULT_LORE_MINI_PREFIX);
+        return withoutItemItalics(parseWithDefaults(text, DEFAULT_LORE_LEGACY_PREFIX, DEFAULT_LORE_MINI_PREFIX));
+    }
+
+    public static Component applyItemTextDefaults(Component component) {
+        if (component == null) {
+            return Component.empty();
+        }
+        return withoutItemItalics(component);
+    }
+
+    public static List<Component> parseItemLoreLines(String text) {
+        List<Component> components = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return components;
+        }
+        String[] lines = text.split("\n");
+        for (String line : lines) {
+            components.add(parseItemLore(line));
+        }
+        return components;
     }
 
     public static List<Component> parseLines(String text) {
@@ -92,6 +112,10 @@ public final class TextFormatter {
             }
         }
         return LEGACY_SERIALIZER.deserialize(legacyPrefix + normalized);
+    }
+
+    private static Component withoutItemItalics(Component component) {
+        return component.decorationIfAbsent(TextDecoration.ITALIC, TextDecoration.State.FALSE);
     }
 
     public static String formatLegacy(String text) {

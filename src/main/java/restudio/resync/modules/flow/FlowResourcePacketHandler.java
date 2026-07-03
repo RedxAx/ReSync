@@ -82,7 +82,7 @@ public class FlowResourcePacketHandler<T> {
             }
             adapter.save(value);
             adapter.afterSave(session, value);
-            adapter.sendSaveAck(session, id);
+            adapter.sendSaveAck(session, id, payload.requestId());
             sender.succeedJob(job, id, "Saved");
         } catch (Exception exception) {
             sender.failJob(job, exception.getMessage(), exception);

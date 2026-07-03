@@ -26,6 +26,10 @@ public interface FlowResourceAdapter<T> {
 
     void sendSaveAck(Session session, String id);
 
+    default void sendSaveAck(Session session, String id, String requestId) {
+        sendSaveAck(session, id);
+    }
+
     default String requestMissingMessage() {
         return descriptor().displayName() + " ID not provided";
     }

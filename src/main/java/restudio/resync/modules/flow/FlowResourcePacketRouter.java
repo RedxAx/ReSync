@@ -198,6 +198,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendGuiSaveAck(session, id, requestId);
+            }
+
+            @Override
             public void afterSave(Session session, GuiDefinition value) {
                 GuiManager.refreshOpenGuis(value);
                 GuiManager.refreshSessionGui(session, value);
@@ -268,6 +273,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendScoreboardSaveAck(session, id, requestId);
+            }
+
+            @Override
             public void afterSave(Session session, ScoreboardDefinition value) {
                 ScoreboardTemplateManager.refreshActiveTemplates(storage, value.getId());
             }
@@ -333,6 +343,11 @@ public class FlowResourcePacketRouter {
             @Override
             public void sendSaveAck(Session session, String id) {
                 sender.sendTabSaveAck(session, id);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendTabSaveAck(session, id, requestId);
             }
 
             @Override
@@ -411,6 +426,11 @@ public class FlowResourcePacketRouter {
             @Override
             public void sendSaveAck(Session session, String id) {
                 sender.sendCustomContentSaveAck(session, id);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendCustomContentSaveAck(session, id, requestId);
             }
 
             @Override
@@ -504,6 +524,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendProjectMetadataSaveAck(session, "project", requestId);
+            }
+
+            @Override
             public String requestMissingMessage() {
                 return "Project Metadata ID not provided";
             }
@@ -578,6 +603,11 @@ public class FlowResourcePacketRouter {
             @Override
             public void sendSaveAck(Session session, String id) {
                 sender.sendJsonResourceSaveAck(session, descriptor().flowPackets().saveAck(), id);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                sender.sendJsonResourceSaveAck(session, descriptor().flowPackets().saveAck(), id, requestId);
             }
         };
     }

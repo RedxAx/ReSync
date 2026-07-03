@@ -97,28 +97,56 @@ public class FlowPacketSender {
         sendIdAck(session, (byte) 0x07, flowId);
     }
 
+    public void sendFlowSaveAck(Session session, String flowId, String requestId) {
+        sendIdAck(session, (byte) 0x07, flowId, requestId);
+    }
+
     public void sendGuiSaveAck(Session session, String guiId) {
         sendIdAck(session, (byte) 0x17, guiId);
+    }
+
+    public void sendGuiSaveAck(Session session, String guiId, String requestId) {
+        sendIdAck(session, (byte) 0x17, guiId, requestId);
     }
 
     public void sendScoreboardSaveAck(Session session, String scoreboardId) {
         sendIdAck(session, (byte) 0x1E, scoreboardId);
     }
 
+    public void sendScoreboardSaveAck(Session session, String scoreboardId, String requestId) {
+        sendIdAck(session, (byte) 0x1E, scoreboardId, requestId);
+    }
+
     public void sendTabSaveAck(Session session, String tabId) {
         sendIdAck(session, (byte) 0x26, tabId);
+    }
+
+    public void sendTabSaveAck(Session session, String tabId, String requestId) {
+        sendIdAck(session, (byte) 0x26, tabId, requestId);
     }
 
     public void sendCustomContentSaveAck(Session session, String contentId) {
         sendIdAck(session, (byte) 0x35, contentId);
     }
 
+    public void sendCustomContentSaveAck(Session session, String contentId, String requestId) {
+        sendIdAck(session, (byte) 0x35, contentId, requestId);
+    }
+
     public void sendProjectMetadataSaveAck(Session session, String metadataId) {
         sendIdAck(session, (byte) 0x56, metadataId);
     }
 
+    public void sendProjectMetadataSaveAck(Session session, String metadataId, String requestId) {
+        sendIdAck(session, (byte) 0x56, metadataId, requestId);
+    }
+
     public void sendJsonResourceSaveAck(Session session, byte packetId, String id) {
         sendIdAck(session, packetId, id);
+    }
+
+    public void sendJsonResourceSaveAck(Session session, byte packetId, String id, String requestId) {
+        sendIdAck(session, packetId, id, requestId);
     }
 
     public JobRecord<String> beginJob(Session session, String action, String target) {
@@ -358,6 +386,25 @@ public class FlowPacketSender {
         buffer.put(packetId);
         buffer.putInt(idBytes.length);
         buffer.put(idBytes);
+        sendRaw(session, buffer.array(), false);
+    }
+
+    private void sendIdAck(Session session, byte packetId, String id, String requestId) {
+        if (id == null) {
+            return;
+        }
+        if (requestId == null || requestId.isBlank()) {
+            sendIdAck(session, packetId, id);
+            return;
+        }
+        byte[] idBytes = id.getBytes(StandardCharsets.UTF_8);
+        byte[] requestIdBytes = requestId.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length + 4 + requestIdBytes.length);
+        buffer.put(packetId);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+        buffer.putInt(requestIdBytes.length);
+        buffer.put(requestIdBytes);
         sendRaw(session, buffer.array(), false);
     }
 

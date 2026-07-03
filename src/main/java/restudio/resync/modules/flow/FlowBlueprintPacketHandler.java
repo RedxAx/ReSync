@@ -130,7 +130,7 @@ public class FlowBlueprintPacketHandler {
                     }
                 }
                 Log.fine("Custom content saved from flow: " + content.getId());
-                sender.sendFlowSaveAck(session, flowId);
+                sender.sendFlowSaveAck(session, flowId, payload.requestId());
                 sender.succeedJob(job, flowId, "Saved");
                 return;
             }
@@ -141,7 +141,7 @@ public class FlowBlueprintPacketHandler {
             }
             updateGraphBindings(graph);
             Log.fine("Flow saved: " + flowId);
-            sender.sendFlowSaveAck(session, flowId);
+            sender.sendFlowSaveAck(session, flowId, payload.requestId());
             sender.succeedJob(job, flowId, "Saved");
         } catch (Exception e) {
             restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);

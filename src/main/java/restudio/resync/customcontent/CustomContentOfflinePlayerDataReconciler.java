@@ -8,7 +8,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
 import restudio.resync.Log;
+import restudio.resync.ReSync;
 import restudio.resync.advancement.PaperUnsafe;
 
 import java.io.DataInputStream;
@@ -20,65 +22,198 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 class CustomContentOfflinePlayerDataReconciler {
     private final CustomContentItemReconciler itemReconciler;
+    private final Map<Path, FileReconcileState> fileStates = new ConcurrentHashMap<>();
 
     CustomContentOfflinePlayerDataReconciler(CustomContentItemReconciler itemReconciler) {
         this.itemReconciler = itemReconciler;
     }
 
-    void reconcile(String contentId, boolean clearDeleted) {
-        if (!PaperUnsafe.itemJsonRoundTripSupported()) {
+    void reconcileAsync(String contentId, boolean clearDeleted) {
+        JavaPlugin plugin = ReSync.getInstance();
+        if (!pluginActive(plugin)) {
             return;
         }
+        if (Bukkit.isPrimaryThread()) {
+            reconcileAsync(plugin, contentId, clearDeleted);
+            return;
+        }
+        scheduleSync(plugin, () -> reconcileAsync(plugin, contentId, clearDeleted));
+    }
+
+    private void reconcileAsync(JavaPlugin plugin, String contentId, boolean clearDeleted) {
+        if (!pluginActive(plugin) || !PaperUnsafe.itemJsonRoundTripSupported()) {
+            return;
+        }
+        OfflinePlayerDataSnapshot snapshot = snapshotPlayerDataState();
+        if (snapshot.directories().isEmpty() && snapshot.worldContainer() == null) {
+            return;
+        }
+        scheduleAsync(plugin, () -> reconcileSnapshot(plugin, snapshot, contentId, clearDeleted));
+    }
+
+    private OfflinePlayerDataSnapshot snapshotPlayerDataState() {
         Set<UUID> onlinePlayers = new HashSet<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             onlinePlayers.add(player.getUniqueId());
         }
-        for (Path playerDataDirectory : playerDataDirectories()) {
-            reconcileDirectory(playerDataDirectory, contentId, clearDeleted, onlinePlayers);
+        Set<Path> directories = new LinkedHashSet<>();
+        for (World world : Bukkit.getWorlds()) {
+            directories.add(world.getWorldFolder().toPath().resolve("playerdata"));
+        }
+        Path container = Bukkit.getWorldContainer().toPath();
+        return new OfflinePlayerDataSnapshot(directories, container, onlinePlayers);
+    }
+
+    private void reconcileSnapshot(JavaPlugin plugin, OfflinePlayerDataSnapshot snapshot, String contentId, boolean clearDeleted) {
+        for (Path playerDataDirectory : playerDataDirectories(snapshot)) {
+            if (!pluginActive(plugin)) {
+                return;
+            }
+            reconcileDirectory(plugin, playerDataDirectory, contentId, clearDeleted, snapshot.onlinePlayers());
         }
     }
 
-    private void reconcileDirectory(Path directory, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
+    private void reconcileDirectory(JavaPlugin plugin, Path directory, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
         if (directory == null || !Files.isDirectory(directory)) {
             return;
         }
         try (var stream = Files.list(directory)) {
             for (Path file : stream.filter(path -> path.getFileName().toString().endsWith(".dat")).toList()) {
+                if (!pluginActive(plugin)) {
+                    return;
+                }
                 if (isOnlinePlayerFile(file, onlinePlayers)) {
                     continue;
                 }
-                reconcileFile(file, contentId, clearDeleted);
+                reconcileFile(plugin, file, contentId, clearDeleted, onlinePlayers);
             }
         } catch (IOException exception) {
             Log.warn("Failed to scan offline player data: " + exception.getMessage());
         }
     }
 
-    private void reconcileFile(Path file, String contentId, boolean clearDeleted) {
+    private void reconcileFile(JavaPlugin plugin, Path file, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
+        Path fileKey = file.toAbsolutePath().normalize();
+        FileReconcileState state = fileStates.computeIfAbsent(fileKey, ignored -> new FileReconcileState());
+        synchronized (state) {
+            if (state.active) {
+                state.pending.add(new FileReconcileRequest(file, contentId, clearDeleted, onlinePlayers));
+                return;
+            }
+            state.active = true;
+        }
+        reconcileFilePass(plugin, file, fileKey, state, contentId, clearDeleted, onlinePlayers);
+    }
+
+    private void reconcileFilePass(JavaPlugin plugin, Path file, Path fileKey, FileReconcileState state, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
         try {
             NbtTag root = Nbt.readCompressed(file);
             if (root == null || root.type() != Nbt.COMPOUND || !(root.value() instanceof List<?>)) {
+                finishFile(plugin, fileKey, state);
                 return;
             }
-            boolean changed = false;
-            changed |= reconcileItemList(root, "Inventory", contentId, clearDeleted);
-            changed |= reconcileItemList(root, "EnderItems", contentId, clearDeleted);
-            if (changed) {
-                Nbt.writeCompressed(file, root);
-            }
+            transformFile(plugin, file, fileKey, state, root, contentId, clearDeleted, onlinePlayers);
         } catch (Exception exception) {
+            finishFile(plugin, fileKey, state);
             Log.warn("Failed to reconcile offline player items in " + file.getFileName() + ": " + exception.getMessage());
+        }
+    }
+
+    private void transformFile(JavaPlugin plugin, Path file, Path fileKey, FileReconcileState state, NbtTag root, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
+        if (!pluginActive(plugin)) {
+            finishFile(plugin, fileKey, state);
+            return;
+        }
+        if (!scheduleSync(plugin, () -> {
+            if (!pluginActive(plugin)) {
+                finishFile(plugin, fileKey, state);
+                return;
+            }
+            if (isOnlinePlayerFile(file, onlinePlayers) || isCurrentlyOnlinePlayerFile(file)) {
+                finishFile(plugin, fileKey, state);
+                return;
+            }
+            try {
+                boolean changed = false;
+                changed |= reconcileItemList(root, "Inventory", contentId, clearDeleted);
+                changed |= reconcileItemList(root, "EnderItems", contentId, clearDeleted);
+                if (changed) {
+                    writeFile(plugin, file, fileKey, state, root, onlinePlayers);
+                } else {
+                    finishFile(plugin, fileKey, state);
+                }
+            } catch (RuntimeException exception) {
+                finishFile(plugin, fileKey, state);
+                Log.warn("Failed to transform offline player items in " + file.getFileName() + ": " + exception.getMessage());
+            }
+        })) {
+            finishFile(plugin, fileKey, state);
+        }
+    }
+
+    private void writeFile(JavaPlugin plugin, Path file, Path fileKey, FileReconcileState state, NbtTag root, Set<UUID> onlinePlayers) {
+        if (!pluginActive(plugin)) {
+            finishFile(plugin, fileKey, state);
+            return;
+        }
+        if (isOnlinePlayerFile(file, onlinePlayers) || isCurrentlyOnlinePlayerFile(file)) {
+            finishFile(plugin, fileKey, state);
+            return;
+        }
+        if (!scheduleSync(plugin, () -> {
+            if (!pluginActive(plugin)) {
+                finishFile(plugin, fileKey, state);
+                return;
+            }
+            if (isOnlinePlayerFile(file, onlinePlayers) || isCurrentlyOnlinePlayerFile(file)) {
+                finishFile(plugin, fileKey, state);
+                return;
+            }
+            try {
+                Nbt.writeCompressed(file, root);
+            } catch (Exception exception) {
+                Log.warn("Failed to write reconciled offline player items in " + file.getFileName() + ": " + exception.getMessage());
+            } finally {
+                finishFile(plugin, fileKey, state);
+            }
+        })) {
+            finishFile(plugin, fileKey, state);
+        }
+    }
+
+    private void finishFile(JavaPlugin plugin, Path fileKey, FileReconcileState state) {
+        FileReconcileRequest pending;
+        synchronized (state) {
+            if (!pluginActive(plugin)) {
+                state.active = false;
+                return;
+            }
+            pending = state.pending.pollFirst();
+            if (pending == null) {
+                state.active = false;
+                return;
+            }
+        }
+        FileReconcileRequest next = pending;
+        if (!scheduleAsync(plugin, () -> reconcileFilePass(plugin, next.file(), fileKey, state, next.contentId(), next.clearDeleted(), next.onlinePlayers()))) {
+            synchronized (state) {
+                state.pending.addFirst(next);
+                state.active = false;
+            }
         }
     }
 
@@ -131,7 +266,7 @@ class CustomContentOfflinePlayerDataReconciler {
         }
         updatedJson.remove("DataVersion");
         NbtTag slot = Nbt.find(compound, "Slot");
-        List<NbtTag> replacement = Nbt.fromJsonObject(updatedJson);
+        List<NbtTag> replacement = Nbt.fromJsonObject(updatedJson, compound);
         if (slot != null) {
             Nbt.put(replacement, slot);
         }
@@ -151,16 +286,22 @@ class CustomContentOfflinePlayerDataReconciler {
         }
     }
 
-    private Set<Path> playerDataDirectories() {
-        Set<Path> directories = new LinkedHashSet<>();
-        for (World world : Bukkit.getWorlds()) {
-            Path folder = world.getWorldFolder().toPath().resolve("playerdata");
-            if (Files.isDirectory(folder)) {
-                directories.add(folder);
-            }
+    private boolean isCurrentlyOnlinePlayerFile(Path file) {
+        String name = file.getFileName().toString();
+        if (!name.endsWith(".dat")) {
+            return false;
         }
-        Path container = Bukkit.getWorldContainer().toPath();
-        if (Files.isDirectory(container)) {
+        try {
+            return Bukkit.getPlayer(UUID.fromString(name.substring(0, name.length() - 4))) != null;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private Set<Path> playerDataDirectories(OfflinePlayerDataSnapshot snapshot) {
+        Set<Path> directories = new LinkedHashSet<>(snapshot.directories());
+        Path container = snapshot.worldContainer();
+        if (container != null && Files.isDirectory(container)) {
             try (var stream = Files.list(container)) {
                 for (Path path : stream.toList()) {
                     Path playerData = path.resolve("playerdata");
@@ -173,6 +314,45 @@ class CustomContentOfflinePlayerDataReconciler {
             }
         }
         return directories;
+    }
+
+    private boolean pluginActive(JavaPlugin plugin) {
+        return plugin != null && plugin.isEnabled();
+    }
+
+    private boolean scheduleSync(JavaPlugin plugin, Runnable action) {
+        if (!pluginActive(plugin)) {
+            return false;
+        }
+        try {
+            Bukkit.getScheduler().runTask(plugin, action);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private boolean scheduleAsync(JavaPlugin plugin, Runnable action) {
+        if (!pluginActive(plugin)) {
+            return false;
+        }
+        try {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, action);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private record OfflinePlayerDataSnapshot(Set<Path> directories, Path worldContainer, Set<UUID> onlinePlayers) {
+    }
+
+    private record FileReconcileRequest(Path file, String contentId, boolean clearDeleted, Set<UUID> onlinePlayers) {
+    }
+
+    private static final class FileReconcileState {
+        private final ArrayDeque<FileReconcileRequest> pending = new ArrayDeque<>();
+        private boolean active;
     }
 
     private record NbtTag(byte type, String name, Object value) {
@@ -447,24 +627,42 @@ class CustomContentOfflinePlayerDataReconciler {
         }
 
         private static List<NbtTag> fromJsonObject(JsonObject object) {
+            return fromJsonObject(object, List.of());
+        }
+
+        private static List<NbtTag> fromJsonObject(JsonObject object, List<NbtTag> template) {
             List<NbtTag> tags = new ArrayList<>();
             for (String key : object.keySet()) {
-                tags.add(fromJson(key, object.get(key)));
+                tags.add(fromJson(key, object.get(key), find(template, key)));
             }
             return tags;
         }
 
         private static NbtTag fromJson(String name, JsonElement element) {
+            return fromJson(name, element, null);
+        }
+
+        private static NbtTag fromJson(String name, JsonElement element, NbtTag template) {
             if (element == null || element.isJsonNull()) {
-                return new NbtTag(STRING, name, "");
+                return new NbtTag(template != null ? template.type() : STRING, name, defaultValue(template));
             }
             if (element.isJsonObject()) {
-                return new NbtTag(COMPOUND, name, fromJsonObject(element.getAsJsonObject()));
+                List<NbtTag> templateCompound = template != null && template.type() == COMPOUND ? compoundValue(template.value()) : List.of();
+                return new NbtTag(COMPOUND, name, fromJsonObject(element.getAsJsonObject(), templateCompound));
             }
             if (element.isJsonArray()) {
-                return new NbtTag(LIST, name, fromJsonArray(element.getAsJsonArray()));
+                return fromJsonArrayTag(name, element.getAsJsonArray(), template);
             }
             JsonPrimitive primitive = element.getAsJsonPrimitive();
+            if (template != null && isNumericType(template.type()) && primitive.isNumber()) {
+                return new NbtTag(template.type(), name, numberValue(primitive, template.type()));
+            }
+            if (template != null && template.type() == BYTE && primitive.isBoolean()) {
+                return new NbtTag(BYTE, name, (byte) (primitive.getAsBoolean() ? 1 : 0));
+            }
+            if (template != null && template.type() == STRING) {
+                return new NbtTag(STRING, name, primitive.isString() ? primitive.getAsString() : primitive.toString());
+            }
             if (primitive.isString()) {
                 return new NbtTag(STRING, name, primitive.getAsString());
             }
@@ -477,14 +675,38 @@ class CustomContentOfflinePlayerDataReconciler {
             return new NbtTag(DOUBLE, name, primitive.getAsDouble());
         }
 
-        private static NbtList fromJsonArray(JsonArray array) {
-            if (array.isEmpty()) {
-                return new NbtList(END, new ArrayList<>());
+        private static NbtTag fromJsonArrayTag(String name, JsonArray array, NbtTag template) {
+            if (template != null) {
+                if (template.type() == BYTE_ARRAY) {
+                    return new NbtTag(BYTE_ARRAY, name, byteArrayFromJson(array));
+                }
+                if (template.type() == INT_ARRAY) {
+                    return new NbtTag(INT_ARRAY, name, intArrayFromJson(array));
+                }
+                if (template.type() == LONG_ARRAY) {
+                    return new NbtTag(LONG_ARRAY, name, longArrayFromJson(array));
+                }
+                if (template.type() == LIST && template.value() instanceof NbtList templateList) {
+                    return new NbtTag(LIST, name, fromJsonArray(array, templateList));
+                }
             }
-            byte elementType = arrayElementType(array);
+            return new NbtTag(LIST, name, fromJsonArray(array));
+        }
+
+        private static NbtList fromJsonArray(JsonArray array) {
+            return fromJsonArray(array, null);
+        }
+
+        private static NbtList fromJsonArray(JsonArray array, NbtList template) {
+            if (array.isEmpty()) {
+                return new NbtList(template != null ? template.elementType() : END, new ArrayList<>());
+            }
+            byte elementType = template != null && template.elementType() != END ? template.elementType() : arrayElementType(array);
             List<Object> values = new ArrayList<>();
-            for (JsonElement element : array) {
-                NbtTag tag = fromJson("", element);
+            List<Object> templateValues = template != null ? template.values() : List.of();
+            for (int index = 0; index < array.size(); index++) {
+                NbtTag templateTag = index < templateValues.size() ? new NbtTag(elementType, "", templateValues.get(index)) : null;
+                NbtTag tag = fromJson("", array.get(index), templateTag);
                 values.add(tag.value());
             }
             return new NbtList(elementType, values);
@@ -497,6 +719,66 @@ class CustomContentOfflinePlayerDataReconciler {
                 }
             }
             return END;
+        }
+
+        private static byte[] byteArrayFromJson(JsonArray array) {
+            byte[] values = new byte[array.size()];
+            for (int index = 0; index < array.size(); index++) {
+                values[index] = array.get(index).getAsByte();
+            }
+            return values;
+        }
+
+        private static int[] intArrayFromJson(JsonArray array) {
+            int[] values = new int[array.size()];
+            for (int index = 0; index < array.size(); index++) {
+                values[index] = array.get(index).getAsInt();
+            }
+            return values;
+        }
+
+        private static long[] longArrayFromJson(JsonArray array) {
+            long[] values = new long[array.size()];
+            for (int index = 0; index < array.size(); index++) {
+                values[index] = array.get(index).getAsLong();
+            }
+            return values;
+        }
+
+        private static boolean isNumericType(byte type) {
+            return type == BYTE || type == SHORT || type == INT || type == LONG || type == FLOAT || type == DOUBLE;
+        }
+
+        private static Object numberValue(JsonPrimitive primitive, byte type) {
+            return switch (type) {
+                case BYTE -> primitive.getAsByte();
+                case SHORT -> primitive.getAsShort();
+                case INT -> primitive.getAsInt();
+                case LONG -> primitive.getAsLong();
+                case FLOAT -> primitive.getAsFloat();
+                case DOUBLE -> primitive.getAsDouble();
+                default -> primitive.getAsInt();
+            };
+        }
+
+        private static Object defaultValue(NbtTag template) {
+            if (template == null) {
+                return "";
+            }
+            return switch (template.type()) {
+                case BYTE -> (byte) 0;
+                case SHORT -> (short) 0;
+                case INT -> 0;
+                case LONG -> 0L;
+                case FLOAT -> 0.0f;
+                case DOUBLE -> 0.0d;
+                case BYTE_ARRAY -> new byte[0];
+                case LIST -> template.value() instanceof NbtList list ? new NbtList(list.elementType(), new ArrayList<>()) : new NbtList(END, new ArrayList<>());
+                case COMPOUND -> new ArrayList<NbtTag>();
+                case INT_ARRAY -> new int[0];
+                case LONG_ARRAY -> new long[0];
+                default -> "";
+            };
         }
 
         @SuppressWarnings("unchecked")

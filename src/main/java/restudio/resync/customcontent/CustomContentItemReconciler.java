@@ -51,13 +51,13 @@ class CustomContentItemReconciler {
         }
         runSync(() -> reconcileLoaded(contentId, false));
         reconcileWorldPlayerStates(contentId, false);
-        runSync(() -> offlinePlayerDataReconciler.reconcile(contentId, false));
+        offlinePlayerDataReconciler.reconcileAsync(contentId, false);
     }
 
     void reconcileAll() {
         runSync(() -> reconcileLoaded(null, false));
         reconcileWorldPlayerStates(null, false);
-        runSync(() -> offlinePlayerDataReconciler.reconcile(null, false));
+        offlinePlayerDataReconciler.reconcileAsync(null, false);
     }
 
     void clearContent(String contentId) {
@@ -66,7 +66,7 @@ class CustomContentItemReconciler {
         }
         runSync(() -> reconcileLoaded(contentId, true));
         reconcileWorldPlayerStates(contentId, true);
-        runSync(() -> offlinePlayerDataReconciler.reconcile(contentId, true));
+        offlinePlayerDataReconciler.reconcileAsync(contentId, true);
     }
 
     void reconcilePlayer(Player player) {

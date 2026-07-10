@@ -354,7 +354,7 @@ public class FlowModule implements Module {
                 definition.setCustomModelData(meta.getCustomModelData());
             }
         }
-        definition.setComponents(quickEditAttributeService.componentsFromStack(item));
+        definition.setComponents(quickEditAttributeService.customComponentsFromStack(item));
         definition.setTags(List.of());
         definition.setAbilities(List.of());
         return definition;
@@ -417,6 +417,7 @@ public class FlowModule implements Module {
             sendQuickEditFailure(session, editSession.sessionId(), "Invalid material: " + materialName);
             return;
         }
+        definition.setComponents(quickEditAttributeService.customComponentsForMaterial(material.name(), definition.getComponents()));
         List<Map<String, Object>> errors = quickEditAttributeService.validate(material.name(), definition.getComponents());
         if (!errors.isEmpty()) {
             sendQuickEditFailure(session, editSession.sessionId(), quickEditError(errors));

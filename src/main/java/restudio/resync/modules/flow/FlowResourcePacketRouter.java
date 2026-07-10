@@ -397,6 +397,7 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void save(CustomContentDefinition value) {
+                value.setComponents(attributeSchemaService.customComponentsForMaterial(value.getMaterial(), value.getComponents()));
                 List<String> errors = validator.validate(value);
                 if (!errors.isEmpty()) {
                     throw new IllegalArgumentException(String.join("; ", errors));

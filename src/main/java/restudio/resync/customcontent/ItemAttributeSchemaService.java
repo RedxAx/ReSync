@@ -116,6 +116,7 @@ public class ItemAttributeSchemaService {
             boolean applicable = componentAppliesToMaterial(material, id, defaultValue, exampleValue, generatedExample, profile);
             boolean advanced = defaultValue == null && exampleValue == null;
             Object value = defaultValue != null ? defaultValue : exampleValue != null ? exampleValue : advancedDefaultValue(id);
+            boolean writable = injectedComponentIds != null || componentValueCanApply(material, id, value);
             String group = profile.category();
             int priority = componentPriority(profile, defaultValue != null, applicable, advanced);
             Map<String, Object> metadata = new LinkedHashMap<>();
@@ -126,6 +127,7 @@ public class ItemAttributeSchemaService {
             metadata.put("runtime", runtimeKnown);
             metadata.put("default", defaultValue != null);
             metadata.put("advanced", advanced);
+            metadata.put("writable", writable);
             metadata.put("applicable", applicable);
             metadata.put("recommended", defaultValue != null || applicable && priority < 500);
             metadata.put("category", group);
@@ -186,6 +188,9 @@ public class ItemAttributeSchemaService {
             return List.of(error("", "Material does not exist: " + materialName));
         }
         for (Map.Entry<String, Object> entry : components.entrySet()) {
+            if (entry.getValue() == null) {
+                continue;
+            }
             try {
                 applyComponents(new ItemStack(material), Map.of(entry.getKey(), entry.getValue()));
             } catch (RuntimeException failure) {
@@ -283,6 +288,42 @@ public class ItemAttributeSchemaService {
         } catch (RuntimeException ignored) {
             return Map.of();
         }
+    }
+
+    public Map<String, Object> customComponentsFromStack(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || !PaperUnsafe.serializeItemAsJsonSupported()) {
+            return Map.of();
+        }
+        return customComponentsForMaterial(stack.getType().name(), componentsFromStack(stack));
+    }
+
+    public Map<String, Object> customComponentsForMaterial(String materialName, Map<String, Object> components) {
+        if (components == null) {
+            return Map.of();
+        }
+        if (components.isEmpty()) {
+            return components;
+        }
+        Material material = material(materialName);
+        if (material == null) {
+            return new LinkedHashMap<>(components);
+        }
+        Map<String, Object> defaults = componentsFromStack(new ItemStack(material));
+        if (defaults.isEmpty()) {
+            return new LinkedHashMap<>(components);
+        }
+        Map<String, Object> custom = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : components.entrySet()) {
+            String id = normalizeComponentId(entry.getKey());
+            if (entry.getValue() != null && !componentValueCanApply(material, id, entry.getValue())) {
+                continue;
+            }
+            Object defaultValue = defaults.get(id);
+            if (!defaults.containsKey(id) || !jsonEquivalent(entry.getValue(), defaultValue)) {
+                custom.put(id, entry.getValue());
+            }
+        }
+        return custom;
     }
 
     private List<String> componentIds() {
@@ -778,7 +819,9 @@ public class ItemAttributeSchemaService {
                 "base", 1.0,
                 "factor", 1.0
             ),
-            "block_sound", "minecraft:item.shield.block"
+            "block_sound", "minecraft:item.shield.block",
+            "disabled_sound", "minecraft:item.shield.break",
+            "bypassed_by", "#minecraft:bypasses_shield"
         )));
         candidates.put("minecraft:death_protection", List.of(Map.of(
             "death_effects", List.of(Map.of(
@@ -841,27 +884,29 @@ public class ItemAttributeSchemaService {
             "hit_sound", "minecraft:item.trident.hit"
         )));
         candidates.put("minecraft:kinetic_weapon", List.of(Map.of(
-            "contact_cooldown_ticks", 20,
+            "contact_cooldown_ticks", 10,
             "delay_ticks", 0,
             "dismount_conditions", Map.of(
                 "max_duration_ticks", 20,
                 "min_speed", 0.0,
                 "min_relative_speed", 0.0
             ),
-            "forward_movement", 1.0,
-            "damage_multiplier", 1.0
+            "forward_movement", 0.0,
+            "damage_multiplier", 1.0,
+            "sound", "minecraft:item.trident.throw",
+            "hit_sound", "minecraft:item.trident.hit"
         )));
         candidates.put("minecraft:attack_range", List.of(Map.of(
             "min_reach", 0.0,
             "max_reach", 3.0,
             "min_creative_reach", 0.0,
             "max_creative_reach", 5.0,
-            "hitbox_margin", 0.0,
+            "hitbox_margin", 0.3,
             "mob_factor", 1.0
         )));
         candidates.put("minecraft:swing_animation", List.of(Map.of(
             "type", "whack",
-            "duration", 4
+            "duration", 6
         )));
         candidates.put("minecraft:sulfur_cube_content", List.of("minecraft:green_wool", Map.of("id", "minecraft:green_wool", "count", 1)));
         candidates.put("minecraft:axolotl/variant", List.of("lucy"));
@@ -938,13 +983,23 @@ public class ItemAttributeSchemaService {
             return null;
         }
         for (Object candidate : candidates) {
-            try {
-                applyComponents(new ItemStack(material), Map.of(id, candidate));
+            if (componentValueCanApply(material, id, candidate)) {
                 return candidate;
-            } catch (RuntimeException ignored) {
             }
         }
         return null;
+    }
+
+    private boolean componentValueCanApply(Material material, String id, Object value) {
+        if (material == null || value == null || !itemJsonRoundTripSupported()) {
+            return false;
+        }
+        try {
+            applyComponents(new ItemStack(material), Map.of(id, value));
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private String keyFromComponent(Object component, String fieldName) {
@@ -1211,6 +1266,10 @@ public class ItemAttributeSchemaService {
             map.put(entry.getKey(), jsonToValue(entry.getValue()));
         }
         return map;
+    }
+
+    private boolean jsonEquivalent(Object left, Object right) {
+        return gson.toJsonTree(left).equals(gson.toJsonTree(right));
     }
 
     private Object jsonToValue(JsonElement element) {

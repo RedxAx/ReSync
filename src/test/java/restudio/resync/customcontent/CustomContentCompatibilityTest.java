@@ -316,6 +316,8 @@ class CustomContentCompatibilityTest {
     void schemaServiceProductionFilterUsesVanillaOriginEvidence() throws Exception {
         String source = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/ItemAttributeSchemaService.java"));
         String storageSource = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/CustomContentStorage.java"));
+        String flowModuleSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/FlowModule.java"));
+        String resourceRouterSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/FlowResourcePacketRouter.java"));
         String catalogSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/FlowOptionCatalogPacketHandler.java"));
         String uiSchemaSource = Files.readString(Path.of("src/main/resources/resync/item_attribute_ui_schema.json"));
 
@@ -324,7 +326,17 @@ class CustomContentCompatibilityTest {
         assertTrue(source.contains("origins.size() < 2"));
         assertTrue(source.contains("candidateExamples(material)"));
         assertTrue(source.contains("candidateExampleValue(material"));
-        assertTrue(source.contains("applyComponents(new ItemStack(material), Map.of(id, candidate))"));
+        assertTrue(source.contains("componentValueCanApply(material, id, candidate)"));
+        assertTrue(source.contains("boolean writable = injectedComponentIds != null || componentValueCanApply(material, id, value)"));
+        assertTrue(source.contains("metadata.put(\"writable\", writable)"));
+        assertFalse(source.contains("if (!writable) {\n                continue;\n            }"));
+        assertTrue(source.contains("customComponentsFromStack"));
+        assertTrue(source.contains("customComponentsForMaterial"));
+        assertTrue(source.contains("componentsFromStack(new ItemStack(material))"));
+        assertTrue(source.contains("jsonEquivalent"));
+        assertTrue(flowModuleSource.contains("quickEditAttributeService.customComponentsFromStack(item)"));
+        assertTrue(storageSource.contains("definition.setComponents(attributeSchemaService.customComponentsForMaterial(definition.getMaterial(), definition.getComponents()))"));
+        assertTrue(resourceRouterSource.contains("value.setComponents(attributeSchemaService.customComponentsForMaterial(value.getMaterial(), value.getComponents()))"));
         assertTrue(source.contains("SPECIALIZED_ITEM_COMPONENTS"));
         assertFalse(source.contains("if (SPECIALIZED_ITEM_COMPONENTS.contains(id))"));
         assertTrue(source.contains("case \"minecraft:food\" -> \"Nutrition And Saturation\""));

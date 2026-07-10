@@ -91,6 +91,7 @@ public class CustomContentStorage {
         if (definition == null) {
             throw new IllegalArgumentException("Invalid custom content definition");
         }
+        definition.setComponents(attributeSchemaService.customComponentsForMaterial(definition.getMaterial(), definition.getComponents()));
         String safeId = safeId(definition.getId(), "save");
         if (safeId == null) {
             throw new IllegalArgumentException("Invalid custom content id");

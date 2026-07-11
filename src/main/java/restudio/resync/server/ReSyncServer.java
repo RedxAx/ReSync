@@ -634,6 +634,12 @@ public class ReSyncServer {
         capabilities.put("packetHooks", Bukkit.getPluginManager().isPluginEnabled("ProtocolLib") ? List.of("native", "packet") : List.of("native"));
         ReSyncJsonResourceStorage jsonStorage = moduleContext.getService(ReSyncJsonResourceStorage.class);
         capabilities.put("resourceTypes", jsonStorage != null ? jsonStorage.resourceTypes() : List.of());
+        capabilities.put("playerManagement", Map.of(
+            "protocolVersion", 2,
+            "channel", "player_tracking",
+            "sections", List.of("overview", "activity", "history", "inventory", "enderChest", "effects", "extensions"),
+            "operations", List.of("playerData", "onlineInventoryEdit", "gameRules", "liveSettings")
+        ));
         AdvancementModule advancementModule = moduleContext.getService(AdvancementModule.class);
         if (advancementModule != null) {
             capabilities.put("advancements", advancementModule.capabilityPayload());

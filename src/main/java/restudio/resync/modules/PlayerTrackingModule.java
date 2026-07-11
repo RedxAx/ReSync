@@ -1,6 +1,7 @@
 package restudio.resync.modules;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import restudio.resync.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -44,18 +45,13 @@ import restudio.resync.player.PlayerTrackingPrivacyPolicy;
 import restudio.resync.player.PlayerTrackingListener;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.player.PlayerTrackingUpdate;
+import restudio.resync.player.PlayerControlAuthorizer;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
-import org.bukkit.util.io.BukkitObjectInputStream;
-import org.bukkit.util.io.BukkitObjectOutputStream;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +63,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PlayerTrackingModule implements Module, Listener, PlayerTrackingListener, FlowExecutionListener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("playerTracking", "PlayerTracking", "player_tracking").withDependencies("flow");
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
+    private final Set<Session> legacyBroadSessions = ConcurrentHashMap.newKeySet();
+    private final Map<Session, Set<UUID>> watchedPlayers = new ConcurrentHashMap<>();
+    private final PlayerControlAuthorizer controlAuthorizer = new PlayerControlAuthorizer();
     private final Gson gson = new Gson();
     private ModuleContext context;
     private Codec codec;
@@ -79,6 +78,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private final Map<UUID, Long> stateRevisions = new ConcurrentHashMap<>();
     private final Map<UUID, Long> inventoryRevisions = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastInventorySignatures = new ConcurrentHashMap<>();
+    private final Map<UUID, String> lastScopedStateSignatures = new ConcurrentHashMap<>();
     private final Set<UUID> pendingInventoryRevisionPlayers = ConcurrentHashMap.newKeySet();
     private int liveStateTaskId = -1;
 
@@ -123,6 +123,8 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         }
         HandlerList.unregisterAll(this);
         subscribedSessions.clear();
+        legacyBroadSessions.clear();
+        watchedPlayers.clear();
         if (liveStateTaskId >= 0) {
             Bukkit.getScheduler().cancelTask(liveStateTaskId);
             liveStateTaskId = -1;
@@ -135,24 +137,46 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         stateRevisions.clear();
         inventoryRevisions.clear();
         lastInventorySignatures.clear();
+        lastScopedStateSignatures.clear();
         pendingInventoryRevisionPlayers.clear();
     }
 
     @Override
     public void onSubscribe(Session session, SubscribeRequest req) {
         subscribedSessions.add(session);
-        sendSnapshot(session);
+        boolean scoped = isScopedSubscription(req.getData());
+        if (scoped) {
+            watchedPlayers.put(session, ConcurrentHashMap.newKeySet());
+            sendCapabilities(session);
+        } else {
+            legacyBroadSessions.add(session);
+            sendSnapshot(session);
+        }
         handleSubscribeBinding(session, req.getData());
+    }
+
+    private boolean isScopedSubscription(String data) {
+        if (data == null || data.isBlank()) return false;
+        try {
+            JsonObject payload = gson.fromJson(data, JsonObject.class);
+            return payload != null && payload.has("mode") && "scoped".equalsIgnoreCase(payload.get("mode").getAsString());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Override
     public void onUnsubscribe(Session session, UnsubscribeRequest req) {
         subscribedSessions.remove(session);
+        legacyBroadSessions.remove(session);
+        watchedPlayers.remove(session);
     }
 
     @Override
     public void cleanup(Session session) {
         subscribedSessions.remove(session);
+        legacyBroadSessions.remove(session);
+        watchedPlayers.remove(session);
         sessionLinkService.unlinkSession(session);
     }
 
@@ -177,6 +201,8 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
                 case "snapshot" -> sendSnapshot(session);
                 case "dossier" -> sendDossier(session, request.playerId);
                 case "capabilities" -> sendCapabilities(session);
+                case "watch" -> watchPlayer(session, request.playerId);
+                case "unwatch" -> unwatchPlayer(session, request.playerId);
                 case "link" -> linkSession(session, request.playerId);
                 case "unlink" -> unlinkSession(session, request.playerId);
                 default -> sendSnapshot(session);
@@ -357,13 +383,18 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private void sendCapabilities(Session session) {
         LinkedHashMap<String, Object> response = new LinkedHashMap<>();
         response.put("type", "player_control_capabilities");
-        response.put("version", 1);
+        response.put("version", 2);
         response.put("provider", "resync");
-        response.put("operations", List.of("playerData", "onlineInventoryEdit", "gameRules", "liveSettings"));
+        response.put("sections", List.of("overview", "activity", "history", "inventory", "enderChest", "effects", "extensions"));
+        response.put("operations", controlAuthorizer.operations(session));
         sendRaw(session, response);
     }
 
     private void handlePlayerControl(Session session, TrackingRequest request) {
+        if (!controlAuthorizer.allows(session, request.action)) {
+            sendControlResponse(session, request, false, "Unauthorized", Map.of());
+            return;
+        }
         switch (request.action) {
             case "inventoryEdit" -> handleInventoryEdit(session, request);
             case "inventoryEditBatch" -> handleInventoryEdit(session, request);
@@ -374,7 +405,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             case "gameRuleSet" -> setGameRule(session, request);
             case "liveSettingsList" -> sendLiveSettingsList(session, request);
             case "liveSettingSet" -> setLiveSetting(session, request);
-            default -> sendCapabilities(session);
+            default -> sendControlResponse(session, request, false, "UnsupportedOperation", Map.of());
         }
     }
 
@@ -391,37 +422,53 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             return;
         }
         Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
+            syncInventoryRevisionIfChanged(onlinePlayer);
             long currentInventoryRevision = inventoryRevision(uuid);
-            if (request.baseInventoryRevision >= 0L && request.baseInventoryRevision != currentInventoryRevision) {
+            if (request.baseInventoryRevision < 0L || request.baseInventoryRevision != currentInventoryRevision) {
                 sendControlResponse(session, request, false, "InventoryChanged", Map.of("playerData", livePlayerData(onlinePlayer)));
                 sendLivePlayerData(onlinePlayer, "inventoryChanged");
                 return;
             }
             boolean success = true;
+            LinkedHashMap<String, ItemStack> replacements = new LinkedHashMap<>();
+            LinkedHashMap<String, ItemStack> previous = new LinkedHashMap<>();
             for (InventoryEditRequest edit : edits) {
-                if (!isValidInventorySlot(onlinePlayer, edit.slot)) {
+                if (!isValidInventorySlot(onlinePlayer, edit.slot) || replacements.containsKey(edit.slot)) {
                     success = false;
                     break;
                 }
+                ItemStack replacement = itemFromRequest(edit);
+                if (replacement == null && !requestsAir(edit)) {
+                    success = false;
+                    break;
+                }
+                replacements.put(edit.slot, replacement);
+                ItemStack current = getInventoryItem(onlinePlayer, edit.slot);
+                previous.put(edit.slot, current != null ? current.clone() : null);
             }
             if (success) {
-                for (InventoryEditRequest edit : edits) {
-                    if (!applyInventoryEdit(onlinePlayer, edit.slot, itemFromRequest(edit))) {
+                for (Map.Entry<String, ItemStack> edit : replacements.entrySet()) {
+                    if (!applyInventoryEdit(onlinePlayer, edit.getKey(), edit.getValue())) {
                         success = false;
                         break;
                     }
                 }
             }
+            if (!success) {
+                for (Map.Entry<String, ItemStack> entry : previous.entrySet()) applyInventoryEdit(onlinePlayer, entry.getKey(), entry.getValue());
+                onlinePlayer.updateInventory();
+            }
             if (success) {
                 onlinePlayer.updateInventory();
-                bumpInventoryRevision(onlinePlayer.getUniqueId());
+                syncInventoryRevisionIfChanged(onlinePlayer);
                 bumpStateRevision(onlinePlayer.getUniqueId());
                 LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
                 payload.put("playerData", livePlayerData(onlinePlayer));
                 sendControlResponse(session, request, true, "InventoryUpdated", payload);
                 sendLivePlayerData(onlinePlayer, "inventoryEdit");
             } else {
-                sendControlResponse(session, request, false, "InventoryEditFailed", Map.of());
+                sendControlResponse(session, request, false, "InventoryEditFailed", Map.of("playerData", livePlayerData(onlinePlayer)));
+                sendLivePlayerData(onlinePlayer, "inventoryRollback");
             }
         });
     }
@@ -499,16 +546,23 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         }
     }
 
+    private ItemStack getInventoryItem(Player player, String slot) {
+        if (slot.startsWith("enderchest.")) return player.getEnderChest().getItem(parseSlot(slot, "enderchest."));
+        if (slot.startsWith("hotbar.")) return player.getInventory().getItem(parseSlot(slot, "hotbar."));
+        if (slot.startsWith("inventory.")) return player.getInventory().getItem(parseSlot(slot, "inventory.") + 9);
+        return switch (slot) {
+            case "armor.head" -> player.getInventory().getHelmet();
+            case "armor.chest" -> player.getInventory().getChestplate();
+            case "armor.legs" -> player.getInventory().getLeggings();
+            case "armor.feet" -> player.getInventory().getBoots();
+            case "weapon.offhand" -> player.getInventory().getItemInOffHand();
+            default -> null;
+        };
+    }
+
     private ItemStack itemFromRequest(InventoryEditRequest edit) {
         if (edit.item != null && !edit.item.isEmpty()) {
             try {
-                Object encoded = edit.item.get("encodedItem");
-                if (encoded instanceof String value && !value.isBlank()) {
-                    ItemStack decoded = decodeItem(value);
-                    if (decoded != null) {
-                        return decoded;
-                    }
-                }
                 LinkedHashMap<String, Object> serialized = new LinkedHashMap<>(edit.item);
                 serialized.remove("encodedItem");
                 return ItemStack.deserialize(serialized);
@@ -525,6 +579,10 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             material = Material.matchMaterial(itemId.substring("minecraft:".length()));
         }
         return material == null ? null : new ItemStack(material, Math.max(1, count));
+    }
+
+    private boolean requestsAir(InventoryEditRequest edit) {
+        return edit != null && (edit.count <= 0 || "minecraft:air".equalsIgnoreCase(edit.itemId) || "air".equalsIgnoreCase(edit.itemId));
     }
 
     private int parseSlot(String slot, String prefix) {
@@ -730,40 +788,8 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         data.put("id", item.getType().getKey().toString());
         data.put("count", item.getAmount());
         data.put("slot", slot);
-        LinkedHashMap<String, Object> tag = new LinkedHashMap<>(item.serialize());
-        tag.put("encodedItem", encodeItem(item));
-        data.put("tag", tag);
+        data.put("tag", new LinkedHashMap<>(item.serialize()));
         return data;
-    }
-
-    private String encodeItem(ItemStack item) {
-        if (item == null || item.getType().isAir()) {
-            return "";
-        }
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            BukkitObjectOutputStream data = new BukkitObjectOutputStream(output);
-            data.writeObject(item);
-            data.close();
-            return Base64.getEncoder().encodeToString(output.toByteArray());
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    private ItemStack decodeItem(String encoded) {
-        if (encoded == null || encoded.isBlank()) {
-            return null;
-        }
-        try {
-            byte[] raw = Base64.getDecoder().decode(encoded);
-            BukkitObjectInputStream data = new BukkitObjectInputStream(new ByteArrayInputStream(raw));
-            Object value = data.readObject();
-            data.close();
-            return value instanceof ItemStack item ? item : null;
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private List<Map<String, Object>> attributes(Player player) {
@@ -795,7 +821,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private void sendControlResponse(Session session, TrackingRequest request, boolean success, String reason, Map<String, Object> payload) {
         LinkedHashMap<String, Object> response = new LinkedHashMap<>();
         response.put("type", "player_control_response");
-        response.put("version", 1);
+        response.put("version", 2);
         response.put("requestId", request.requestId);
         response.put("action", request.action);
         response.put("success", success);
@@ -834,8 +860,10 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     }
 
     private void broadcast(PlayerTrackingUpdate update) {
+        UUID playerId = update != null ? parsePlayerId(update.getPlayerId()) : null;
         for (Session session : subscribedSessions) {
-            send(session, update);
+            Set<UUID> watched = watchedPlayers.get(session);
+            if (legacyBroadSessions.contains(session) || playerId != null && watched != null && watched.contains(playerId)) send(session, update);
         }
     }
 
@@ -843,9 +871,27 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         if (subscribedSessions.isEmpty()) {
             return;
         }
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        Set<UUID> legacyTargets = ConcurrentHashMap.newKeySet();
+        if (!legacyBroadSessions.isEmpty()) Bukkit.getOnlinePlayers().forEach(player -> legacyTargets.add(player.getUniqueId()));
+        for (UUID playerId : legacyTargets) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) continue;
             sendLivePlayerData(player, "livePlayerData");
         }
+        Set<UUID> scopedTargets = ConcurrentHashMap.newKeySet();
+        for (Set<UUID> watched : watchedPlayers.values()) scopedTargets.addAll(watched);
+        scopedTargets.removeAll(legacyTargets);
+        for (UUID playerId : scopedTargets) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) continue;
+            String signature = liveStateSignature(player);
+            if (Objects.equals(lastScopedStateSignatures.put(playerId, signature), signature)) continue;
+            sendLivePlayerData(player, "livePlayerData");
+        }
+    }
+
+    private String liveStateSignature(Player player) {
+        return gson.toJson(livePlayerData(player));
     }
 
     private void scheduleThrottledLivePlayerDataBroadcast(Player player, long throttleMs) {
@@ -959,8 +1005,25 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             dossier = trackingService.getDossier(player.getUniqueId());
         }
         if (dossier != null) {
-            broadcast(PlayerTrackingUpdate.delta(reason, enrichDossier(dossier)));
+            PlayerTrackingUpdate update = PlayerTrackingUpdate.delta(reason, enrichDossier(dossier));
+            for (Session session : subscribedSessions) {
+                Set<UUID> watched = watchedPlayers.get(session);
+                if (legacyBroadSessions.contains(session) || watched != null && watched.contains(player.getUniqueId())) send(session, update);
+            }
         }
+    }
+
+    private void watchPlayer(Session session, String playerId) {
+        UUID uuid = parsePlayerId(playerId);
+        if (uuid == null) return;
+        watchedPlayers.computeIfAbsent(session, ignored -> ConcurrentHashMap.newKeySet()).add(uuid);
+        sendDossier(session, playerId);
+    }
+
+    private void unwatchPlayer(Session session, String playerId) {
+        UUID uuid = parsePlayerId(playerId);
+        Set<UUID> watched = watchedPlayers.get(session);
+        if (uuid != null && watched != null) watched.remove(uuid);
     }
 
     private void send(Session session, PlayerTrackingUpdate update) {

@@ -22,6 +22,7 @@ import restudio.resync.core.Session;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -179,6 +180,13 @@ public class FlowOptionCatalogPacketHandler {
                 normalized.put(String.valueOf(entry.getKey()), normalizeCatalogMetadataValue(entry.getValue()));
             }
             return normalized;
+        }
+        if (value instanceof Number number) {
+            try {
+                return new BigDecimal(number.toString()).stripTrailingZeros();
+            } catch (NumberFormatException ignored) {
+                return number.doubleValue();
+            }
         }
         return value;
     }

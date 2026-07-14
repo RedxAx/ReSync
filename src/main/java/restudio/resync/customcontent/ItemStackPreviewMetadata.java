@@ -15,6 +15,7 @@ import java.util.Map;
 
 public final class ItemStackPreviewMetadata {
     private static final String CUSTOM_MODEL_DATA = "minecraft:custom_model_data";
+    private static final String CUSTOM_DATA = "minecraft:custom_data";
 
     private ItemStackPreviewMetadata() {
     }
@@ -82,7 +83,7 @@ public final class ItemStackPreviewMetadata {
             JsonObject components = serialized.getAsJsonObject("components");
             Map<String, Object> result = new LinkedHashMap<>();
             for (Map.Entry<String, JsonElement> entry : components.entrySet()) {
-                if (entry.getKey() != null && !entry.getKey().isBlank() && !entry.getValue().isJsonNull()) {
+                if (entry.getKey() != null && !entry.getKey().isBlank() && !CUSTOM_DATA.equals(entry.getKey()) && !entry.getValue().isJsonNull()) {
                     result.put(entry.getKey(), jsonToMap(entry.getValue()));
                 }
             }

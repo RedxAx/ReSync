@@ -70,7 +70,7 @@ public class GenericListHandler implements NodeHandler {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             Integer index = ctx.getInputValue(node, "index", Integer.class, 0);
             Object item = (index >= 0 && index < list.size()) ? list.get(index) : null;
-            ctx.setOutput(node, "item", item);
+            ctx.setOutput(node, "value", item);
         });
         operations.put("index_of", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());

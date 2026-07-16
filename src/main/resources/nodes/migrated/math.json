@@ -1273,8 +1273,19 @@
   },
   {
     "id": "math.add",
-    "displayName": "Math Add",
+    "displayName": "Add",
     "category": "DATA",
+    "description": "Adds Two Numbers",
+    "aliases": [
+      "Sum",
+      "Plus",
+      "Addition"
+    ],
+    "tags": [
+      "math",
+      "number",
+      "arithmetic"
+    ],
     "inputs": [
       {
         "name": "a",

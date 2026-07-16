@@ -27,18 +27,17 @@ public class FlowControlHandler implements NodeHandler {
 
         operations.put("switch_case", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", Object.class, null);
-            List<String> cases = ctx.getInputValue(node, "cases", List.class, List.of());
+            List<?> cases = ctx.getInputValue(node, "cases", List.class, List.of());
+            int matchedIndex = -1;
             for (int i = 0; i < cases.size(); i++) {
                 if (String.valueOf(cases.get(i)).equals(String.valueOf(value))) {
-                    ctx.setOutput(node, "matched", true);
-                    ctx.setOutput(node, "index", i);
-                    ctx.triggerOutput("case_" + i);
-                    return;
+                    matchedIndex = i;
+                    break;
                 }
             }
-            ctx.setOutput(node, "matched", false);
-            ctx.setOutput(node, "index", -1);
-            ctx.triggerOutput("default");
+            ctx.setOutput(node, "matched", matchedIndex >= 0);
+            ctx.setOutput(node, "index", matchedIndex);
+            ctx.triggerOutput("flow");
         });
 
         operations.put("branch_random", (ctx, node) -> {

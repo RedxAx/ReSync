@@ -8,6 +8,7 @@ import restudio.resync.worldgen.data.WorldGenSpawnRule;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class TerrainPipeline {
@@ -191,12 +192,12 @@ public class TerrainPipeline {
         }
         String biomeId;
         if (raw instanceof Biome biome) {
-            biomeId = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
+            biomeId = "minecraft:" + biome.name().toLowerCase(Locale.ROOT);
         } else if (raw instanceof String id) {
             biomeId = normalizeBiomeId(id);
         } else {
             Biome biome = getBiome(x, y, z, seed, worldInfo);
-            biomeId = "minecraft:" + biome.name().toLowerCase(java.util.Locale.ROOT);
+            biomeId = "minecraft:" + biome.name().toLowerCase(Locale.ROOT);
         }
         Biome biome = biome(biomeId, Biome.PLAINS);
         return new BiomeChoice(biomeId, isVanillaFeaturesEnabled(biome), isVanillaStructuresEnabled(biome), isVanillaSpawnsEnabled(biome));
@@ -311,7 +312,7 @@ public class TerrainPipeline {
         if (id == null || id.isBlank()) return fallback;
         String value = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
         try {
-            return EntityType.valueOf(value.toUpperCase(java.util.Locale.ROOT));
+            return EntityType.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (Exception ignored) {
             return fallback;
         }
@@ -338,7 +339,7 @@ public class TerrainPipeline {
     public static Material material(String id, Material fallback) {
         if (id == null || id.isBlank()) return fallback;
         String value = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
-        Material material = Material.matchMaterial(value.toUpperCase(java.util.Locale.ROOT));
+        Material material = Material.matchMaterial(value.toUpperCase(Locale.ROOT));
         return material != null ? material : fallback;
     }
 
@@ -346,7 +347,7 @@ public class TerrainPipeline {
         if (id == null || id.isBlank()) return fallback;
         String value = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
         try {
-            return Biome.valueOf(value.toUpperCase(java.util.Locale.ROOT));
+            return Biome.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (Exception ignored) {
             return fallback;
         }
@@ -356,7 +357,7 @@ public class TerrainPipeline {
         if (id == null || String.valueOf(id).isBlank()) {
             return "minecraft:plains";
         }
-        String value = String.valueOf(id).toLowerCase(java.util.Locale.ROOT);
+        String value = String.valueOf(id).toLowerCase(Locale.ROOT);
         return value.contains(":") ? value : "minecraft:" + value;
     }
 

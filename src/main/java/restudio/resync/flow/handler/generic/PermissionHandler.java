@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 public class PermissionHandler implements NodeHandler {
+    private static final String PERMISSION_COUNT_KEY = "__permission_count";
+    private static final int MAX_PERMISSION_INPUTS = 32;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public PermissionHandler() {
@@ -37,8 +39,8 @@ public class PermissionHandler implements NodeHandler {
                 return;
             }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String permission = ctx.getInputValue(node, "permission", String.class, "");
-            if (player == null || permission.isEmpty()) {
+            List<String> permissions = resolvePermissions(ctx, node);
+            if (player == null || permissions.isEmpty()) {
                 ctx.setOutput(node, "success", false);
                 ctx.setOutput(node, "error", player == null ? "Player is null" : "Permission is empty");
                 ctx.setOutput(node, "has", false);
@@ -59,9 +61,13 @@ public class PermissionHandler implements NodeHandler {
                 return;
             }
             QueryOptions queryOptions = getQueryOptions(lp, user);
-            boolean has = user.getCachedData().getPermissionData(queryOptions)
-                    .checkPermission(permission).asBoolean();
+            var permissionData = user.getCachedData().getPermissionData(queryOptions);
+            boolean findAll = "Find All".equalsIgnoreCase(ctx.getInputValue(node, "mode", String.class, "Find Any"));
+            boolean has = findAll
+                    ? permissions.stream().allMatch(permission -> permissionData.checkPermission(permission).asBoolean())
+                    : permissions.stream().anyMatch(permission -> permissionData.checkPermission(permission).asBoolean());
             ctx.setOutput(node, "success", true);
+            ctx.setOutput(node, "error", "");
             ctx.setOutput(node, "has", has);
         });
 
@@ -845,6 +851,31 @@ public class PermissionHandler implements NodeHandler {
             mutateTrackPosition(ctx, node, false);
         });
 
+    }
+
+    private List<String> resolvePermissions(FlowContext ctx, FlowNode node) {
+        int count = 1;
+        if (node.getInputValues() != null) {
+            Object storedCount = node.getInputValues().get(PERMISSION_COUNT_KEY);
+            if (storedCount instanceof Number number) {
+                count = number.intValue();
+            } else if (storedCount != null) {
+                try {
+                    count = Integer.parseInt(storedCount.toString());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        count = Math.clamp(count, 1, MAX_PERMISSION_INPUTS);
+        List<String> permissions = new ArrayList<>();
+        for (int index = 1; index <= count; index++) {
+            String pin = index == 1 ? "permission" : "permission_" + index;
+            String permission = ctx.getInputValue(node, pin, String.class, "").trim();
+            if (!permission.isBlank()) {
+                permissions.add(permission);
+            }
+        }
+        return permissions;
     }
 
     private void mutateTrackPosition(FlowContext ctx, FlowNode node, boolean promote) {

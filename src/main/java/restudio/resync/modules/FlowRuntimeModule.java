@@ -58,6 +58,7 @@ import restudio.resync.flow.handler.generic.LocationHandler;
 import restudio.resync.flow.handler.generic.LogicHandler;
 import restudio.resync.flow.handler.generic.MenuHandler;
 import restudio.resync.flow.handler.generic.MiscHandler;
+import restudio.resync.flow.handler.generic.NetworkFlowHandler;
 import restudio.resync.flow.handler.generic.ParticleHandler;
 import restudio.resync.flow.handler.generic.PermissionHandler;
 import restudio.resync.flow.handler.generic.PlaceholderHandler;
@@ -81,6 +82,7 @@ import restudio.resync.flow.handler.generic.WorldActionHandler;
 import restudio.resync.flow.handler.family.JsonFamilyHandler;
 import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.handler.event.FlowEventRegistry;
+import restudio.resync.flow.network.NetworkFlowBridge;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -116,6 +118,7 @@ public class FlowRuntimeModule implements Module {
     private FlowExecutor executor;
     private GuiManager guiManager;
     private GlobalTriggers globalTriggers;
+    private NetworkFlowBridge networkFlowBridge;
     private SystemEventListener systemEventListener;
     private ScoreboardRuntimeListener scoreboardRuntimeListener;
     private PropertyRegistry propertyRegistry;
@@ -178,9 +181,12 @@ public class FlowRuntimeModule implements Module {
         villageProfileService = new VillageProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
         globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry);
+        networkFlowBridge = new NetworkFlowBridge(context.getPlugin());
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher());
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
+        globalTriggers.setSystemEventListener(systemEventListener);
+        globalTriggers.refreshBindings();
         int channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         OptionCatalogRegistry optionCatalogRegistry = context.getService(OptionCatalogRegistry.class);
         registerResourceCatalogs(optionCatalogRegistry, jsonResourceStorage);
@@ -201,6 +207,7 @@ public class FlowRuntimeModule implements Module {
         context.registerService(FlowExecutor.class, executor);
         context.registerService(FlowTraceService.class, traceService);
         context.registerService(FlowDebugService.class, debugService);
+        context.registerService(NetworkFlowBridge.class, networkFlowBridge);
         context.registerService(FlowModule.class, delegate);
         context.registerService(LootTableService.class, lootTableService);
         context.registerService(VillageProfileService.class, villageProfileService);
@@ -328,6 +335,7 @@ public class FlowRuntimeModule implements Module {
         new ScoreboardHandler().registerTo(handlerRegistry);
         new SoundHandler().registerTo(handlerRegistry);
         new ServerHandler().registerTo(handlerRegistry);
+        new NetworkFlowHandler().registerTo(handlerRegistry);
         new TeamHandler().registerTo(handlerRegistry);
         new TextFormatHandler().registerTo(handlerRegistry);
         new ScheduleHandler().registerTo(handlerRegistry);
@@ -383,6 +391,9 @@ public class FlowRuntimeModule implements Module {
 
     @Override
     public void stop(ModuleContext context) {
+        if (networkFlowBridge != null) {
+            networkFlowBridge.disconnect();
+        }
         if (systemEventListener != null) {
             systemEventListener.onServerStop();
         }

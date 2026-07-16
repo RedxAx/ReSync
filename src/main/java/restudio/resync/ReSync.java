@@ -7,6 +7,11 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
 import restudio.resync.bridge.ReSyncPluginMessageBridge;
+import restudio.resync.flow.network.NetworkFlowBridge;
+import restudio.resync.network.paper.ReSyncNetworkAgent;
+import restudio.resync.network.paper.ReSyncNetworkAgentConfig;
+import restudio.resync.network.paper.state.NetworkPlayerStateConfig;
+import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
@@ -20,6 +25,8 @@ public class ReSync extends JavaPlugin {
     private WebSocketServer wsServer;
     private ReSyncServer server;
     private ReSyncPluginMessageBridge pluginMessageBridge;
+    private ReSyncNetworkAgent networkAgent;
+    private NetworkPlayerStateCoordinator networkPlayerStateCoordinator;
     private Object placeholderExpansion;
     private InteractiveSelectionManager interactiveSelectionManager;
 
@@ -41,6 +48,24 @@ public class ReSync extends JavaPlugin {
         pluginMessageBridge.register();
         interactiveSelectionManager = new InteractiveSelectionManager(this);
         interactiveSelectionManager.start();
+        try {
+            ReSyncNetworkAgentConfig networkConfig = ReSyncNetworkAgentConfig.load(getDataFolder().toPath());
+            if (networkConfig.enabled()) {
+                networkAgent = new ReSyncNetworkAgent(this, networkConfig);
+                NetworkFlowBridge networkFlowBridge = server.getModuleContext().getService(NetworkFlowBridge.class);
+                if (networkFlowBridge != null) {
+                    networkFlowBridge.connect(networkAgent);
+                }
+                NetworkPlayerStateConfig playerStateConfig = NetworkPlayerStateConfig.load(getDataFolder().toPath());
+                if (playerStateConfig.enabled()) {
+                    networkPlayerStateCoordinator = new NetworkPlayerStateCoordinator(this, playerStateConfig);
+                    networkAgent.setTransferHandler(networkPlayerStateCoordinator);
+                }
+                networkAgent.start();
+            }
+        } catch (Exception exception) {
+            Log.error("ReSync network agent failed to start: " + exception.getMessage(), exception);
+        }
 
         wsServer = new WebSocketServer(new InetSocketAddress(config.getBindHost(), config.getPort())) {
             @Override
@@ -94,6 +119,17 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (networkPlayerStateCoordinator != null) {
+            if (networkAgent != null) {
+                networkAgent.setTransferHandler(null);
+            }
+            networkPlayerStateCoordinator.shutdown();
+            networkPlayerStateCoordinator = null;
+        }
+        if (networkAgent != null) {
+            networkAgent.shutdown();
+            networkAgent = null;
+        }
         if (pluginMessageBridge != null) {
             pluginMessageBridge.unregister();
             pluginMessageBridge = null;
@@ -131,6 +167,10 @@ public class ReSync extends JavaPlugin {
 
     public ReSyncServer getReSyncServer() {
         return server;
+    }
+
+    public ReSyncNetworkAgent getNetworkAgent() {
+        return networkAgent;
     }
 
     public InteractiveSelectionManager getInteractiveSelectionManager() {

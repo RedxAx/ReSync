@@ -458,7 +458,8 @@ public class NodeDefinitionLoader {
             pin.defaultValue,
             constraints,
             visibleWhen,
-            pin.description
+            pin.description,
+            Boolean.TRUE.equals(pin.optional)
         );
     }
 
@@ -592,6 +593,7 @@ public class NodeDefinitionLoader {
         PinConstraintsJson constraints;
         Map<String, String> visibleWhen;
         String description;
+        Boolean optional;
     }
 
     private static class PinConstraintsJson {

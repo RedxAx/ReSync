@@ -24,6 +24,7 @@ public class FlowRuntime {
     private final Map<String, Object> eventVariables;
     private final TypeAdapterRegistry typeAdapter;
     private final ThreadLocal<String> triggeredOutputPin = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<Set<String>> resolvingPassthroughOutputs = ThreadLocal.withInitial(HashSet::new);
     private final Set<String> evaluatingNodes = new HashSet<>();
     private final ThreadLocal<Set<String>> executingFlowNodes = ThreadLocal.withInitial(HashSet::new);
     private final Map<String, Object> functionInputs = new HashMap<>();
@@ -114,6 +115,9 @@ public class FlowRuntime {
 
         for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
             if (conn.getTargetPin().equals(pinName)) {
+                if (conn.getEditorSourceNodeId() != null && !conn.getEditorSourceNodeId().isBlank() && isPassthroughOutputPin(conn.getEditorSourcePin())) {
+                    return getNodeOutput(conn.getEditorSourceNodeId(), conn.getEditorSourcePin());
+                }
                 return getNodeOutput(conn.getSourceNodeId(), conn.getSourcePin());
             }
         }
@@ -258,11 +262,22 @@ public class FlowRuntime {
     public Object getNodeOutput(String nodeId, String pinName) {
         if (isPassthroughOutputPin(pinName)) {
             String key = nodeId + ":" + pinName;
-            if (nodeOutputs.containsKey(key)) {
-                return nodeOutputs.get(key);
+            Set<String> resolving = resolvingPassthroughOutputs.get();
+            if (!resolving.add(key)) {
+                return null;
             }
-            FlowNode node = graph != null && graph.getNodes() != null ? graph.getNodes().get(nodeId) : null;
-            return node != null ? resolveInputRaw(node, passthroughInputPin(pinName)) : null;
+            try {
+                if (nodeOutputs.containsKey(key)) {
+                    return nodeOutputs.get(key);
+                }
+                FlowNode node = graph != null && graph.getNodes() != null ? graph.getNodes().get(nodeId) : null;
+                return node != null ? resolveInputRaw(node, passthroughInputPin(pinName)) : null;
+            } finally {
+                resolving.remove(key);
+                if (resolving.isEmpty()) {
+                    resolvingPassthroughOutputs.remove();
+                }
+            }
         }
         return nodeOutputs.get(nodeId + ":" + pinName);
     }

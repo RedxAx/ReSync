@@ -204,6 +204,7 @@ public class FlowNodeRegistryPacketHandler {
             updateConstraintsDigest(digest, pin.getConstraints());
             updateDigest(digest, pin.getVisibleWhen());
             updateDigest(digest, pin.getDescription());
+            updateDigest(digest, pin.isOptional());
         }
     }
 

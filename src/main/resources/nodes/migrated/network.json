@@ -1,0 +1,490 @@
+[
+  {
+    "id": "network.status",
+    "displayName": "Get Network Status",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_status" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ],
+    "outputs": [
+      { "name": "connected", "dataType": "boolean" },
+      { "name": "network_id", "dataType": "string" },
+      { "name": "node_id", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.get.servers",
+    "displayName": "Get Network Servers",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_servers" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ],
+    "outputs": [
+      { "name": "servers", "dataType": "list" },
+      { "name": "count", "dataType": "number" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.get.server.health",
+    "displayName": "Get Network Server Health",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_server_health" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "node_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "found", "dataType": "boolean" },
+      { "name": "server", "dataType": "map" },
+      { "name": "status", "dataType": "string" },
+      { "name": "players", "dataType": "number" },
+      { "name": "capacity", "dataType": "number" },
+      { "name": "tps", "dataType": "number" },
+      { "name": "mspt", "dataType": "number" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.variable.get",
+    "displayName": "Get Network Variable",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_variable_get" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "scope", "dataType": "string", "widget": "DROPDOWN", "options": ["NETWORK", "REALM", "GROUP", "SERVER", "PLAYER"], "defaultValue": "NETWORK" },
+      { "name": "scope_id", "dataType": "string" },
+      { "name": "key", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "exists", "dataType": "boolean" },
+      { "name": "value", "dataType": "any" },
+      { "name": "type", "dataType": "string" },
+      { "name": "revision", "dataType": "number" },
+      { "name": "expires_at", "dataType": "number" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.variable.set",
+    "displayName": "Set Network Variable",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_variable_set" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "scope", "dataType": "string", "widget": "DROPDOWN", "options": ["NETWORK", "REALM", "GROUP", "SERVER", "PLAYER"], "defaultValue": "NETWORK" },
+      { "name": "scope_id", "dataType": "string" },
+      { "name": "key", "dataType": "string" },
+      { "name": "type", "dataType": "string", "widget": "DROPDOWN", "options": ["BOOLEAN", "INTEGER", "DECIMAL", "STRING", "JSON", "UUID", "BYTES"], "defaultValue": "STRING" },
+      { "name": "value", "dataType": "any" },
+      { "name": "ttl_seconds", "dataType": "number", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "value", "dataType": "any" },
+      { "name": "type", "dataType": "string" },
+      { "name": "revision", "dataType": "number" },
+      { "name": "expires_at", "dataType": "number" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.variable.compare.set",
+    "displayName": "Compare Network Variable",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_variable_compare_set" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "scope", "dataType": "string", "widget": "DROPDOWN", "options": ["NETWORK", "REALM", "GROUP", "SERVER", "PLAYER"], "defaultValue": "NETWORK" },
+      { "name": "scope_id", "dataType": "string" },
+      { "name": "key", "dataType": "string" },
+      { "name": "type", "dataType": "string", "widget": "DROPDOWN", "options": ["BOOLEAN", "INTEGER", "DECIMAL", "STRING", "JSON", "UUID", "BYTES"], "defaultValue": "STRING" },
+      { "name": "value", "dataType": "any" },
+      { "name": "expected_revision", "dataType": "number", "defaultValue": 0 },
+      { "name": "ttl_seconds", "dataType": "number", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "value", "dataType": "any" },
+      { "name": "type", "dataType": "string" },
+      { "name": "revision", "dataType": "number" },
+      { "name": "expires_at", "dataType": "number" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.event.publish",
+    "displayName": "Publish Network Event",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_event_publish" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event_id", "dataType": "string" },
+      { "name": "channel", "dataType": "string", "defaultValue": "flow" },
+      { "name": "subject", "dataType": "string" },
+      { "name": "data", "dataType": "any" },
+      { "name": "ttl_seconds", "dataType": "number", "defaultValue": 86400 }
+    ],
+    "outputs": [
+      { "name": "event_id", "dataType": "string" },
+      { "name": "created_at", "dataType": "number" },
+      { "name": "expires_at", "dataType": "number" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.broadcast",
+    "displayName": "Broadcast Network Message",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_broadcast" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "message", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "sent", "dataType": "boolean" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.proxy.command",
+    "displayName": "Run Network Command",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_proxy_command" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "command", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "executed", "dataType": "boolean" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.server.mode",
+    "displayName": "Set Network Server Mode",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_node_mode" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "node_id", "dataType": "string" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["ONLINE", "DRAINING", "MAINTENANCE"], "defaultValue": "ONLINE" }
+    ],
+    "outputs": [
+      { "name": "applied", "dataType": "boolean" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.player.send",
+    "displayName": "Send Player To Server",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_player_route" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "server", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "transferred", "dataType": "boolean" },
+      { "name": "status", "dataType": "string" },
+      { "name": "server", "dataType": "string" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "network.player.handoff",
+    "displayName": "Handoff Player State",
+    "category": "NETWORK",
+    "handler": "NetworkFlowHandler",
+    "handlerConfig": { "operation": "network_player_handoff" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "target_node", "dataType": "string" },
+      { "name": "server", "dataType": "string" },
+      { "name": "timeout_seconds", "dataType": "number", "defaultValue": 30 }
+    ],
+    "outputs": [
+      { "name": "transfer_id", "dataType": "string" },
+      { "name": "fence_epoch", "dataType": "number" },
+      { "name": "transferred", "dataType": "boolean" },
+      { "name": "status", "dataType": "string" },
+      { "name": "server", "dataType": "string" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" },
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "event.network.variable.changed",
+    "displayName": "Network Variable Changed",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkVariableChangedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.scope", "dataType": "string" },
+      { "name": "event.scope_id", "dataType": "string" },
+      { "name": "event.key", "dataType": "string" },
+      { "name": "event.type", "dataType": "string" },
+      { "name": "event.value", "dataType": "any" },
+      { "name": "event.revision", "dataType": "number" },
+      { "name": "event.expires_at", "dataType": "number" },
+      { "name": "event.origin_node_id", "dataType": "string" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.scope", "target": "event.scope" },
+      { "source": "event.scopeId", "target": "event.scope_id" },
+      { "source": "event.key", "target": "event.key" },
+      { "source": "event.type", "target": "event.type" },
+      { "source": "event.value", "target": "event.value" },
+      { "source": "event.revision", "target": "event.revision" },
+      { "source": "event.expiresAt", "target": "event.expires_at" },
+      { "source": "event.originNodeId", "target": "event.origin_node_id" }
+    ]
+  },
+  {
+    "id": "event.network.event.received",
+    "displayName": "Network Event Received",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkEventReceivedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.event_id", "dataType": "string" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.channel", "dataType": "string" },
+      { "name": "event.subject", "dataType": "string" },
+      { "name": "event.payload", "dataType": "string" },
+      { "name": "event.data", "dataType": "any" },
+      { "name": "event.origin_node_id", "dataType": "string" },
+      { "name": "event.created_at", "dataType": "number" },
+      { "name": "event.expires_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.eventId", "target": "event.event_id" },
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.channel", "target": "event.channel" },
+      { "source": "event.subject", "target": "event.subject" },
+      { "source": "event.payload", "target": "event.payload" },
+      { "source": "event.data", "target": "event.data" },
+      { "source": "event.originNodeId", "target": "event.origin_node_id" },
+      { "source": "event.createdAt", "target": "event.created_at" },
+      { "source": "event.expiresAt", "target": "event.expires_at" }
+    ]
+  },
+  {
+    "id": "event.network.server.status",
+    "displayName": "Network Server Status Changed",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkServerStatusEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.node_id", "dataType": "string" },
+      { "name": "event.status", "dataType": "string" },
+      { "name": "event.previous_status", "dataType": "string" },
+      { "name": "event.health", "dataType": "string" },
+      { "name": "event.previous_health", "dataType": "string" },
+      { "name": "event.players", "dataType": "number" },
+      { "name": "event.capacity", "dataType": "number" },
+      { "name": "event.tps", "dataType": "number" },
+      { "name": "event.mspt", "dataType": "number" },
+      { "name": "event.observed_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.nodeId", "target": "event.node_id" },
+      { "source": "event.status", "target": "event.status" },
+      { "source": "event.previousStatus", "target": "event.previous_status" },
+      { "source": "event.health", "target": "event.health" },
+      { "source": "event.previousHealth", "target": "event.previous_health" },
+      { "source": "event.players", "target": "event.players" },
+      { "source": "event.capacity", "target": "event.capacity" },
+      { "source": "event.tps", "target": "event.tps" },
+      { "source": "event.mspt", "target": "event.mspt" },
+      { "source": "event.observedAt", "target": "event.observed_at" }
+    ]
+  },
+  {
+    "id": "event.network.player.joined",
+    "displayName": "Player Joined Network",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkPlayerJoinedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.player_id", "dataType": "uuid" },
+      { "name": "event.player_name", "dataType": "string" },
+      { "name": "event.server", "dataType": "string" },
+      { "name": "event.occurred_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.playerId", "target": "event.player_id" },
+      { "source": "event.playerName", "target": "event.player_name" },
+      { "source": "event.targetServer", "target": "event.server" },
+      { "source": "event.occurredAt", "target": "event.occurred_at" }
+    ]
+  },
+  {
+    "id": "event.network.player.left",
+    "displayName": "Player Left Network",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkPlayerLeftEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.player_id", "dataType": "uuid" },
+      { "name": "event.player_name", "dataType": "string" },
+      { "name": "event.server", "dataType": "string" },
+      { "name": "event.reason", "dataType": "string" },
+      { "name": "event.occurred_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.playerId", "target": "event.player_id" },
+      { "source": "event.playerName", "target": "event.player_name" },
+      { "source": "event.sourceServer", "target": "event.server" },
+      { "source": "event.failure", "target": "event.reason" },
+      { "source": "event.occurredAt", "target": "event.occurred_at" }
+    ]
+  },
+  {
+    "id": "event.network.player.transfer.started",
+    "displayName": "Player Transfer Started",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkPlayerTransferStartedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.player_id", "dataType": "uuid" },
+      { "name": "event.player_name", "dataType": "string" },
+      { "name": "event.source_server", "dataType": "string" },
+      { "name": "event.target_server", "dataType": "string" },
+      { "name": "event.occurred_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.playerId", "target": "event.player_id" },
+      { "source": "event.playerName", "target": "event.player_name" },
+      { "source": "event.sourceServer", "target": "event.source_server" },
+      { "source": "event.targetServer", "target": "event.target_server" },
+      { "source": "event.occurredAt", "target": "event.occurred_at" }
+    ]
+  },
+  {
+    "id": "event.network.player.transfer.completed",
+    "displayName": "Player Transfer Completed",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkPlayerTransferCompletedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.player_id", "dataType": "uuid" },
+      { "name": "event.player_name", "dataType": "string" },
+      { "name": "event.source_server", "dataType": "string" },
+      { "name": "event.target_server", "dataType": "string" },
+      { "name": "event.occurred_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.playerId", "target": "event.player_id" },
+      { "source": "event.playerName", "target": "event.player_name" },
+      { "source": "event.sourceServer", "target": "event.source_server" },
+      { "source": "event.targetServer", "target": "event.target_server" },
+      { "source": "event.occurredAt", "target": "event.occurred_at" }
+    ]
+  },
+  {
+    "id": "event.network.player.transfer.failed",
+    "displayName": "Player Transfer Failed",
+    "category": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.network.event.ReSyncNetworkPlayerTransferFailedEvent",
+    "handlerConfig": { "playerEvent": false },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.network_id", "dataType": "string" },
+      { "name": "event.player_id", "dataType": "uuid" },
+      { "name": "event.player_name", "dataType": "string" },
+      { "name": "event.source_server", "dataType": "string" },
+      { "name": "event.target_server", "dataType": "string" },
+      { "name": "event.failure", "dataType": "string" },
+      { "name": "event.occurred_at", "dataType": "number" }
+    ],
+    "outputMappings": [
+      { "source": "event.networkId", "target": "event.network_id" },
+      { "source": "event.playerId", "target": "event.player_id" },
+      { "source": "event.playerName", "target": "event.player_name" },
+      { "source": "event.sourceServer", "target": "event.source_server" },
+      { "source": "event.targetServer", "target": "event.target_server" },
+      { "source": "event.failure", "target": "event.failure" },
+      { "source": "event.occurredAt", "target": "event.occurred_at" }
+    ]
+  }
+]

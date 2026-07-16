@@ -26,7 +26,7 @@ class NodeDefinitionCatalogTest {
             }
         }
 
-        assertEquals(1242, count);
+        assertEquals(1262, count);
     }
 
     @Test
@@ -148,6 +148,17 @@ class NodeDefinitionCatalogTest {
         assertEquals("last_index_of", lastIndexOf.getAsJsonObject("handlerConfig").get("operation").getAsString());
     }
 
+    @Test
+    void additionNodeIsDiscoverableByCommonNames() throws Exception {
+        JsonObject add = findNode("math.json", "math.add");
+
+        assertEquals("Add", add.get("displayName").getAsString());
+        assertEquals("Adds Two Numbers", add.get("description").getAsString());
+        assertTrue(hasString(add, "aliases", "Sum"));
+        assertTrue(hasString(add, "aliases", "Plus"));
+        assertEquals("add", add.getAsJsonObject("handlerConfig").get("operation").getAsString());
+    }
+
     private JsonObject findNode(String fileName, String id) throws Exception {
         Path file = Path.of("src", "main", "resources", "nodes", "migrated", fileName);
         JsonElement element = JsonParser.parseString(Files.readString(file));
@@ -206,6 +217,18 @@ class NodeDefinitionCatalogTest {
                 if (option.equals(value.getAsString())) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasString(JsonObject node, String arrayName, String expected) {
+        if (!node.has(arrayName) || !node.get(arrayName).isJsonArray()) {
+            return false;
+        }
+        for (JsonElement value : node.getAsJsonArray(arrayName)) {
+            if (expected.equals(value.getAsString())) {
+                return true;
             }
         }
         return false;

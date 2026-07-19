@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import restudio.flow.data.FlowTypeRef;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,24 +24,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class NodeDefinitionBuildValidator {
-    private static final Set<String> OPTION_SOURCES = Set.of(
-        "advancement",
-        "biome",
-        "difficulty",
-        "enchantment",
-        "entity_type",
-        "gamemode",
-        "material",
-        "block",
-        "particle",
-        "potion_effect",
-        "sound",
-        "world"
-    );
     private static final Set<String> KNOWN_DATA_TYPES = Set.of("execution", "any", "string", "number", "boolean");
+    private static final Set<String> CLOCK_DOMAINS = Set.of("wall_time", "monotonic_elapsed", "server_ticks", "world_day_time");
+    private static final Pattern OPTION_SOURCE_ID = Pattern.compile("[a-z0-9_.-]+(?::[a-z0-9_.-]+)+");
     private static final Pattern FLOW_DATA_TYPE_ID = Pattern.compile("new\\s+FlowDataType\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern FLOW_DATA_TYPE_ALIAS = Pattern.compile("REGISTRY\\.put\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern OPERATION_ID = Pattern.compile("operations\\.put\\s*\\(\\s*\"([^\"]+)\"");
+    private static final Pattern SUPPORTED_OPERATIONS = Pattern.compile("SUPPORTED_OPERATIONS\\s*=\\s*Set\\.of\\((.*?)\\);", Pattern.DOTALL);
+    private static final Pattern STRING_LITERAL = Pattern.compile("\"([^\"]+)\"");
     private static final Pattern REGISTRY_REGISTER = Pattern.compile("registry\\.register\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern RESTORED_ID = Pattern.compile("\"((?:entity|player)_[^\"]+)\"");
 
@@ -99,6 +91,13 @@ public final class NodeDefinitionBuildValidator {
                         Matcher matcher = OPERATION_ID.matcher(text);
                         while (matcher.find()) {
                             ids.add(matcher.group(1));
+                        }
+                        Matcher supported = SUPPORTED_OPERATIONS.matcher(text);
+                        while (supported.find()) {
+                            Matcher literal = STRING_LITERAL.matcher(supported.group(1));
+                            while (literal.find()) {
+                                ids.add(literal.group(1));
+                            }
                         }
                         if (!ids.isEmpty()) {
                             operations.put(handlerName, ids);
@@ -208,6 +207,8 @@ public final class NodeDefinitionBuildValidator {
                 errors.add(id + " is a family node without mode/action input");
             }
 
+            validateClockDomain(id, definition, handler, hidden, errors);
+
             validateHandlerOperation(id, definition, handler, handlerOperations, errors);
             validatePins(id, definition, "inputs", dataTypes, errors);
             validatePins(id, definition, "outputs", dataTypes, errors);
@@ -275,42 +276,99 @@ public final class NodeDefinitionBuildValidator {
             } else if (!names.add(name)) {
                 errors.add(id + " has duplicate pin " + name + " in " + key);
             }
-            String pinType = string(pin, "type");
+            String pinType = string(pin, "pinType");
+            if (pinType == null) {
+                pinType = string(pin, "type");
+            }
             String dataType = string(pin, "dataType");
             if (!"FLOW".equalsIgnoreCase(String.valueOf(pinType))) {
-                String normalized = dataType == null || dataType.isBlank() ? "any" : dataType.toLowerCase(Locale.ROOT);
-                if (!dataTypes.contains(normalized)) {
-                    errors.add(id + "." + name + " references unknown dataType " + dataType);
-                }
+                validateDataTypeExpression(id, name, dataType, dataTypes, errors);
             }
             String optionsSource = string(pin, "optionsSource");
             if (optionsSource != null && !optionsSource.isBlank()) {
                 validateOptionSource(id, name, optionsSource, errors);
             }
+            if (pin.has("options") && pin.get("options").isJsonObject()) {
+                errors.add(id + "." + name + " uses an object for options; dynamic catalogs require optionsSource");
+            }
+            if (pin.has("repeatable")) {
+                if (!"inputs".equals(key) || !pin.get("repeatable").isJsonObject()) {
+                    errors.add(id + "." + name + " has invalid repeatable input metadata");
+                } else {
+                    JsonObject repeatable = pin.getAsJsonObject("repeatable");
+                    String groupId = string(repeatable, "groupId");
+                    if (groupId == null || groupId.isBlank()) {
+                        errors.add(id + "." + name + " repeatable metadata requires groupId");
+                    }
+                }
+            }
+        }
+    }
+
+    private static void validateClockDomain(String id, JsonObject definition, String handler, boolean hidden, List<String> errors) {
+        String operation = definition.has("handlerConfig") && definition.get("handlerConfig").isJsonObject()
+            ? string(definition.getAsJsonObject("handlerConfig"), "operation") : null;
+        boolean temporal = "TimeHandler".equals(handler) || "ScheduleHandler".equals(handler)
+            || "delay".equals(operation) || "loop_interval".equals(operation);
+        String clockDomain = string(definition, "clockDomain");
+        if (temporal && !hidden && (clockDomain == null || clockDomain.isBlank())) {
+            errors.add(id + " is temporal and does not declare clockDomain");
+            return;
+        }
+        if (clockDomain == null || clockDomain.isBlank()) {
+            return;
+        }
+        for (String domain : clockDomain.split(",")) {
+            if (!CLOCK_DOMAINS.contains(domain.strip())) {
+                errors.add(id + " declares unknown clockDomain " + domain.strip());
+            }
+        }
+    }
+
+    private static void validateDataTypeExpression(String nodeId, String pinName, String expression, Set<String> dataTypes, List<String> errors) {
+        FlowTypeRef typeRef;
+        try {
+            typeRef = FlowTypeRef.parse(expression == null || expression.isBlank() ? "any" : expression);
+        } catch (IllegalArgumentException exception) {
+            errors.add(nodeId + "." + pinName + " has invalid dataType expression " + expression);
+            return;
+        }
+        validateDataTypeRef(nodeId, pinName, typeRef, dataTypes, errors);
+    }
+
+    private static void validateDataTypeRef(String nodeId, String pinName, FlowTypeRef typeRef, Set<String> dataTypes, List<String> errors) {
+        if (typeRef.isTypeVariable()) {
+            return;
+        }
+        if (!dataTypes.contains(typeRef.getTypeId())) {
+            errors.add(nodeId + "." + pinName + " references unknown dataType " + typeRef.getTypeId());
+        }
+        int arguments = typeRef.getArguments().size();
+        if (Set.of("list", "set", "queue", "stack", "optional", "result", "job_reference").contains(typeRef.getTypeId()) && arguments != 1) {
+            errors.add(nodeId + "." + pinName + " requires one type argument for " + typeRef.getTypeId());
+        }
+        if ("map".equals(typeRef.getTypeId()) && arguments != 2) {
+            errors.add(nodeId + "." + pinName + " requires key and value type arguments for map");
+        }
+        if ("resource_reference".equals(typeRef.getTypeId())) {
+            if (typeRef.getArguments().size() > 1) {
+                errors.add(nodeId + "." + pinName + " resource reference accepts at most one resource kind");
+            } else if (!typeRef.getArguments().isEmpty()) {
+                String resourceKind = typeRef.getArguments().getFirst().getTypeId();
+                if (ReSyncResourceCatalog.byType(resourceKind) == null && !resourceKind.contains(":")) {
+                    errors.add(nodeId + "." + pinName + " references unknown resource kind " + resourceKind);
+                }
+            }
+            return;
+        }
+        for (FlowTypeRef argument : typeRef.getArguments()) {
+            validateDataTypeRef(nodeId, pinName, argument, dataTypes, errors);
         }
     }
 
     private static void validateOptionSource(String id, String pinName, String optionsSource, List<String> errors) {
-        String prefix;
-        if (optionsSource.startsWith("server:minecraft:")) {
-            prefix = "server:minecraft:";
-        } else if (optionsSource.startsWith("client:minecraft:")) {
-            prefix = "client:minecraft:";
-        } else if (optionsSource.startsWith("minecraft:")) {
-            prefix = "minecraft:";
-        } else if (optionsSource.startsWith("server:custom_content:")) {
-            String catalog = optionsSource.substring("server:custom_content:".length());
-            if (!Set.of("provider", "recipe_item", "nexo_item", "nexo_block", "nexo_furniture", "nexo_armor").contains(catalog)) {
-                errors.add(id + "." + pinName + " references unknown custom content optionsSource " + optionsSource);
-            }
-            return;
-        } else {
-            errors.add(id + "." + pinName + " references unsupported optionsSource " + optionsSource);
-            return;
-        }
-        String catalog = optionsSource.substring(prefix.length());
-        if (!OPTION_SOURCES.contains(catalog)) {
-            errors.add(id + "." + pinName + " references unknown minecraft optionsSource " + optionsSource);
+        if (!OPTION_SOURCE_ID.matcher(optionsSource).matches()) {
+            errors.add(id + "." + pinName + " references malformed optionsSource " + optionsSource);
         }
     }
 

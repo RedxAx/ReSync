@@ -3,21 +3,57 @@ package restudio.resync.flow.migration;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
+import restudio.flow.data.FlowSerializer;
+import restudio.flow.data.FlowVariable;
 import restudio.resync.Log;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 public class FlowGraphMigrator {
     private static final Set<String> LEGACY_EVENT_FLOW_PINS = Set.of("next", "left", "right", "middle", "shift_left", "shift_right");
+    private static final Map<Character, String> LEGACY_NAMED_COLORS = Map.ofEntries(
+        Map.entry('0', "black"), Map.entry('1', "dark_blue"), Map.entry('2', "dark_green"), Map.entry('3', "dark_aqua"),
+        Map.entry('4', "dark_red"), Map.entry('5', "dark_purple"), Map.entry('6', "gold"), Map.entry('7', "gray"),
+        Map.entry('8', "dark_gray"), Map.entry('9', "blue"), Map.entry('a', "green"), Map.entry('b', "aqua"),
+        Map.entry('c', "red"), Map.entry('d', "light_purple"), Map.entry('e', "yellow"), Map.entry('f', "white")
+    );
+    private static final Map<String, String> NAMED_COLOR_RGB = Map.ofEntries(
+        Map.entry("black", "#000000"), Map.entry("dark_blue", "#0000AA"), Map.entry("dark_green", "#00AA00"), Map.entry("dark_aqua", "#00AAAA"),
+        Map.entry("dark_red", "#AA0000"), Map.entry("dark_purple", "#AA00AA"), Map.entry("gold", "#FFAA00"), Map.entry("gray", "#AAAAAA"),
+        Map.entry("dark_gray", "#555555"), Map.entry("blue", "#5555FF"), Map.entry("green", "#55FF55"), Map.entry("aqua", "#55FFFF"),
+        Map.entry("red", "#FF5555"), Map.entry("light_purple", "#FF55FF"), Map.entry("yellow", "#FFFF55"), Map.entry("white", "#FFFFFF")
+    );
+    private static final Map<String, String> LEGACY_PARTICLE_MODES = Map.ofEntries(
+        Map.entry("particle_spawn", "point"), Map.entry("particle.spawn", "point"),
+        Map.entry("particle_area", "area"), Map.entry("particle.area", "area"),
+        Map.entry("particle_player_spawn", "player"), Map.entry("particle.player.spawn", "player"),
+        Map.entry("particle_line", "line"), Map.entry("particle.line", "line"),
+        Map.entry("particle_circle", "circle"), Map.entry("particle.circle", "circle"),
+        Map.entry("particle_sphere", "sphere"), Map.entry("particle.sphere", "sphere"),
+        Map.entry("particle_ellipse", "ellipse"), Map.entry("particle.ellipse", "ellipse"),
+        Map.entry("particle_spiral", "spiral"), Map.entry("particle.spiral", "spiral"),
+        Map.entry("particle_cone", "cone"), Map.entry("particle.cone", "cone"),
+        Map.entry("particle_ring", "ring"), Map.entry("particle.ring", "ring"),
+        Map.entry("particle_cube", "cube"), Map.entry("particle.cube", "cube"),
+        Map.entry("particle_wave", "wave"), Map.entry("particle.wave", "wave"),
+        Map.entry("particle_text", "text"), Map.entry("particle.text", "text"),
+        Map.entry("particle_block_dust", "block_dust"), Map.entry("particle.block.dust", "block_dust"),
+        Map.entry("particle_item_break", "item_break"), Map.entry("particle.item.break", "item_break"),
+        Map.entry("particle_explosion", "explosion"), Map.entry("particle.explosion", "explosion")
+    );
     private final FlowStorage storage;
     private final NodeDefinitionRegistry nodeDefinitionRegistry;
     private final IdCompatibilityLayer idCompatibility;
+    private volatile FlowMigrationReport lastReport = FlowMigrationReport.empty();
 
     public FlowGraphMigrator(FlowStorage storage) {
         this(storage, null);
@@ -33,21 +69,44 @@ public class FlowGraphMigrator {
         if (storage == null) {
             return;
         }
+        String migrationId = "flow-v" + FlowGraph.CURRENT_VERSION + "-" + System.currentTimeMillis();
+        int scanned = 0;
         int migrated = 0;
+        int failed = 0;
+        int changedNodes = 0;
+        ArrayList<String> changedGraphIds = new ArrayList<>();
+        ArrayList<String> failedGraphIds = new ArrayList<>();
         for (String flowId : storage.listFlowIds()) {
+            scanned++;
             boolean legacyGraphFile = !storage.hasStoredGraphVersion(flowId);
             FlowGraph graph = storage.getGraph(flowId);
             if (graph == null) {
                 continue;
             }
-            if (migrateGraph(graph, legacyGraphFile)) {
-                storage.saveGraph(graph);
-                migrated++;
+            try {
+                FlowGraph candidate = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
+                GraphMigrationResult result = migrateGraphDetailed(candidate, legacyGraphFile);
+                if (result.changed()) {
+                    storage.backupGraphForMigration(flowId, migrationId);
+                    storage.saveGraph(candidate);
+                    migrated++;
+                    changedNodes += result.changedNodes();
+                    changedGraphIds.add(flowId);
+                }
+            } catch (RuntimeException exception) {
+                failed++;
+                failedGraphIds.add(flowId);
+                Log.warn("[FlowGraphMigrator] Failed to migrate " + flowId + ": " + exception.getMessage());
             }
         }
-        if (migrated > 0) {
-            Log.info("[FlowGraphMigrator] Migrated " + migrated + " flow(s) to version " + FlowGraph.CURRENT_VERSION);
+        lastReport = new FlowMigrationReport(migrationId, scanned, migrated, failed, changedNodes, changedGraphIds, failedGraphIds);
+        if (migrated > 0 || failed > 0) {
+            Log.info("[FlowGraphMigrator] Scanned " + scanned + ", migrated " + migrated + ", changed nodes " + changedNodes + ", failed " + failed);
         }
+    }
+
+    public FlowMigrationReport getLastReport() {
+        return lastReport;
     }
 
     public boolean migrateGraph(FlowGraph graph) {
@@ -55,19 +114,25 @@ public class FlowGraphMigrator {
     }
 
     public boolean migrateGraph(FlowGraph graph, boolean forceLegacyGraph) {
+        return migrateGraphDetailed(graph, forceLegacyGraph).changed();
+    }
+
+    private GraphMigrationResult migrateGraphDetailed(FlowGraph graph, boolean forceLegacyGraph) {
         if (graph == null) {
-            return false;
+            return new GraphMigrationResult(false, 0);
         }
         boolean changed = false;
+        int changedNodes = 0;
         boolean legacyGraph = forceLegacyGraph || graph.getVersion() <= 0;
         boolean outdatedGraph = forceLegacyGraph || graph.getVersion() < FlowGraph.CURRENT_VERSION;
         if (outdatedGraph) {
             graph.setVersion(FlowGraph.CURRENT_VERSION);
+            migrateGraphMetadata(graph);
             changed = true;
         }
         Map<String, FlowNode> nodes = graph.getNodes();
         if (nodes == null || nodes.isEmpty()) {
-            return changed;
+            return new GraphMigrationResult(changed, 0);
         }
         Map<String, String> originalTypes = new HashMap<>();
         for (Map.Entry<String, FlowNode> entry : nodes.entrySet()) {
@@ -76,29 +141,78 @@ public class FlowGraphMigrator {
                 continue;
             }
             String originalType = node.getType();
+            boolean nodeChanged = false;
             originalTypes.put(entry.getKey(), originalType);
             boolean legacyNode = node.getVersion() <= 0;
-            boolean outdatedNode = node.getVersion() < FlowNode.CURRENT_VERSION;
             String mappedType = idCompatibility.mapToNew(originalType);
             if (mappedType != null && !mappedType.equals(originalType) && (legacyGraph || legacyNode || idCompatibility.hasMapping(originalType))) {
                 node.setType(mappedType);
                 changed = true;
+                nodeChanged = true;
             }
-            if (migrateNodeValues(node, originalType)) {
+            if (migrateNodeValues(graph, node, originalType, outdatedGraph)) {
                 changed = true;
+                nodeChanged = true;
             }
             if (migrateHandlerConfig(node)) {
                 changed = true;
+                nodeChanged = true;
             }
-            if (outdatedNode) {
-                node.setVersion(FlowNode.CURRENT_VERSION);
+            int targetVersion = targetNodeVersion(node);
+            if (node.getVersion() < targetVersion) {
+                node.setVersion(targetVersion);
                 changed = true;
+                nodeChanged = true;
+            }
+            if (nodeChanged) {
+                changedNodes++;
             }
         }
-        if (migrateConnections(graph, originalTypes)) {
+        if (migrateConnections(graph, originalTypes, outdatedGraph)) {
             changed = true;
         }
-        return changed;
+        return new GraphMigrationResult(changed, changedNodes);
+    }
+
+    private void migrateGraphMetadata(FlowGraph graph) {
+        graph.setFunctionOwner(graph.getFunctionOwner());
+        graph.setFunctionNamespace(graph.getFunctionNamespace());
+        graph.setFunctionVersion(graph.getFunctionVersion());
+        graph.setFunctionDescription(graph.getFunctionDescription());
+        if (graph.getFunctionInputs() != null) {
+            for (FlowGraph.FunctionParameter parameter : graph.getFunctionInputs()) {
+                if (parameter != null) {
+                    parameter.setTypeRef(parameter.getTypeRef().normalizedGenerics());
+                }
+            }
+        }
+        if (graph.getFunctionOutputs() != null) {
+            for (FlowGraph.FunctionParameter parameter : graph.getFunctionOutputs()) {
+                if (parameter != null) {
+                    parameter.setTypeRef(parameter.getTypeRef().normalizedGenerics());
+                }
+            }
+        }
+        if (graph.getLocalVariables() != null) {
+            for (FlowVariable variable : graph.getLocalVariables()) {
+                if (variable == null) {
+                    continue;
+                }
+                variable.setScope(variable.getScope());
+                variable.setLifetime(variable.getLifetime());
+                variable.setOwner(variable.getOwner());
+                variable.setAbsencePolicy(variable.getAbsencePolicy());
+                variable.setConcurrencyPolicy(variable.getConcurrencyPolicy());
+            }
+        }
+    }
+
+    private int targetNodeVersion(FlowNode node) {
+        if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
+            return FlowNode.CURRENT_VERSION;
+        }
+        NodeDefinition definition = nodeDefinitionRegistry.get(node.getType());
+        return definition != null ? Math.max(FlowNode.CURRENT_VERSION, definition.getSchemaVersion()) : FlowNode.CURRENT_VERSION;
     }
 
     private boolean migrateHandlerConfig(FlowNode node) {
@@ -123,7 +237,7 @@ public class FlowGraphMigrator {
         return changed;
     }
 
-    private boolean migrateNodeValues(FlowNode node, String originalType) {
+    private boolean migrateNodeValues(FlowGraph graph, FlowNode node, String originalType, boolean outdatedGraph) {
         if (node == null) {
             return false;
         }
@@ -139,9 +253,60 @@ public class FlowGraphMigrator {
                 inputValues.put("mode", "push");
                 changed = true;
             }
-        } else if ("entity_kill".equals(originalType)) {
-            if (!"do".equals(inputValues.get("action"))) {
-                inputValues.put("action", "do");
+        }
+        if (outdatedGraph && "entity.kill".equals(node.getType()) && inputValues.remove("action") != null) {
+            changed = true;
+        }
+        if ("custom_content.item".equals(node.getType()) || "custom_content.block".equals(node.getType()) || "custom_content.armor".equals(node.getType())) {
+            Object legacyArmorSlot = inputValues.remove("armor_slot");
+            if (legacyArmorSlot != null) {
+                changed = true;
+            }
+            if ("custom_content.armor".equals(node.getType()) && graph != null && !graph.getContentProperties().containsKey("armor_slot")) {
+                String armorSlot = legacyArmorSlot != null && !String.valueOf(legacyArmorSlot).isBlank() ? String.valueOf(legacyArmorSlot) : "chest";
+                graph.getContentProperties().put("armor_slot", armorSlot);
+                changed = true;
+            }
+        }
+        String scheduleType = switch (originalType != null ? originalType : "") {
+            case "misc.delay", "delay.ticks" -> "schedule.wait_ticks";
+            case "delay", "delay.seconds" -> "schedule.delay";
+            case "cancel.schedule" -> "schedule.cancel_task";
+            default -> null;
+        };
+        if (scheduleType != null) {
+            if (!scheduleType.equals(node.getType())) {
+                node.setType(scheduleType);
+                changed = true;
+            }
+            String operation = switch (scheduleType) {
+                case "schedule.wait_ticks" -> "wait_ticks";
+                case "schedule.cancel_task" -> "cancel_task";
+                default -> "delay";
+            };
+            Map<String, Object> handlerConfig = node.getHandlerConfigValues();
+            if (!operation.equals(handlerConfig.get("operation"))) {
+                handlerConfig.put("operation", operation);
+                node.setHandlerConfig(handlerConfig);
+                changed = true;
+            }
+        }
+        String particleMode = originalType != null ? LEGACY_PARTICLE_MODES.get(originalType) : null;
+        if (particleMode == null && node.getType() != null) particleMode = LEGACY_PARTICLE_MODES.get(node.getType());
+        if (particleMode != null) {
+            if (!"particle.apply".equals(node.getType())) {
+                node.setType("particle.apply");
+                changed = true;
+            }
+            changed |= putIfDifferent(inputValues, "mode", particleMode);
+            changed |= moveInputValue(inputValues, "particle_type", "particle");
+            changed |= moveInputValue(inputValues, "center_location", "location");
+            changed |= moveInputValue(inputValues, "is_filled", "filled");
+            changed |= moveInputValue(inputValues, "points", "count");
+            Map<String, Object> handlerConfig = node.getHandlerConfigValues();
+            if (!"particle_apply".equals(handlerConfig.get("operation"))) {
+                handlerConfig.put("operation", "particle_apply");
+                node.setHandlerConfig(handlerConfig);
                 changed = true;
             }
         }
@@ -150,7 +315,144 @@ public class FlowGraphMigrator {
             changed |= lowerCaseInputValue(inputValues, "mode");
             changed |= lowerCaseInputValue(inputValues, "scope");
         }
+        if ("permission.perm_has".equals(node.getType()) || "perm.check".equals(node.getType())) {
+            changed |= migrateRepeatableCount(inputValues, "__permission_count", "__repeatable_count:permissions");
+        }
+        changed |= migrateTimeValues(inputValues, originalType, node.getType());
+        changed |= migrateTypedColorValues(node, inputValues);
+        changed |= migrateResourceReferences(node.getType(), inputValues);
         return changed;
+    }
+
+    private boolean migrateTimeValues(Map<String, Object> inputValues, String originalType, String currentType) {
+        if (originalType == null) {
+            return false;
+        }
+        boolean changed = false;
+        switch (originalType) {
+            case "misc.time_format" -> {
+                changed |= moveInputValue(inputValues, "timestamp_ms", "time");
+                changed |= moveInputValue(inputValues, "format_pattern", "format");
+            }
+            case "misc.time_parse" -> {
+                changed |= moveInputValue(inputValues, "date_string", "string");
+                changed |= moveInputValue(inputValues, "format_pattern", "format");
+            }
+            case "misc.time_add" -> changed |= moveInputValue(inputValues, "timestamp_ms", "time");
+            case "misc.time_diff" -> {
+                changed |= moveInputValue(inputValues, "timestamp1_ms", "time1");
+                changed |= moveInputValue(inputValues, "timestamp2_ms", "time2");
+            }
+            default -> {}
+        }
+        if (Set.of("time.format", "time.parse", "time.add", "schedule.schedule", "schedule.cron", "schedule.at.time").contains(currentType)) {
+            Object zone = inputValues.get("time_zone");
+            if (zone == null || zone.toString().isBlank()) {
+                inputValues.put("time_zone", "UTC");
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private boolean migrateTypedColorValues(FlowNode node, Map<String, Object> inputValues) {
+        if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
+            return false;
+        }
+        NodeDefinition definition = nodeDefinitionRegistry.get(node.getType());
+        if (definition == null) {
+            return false;
+        }
+        boolean changed = false;
+        for (NodeDefinition.PinDefinition input : definition.getInputs()) {
+            Object value = inputValues.get(input.getName());
+            if (value == null) {
+                continue;
+            }
+            String typeId = input.getTypeRef().getTypeId();
+            Object normalized = switch (typeId) {
+                case "named_text_color" -> normalizeNamedColor(value);
+                case "rgb_color" -> normalizeRgbColor(value);
+                default -> value;
+            };
+            if (!normalized.equals(value)) {
+                inputValues.put(input.getName(), normalized);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private Object normalizeNamedColor(Object value) {
+        if (!(value instanceof String text)) {
+            return value;
+        }
+        String normalized = text.strip().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        if (normalized.length() == 2 && (normalized.charAt(0) == '&' || normalized.charAt(0) == '§')) {
+            return LEGACY_NAMED_COLORS.getOrDefault(normalized.charAt(1), value.toString());
+        }
+        return NAMED_COLOR_RGB.containsKey(normalized) ? normalized : value;
+    }
+
+    private Object normalizeRgbColor(Object value) {
+        if (value instanceof Number number) {
+            return String.format("#%06X", number.intValue() & 0xFFFFFF);
+        }
+        if (!(value instanceof String text)) {
+            return value;
+        }
+        Object named = normalizeNamedColor(text);
+        if (named instanceof String name && NAMED_COLOR_RGB.containsKey(name)) {
+            return NAMED_COLOR_RGB.get(name);
+        }
+        String normalized = text.strip();
+        if (normalized.startsWith("0x") || normalized.startsWith("0X")) {
+            normalized = normalized.substring(2);
+        } else if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1);
+        }
+        if (normalized.matches("(?i)[0-9a-f]{3}")) {
+            normalized = "" + normalized.charAt(0) + normalized.charAt(0) + normalized.charAt(1) + normalized.charAt(1)
+                + normalized.charAt(2) + normalized.charAt(2);
+        }
+        return normalized.matches("(?i)[0-9a-f]{6}") ? "#" + normalized.toUpperCase(Locale.ROOT) : value;
+    }
+
+    private boolean migrateResourceReferences(String nodeType, Map<String, Object> inputValues) {
+        if (nodeType == null) {
+            return false;
+        }
+        return switch (nodeType) {
+            case "loot.generate", "loot.give", "loot.fill_container" -> migrateResourceReference(inputValues, "loot_table", "loot_table");
+            case "trade.apply_trade_profile", "trade.open_trades" -> migrateResourceReference(inputValues, "profile_id", "trade_profile");
+            case "npc.spawn", "npc.despawn", "npc.open" -> migrateResourceReference(inputValues, "npc_id", "npc_definition");
+            case "npc.set_profile" -> migrateResourceReference(inputValues, "npc_id", "npc_definition")
+                | migrateResourceReference(inputValues, "profile_id", "trade_profile");
+            case "network.get.server.health", "network.server.mode" -> migrateResourceReference(inputValues, "node_id", "network_node");
+            case "network.player.send" -> migrateResourceReference(inputValues, "server", "network_route");
+            case "network.player.handoff" -> migrateResourceReference(inputValues, "target_node", "network_node")
+                | migrateResourceReference(inputValues, "server", "network_route");
+            case "scoreboard.show.template" -> migrateResourceReference(inputValues, "scoreboard_id", "scoreboard");
+            default -> false;
+        };
+    }
+
+    private boolean migrateResourceReference(Map<String, Object> inputValues, String pin, String kind) {
+        Object value = inputValues.get(pin);
+        if (!(value instanceof String id) || id.isBlank()) {
+            return false;
+        }
+        inputValues.put(pin, new FlowResourceReference(kind, id, "builtin"));
+        return true;
+    }
+
+    private boolean migrateRepeatableCount(Map<String, Object> inputValues, String legacyKey, String targetKey) {
+        if (!inputValues.containsKey(legacyKey)) {
+            return false;
+        }
+        Object value = inputValues.remove(legacyKey);
+        inputValues.putIfAbsent(targetKey, value);
+        return true;
     }
 
     private boolean migrateVariableAccessValues(Map<String, Object> inputValues, String originalType) {
@@ -193,8 +495,7 @@ public class FlowGraphMigrator {
             case "variable_decrement" -> changed |= putIfDifferent(inputValues, "mode", "decrement");
             case "variable_multiply" -> changed |= putIfDifferent(inputValues, "mode", "multiply");
             case "variable_divide" -> changed |= putIfDifferent(inputValues, "mode", "divide");
-            default -> {
-            }
+            default -> { return changed; }
         }
         return changed;
     }
@@ -229,7 +530,7 @@ public class FlowGraphMigrator {
         return true;
     }
 
-    private boolean migrateConnections(FlowGraph graph, Map<String, String> originalTypes) {
+    private boolean migrateConnections(FlowGraph graph, Map<String, String> originalTypes, boolean outdatedGraph) {
         if (graph.getConnections() == null || graph.getConnections().isEmpty()) {
             return false;
         }
@@ -242,7 +543,17 @@ public class FlowGraphMigrator {
             FlowNode targetNode = graph.getNodes().get(connection.getTargetNodeId());
             String originalSourceType = originalTypes.get(connection.getSourceNodeId());
             String originalTargetType = originalTypes.get(connection.getTargetNodeId());
-            String sourcePin = mapSourcePin(originalSourceType, sourceNode, connection.getSourcePin());
+            if (isLegacyBreakContinuation(originalSourceType, sourceNode, connection.getSourcePin())) {
+                String loopNodeId = enclosingLoopNodeId(graph, connection.getSourceNodeId());
+                if (loopNodeId != null) {
+                    connection.setSourceNodeId(loopNodeId);
+                    connection.setSourcePin("done");
+                    sourceNode = graph.getNodes().get(loopNodeId);
+                    originalSourceType = originalTypes.get(loopNodeId);
+                    changed = true;
+                }
+            }
+            String sourcePin = mapSourcePin(originalSourceType, sourceNode, connection.getSourcePin(), outdatedGraph);
             if (!equals(sourcePin, connection.getSourcePin())) {
                 connection.setSourcePin(sourcePin);
                 changed = true;
@@ -256,7 +567,48 @@ public class FlowGraphMigrator {
         return changed;
     }
 
-    private String mapSourcePin(String originalType, FlowNode sourceNode, String pin) {
+    private boolean isLegacyBreakContinuation(String originalType, FlowNode sourceNode, String pin) {
+        String currentType = sourceNode != null ? sourceNode.getType() : null;
+        return ("break.loop".equals(originalType) || "break_loop".equals(originalType) || "break.loop".equals(currentType))
+            && ("flow".equals(pin) || "next".equals(pin));
+    }
+
+    private String enclosingLoopNodeId(FlowGraph graph, String nodeId) {
+        ArrayList<String> pending = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        pending.add(nodeId);
+        visited.add(nodeId);
+        for (int index = 0; index < pending.size(); index++) {
+            String current = pending.get(index);
+            for (FlowConnection connection : graph.getConnections()) {
+                if (connection == null || !current.equals(connection.getTargetNodeId()) || !isExecutionInputPin(connection.getTargetPin())) {
+                    continue;
+                }
+                FlowNode source = graph.getNodes().get(connection.getSourceNodeId());
+                if (source != null && isLoopBodyOutput(source.getType(), connection.getSourcePin())) {
+                    return connection.getSourceNodeId();
+                }
+                if (visited.add(connection.getSourceNodeId())) {
+                    pending.add(connection.getSourceNodeId());
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isExecutionInputPin(String pin) {
+        return "flow".equals(pin) || "next".equals(pin);
+    }
+
+    private boolean isLoopBodyOutput(String type, String pin) {
+        if (!"flow".equals(pin) && !"loop".equals(pin)) {
+            return false;
+        }
+        return "loop_while".equals(type) || "loop.count".equals(type) || "loop.for.each".equals(type)
+            || "loop.for.each.player".equals(type) || "loop.for.each.entity".equals(type);
+    }
+
+    private String mapSourcePin(String originalType, FlowNode sourceNode, String pin, boolean outdatedGraph) {
         if (pin == null || pin.isBlank()) {
             return pin;
         }
@@ -270,6 +622,25 @@ public class FlowGraphMigrator {
             if (!"flow".equals(pin) && !pin.startsWith("event.")) {
                 return "event." + pin;
             }
+        }
+        if (originalType != null) {
+            return switch (originalType) {
+                case "loop_while" -> outdatedGraph && "completed".equals(pin) ? "done" : "flow".equals(pin) ? "loop" : pin;
+                case "loop.for.each", "loop.for.each.player", "loop.for.each.entity", "loop.count",
+                     "logic_loop_for_each", "logic_loop_for_each_player", "logic_loop_for_each_entity", "flow.loop_count" -> "flow".equals(pin) ? "loop" : pin;
+                case "misc.time_format" -> "formatted_string".equals(pin) ? "string" : pin;
+                case "misc.time_parse" -> "timestamp_ms".equals(pin) ? "time" : pin;
+                case "misc.time_add" -> "new_timestamp".equals(pin) ? "time" : pin;
+                case "misc.time_diff" -> "diff_value".equals(pin) ? "unit_diff" : pin;
+                case "misc.delay", "delay.ticks", "delay", "delay.seconds" -> "done".equals(pin) ? "completed" : pin;
+                case "particle_spawn", "particle.spawn", "particle_area", "particle.area", "particle_player_spawn", "particle.player.spawn",
+                     "particle_line", "particle.line", "particle_circle", "particle.circle", "particle_sphere", "particle.sphere",
+                     "particle_ellipse", "particle.ellipse", "particle_spiral", "particle.spiral", "particle_cone", "particle.cone",
+                     "particle_ring", "particle.ring", "particle_cube", "particle.cube", "particle_wave", "particle.wave",
+                     "particle_text", "particle.text", "particle_block_dust", "particle.block.dust", "particle_item_break", "particle.item.break",
+                     "particle_explosion", "particle.explosion" -> "next".equals(pin) ? "flow" : pin;
+                default -> pin;
+            };
         }
         return pin;
     }
@@ -288,10 +659,47 @@ public class FlowGraphMigrator {
                 default -> pin;
             };
         }
+        if (originalType != null) {
+            return switch (originalType) {
+                case "misc.time_format" -> switch (pin) {
+                    case "timestamp_ms" -> "time";
+                    case "format_pattern" -> "format";
+                    default -> pin;
+                };
+                case "misc.time_parse" -> switch (pin) {
+                    case "date_string" -> "string";
+                    case "format_pattern" -> "format";
+                    default -> pin;
+                };
+                case "misc.time_add" -> "timestamp_ms".equals(pin) ? "time" : pin;
+                case "misc.time_diff" -> switch (pin) {
+                    case "timestamp1_ms" -> "time1";
+                    case "timestamp2_ms" -> "time2";
+                    default -> pin;
+                };
+                case "particle_spawn", "particle.spawn", "particle_area", "particle.area", "particle_player_spawn", "particle.player.spawn",
+                     "particle_line", "particle.line", "particle_circle", "particle.circle", "particle_sphere", "particle.sphere",
+                     "particle_ellipse", "particle.ellipse", "particle_spiral", "particle.spiral", "particle_cone", "particle.cone",
+                     "particle_ring", "particle.ring", "particle_cube", "particle.cube", "particle_wave", "particle.wave",
+                     "particle_text", "particle.text", "particle_block_dust", "particle.block.dust", "particle_item_break", "particle.item.break",
+                     "particle_explosion", "particle.explosion" -> switch (pin) {
+                    case "particle_type" -> "particle";
+                    case "center_location" -> "location";
+                    case "is_filled" -> "filled";
+                    case "points" -> "count";
+                    case "next" -> "flow";
+                    default -> pin;
+                };
+                default -> pin;
+            };
+        }
         return pin;
     }
 
     private boolean equals(String first, String second) {
         return first == null ? second == null : first.equals(second);
+    }
+
+    private record GraphMigrationResult(boolean changed, int changedNodes) {
     }
 }

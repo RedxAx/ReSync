@@ -21,7 +21,9 @@ public class IdCompatibilityLayer {
 
     private void loadMigrationMap() {
         try (InputStream is = getClass().getResourceAsStream("/nodes/migrated/_id_migration_map.json")) {
-            if (is == null) return;
+            if (is == null) {
+                throw new IllegalStateException("Node migration map is missing");
+            }
             Map<String, String> map = new Gson().fromJson(
                 new InputStreamReader(is, StandardCharsets.UTF_8),
                 new TypeToken<Map<String, String>>() {}.getType()
@@ -37,7 +39,7 @@ public class IdCompatibilityLayer {
                 }
             }
         } catch (Exception e) {
-            // Silently skip if migration map is not available
+            throw new IllegalStateException("Failed to load node migration map", e);
         }
     }
 

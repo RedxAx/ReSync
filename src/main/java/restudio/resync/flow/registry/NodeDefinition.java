@@ -1,12 +1,15 @@
 package restudio.resync.flow.registry;
 
 import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowTypeRef;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class NodeDefinition {
@@ -26,8 +29,10 @@ public class NodeDefinition {
 
         public static final NodeCategory EVENT = new NodeCategory("event", "Event", 0xFFFF5555, 100);
         public static final NodeCategory ACTION = new NodeCategory("action", "Action", 0xFF5555FF, 200);
+        public static final NodeCategory PLAYER = new NodeCategory("player", "Player", 0xFF55AAFF, 250);
         public static final NodeCategory LOGIC = new NodeCategory("logic", "Logic", 0xFFFF55FF, 300);
         public static final NodeCategory NETWORK = new NodeCategory("network", "Network", 0xFF4F8CFF, 350);
+        public static final NodeCategory CHAT = new NodeCategory("chat", "Chat", 0xFF55FFAA, 375);
         public static final NodeCategory DATA = new NodeCategory("data", "Data", 0xFF55FFFF, 400);
         public static final NodeCategory VARIABLE = new NodeCategory("variable", "Variable", 0xFFFFFF55, 500);
         public static final NodeCategory FUNCTION = new NodeCategory("function", "Function", 0xFFFFAA55, 600);
@@ -37,6 +42,9 @@ public class NodeDefinition {
         public static final NodeCategory INVENTORY = new NodeCategory("inventory", "Inventory", 0xFF00CED1, 1000);
         public static final NodeCategory ITEM = new NodeCategory("item", "Item", 0xFF32CD32, 1100);
         public static final NodeCategory SCOREBOARD = new NodeCategory("scoreboard", "Scoreboard", 0xFFDAA520, 1200);
+        public static final NodeCategory TRADE = new NodeCategory("trade", "Trade", 0xFFB8860B, 1225);
+        public static final NodeCategory NPC = new NodeCategory("npc", "NPC", 0xFFCD853F, 1250);
+        public static final NodeCategory LOOT = new NodeCategory("loot", "Loot", 0xFFFFA500, 1275);
         public static final NodeCategory ECONOMY = new NodeCategory("economy", "Economy", 0xFFFFFF00, 1300);
         public static final NodeCategory PERMISSION = new NodeCategory("permission", "Permission", 0xFFBA55D3, 1400);
         public static final NodeCategory ABILITY = new NodeCategory("ability", "Ability", 0xFF00BFA5, 1500);
@@ -79,8 +87,15 @@ public class NodeDefinition {
             if (id == null || id.isBlank()) {
                 return UTILITY;
             }
-            NodeCategory cat = REGISTRY.get(id.toLowerCase());
+            NodeCategory cat = find(id);
             return cat != null ? cat : UTILITY;
+        }
+
+        public static NodeCategory find(String id) {
+            if (id == null || id.isBlank()) {
+                return null;
+            }
+            return REGISTRY.get(id.toLowerCase());
         }
 
         public static List<NodeCategory> values() {
@@ -135,6 +150,8 @@ public class NodeDefinition {
     private final int color;
     private final int priority;
     private final boolean hidden;
+    private final String hiddenReason;
+    private String owner;
     private final String description;
     private final String handler;
     private final Map<String, Object> handlerConfig;
@@ -153,6 +170,12 @@ public class NodeDefinition {
     private final String family;
     private final boolean recommended;
     private final String replacementFor;
+    private final String authorizationPolicy;
+    private final boolean sensitive;
+    private final boolean destructive;
+    private final String auditPolicy;
+    private final String confirmationPolicy;
+    private final String clockDomain;
 
     private NodeDefinition(Builder builder) {
         this.id = builder.id;
@@ -163,6 +186,8 @@ public class NodeDefinition {
         this.color = builder.color;
         this.priority = builder.priority;
         this.hidden = builder.hidden;
+        this.hiddenReason = builder.hiddenReason;
+        this.owner = builder.owner;
         this.description = builder.description;
         this.handler = builder.handler;
         this.handlerConfig = builder.handlerConfig;
@@ -181,6 +206,12 @@ public class NodeDefinition {
         this.family = builder.family;
         this.recommended = builder.recommended;
         this.replacementFor = builder.replacementFor;
+        this.authorizationPolicy = builder.authorizationPolicy;
+        this.sensitive = builder.sensitive;
+        this.destructive = builder.destructive;
+        this.auditPolicy = builder.auditPolicy;
+        this.confirmationPolicy = builder.confirmationPolicy;
+        this.clockDomain = builder.clockDomain;
     }
 
     public String getId() {
@@ -213,6 +244,18 @@ public class NodeDefinition {
 
     public boolean isHidden() {
         return hidden;
+    }
+
+    public String getHiddenReason() {
+        return hiddenReason != null ? hiddenReason : "";
+    }
+
+    public String getOwner() {
+        return owner != null && !owner.isBlank() ? owner : "builtin";
+    }
+
+    public void assignOwner(String owner) {
+        this.owner = owner != null && !owner.isBlank() ? owner : "builtin";
     }
 
     public String getDescription() {
@@ -271,6 +314,30 @@ public class NodeDefinition {
         return tags;
     }
 
+    public String getAuthorizationPolicy() {
+        return authorizationPolicy != null && !authorizationPolicy.isBlank() ? authorizationPolicy : "trusted_server_flow";
+    }
+
+    public boolean isSensitive() {
+        return sensitive;
+    }
+
+    public boolean isDestructive() {
+        return destructive;
+    }
+
+    public String getAuditPolicy() {
+        return auditPolicy != null && !auditPolicy.isBlank() ? auditPolicy : "none";
+    }
+
+    public String getConfirmationPolicy() {
+        return confirmationPolicy != null && !confirmationPolicy.isBlank() ? confirmationPolicy : "none";
+    }
+
+    public String getClockDomain() {
+        return clockDomain != null ? clockDomain : "";
+    }
+
     public List<String> getExamples() {
         return examples;
     }
@@ -285,6 +352,19 @@ public class NodeDefinition {
 
     public String getReplacementFor() {
         return replacementFor;
+    }
+
+    public NodeDefinition withPins(List<PinDefinition> inputs, List<PinDefinition> outputs) {
+        Builder builder = new Builder(this);
+        builder.inputs.clear();
+        builder.outputs.clear();
+        if (inputs != null) {
+            builder.inputs.addAll(inputs);
+        }
+        if (outputs != null) {
+            builder.outputs.addAll(outputs);
+        }
+        return builder.build();
     }
 
     public record PinMapping(String source, String target) {
@@ -338,11 +418,43 @@ public class NodeDefinition {
         }
     }
 
+    public static class RepeatablePin {
+        private final String groupId;
+        private final int minItems;
+        private final int maxItems;
+        private final String itemLabel;
+
+        public RepeatablePin(String groupId, int minItems, int maxItems, String itemLabel) {
+            this.groupId = groupId;
+            this.minItems = Math.max(0, minItems);
+            this.maxItems = Math.max(this.minItems, maxItems);
+            this.itemLabel = itemLabel;
+        }
+
+        public String getGroupId() {
+            return groupId;
+        }
+
+        public int getMinItems() {
+            return minItems;
+        }
+
+        public int getMaxItems() {
+            return maxItems;
+        }
+
+        public String getItemLabel() {
+            return itemLabel;
+        }
+    }
+
     public static class PinDefinition {
         private final String name;
         private final PinType type;
         private final PinDirection direction;
         private final FlowDataType dataType;
+        private final FlowTypeRef typeRef;
+        private final RepeatablePin repeatable;
         private final WidgetType widgetType;
         private final List<String> options;
         private final String optionsSource;
@@ -360,6 +472,10 @@ public class NodeDefinition {
             this(name, type, direction, dataType, null, null, null, null, null, null, null, optional);
         }
 
+        public PinDefinition(String name, PinType type, PinDirection direction, FlowDataType dataType, FlowTypeRef typeRef) {
+            this(name, type, direction, dataType, null, null, null, null, null, null, null, false, typeRef);
+        }
+
         public PinDefinition(String name, PinType type, PinDirection direction, FlowDataType dataType,
                              WidgetType widgetType, List<String> options, String optionsSource, String defaultValue,
                              PinConstraints constraints, Map<String, String> visibleWhen, String description) {
@@ -369,10 +485,28 @@ public class NodeDefinition {
         public PinDefinition(String name, PinType type, PinDirection direction, FlowDataType dataType,
                              WidgetType widgetType, List<String> options, String optionsSource, String defaultValue,
                              PinConstraints constraints, Map<String, String> visibleWhen, String description, boolean optional) {
+            this(name, type, direction, dataType, widgetType, options, optionsSource, defaultValue, constraints, visibleWhen,
+                description, optional, dataType != null ? FlowTypeRef.simple(dataType.getId()) : FlowTypeRef.simple("any"));
+        }
+
+        public PinDefinition(String name, PinType type, PinDirection direction, FlowDataType dataType,
+                             WidgetType widgetType, List<String> options, String optionsSource, String defaultValue,
+                             PinConstraints constraints, Map<String, String> visibleWhen, String description, boolean optional,
+                             FlowTypeRef typeRef) {
+            this(name, type, direction, dataType, widgetType, options, optionsSource, defaultValue, constraints, visibleWhen,
+                description, optional, typeRef, null);
+        }
+
+        public PinDefinition(String name, PinType type, PinDirection direction, FlowDataType dataType,
+                             WidgetType widgetType, List<String> options, String optionsSource, String defaultValue,
+                             PinConstraints constraints, Map<String, String> visibleWhen, String description, boolean optional,
+                             FlowTypeRef typeRef, RepeatablePin repeatable) {
             this.name = name;
             this.type = type;
             this.direction = direction;
             this.dataType = dataType;
+            this.typeRef = typeRef;
+            this.repeatable = repeatable;
             this.widgetType = widgetType;
             this.options = options != null ? options : Collections.emptyList();
             this.optionsSource = optionsSource;
@@ -397,6 +531,14 @@ public class NodeDefinition {
 
         public FlowDataType getDataType() {
             return dataType;
+        }
+
+        public FlowTypeRef getTypeRef() {
+            return typeRef != null ? typeRef : FlowTypeRef.simple(dataType != null ? dataType.getId() : "any");
+        }
+
+        public RepeatablePin getRepeatable() {
+            return repeatable;
         }
 
         public WidgetType getWidgetType() {
@@ -441,6 +583,8 @@ public class NodeDefinition {
         private int color = 0xFFAAAAAA;
         private int priority = 0;
         private boolean hidden = false;
+        private String hiddenReason = "";
+        private String owner = "builtin";
         private String description;
         private String handler;
         private Map<String, Object> handlerConfig;
@@ -459,11 +603,54 @@ public class NodeDefinition {
         private String family;
         private boolean recommended;
         private String replacementFor;
+        private String authorizationPolicy = "trusted_server_flow";
+        private boolean sensitive;
+        private boolean destructive;
+        private String auditPolicy = "none";
+        private String confirmationPolicy = "none";
+        private String clockDomain = "";
 
         public Builder(String id, String displayName, NodeCategory category) {
             this.id = id;
             this.displayName = displayName;
             this.category = category;
+        }
+
+        private Builder(NodeDefinition definition) {
+            this.id = definition.id;
+            this.displayName = definition.displayName;
+            this.category = definition.category;
+            this.inputs.addAll(definition.inputs);
+            this.outputs.addAll(definition.outputs);
+            this.color = definition.color;
+            this.priority = definition.priority;
+            this.hidden = definition.hidden;
+            this.hiddenReason = definition.hiddenReason;
+            this.owner = definition.owner;
+            this.description = definition.description;
+            this.handler = definition.handler;
+            this.handlerConfig = definition.handlerConfig;
+            this.trigger = definition.trigger;
+            this.eventType = definition.eventType;
+            this.aliases = definition.aliases;
+            this.outputMappings = definition.outputMappings;
+            this.schemaVersion = definition.schemaVersion;
+            this.kind = definition.kind;
+            this.availability = definition.availability;
+            this.canonicalId = definition.canonicalId;
+            this.legacyIds = definition.legacyIds;
+            this.deprecated = definition.deprecated;
+            this.tags = definition.tags;
+            this.examples = definition.examples;
+            this.family = definition.family;
+            this.recommended = definition.recommended;
+            this.replacementFor = definition.replacementFor;
+            this.authorizationPolicy = definition.authorizationPolicy;
+            this.sensitive = definition.sensitive;
+            this.destructive = definition.destructive;
+            this.auditPolicy = definition.auditPolicy;
+            this.confirmationPolicy = definition.confirmationPolicy;
+            this.clockDomain = definition.clockDomain;
         }
 
         public Builder input(String name, PinType type, FlowDataType dataType) {
@@ -505,6 +692,16 @@ public class NodeDefinition {
 
         public Builder hidden(boolean hidden) {
             this.hidden = hidden;
+            return this;
+        }
+
+        public Builder hiddenReason(String hiddenReason) {
+            this.hiddenReason = hiddenReason != null ? hiddenReason : "";
+            return this;
+        }
+
+        public Builder owner(String owner) {
+            this.owner = owner != null && !owner.isBlank() ? owner : "builtin";
             return this;
         }
 
@@ -598,6 +795,36 @@ public class NodeDefinition {
             return this;
         }
 
+        public Builder authorizationPolicy(String authorizationPolicy) {
+            this.authorizationPolicy = authorizationPolicy != null && !authorizationPolicy.isBlank() ? authorizationPolicy : "trusted_server_flow";
+            return this;
+        }
+
+        public Builder sensitive(boolean sensitive) {
+            this.sensitive = sensitive;
+            return this;
+        }
+
+        public Builder destructive(boolean destructive) {
+            this.destructive = destructive;
+            return this;
+        }
+
+        public Builder auditPolicy(String auditPolicy) {
+            this.auditPolicy = auditPolicy != null && !auditPolicy.isBlank() ? auditPolicy : "none";
+            return this;
+        }
+
+        public Builder confirmationPolicy(String confirmationPolicy) {
+            this.confirmationPolicy = confirmationPolicy != null && !confirmationPolicy.isBlank() ? confirmationPolicy : "none";
+            return this;
+        }
+
+        public Builder clockDomain(String clockDomain) {
+            this.clockDomain = clockDomain != null ? clockDomain : "";
+            return this;
+        }
+
         public Builder hidden() {
             return hidden(true);
         }
@@ -609,7 +836,41 @@ public class NodeDefinition {
             if (kind == null) {
                 kind = inferKind();
             }
+            if (description == null || description.isBlank()) {
+                description = displayName + " Flow capability.";
+            }
+            if (tags == null || tags.isEmpty()) {
+                LinkedHashSet<String> resolvedTags = new LinkedHashSet<>();
+                if (id != null) {
+                    for (String token : id.toLowerCase(Locale.ROOT).split("[.:_\\-]+")) {
+                        if (!token.isBlank()) {
+                            resolvedTags.add(token);
+                        }
+                    }
+                }
+                if (category != null) {
+                    resolvedTags.add(category.getId().toLowerCase(Locale.ROOT));
+                }
+                resolvedTags.add(kind.name().toLowerCase(Locale.ROOT));
+                tags = List.copyOf(resolvedTags);
+            }
+            if (examples == null || examples.isEmpty()) {
+                examples = List.of(defaultUsageHint());
+            }
+            if (destructive && "none".equals(confirmationPolicy)) {
+                confirmationPolicy = "explicit_flow_intent";
+            }
             return new NodeDefinition(this);
+        }
+
+        private String defaultUsageHint() {
+            return switch (kind) {
+                case EVENT -> "Connect the event Flow output to the actions that should run.";
+                case ACTION -> "Connect the required inputs, then continue from the Flow output.";
+                case QUERY, PURE -> "Connect the inputs and use the typed outputs in another node.";
+                case FAMILY -> "Choose the operation and connect the inputs required by that operation.";
+                case ALIAS -> "Replace this node with its canonical equivalent.";
+            };
         }
 
         private NodeKind inferKind() {
@@ -636,6 +897,8 @@ public class NodeDefinition {
         private PinType type;
         private PinDirection direction;
         private FlowDataType dataType;
+        private FlowTypeRef typeRef;
+        private RepeatablePin repeatable;
         private WidgetType widgetType;
         private List<String> options;
         private String optionsSource;
@@ -650,6 +913,17 @@ public class NodeDefinition {
             this.type = type;
             this.direction = direction;
             this.dataType = dataType;
+            this.typeRef = dataType != null ? FlowTypeRef.simple(dataType.getId()) : FlowTypeRef.simple("any");
+        }
+
+        public PinBuilder typeRef(FlowTypeRef typeRef) {
+            this.typeRef = typeRef;
+            return this;
+        }
+
+        public PinBuilder repeatable(String groupId, int minItems, int maxItems, String itemLabel) {
+            this.repeatable = new RepeatablePin(groupId, minItems, maxItems, itemLabel);
+            return this;
         }
 
         public PinBuilder widget(WidgetType widgetType) {
@@ -704,7 +978,8 @@ public class NodeDefinition {
         }
 
         public PinDefinition build() {
-            return new PinDefinition(name, type, direction, dataType, widgetType, options, optionsSource, defaultValue, constraints, visibleWhen, description, optional);
+            return new PinDefinition(name, type, direction, dataType, widgetType, options, optionsSource, defaultValue, constraints,
+                visibleWhen, description, optional, typeRef, repeatable);
         }
     }
 }

@@ -24,7 +24,7 @@ public class FlowNode {
         this.version = CURRENT_VERSION;
         this.x = x;
         this.y = y;
-        this.inputValues = inputValues != null ? inputValues : new HashMap<>();
+        this.inputValues = inputValues != null ? new HashMap<>(inputValues) : new HashMap<>();
     }
 
     public String getType() {

@@ -2,12 +2,19 @@ package restudio.resync.flow.registry;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.google.gson.TypeAdapter;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowTypeRef;
 import restudio.resync.Log;
+import restudio.resync.flow.handler.HandlerRegistry;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,7 +30,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -33,6 +42,8 @@ import java.util.jar.JarFile;
 public class NodeDefinitionLoader {
 
     private final Gson gson;
+    private final List<NodeDefinitionDiagnostic> diagnostics = new ArrayList<>();
+    private final Map<NodeDefinition, DefinitionOrigin> origins = new IdentityHashMap<>();
     private NodeDefinitionValidator validator;
 
     public NodeDefinitionLoader() {
@@ -40,16 +51,20 @@ public class NodeDefinitionLoader {
             .registerTypeAdapter(NodeDefinition.PinType.class, new EnumAdapter<>(NodeDefinition.PinType.class))
             .registerTypeAdapter(NodeDefinition.PinDirection.class, new EnumAdapter<>(NodeDefinition.PinDirection.class))
             .registerTypeAdapter(NodeDefinition.WidgetType.class, new EnumAdapter<>(NodeDefinition.WidgetType.class))
-            .registerTypeAdapter(NodeDefinition.NodeCategory.class, new com.google.gson.TypeAdapter<NodeDefinition.NodeCategory>() {
+            .registerTypeAdapter(NodeDefinition.NodeCategory.class, new TypeAdapter<NodeDefinition.NodeCategory>() {
                 @Override
-                public void write(com.google.gson.stream.JsonWriter out, NodeDefinition.NodeCategory value) throws IOException {
+                public void write(JsonWriter out, NodeDefinition.NodeCategory value) throws IOException {
                     out.value(value != null ? value.getId() : null);
                 }
 
                 @Override
-                public NodeDefinition.NodeCategory read(com.google.gson.stream.JsonReader in) throws IOException {
+                public NodeDefinition.NodeCategory read(JsonReader in) throws IOException {
                     String id = in.nextString();
-                    return NodeDefinition.NodeCategory.fromString(id);
+                    NodeDefinition.NodeCategory category = NodeDefinition.NodeCategory.find(id);
+                    if (category == null) {
+                        throw new JsonParseException("Unknown node category: " + id);
+                    }
+                    return category;
                 }
             })
             .registerTypeAdapter(NodeDefinition.NodeKind.class, new EnumAdapter<>(NodeDefinition.NodeKind.class))
@@ -58,6 +73,10 @@ public class NodeDefinitionLoader {
 
     public void setValidator(NodeDefinitionValidator validator) {
         this.validator = validator;
+    }
+
+    public List<NodeDefinitionDiagnostic> getDiagnostics() {
+        return List.copyOf(diagnostics);
     }
 
     public List<NodeDefinition> loadFromClasspath(String resourcePath) {
@@ -161,7 +180,7 @@ public class NodeDefinitionLoader {
                 .filter(p -> !p.getFileName().toString().startsWith("_"))
                 .forEach(p -> {
                     try (InputStream is = Files.newInputStream(p)) {
-                        results.addAll(parse(is));
+                        results.addAll(parse(is, p.toString()));
                     } catch (Exception e) {
                         errors.add(p.getFileName() + ": " + e.getMessage());
                     }
@@ -187,7 +206,7 @@ public class NodeDefinitionLoader {
                     continue;
                 }
                 try (InputStream is = jarFile.getInputStream(entry)) {
-                    results.addAll(parse(is));
+                    results.addAll(parse(is, name));
                 } catch (Exception e) {
                     errors.add(fileName + ": " + e.getMessage());
                 }
@@ -195,19 +214,19 @@ public class NodeDefinitionLoader {
         }
     }
 
-    public List<NodeDefinition> loadFromDirectory(java.nio.file.Path dir) {
+    public List<NodeDefinition> loadFromDirectory(Path dir) {
         List<NodeDefinition> results = new ArrayList<>();
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
             return results;
         }
 
-        try (Stream<java.nio.file.Path> stream = Files.walk(dir)) {
+        try (Stream<Path> stream = Files.walk(dir)) {
             stream.filter(Files::isRegularFile)
                   .filter(p -> p.toString().endsWith(".json"))
                   .filter(p -> !p.getFileName().toString().startsWith("_"))
                   .forEach(p -> {
                       try (InputStream is = Files.newInputStream(p)) {
-                          results.addAll(parse(is));
+                          results.addAll(parse(is, p.toString()));
                       } catch (Exception e) {
                           Log.warn("[NodeDefinitionLoader] Failed to load " + p + ": " + e.getMessage());
                       }
@@ -220,48 +239,76 @@ public class NodeDefinitionLoader {
     }
 
     public List<NodeDefinition> parse(InputStream inputStream) {
+        return parse(inputStream, "stream");
+    }
+
+    public List<NodeDefinition> parse(InputStream inputStream, String source) {
         List<NodeDefinition> results = new ArrayList<>();
         JsonReader reader = new JsonReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-        com.google.gson.JsonElement root = com.google.gson.JsonParser.parseReader(reader);
+        JsonElement root;
+        try {
+            root = JsonParser.parseReader(reader);
+        } catch (RuntimeException exception) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
+            return results;
+        }
 
         if (root.isJsonArray()) {
-            for (com.google.gson.JsonElement element : root.getAsJsonArray()) {
-                NodeDefinition def = parseSingle(element);
-                if (def != null) {
-                    results.add(def);
-                }
+            for (int index = 0; index < root.getAsJsonArray().size(); index++) {
+                parseElement(root.getAsJsonArray().get(index), source, index, results);
             }
         } else if (root.isJsonObject()) {
-            NodeDefinition def = parseSingle(root);
-            if (def != null) {
-                results.add(def);
-            }
+            parseElement(root, source, 0, results);
+        } else {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "INVALID_ROOT", source, -1, "", "Definition file root must be an object or array");
         }
 
         return results;
     }
 
-    private com.google.gson.JsonElement applyCompatibilityTransforms(com.google.gson.JsonElement element) {
+    private void parseElement(JsonElement element, String source, int index, List<NodeDefinition> results) {
+        String nodeId = extractNodeId(element);
+        try {
+            NodeDefinition definition = parseSingle(element);
+            results.add(definition);
+            origins.put(definition, new DefinitionOrigin(source, index));
+        } catch (RuntimeException exception) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "DEFINITION_PARSE_FAILED", source, index, nodeId, exception.getMessage());
+        }
+    }
+
+    private String extractNodeId(JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            return "";
+        }
+        JsonObject object = element.getAsJsonObject();
+        if (!object.has("id") || !object.get("id").isJsonPrimitive()) {
+            return "";
+        }
+        return object.get("id").getAsString();
+    }
+
+    private JsonElement applyCompatibilityTransforms(JsonElement element) {
         if (!element.isJsonObject()) {
             return element;
         }
-        com.google.gson.JsonObject obj = element.getAsJsonObject();
+        JsonObject obj = element.getAsJsonObject();
 
         if (obj.has("inputs") && obj.get("inputs").isJsonArray()) {
-            com.google.gson.JsonArray arr = obj.getAsJsonArray("inputs");
+            JsonArray arr = obj.getAsJsonArray("inputs");
             for (int i = 0; i < arr.size(); i++) {
                 arr.set(i, normalizeLegacyPin(arr.get(i)));
             }
         }
         if (obj.has("outputs") && obj.get("outputs").isJsonArray()) {
-            com.google.gson.JsonArray arr = obj.getAsJsonArray("outputs");
+            JsonArray arr = obj.getAsJsonArray("outputs");
             for (int i = 0; i < arr.size(); i++) {
                 arr.set(i, normalizeLegacyPin(arr.get(i)));
             }
         }
 
         if (obj.has("handlerConfig") && obj.get("handlerConfig").isJsonObject()) {
-            com.google.gson.JsonObject hc = obj.getAsJsonObject("handlerConfig");
+            JsonObject hc = obj.getAsJsonObject("handlerConfig");
             if (hc.has("property") && !obj.has("property") && obj.has("id")) {
                 String id = obj.get("id").getAsString();
                 if (id.contains(".")) {
@@ -274,11 +321,11 @@ public class NodeDefinitionLoader {
         return obj;
     }
 
-    private com.google.gson.JsonElement normalizeLegacyPin(com.google.gson.JsonElement pinEl) {
+    private JsonElement normalizeLegacyPin(JsonElement pinEl) {
         if (!pinEl.isJsonObject()) {
             return pinEl;
         }
-        com.google.gson.JsonObject pin = pinEl.getAsJsonObject();
+        JsonObject pin = pinEl.getAsJsonObject();
 
         if (pin.has("id") && !pin.has("name")) {
             pin.addProperty("name", pin.get("id").getAsString());
@@ -309,15 +356,17 @@ public class NodeDefinitionLoader {
         return pin;
     }
 
-    private NodeDefinition parseSingle(com.google.gson.JsonElement element) {
+    private NodeDefinition parseSingle(JsonElement element) {
         element = applyCompatibilityTransforms(element);
         NodeJson dto = gson.fromJson(element, NodeJson.class);
         if (dto == null || dto.id == null || dto.id.isBlank()) {
-            return null;
+            throw new JsonParseException("Node ID is required");
         }
 
         NodeDefinition.NodeCategory category = dto.category != null ? dto.category : NodeDefinition.NodeCategory.UTILITY;
-        NodeDefinition.Builder builder = new NodeDefinition.Builder(dto.id, dto.displayName != null ? dto.displayName : dto.id, category);
+        String displayName = dto.displayName != null ? dto.displayName : dto.id;
+        NodeDefinition.Builder builder = new NodeDefinition.Builder(dto.id, displayName, category);
+        builder.owner(dto.owner);
 
         if (dto.schemaVersion != null) {
             builder.schemaVersion(dto.schemaVersion);
@@ -328,9 +377,7 @@ public class NodeDefinitionLoader {
         NodeDefinition.Availability availability = dto.availability != null
             ? new NodeDefinition.Availability(dto.availability.plugin, dto.availability.platform, dto.availability.minVersion)
             : inferAvailability(dto.handler);
-        if (availability != null) {
-            builder.availability(availability);
-        }
+        builder.availability(availability != null ? availability : new NodeDefinition.Availability(null, null, null));
         if (dto.canonicalId != null && !dto.canonicalId.isBlank()) {
             builder.canonicalId(dto.canonicalId);
         }
@@ -349,9 +396,12 @@ public class NodeDefinitionLoader {
         }
         if (dto.hidden != null && dto.hidden) {
             builder.hidden();
+            builder.hiddenReason(dto.hiddenReason != null && !dto.hiddenReason.isBlank() ? dto.hiddenReason : defaultHiddenReason(dto));
         }
         if (dto.description != null && !dto.description.isBlank()) {
             builder.description(dto.description);
+        } else {
+            builder.description(defaultDescription(dto, displayName));
         }
         if (dto.handler != null && !dto.handler.isBlank()) {
             builder.handler(dto.handler);
@@ -377,12 +427,8 @@ public class NodeDefinitionLoader {
             }
             builder.outputMappings(mappings);
         }
-        if (dto.tags != null) {
-            builder.tags(dto.tags);
-        }
-        if (dto.examples != null) {
-            builder.examples(dto.examples);
-        }
+        builder.tags(dto.tags != null && !dto.tags.isEmpty() ? dto.tags : defaultTags(dto, category));
+        builder.examples(dto.examples != null && !dto.examples.isEmpty() ? dto.examples : defaultExamples(dto, displayName));
         if (dto.family != null && !dto.family.isBlank()) {
             builder.family(dto.family);
         }
@@ -392,13 +438,34 @@ public class NodeDefinitionLoader {
         if (dto.replacementFor != null && !dto.replacementFor.isBlank()) {
             builder.replacementFor(dto.replacementFor);
         }
+        if (dto.authorizationPolicy != null && !dto.authorizationPolicy.isBlank()) {
+            builder.authorizationPolicy(dto.authorizationPolicy);
+        }
+        boolean sensitive = dto.sensitive != null ? dto.sensitive : isSensitive(dto);
+        builder.sensitive(sensitive);
+        boolean destructive = dto.destructive != null ? dto.destructive : isDestructive(dto);
+        builder.destructive(destructive);
+        if (dto.auditPolicy != null && !dto.auditPolicy.isBlank()) {
+            builder.auditPolicy(dto.auditPolicy);
+        } else if (destructive) {
+            builder.auditPolicy("high_impact");
+        } else if (sensitive) {
+            builder.auditPolicy("sensitive");
+        }
+        if (dto.confirmationPolicy != null && !dto.confirmationPolicy.isBlank()) {
+            builder.confirmationPolicy(dto.confirmationPolicy);
+        } else if (destructive) {
+            builder.confirmationPolicy("explicit_flow_intent");
+        }
+        if (dto.clockDomain != null && !dto.clockDomain.isBlank()) {
+            builder.clockDomain(dto.clockDomain);
+        }
 
         if (dto.inputs != null) {
             for (PinJson pin : dto.inputs) {
                 NodeDefinition.PinDefinition def = toPinDefinition(pin, NodeDefinition.PinDirection.INPUT);
                 if (def == null) {
-                    Log.warn("[NodeDefinitionLoader] Invalid input pin in node: " + dto.id);
-                    return null;
+                    throw new JsonParseException("Invalid input pin in node " + dto.id);
                 }
                 builder.input(def);
             }
@@ -408,8 +475,7 @@ public class NodeDefinitionLoader {
             for (PinJson pin : dto.outputs) {
                 NodeDefinition.PinDefinition def = toPinDefinition(pin, NodeDefinition.PinDirection.OUTPUT);
                 if (def == null) {
-                    Log.warn("[NodeDefinitionLoader] Invalid output pin in node: " + dto.id);
-                    return null;
+                    throw new JsonParseException("Invalid output pin in node " + dto.id);
                 }
                 builder.output(def);
             }
@@ -418,9 +484,214 @@ public class NodeDefinitionLoader {
         return builder.build();
     }
 
+    private String defaultHiddenReason(NodeJson dto) {
+        if (Boolean.TRUE.equals(dto.deprecated)) {
+            return "deprecated";
+        }
+        if (dto.kind == NodeDefinition.NodeKind.ALIAS || dto.canonicalId != null && !dto.canonicalId.isBlank()) {
+            return "migration_only";
+        }
+        return "internal";
+    }
+
+    private String defaultDescription(NodeJson dto, String displayName) {
+        String phrase = displayName == null || displayName.isBlank() ? dto.id : displayName;
+        String normalized = phrase.strip();
+        if (Boolean.TRUE.equals(dto.trigger)) {
+            String event = normalized.toLowerCase(Locale.ROOT);
+            return "Runs when the " + event + (event.endsWith(" event") ? "" : " event") + " occurs.";
+        }
+        List<String> words = List.of(normalized.split("\\s+"));
+        int verbIndex = -1;
+        String action = null;
+        for (int index = 0; index < words.size(); index++) {
+            action = descriptionAction(words.get(index));
+            if (action != null) {
+                verbIndex = index;
+                String candidate = words.get(index).toLowerCase(Locale.ROOT);
+                if (index != 0 || !"list".equals(candidate) && !"set".equals(candidate) && !"map".equals(candidate)) {
+                    break;
+                }
+            }
+        }
+        if (verbIndex < 0) {
+            boolean actionNode = dto.kind == NodeDefinition.NodeKind.ACTION || dto.kind == NodeDefinition.NodeKind.FAMILY || dto.inputs != null && dto.inputs.stream()
+                .anyMatch(pin -> pin != null && pin.pinType == NodeDefinition.PinType.FLOW);
+            return (actionNode ? "Runs " : "Returns ") + normalized.toLowerCase(Locale.ROOT) + '.';
+        }
+        String verb = words.get(verbIndex).toLowerCase(Locale.ROOT);
+        List<String> subjectWords = new ArrayList<>();
+        subjectWords.addAll(words.subList(0, verbIndex));
+        subjectWords.addAll(words.subList(verbIndex + 1, words.size()));
+        String subject = String.join(" ", subjectWords).toLowerCase(Locale.ROOT);
+        if ("is".equals(verb)) {
+            String predicate = String.join(" ", words.subList(0, verbIndex)).toLowerCase(Locale.ROOT);
+            String condition = String.join(" ", words.subList(verbIndex + 1, words.size())).toLowerCase(Locale.ROOT);
+            return "Checks whether " + (predicate.isBlank() ? "the value" : predicate) + " is " + condition + '.';
+        }
+        if ("has".equals(verb)) {
+            String predicate = String.join(" ", words.subList(0, verbIndex)).toLowerCase(Locale.ROOT);
+            String condition = String.join(" ", words.subList(verbIndex + 1, words.size())).toLowerCase(Locale.ROOT);
+            return "Checks whether " + (predicate.isBlank() ? "the target" : predicate) + " has " + condition + '.';
+        }
+        if ("contains".equals(verb)) {
+            String source = String.join(" ", words.subList(0, verbIndex)).toLowerCase(Locale.ROOT);
+            return "Checks whether the " + (source.isBlank() ? "source" : source) + " contains the requested value.";
+        }
+        if ("equals".equals(verb)) {
+            return "Checks whether the supplied values are equal.";
+        }
+        if ("matches".equals(verb)) {
+            return "Checks whether the supplied value matches the requested pattern.";
+        }
+        if ("starts".equals(verb) || "ends".equals(verb)) {
+            String source = String.join(" ", words.subList(0, verbIndex)).toLowerCase(Locale.ROOT);
+            return "Checks whether the " + (source.isBlank() ? "value" : source) + ' ' + verb + " with the requested text.";
+        }
+        String detail = subject.isBlank() ? normalized.toLowerCase(Locale.ROOT) : subject;
+        return action + ' ' + detail + '.';
+    }
+
+    private String descriptionAction(String verb) {
+        return switch (verb.toLowerCase(Locale.ROOT)) {
+            case "get" -> "Gets";
+            case "set" -> "Sets";
+            case "add" -> "Adds";
+            case "remove" -> "Removes";
+            case "delete" -> "Deletes";
+            case "create" -> "Creates";
+            case "open" -> "Opens";
+            case "close" -> "Closes";
+            case "send" -> "Sends";
+            case "play" -> "Plays";
+            case "stop" -> "Stops";
+            case "apply" -> "Applies";
+            case "check" -> "Checks";
+            case "find" -> "Finds";
+            case "list" -> "Lists";
+            case "generate" -> "Generates";
+            case "spawn" -> "Spawns";
+            case "despawn" -> "Despawns";
+            case "teleport" -> "Teleports";
+            case "give" -> "Gives";
+            case "take" -> "Takes";
+            case "save" -> "Saves";
+            case "load" -> "Loads";
+            case "reload" -> "Reloads";
+            case "start" -> "Starts";
+            case "cancel" -> "Cancels";
+            case "update" -> "Updates";
+            case "clear" -> "Clears";
+            case "format" -> "Formats";
+            case "parse" -> "Parses";
+            case "convert" -> "Converts";
+            case "calculate" -> "Calculates";
+            case "execute" -> "Executes";
+            case "run" -> "Runs";
+            case "filter" -> "Filters";
+            case "map" -> "Maps";
+            case "flatten" -> "Flattens";
+            case "group" -> "Groups";
+            case "sort" -> "Sorts";
+            case "merge" -> "Merges";
+            case "join" -> "Joins";
+            case "split" -> "Splits";
+            case "select" -> "Selects";
+            case "count" -> "Counts";
+            case "contains", "equals", "matches", "starts", "ends" -> "Checks whether";
+            case "broadcast" -> "Broadcasts";
+            case "show" -> "Shows";
+            case "hide" -> "Hides";
+            case "enable" -> "Enables";
+            case "disable" -> "Disables";
+            case "is", "has" -> "Checks whether";
+            default -> null;
+        };
+    }
+
+    private List<String> defaultTags(NodeJson dto, NodeDefinition.NodeCategory category) {
+        Set<String> tags = new HashSet<>();
+        for (String token : dto.id.toLowerCase(Locale.ROOT).split("[.:_\\-]+")) {
+            if (!token.isBlank()) {
+                tags.add(token);
+            }
+        }
+        if (category != null && category.getId() != null) {
+            tags.add(category.getId().toLowerCase(Locale.ROOT));
+        }
+        if (dto.kind != null) {
+            tags.add(dto.kind.name().toLowerCase(Locale.ROOT));
+        }
+        if (Boolean.TRUE.equals(dto.trigger)) {
+            tags.add("event");
+        }
+        return tags.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    private List<String> defaultExamples(NodeJson dto, String displayName) {
+        String name = displayName != null && !displayName.isBlank() ? displayName : dto.id;
+        if (Boolean.TRUE.equals(dto.trigger)) {
+            return List.of("Connect the " + name + " Flow output to the actions that should run.");
+        }
+        List<String> dataInputs = dto.inputs != null ? dto.inputs.stream()
+            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pin.name != null && !pin.name.isBlank())
+            .map(pin -> pin.name.replace('_', ' '))
+            .limit(3)
+            .toList() : List.of();
+        boolean action = dto.inputs != null && dto.inputs.stream().anyMatch(pin -> pin != null && pin.pinType == NodeDefinition.PinType.FLOW);
+        boolean failure = dto.outputs != null && dto.outputs.stream()
+            .anyMatch(pin -> pin != null && "failed".equalsIgnoreCase(pin.name));
+        String supplied = dataInputs.isEmpty() ? "its inputs" : String.join(", ", dataInputs);
+        if (action) {
+            return List.of("Connect Flow, provide " + supplied + ", then handle " + (failure ? "Flow or Failed." : "its continuation."));
+        }
+        List<String> dataOutputs = dto.outputs != null ? dto.outputs.stream()
+            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pin.name != null && !pin.name.isBlank())
+            .map(pin -> pin.name.replace('_', ' '))
+            .limit(2)
+            .toList() : List.of();
+        String produced = dataOutputs.isEmpty() ? "its result" : String.join(" and ", dataOutputs);
+        return List.of("Provide " + supplied + " and connect " + produced + " to a compatible input.");
+    }
+
+    private boolean isDestructive(NodeJson dto) {
+        boolean action = dto.kind == NodeDefinition.NodeKind.ACTION || dto.inputs != null && dto.inputs.stream()
+            .anyMatch(pin -> pin != null && pin.pinType == NodeDefinition.PinType.FLOW);
+        if (!action) {
+            return false;
+        }
+        String operation = dto.handlerConfig != null && dto.handlerConfig.get("operation") != null
+            ? String.valueOf(dto.handlerConfig.get("operation")) : "";
+        String identity = (dto.id + " " + operation).trim().toLowerCase(Locale.ROOT);
+        return List.of("delete", "remove", "clear", "reset", "shutdown", "restart", "reload", "unload", "revoke", "grant", "command", "ban", "kick", "despawn", "dissolve")
+            .stream().anyMatch(token -> identity.matches(".*(?:^|[\\s._:\\-])" + token + "(?:$|[\\s._:\\-]).*"));
+    }
+
+    private boolean isSensitive(NodeJson dto) {
+        String handler = dto.handler != null ? dto.handler : "";
+        if (Set.of("FileHandler", "HttpHandler", "DiscordHandler", "PermissionHandler", "NetworkFlowHandler", "ServerHandler", "EconomyHandler")
+            .contains(handler)) {
+            return true;
+        }
+        String operation = dto.handlerConfig != null && dto.handlerConfig.get("operation") != null
+            ? String.valueOf(dto.handlerConfig.get("operation")) : "";
+        String identity = (dto.id + " " + operation).toLowerCase(Locale.ROOT);
+        return List.of("resourcepack", "webhook", "proxy_command", "player_route", "transfer")
+            .stream().anyMatch(identity::contains);
+    }
+
     private NodeDefinition.PinDefinition toPinDefinition(PinJson pin, NodeDefinition.PinDirection direction) {
         NodeDefinition.PinType pinType = pin.pinType != null ? pin.pinType : NodeDefinition.PinType.DATA;
-        FlowDataType dataType = parseAndValidateDataType(pin.dataType, pinType);
+        FlowTypeRef typeRef;
+        try {
+            typeRef = pin.dataType == null || pin.dataType.isBlank()
+                ? FlowTypeRef.simple(pinType == NodeDefinition.PinType.FLOW ? "execution" : "any")
+                : FlowTypeRef.parse(pin.dataType);
+        } catch (IllegalArgumentException exception) {
+            Log.warn("[NodeDefinitionLoader] Invalid dataType expression: " + pin.dataType);
+            return null;
+        }
+        FlowDataType dataType = typeRef.isTypeVariable() ? FlowDataType.ANY : parseAndValidateDataType(typeRef.getTypeId(), pinType);
         if (dataType == null) {
             return null;
         }
@@ -433,10 +704,6 @@ public class NodeDefinitionLoader {
             String inferred = inferOptionsSource(dataType);
             if (inferred != null) {
                 optionsSource = inferred;
-                widget = NodeDefinition.WidgetType.DROPDOWN;
-                if (inferred.contains("material") || inferred.contains("advancement") || inferred.contains("enchantment") || inferred.contains("sound")) {
-                    widget = NodeDefinition.WidgetType.SEARCHABLE_LIST;
-                }
             }
         }
 
@@ -446,6 +713,9 @@ public class NodeDefinitionLoader {
         }
 
         Map<String, String> visibleWhen = pin.visibleWhen != null ? pin.visibleWhen : Collections.emptyMap();
+        NodeDefinition.RepeatablePin repeatable = pin.repeatable != null
+            ? new NodeDefinition.RepeatablePin(pin.repeatable.groupId, pin.repeatable.minItems, pin.repeatable.maxItems, pin.repeatable.itemLabel)
+            : null;
 
         return new NodeDefinition.PinDefinition(
             pin.name,
@@ -459,7 +729,9 @@ public class NodeDefinitionLoader {
             constraints,
             visibleWhen,
             pin.description,
-            Boolean.TRUE.equals(pin.optional)
+            Boolean.TRUE.equals(pin.optional),
+            typeRef,
+            repeatable
         );
     }
 
@@ -471,12 +743,8 @@ public class NodeDefinitionLoader {
             return FlowDataType.ANY;
         }
         FlowDataType type = FlowDataType.fromString(raw);
-        if (type == FlowDataType.ANY && !"any".equalsIgnoreCase(raw)) {
-            if (raw.contains(":")) {
-                return new FlowDataType(raw, FlowDataType.STRING, String.class, null, 0x808080);
-            }
+        if (!type.isResolved()) {
             Log.warn("[NodeDefinitionLoader] Unknown dataType: " + raw);
-            return null;
         }
         return type;
     }
@@ -497,49 +765,77 @@ public class NodeDefinitionLoader {
         if (type == null) return null;
         String id = type.getId();
         return switch (id) {
-            case "material" -> "client:minecraft:material";
-            case "gamemode" -> "client:minecraft:gamemode";
-            case "difficulty" -> "client:minecraft:difficulty";
-            case "potion_effect" -> "client:minecraft:potion_effect";
-            case "sound" -> "client:minecraft:sound";
-            case "advancement" -> "client:minecraft:advancement";
-            case "biome" -> "client:minecraft:biome";
-            case "entity_type" -> "client:minecraft:entity_type";
-            case "enchantment" -> "client:minecraft:enchantment";
+            case "material" -> "server:minecraft:material";
+            case "gamemode" -> "server:minecraft:gamemode";
+            case "difficulty" -> "server:minecraft:difficulty";
+            case "potion_effect" -> "server:minecraft:potion_effect";
+            case "sound" -> "server:minecraft:sound";
+            case "advancement" -> "server:minecraft:advancement";
+            case "biome" -> "server:minecraft:biome";
+            case "entity_type" -> "server:minecraft:entity_type";
+            case "enchantment" -> "server:minecraft:enchantment";
             default -> null;
         };
     }
 
-    public void validateAndRegister(List<NodeDefinition> definitions, NodeDefinitionRegistry registry, restudio.resync.flow.handler.HandlerRegistry handlerRegistry, String pluginId) {
+    public void validateAndRegister(List<NodeDefinition> definitions, NodeDefinitionRegistry registry, HandlerRegistry handlerRegistry, String pluginId) {
         if (validator == null && handlerRegistry != null) {
             validator = new NodeDefinitionValidator(handlerRegistry);
         }
         Set<String> displayNames = new HashSet<>();
         for (NodeDefinition def : definitions) {
             if (registry.getAllDefinitions().containsKey(def.getId())) {
-                Log.warn("[NodeDefinitionLoader] Duplicate node ID: " + def.getId());
+                reject(def, "DUPLICATE_NODE_ID", "Duplicate node ID: " + def.getId());
                 continue;
             }
             String displayKey = def.getCategory() + ":" + def.getDisplayName().toLowerCase();
             if (!def.isHidden() && !displayNames.add(displayKey)) {
-                Log.warn("[NodeDefinitionLoader] Duplicate visible display name in category " + def.getCategory() + ": " + def.getDisplayName());
+                warn(def, "DUPLICATE_DISPLAY_NAME", "Duplicate visible display name in category " + def.getCategory() + ": " + def.getDisplayName());
             }
             if (validator != null) {
                 NodeDefinitionValidator.ValidationResult result = validator.validate(def);
                 if (result.hasErrors()) {
                     for (String error : result.errors()) {
-                        Log.warn("[NodeDefinitionLoader] Validation error for " + def.getId() + ": " + error);
+                        reject(def, "VALIDATION_FAILED", error);
                     }
                     continue;
                 }
                 if (result.hasWarnings()) {
                     for (String warning : result.warnings()) {
-                        Log.fine("[NodeDefinitionLoader] Validation warning for " + def.getId() + ": " + warning);
+                        warn(def, "VALIDATION_WARNING", warning);
                     }
                 }
             }
             registry.register(pluginId, def);
         }
+    }
+
+    public void rejectUnavailable(NodeDefinition definition, String reason) {
+        warn(definition, "UNAVAILABLE", reason);
+    }
+
+    private void reject(NodeDefinition definition, String code, String message) {
+        DefinitionOrigin origin = origins.getOrDefault(definition, new DefinitionOrigin("unknown", -1));
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, code, origin.source(), origin.index(), definition != null ? definition.getId() : "", message);
+    }
+
+    private void warn(NodeDefinition definition, String code, String message) {
+        DefinitionOrigin origin = origins.getOrDefault(definition, new DefinitionOrigin("unknown", -1));
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.WARNING, code, origin.source(), origin.index(), definition != null ? definition.getId() : "", message);
+    }
+
+    private void addDiagnostic(NodeDefinitionDiagnostic.Severity severity, String code, String source, int index, String nodeId, String message) {
+        NodeDefinitionDiagnostic diagnostic = new NodeDefinitionDiagnostic(severity, code, source, index, nodeId, message);
+        diagnostics.add(diagnostic);
+        String prefix = source + (index >= 0 ? "[" + index + "]" : "") + (!nodeId.isBlank() ? " " + nodeId : "");
+        if (severity == NodeDefinitionDiagnostic.Severity.ERROR) {
+            Log.warn("[NodeDefinitionLoader] " + prefix + ": " + message);
+        } else {
+            Log.fine("[NodeDefinitionLoader] " + prefix + ": " + message);
+        }
+    }
+
+    private record DefinitionOrigin(String source, int index) {
     }
 
     private static class NodeJson {
@@ -550,6 +846,8 @@ public class NodeDefinitionLoader {
         Integer color;
         Integer priority;
         Boolean hidden;
+        String hiddenReason;
+        String owner;
         Integer schemaVersion;
         NodeDefinition.NodeKind kind;
         AvailabilityJson availability;
@@ -569,6 +867,12 @@ public class NodeDefinitionLoader {
         String family;
         Boolean recommended;
         String replacementFor;
+        String authorizationPolicy;
+        Boolean sensitive;
+        Boolean destructive;
+        String auditPolicy;
+        String confirmationPolicy;
+        String clockDomain;
     }
 
     private static class AvailabilityJson {
@@ -594,6 +898,14 @@ public class NodeDefinitionLoader {
         Map<String, String> visibleWhen;
         String description;
         Boolean optional;
+        RepeatablePinJson repeatable;
+    }
+
+    private static class RepeatablePinJson {
+        String groupId;
+        int minItems = 1;
+        int maxItems = 32;
+        String itemLabel;
     }
 
     private static class PinConstraintsJson {

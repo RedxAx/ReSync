@@ -3,6 +3,7 @@ package restudio.resync.core;
 import org.java_websocket.WebSocket;
 import restudio.resync.protocol.FrameSender;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,6 +19,7 @@ public class ConnectionInfo {
     private volatile ConnectionState state;
     private String clientId;
     private String clientVersion;
+    private Set<String> clientCapabilities = Set.of();
 
     public ConnectionInfo(WebSocket webSocket, int connectionId) {
         this(webSocket, new FrameSender() {
@@ -95,6 +97,14 @@ public class ConnectionInfo {
 
     public void setClientVersion(String clientVersion) {
         this.clientVersion = clientVersion;
+    }
+
+    public Set<String> getClientCapabilities() {
+        return clientCapabilities;
+    }
+
+    public void setClientCapabilities(Set<String> clientCapabilities) {
+        this.clientCapabilities = clientCapabilities != null ? Set.copyOf(clientCapabilities) : Set.of();
     }
 
     public long getBytesSent() {

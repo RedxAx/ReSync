@@ -20,27 +20,26 @@ public class UuidHandler implements NodeHandler {
 
         operations.put("uuid_from_string", (ctx, node) -> {
             String uuidString = ctx.getInputValue(node, "uuid_string", String.class, "");
-            UUID uuidObject = null;
             try {
-                uuidObject = UUID.fromString(uuidString);
-            } catch (Exception ignored) {
+                ctx.setOutput(node, "uuid_object", UUID.fromString(uuidString));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Invalid UUID: " + uuidString, exception);
             }
-            ctx.setOutput(node, "uuid_object", uuidObject);
         });
 
         operations.put("uuid_to_string", (ctx, node) -> {
             UUID uuidObject = ctx.getInputValue(node, "uuid_object", UUID.class, null);
-            ctx.setOutput(node, "uuid_string", uuidObject != null ? uuidObject.toString() : "");
+            ctx.setOutput(node, "uuid_string", requireUuid(uuidObject).toString());
         });
 
         operations.put("uuid_version", (ctx, node) -> {
             UUID uuidObject = ctx.getInputValue(node, "uuid_object", UUID.class, null);
-            ctx.setOutput(node, "version", uuidObject != null ? uuidObject.version() : -1);
+            ctx.setOutput(node, "version", requireUuid(uuidObject).version());
         });
 
         operations.put("uuid_timestamp", (ctx, node) -> {
             UUID uuidObject = ctx.getInputValue(node, "uuid_object", UUID.class, null);
-            ctx.setOutput(node, "timestamp", uuidObject != null ? uuidObject.timestamp() : 0L);
+            ctx.setOutput(node, "timestamp", requireUuid(uuidObject).timestamp());
         });
     }
 
@@ -52,9 +51,17 @@ public class UuidHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown UUID operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private static UUID requireUuid(UUID value) {
+        if (value == null) {
+            throw new IllegalArgumentException("UUID is required");
+        }
+        return value;
     }
 }

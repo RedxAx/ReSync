@@ -52,7 +52,7 @@
     "inputs": [
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
@@ -73,11 +73,11 @@
     "inputs": [
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       },
       {
         "name": "weights_list",
-        "dataType": "list"
+        "dataType": "list<number>"
       }
     ],
     "outputs": [
@@ -821,7 +821,7 @@
     "inputs": [
       {
         "name": "values_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
@@ -842,7 +842,7 @@
     "inputs": [
       {
         "name": "values_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
@@ -1530,7 +1530,7 @@
     "inputs": [
       {
         "name": "values_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
@@ -1551,7 +1551,7 @@
     "inputs": [
       {
         "name": "values_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [

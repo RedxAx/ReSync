@@ -47,7 +47,8 @@ public final class TextFormatter {
         if (MINIMESSAGE_PATTERN.matcher(normalized).find()) {
             try {
                 return MINI_MESSAGE.deserialize(normalized);
-            } catch (Exception ignored) {
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Invalid MiniMessage text", exception);
             }
         }
         return LEGACY_SERIALIZER.deserialize(normalized);
@@ -108,7 +109,8 @@ public final class TextFormatter {
         if (MINIMESSAGE_PATTERN.matcher(normalized).find()) {
             try {
                 return MINI_MESSAGE.deserialize(miniPrefix + normalized);
-            } catch (Exception ignored) {
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Invalid MiniMessage item text", exception);
             }
         }
         return LEGACY_SERIALIZER.deserialize(legacyPrefix + normalized);

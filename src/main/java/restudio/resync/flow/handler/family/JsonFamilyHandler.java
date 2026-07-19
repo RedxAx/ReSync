@@ -18,6 +18,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.handler.property.PropertyRegistry;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -28,27 +29,21 @@ import java.util.Locale;
 
 public class JsonFamilyHandler implements NodeHandler {
     private static final Set<String> OPERATIONS = Set.of("get", "set", "has", "do", "execute");
-    private static final Map<String, Set<String>> PROPERTIES = Map.of(
-        "player", Set.of("location", "health", "max_health", "food_level", "gamemode", "sneak", "fly", "name", "uuid", "world", "inventory", "item_in_hand", "display_name", "xp_level", "walk_speed", "fly_speed", "exp", "total_exp", "exp_to_level", "allow_flight", "on_ground", "sleeping", "bed_spawn_location", "last_damage", "killer", "ping", "player_list_name", "op", "offhand_item", "saturation", "exhaustion", "sprint", "vanish", "glowing", "invulnerable", "fire_ticks", "freeze_ticks", "no_damage_ticks", "remaining_air", "max_air", "xp_progress", "compass_target", "ip", "is_flying", "online", "whitelisted", "banned", "sleep_ticks", "locale", "view_distance", "is_op", "item_in_offhand", "armor"),
-        "entity", Set.of("name", "custom_name", "glowing", "silent", "invulnerable", "fire_ticks", "freeze_ticks", "health", "max_health", "persistent", "target", "baby", "tamed", "sitting", "swimming", "pickup_items", "gravity", "visible", "ai", "collidable", "remove", "kill", "exists", "type", "uuid", "location", "velocity", "world", "passengers", "vehicle", "height", "width", "ticks_lived", "no_damage_ticks", "remaining_air", "max_air", "fall_distance", "portal_cooldown", "scoreboard_tags", "absorption"),
-        "world", Set.of("time", "full_time", "weather", "has_storm", "is_thundering", "difficulty", "spawn_location", "seed", "name", "environment", "players", "entities", "loaded_chunks", "sea_level", "min_height", "max_height", "time_relative", "pvp", "auto_save", "keep_spawn", "thundering", "weather_type"),
-        "block", Set.of("type", "data", "light_level", "biome", "temperature", "humidity", "is_solid", "is_liquid", "is_air", "break_naturally", "location", "world", "x", "y", "z"),
-        "inventory", Set.of("size", "type", "items", "first_empty", "max_stack_size", "holder", "clear"),
-        "itemstack", Set.of("type", "amount", "display_name", "lore", "durability", "max_durability", "enchantments", "custom_model_data", "unbreakable", "repair_cost", "item_flags", "localized_name")
-    );
     private final String familyId;
+    private final PropertyRegistry propertyRegistry;
 
-    private JsonFamilyHandler(String familyId) {
+    private JsonFamilyHandler(String familyId, PropertyRegistry propertyRegistry) {
         this.familyId = familyId;
+        this.propertyRegistry = propertyRegistry;
     }
 
-    public static void registerFamilies(HandlerRegistry registry) {
-        registry.register("player", new JsonFamilyHandler("player"));
-        registry.register("entity", new JsonFamilyHandler("entity"));
-        registry.register("world", new JsonFamilyHandler("world"));
-        registry.register("block", new JsonFamilyHandler("block"));
-        registry.register("inventory", new JsonFamilyHandler("inventory"));
-        registry.register("itemstack", new JsonFamilyHandler("itemstack"));
+    public static void registerFamilies(HandlerRegistry registry, PropertyRegistry propertyRegistry) {
+        registry.register("player", new JsonFamilyHandler("player", propertyRegistry));
+        registry.register("entity", new JsonFamilyHandler("entity", propertyRegistry));
+        registry.register("world", new JsonFamilyHandler("world", propertyRegistry));
+        registry.register("block", new JsonFamilyHandler("block", propertyRegistry));
+        registry.register("inventory", new JsonFamilyHandler("inventory", propertyRegistry));
+        registry.register("itemstack", new JsonFamilyHandler("itemstack", propertyRegistry));
     }
 
     @Override
@@ -60,37 +55,29 @@ public class JsonFamilyHandler implements NodeHandler {
             property = ctx.getInputValue(node, "property", String.class, "");
         }
         if (property == null || property.isBlank()) {
-            if (isExecutionAction(action)) {
-                ctx.triggerOutput("flow");
-            }
-            return;
+            throw new IllegalArgumentException("Property is required for " + familyId + " operations");
         }
         if (!isSupportedProperty(property)) {
-            ctx.setOutput(node, "success", false);
-            ctx.setOutput(node, "has", false);
-            if (isExecutionAction(action)) {
-                ctx.triggerOutput("flow");
-            }
-            return;
+            throw new IllegalArgumentException("Unknown " + familyId + " property: " + property);
+        }
+        String normalizedAction = action != null ? action.toLowerCase(Locale.ROOT) : "get";
+        if (!propertyRegistry.getActions(familyId, property).contains(normalizedAction)) {
+            throw new IllegalArgumentException("Property " + familyId + "." + property + " does not support action " + normalizedAction);
         }
         Object target = resolveTarget(ctx, node);
         if (target == null) {
-            ctx.setOutput(node, "success", false);
-            ctx.setOutput(node, "has", false);
-            if (isExecutionAction(action)) {
-                ctx.triggerOutput("flow");
-            }
-            return;
+            throw new IllegalArgumentException("Target is required for " + familyId + "." + property);
         }
-        switch (action == null ? "get" : action.toLowerCase(Locale.ROOT)) {
+        switch (normalizedAction) {
             case "set" -> setValue(ctx, node, target, property);
             case "has" -> ctx.setOutput(node, "has", readValue(target, property) != null);
             case "do", "execute" -> ctx.setOutput(node, "success", executeAction(ctx, target, property));
-            default -> {
+            case "get" -> {
                 Object value = readValue(target, property);
                 ctx.setOutput(node, "value", value);
                 ctx.setOutput(node, property, value);
             }
+            default -> throw new IllegalArgumentException("Unknown property action: " + normalizedAction);
         }
         if (isExecutionAction(action)) {
             ctx.triggerOutput("flow");
@@ -103,8 +90,7 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private boolean isSupportedProperty(String property) {
-        Set<String> properties = PROPERTIES.get(familyId);
-        return properties != null && properties.contains(property);
+        return propertyRegistry != null && propertyRegistry.hasProperty(familyId, property);
     }
 
     private Object resolveTarget(FlowContext ctx, FlowNode node) {
@@ -129,10 +115,13 @@ public class JsonFamilyHandler implements NodeHandler {
             try {
                 Method method = target.getClass().getMethod(methodName);
                 return method.invoke(target);
-            } catch (ReflectiveOperationException ignored) {
+            } catch (NoSuchMethodException exception) {
+                continue;
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Failed to read property " + familyId + "." + property, exception);
             }
         }
-        return null;
+        throw new IllegalStateException("No runtime reader exists for advertised property " + familyId + "." + property);
     }
 
     private Object readExplicitValue(Object target, String property) {
@@ -303,6 +292,7 @@ public class JsonFamilyHandler implements NodeHandler {
             return;
         }
         String methodName = "set" + toMethodSuffix(property);
+        RuntimeException failure = null;
         for (Method method : target.getClass().getMethods()) {
             if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
                 continue;
@@ -311,10 +301,14 @@ public class JsonFamilyHandler implements NodeHandler {
                 method.invoke(target, coerceValue(value, method.getParameterTypes()[0]));
                 ctx.setOutput(node, "success", true);
                 return;
-            } catch (ReflectiveOperationException | IllegalArgumentException ignored) {
+            } catch (ReflectiveOperationException | IllegalArgumentException exception) {
+                failure = new IllegalArgumentException("Failed to write property " + familyId + "." + property, exception);
             }
         }
-        ctx.setOutput(node, "success", false);
+        if (failure != null) {
+            throw failure;
+        }
+        throw new IllegalStateException("No runtime writer exists for advertised property " + familyId + "." + property);
     }
 
     private boolean executeAction(FlowContext ctx, Object target, String property) {
@@ -328,10 +322,13 @@ public class JsonFamilyHandler implements NodeHandler {
                 Method method = target.getClass().getMethod(candidate);
                 method.invoke(target);
                 return true;
-            } catch (ReflectiveOperationException ignored) {
+            } catch (NoSuchMethodException exception) {
+                continue;
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Failed to execute property action " + familyId + "." + property, exception);
             }
         }
-        return false;
+        throw new IllegalStateException("No runtime action exists for advertised property " + familyId + "." + property);
     }
 
     private boolean setLivingAfterDamage(FlowContext ctx, LivingEntity living, String property, Object value) {

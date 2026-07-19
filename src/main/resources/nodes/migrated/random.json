@@ -105,13 +105,13 @@
     "inputs": [
       {
         "name": "list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
       {
         "name": "shuffled_list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ]
   },
@@ -214,6 +214,9 @@
     "id": "random.item",
     "displayName": "Random Item",
     "category": "UTILITY",
+    "deprecated": true,
+    "replacementFor": "data.random_item",
+    "hidden": true,
     "handler": "RandomHandler",
     "handlerConfig": {
       "operation": "random_item"
@@ -221,7 +224,7 @@
     "inputs": [
       {
         "name": "items",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "outputs": [
@@ -263,7 +266,7 @@
     "outputs": [
       {
         "name": "color",
-        "dataType": "string"
+        "dataType": "rgb_color"
       }
     ],
     "inputs": []

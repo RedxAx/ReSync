@@ -77,7 +77,7 @@ public class CustomContentHandler implements NodeHandler {
         if (op != null) {
             op.accept(ctx, node);
         } else {
-            ctx.triggerOutput("flow");
+            throw new IllegalArgumentException("Unknown custom content operation: " + operation);
         }
     }
 }

@@ -1,5 +1,9 @@
 package restudio.resync.flow.handler.generic;
 
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -88,19 +92,19 @@ public class RandomHandler implements NodeHandler {
 
         operations.put("random_item", (ctx, node) -> {
             Object itemsObj = ctx.getInputValue(node, "items", Object.class, null);
-            if (itemsObj instanceof java.util.List<?> list && !list.isEmpty()) {
+            if (itemsObj instanceof List<?> list && !list.isEmpty()) {
                 int index = (int) (Math.random() * list.size());
                 ctx.setOutput(node, "result", list.get(index));
             }
         });
 
         operations.put("random_player", (ctx, node) -> {
-            org.bukkit.World world = ctx.getInputValue(node, "world", org.bukkit.World.class, null);
-            java.util.List<org.bukkit.entity.Player> players;
+            World world = ctx.getInputValue(node, "world", World.class, null);
+            List<Player> players;
             if (world != null) {
-                players = new java.util.ArrayList<>(world.getPlayers());
+                players = new ArrayList<>(world.getPlayers());
             } else {
-                players = new java.util.ArrayList<>(org.bukkit.Bukkit.getOnlinePlayers());
+                players = new ArrayList<>(Bukkit.getOnlinePlayers());
             }
             if (!players.isEmpty()) {
                 int index = (int) (Math.random() * players.size());
@@ -109,9 +113,7 @@ public class RandomHandler implements NodeHandler {
         });
 
         operations.put("random_color", (ctx, node) -> {
-            java.util.Random rand = new java.util.Random();
-            String color = String.format("#%02X%02X%02X", rand.nextInt(256), rand.nextInt(256), rand.nextInt(256));
-            ctx.setOutput(node, "color", color);
+            ctx.setOutput(node, "color", Color.fromRGB(RANDOM.nextInt(256), RANDOM.nextInt(256), RANDOM.nextInt(256)));
         });
 
     }
@@ -124,9 +126,10 @@ public class RandomHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown random operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

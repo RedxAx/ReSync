@@ -3,30 +3,61 @@ package restudio.resync.flow.handler.event;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowResourceReference;
 import restudio.resync.Log;
+import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
+import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.HandlerConfig;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.triggers.TriggerDispatcher;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class FlowEventRegistry {
+    private static final Set<String> SYSTEM_MANAGED_EVENT_IDS = Set.of(
+        "event.server.start",
+        "event.server.stop",
+        "event.server.tick",
+        "event.server.save",
+        "event.plugin.enable",
+        "event.plugin.disable",
+        "event.world.load",
+        "event.world.unload",
+        "event.chunk.load",
+        "event.chunk.unload",
+        "event.resync.command"
+    );
 
     private final TriggerDispatcher dispatcher;
+    private final TypeAdapterRegistry typeAdapters;
     private final Map<String, EventNodeDefinition> eventDefinitions = new ConcurrentHashMap<>();
+    private final BoundedDiagnosticDeduplicator reportedOutputMismatches = new BoundedDiagnosticDeduplicator(1024);
+    private final BoundedDiagnosticDeduplicator reportedMappingFailures = new BoundedDiagnosticDeduplicator(1024);
 
     public FlowEventRegistry(TriggerDispatcher dispatcher) {
+        this(dispatcher, new TypeAdapterRegistry());
+    }
+
+    public FlowEventRegistry(TriggerDispatcher dispatcher, TypeAdapterRegistry typeAdapters) {
         this.dispatcher = dispatcher;
+        this.typeAdapters = typeAdapters != null ? typeAdapters : new TypeAdapterRegistry();
     }
 
     public void registerFromJson(List<NodeDefinition> definitions) {
         for (NodeDefinition def : definitions) {
             if (!def.isTrigger()) {
+                continue;
+            }
+            if (isSystemManagedEvent(def.getId())) {
                 continue;
             }
             String eventClassName = def.getEventType();
@@ -40,9 +71,12 @@ public class FlowEventRegistry {
 
             Class<? extends Event> eventClass;
             try {
-                eventClass = (Class<? extends Event>) Class.forName(eventClassName);
+                eventClass = Class.forName(eventClassName).asSubclass(Event.class);
             } catch (ClassNotFoundException e) {
                 Log.warn("[FlowEventRegistry] Event class not found: " + eventClassName);
+                continue;
+            } catch (ClassCastException e) {
+                Log.warn("[FlowEventRegistry] Event type does not extend Bukkit Event: " + eventClassName);
                 continue;
             }
 
@@ -80,7 +114,7 @@ public class FlowEventRegistry {
         }
     }
 
-    private Function<Event, Map<String, Object>> buildVariableExtractor(NodeDefinition def) {
+    Function<Event, Map<String, Object>> buildVariableExtractor(NodeDefinition def) {
         List<NodeDefinition.PinMapping> mappings = def.getOutputMappings();
         if (mappings.isEmpty()) {
             return event -> Map.of();
@@ -90,9 +124,21 @@ public class FlowEventRegistry {
             for (NodeDefinition.PinMapping mapping : mappings) {
                 if (mapping.source().startsWith("event.")) {
                     String getterChain = mapping.source().substring(6);
-                    Object value = resolveGetterChain(event, getterChain);
+                    Object value;
+                    try {
+                        value = resolveGetterChain(event, getterChain);
+                    } catch (IllegalStateException exception) {
+                        String failure = def.getId() + "." + mapping.target() + " from " + mapping.source() + ": " + exception.getMessage();
+                        if (reportedMappingFailures.add(failure)) {
+                            Log.warn("[FlowEventRegistry] Event output mapping failed: " + failure);
+                        }
+                        continue;
+                    }
                     if (value != null) {
-                        vars.put(mapping.target(), value);
+                        Object adapted = adaptOutput(def, mapping.target(), value);
+                        if (adapted != null) {
+                            vars.put(mapping.target(), adapted);
+                        }
                     }
                 }
             }
@@ -100,30 +146,63 @@ public class FlowEventRegistry {
         };
     }
 
-    private Object resolveGetterChain(Object target, String chain) {
-        String[] parts = chain.split("\\.");
-        Object current = target;
-        for (String part : parts) {
-            if (current == null) {
+    private Object adaptOutput(NodeDefinition definition, String pinName, Object value) {
+        NodeDefinition.PinDefinition pin = definition.getOutputs().stream().filter(candidate -> pinName.equals(candidate.getName())).findFirst().orElse(null);
+        FlowDataType type = pin != null ? pin.getDataType() : null;
+        if (type == null || type == FlowDataType.ANY || type.getJavaType() == null || type.getJavaType().isInstance(value)) {
+            return value;
+        }
+        if (type.getParent() == FlowDataType.RESOURCE_REFERENCE) {
+            return new FlowResourceReference(type.getId(), String.valueOf(value), "event", true, Map.of());
+        }
+        Object adapted = typeAdapters.adapt(value, type.getJavaType());
+        if (adapted == null) {
+            if (pin != null && pin.isOptional()) {
                 return null;
             }
-            Method method = findMethod(current.getClass(), part);
-            if (method == null) {
-                method = findMethod(current.getClass(), "get" + capitalize(part));
-            }
-            if (method == null && !part.startsWith("is")) {
-                method = findMethod(current.getClass(), "is" + capitalize(part));
-            }
-            if (method == null) {
-                return null;
-            }
-            try {
-                current = method.invoke(current);
-            } catch (Exception e) {
-                return null;
+            String mismatch = definition.getId() + "." + pinName + " expected " + type.getId() + " but received " + value.getClass().getName();
+            if (reportedOutputMismatches.add(mismatch)) {
+                Log.warn("[FlowEventRegistry] Event output type mismatch: " + mismatch);
             }
         }
-        return current;
+        return adapted;
+    }
+
+    private Object resolveGetterChain(Object target, String chain) {
+        return resolveGetterChain(target, chain.split("\\."), 0);
+    }
+
+    private Object resolveGetterChain(Object current, String[] parts, int index) {
+        if (current == null || index >= parts.length) {
+            return current;
+        }
+        if (current instanceof Iterable<?> values) {
+            List<Object> resolved = new ArrayList<>();
+            for (Object value : values) {
+                Object item = resolveGetterChain(value, parts, index);
+                if (item != null) {
+                    resolved.add(item);
+                }
+            }
+            return resolved;
+        }
+        String part = parts[index];
+        String property = camelCase(part);
+        Method method = findMethod(current.getClass(), property);
+        if (method == null) {
+            method = findMethod(current.getClass(), "get" + capitalize(property));
+        }
+        if (method == null && !property.startsWith("is")) {
+            method = findMethod(current.getClass(), "is" + capitalize(property));
+        }
+        if (method == null) {
+            throw new IllegalStateException("Event getter is unavailable: " + current.getClass().getName() + "." + part);
+        }
+        try {
+            return resolveGetterChain(method.invoke(current), parts, index + 1);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Event getter failed: " + current.getClass().getName() + "." + method.getName(), exception);
+        }
     }
 
     private Method findMethod(Class<?> clazz, String name) {
@@ -141,62 +220,67 @@ public class FlowEventRegistry {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    private Function<Event, Player> buildPlayerExtractor(Class<? extends Event> eventClass) {
-        Method getPlayer = null;
-        Method getEntity = null;
-        Method getWhoClicked = null;
-        try {
-            getPlayer = eventClass.getMethod("getPlayer");
-        } catch (NoSuchMethodException ignored) {
+    private String camelCase(String value) {
+        StringBuilder result = new StringBuilder(value.length());
+        boolean capitalizeNext = false;
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character == '_') {
+                capitalizeNext = true;
+            } else if (capitalizeNext) {
+                result.append(Character.toUpperCase(character));
+                capitalizeNext = false;
+            } else {
+                result.append(character);
+            }
         }
-        try {
-            getEntity = eventClass.getMethod("getEntity");
-        } catch (NoSuchMethodException ignored) {
-        }
-        try {
-            getWhoClicked = eventClass.getMethod("getWhoClicked");
-        } catch (NoSuchMethodException ignored) {
-        }
-        final Method cachedGetPlayer = getPlayer;
-        final Method cachedGetEntity = getEntity;
-        final Method cachedGetWhoClicked = getWhoClicked;
+        return result.toString();
+    }
+
+    Function<Event, Player> buildPlayerExtractor(Class<? extends Event> eventClass) {
+        Method cachedGetPlayer = findMethod(eventClass, "getPlayer");
+        Method cachedGetDamager = findMethod(eventClass, "getDamager");
+        Method cachedGetEntity = findMethod(eventClass, "getEntity");
+        Method cachedGetWhoClicked = findMethod(eventClass, "getWhoClicked");
+        Method cachedGetSender = findMethod(eventClass, "getSender");
         return event -> {
-            try {
-                if (cachedGetPlayer != null) {
-                    Object result = cachedGetPlayer.invoke(event);
-                    if (result instanceof Player p) {
-                        return p;
-                    }
-                }
-            } catch (Exception ignored) {
+            Player player = invokePlayerExtractor(cachedGetPlayer, event);
+            if (player != null) {
+                return player;
             }
-            try {
-                if (cachedGetEntity != null) {
-                    Object entity = cachedGetEntity.invoke(event);
-                    if (entity instanceof Player p) {
-                        return p;
-                    }
-                }
-            } catch (Exception ignored) {
+            player = invokePlayerExtractor(cachedGetDamager, event);
+            if (player != null) {
+                return player;
             }
-            try {
-                if (cachedGetWhoClicked != null) {
-                    Object who = cachedGetWhoClicked.invoke(event);
-                    if (who instanceof Player p) {
-                        return p;
-                    }
-                }
-            } catch (Exception ignored) {
+            player = invokePlayerExtractor(cachedGetEntity, event);
+            if (player != null) {
+                return player;
             }
-            return null;
+            player = invokePlayerExtractor(cachedGetWhoClicked, event);
+            if (player != null) {
+                return player;
+            }
+            return invokePlayerExtractor(cachedGetSender, event);
         };
+    }
+
+    private Player invokePlayerExtractor(Method method, Event event) {
+        if (method == null) {
+            return null;
+        }
+        try {
+            Object result = method.invoke(event);
+            return result instanceof Player player ? player : null;
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to resolve player from event " + event.getEventName() + " using " + method.getName(), exception);
+        }
     }
 
     private String normalizeEventKey(String key) {
         if (key == null) {
             return null;
         }
-        String normalized = key.trim().toLowerCase(java.util.Locale.ROOT);
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) {
             return null;
         }
@@ -206,6 +290,10 @@ public class FlowEventRegistry {
             normalized = normalized.substring(6);
         }
         return normalized.replace('.', '_');
+    }
+
+    static boolean isSystemManagedEvent(String nodeId) {
+        return nodeId != null && SYSTEM_MANAGED_EVENT_IDS.contains(nodeId.toLowerCase(Locale.ROOT));
     }
 
     public Map<String, EventNodeDefinition> getEventDefinitions() {

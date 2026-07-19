@@ -159,6 +159,10 @@
     "id": "misc.delay",
     "displayName": "Delay",
     "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.wait_ticks",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "delay"
@@ -197,7 +201,7 @@
     "outputs": [
       {
         "name": "caller",
-        "dataType": "any"
+        "dataType": "player"
       }
     ],
     "inputs": []
@@ -238,6 +242,11 @@
     "id": "misc.time_format",
     "displayName": "Time Format",
     "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.format",
+    "replacementFor": "time.format",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "time_format"
@@ -263,6 +272,11 @@
     "id": "misc.time_parse",
     "displayName": "Time Parse",
     "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.parse",
+    "replacementFor": "time.parse",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "time_parse"
@@ -288,6 +302,11 @@
     "id": "misc.time_add",
     "displayName": "Time Add",
     "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.add",
+    "replacementFor": "time.add",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "time_add"
@@ -317,6 +336,11 @@
     "id": "misc.time_diff",
     "displayName": "Time Diff",
     "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.diff",
+    "replacementFor": "time.diff",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "time_diff"
@@ -346,48 +370,87 @@
     "id": "delay.ticks",
     "displayName": "Delay Ticks",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.wait_ticks",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "delay"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "ticks", "dataType": "number", "defaultValue": 20, "constraints": { "min": 0, "step": 1 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
     "hidden": true
   },
   {
     "id": "delay.seconds",
     "displayName": "Delay Seconds",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.delay",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "delay"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "seconds", "dataType": "number", "defaultValue": 1, "constraints": { "min": 0 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
     "hidden": true
   },
   {
     "id": "delay.minutes",
     "displayName": "Delay Minutes",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.delay",
     "handler": "MiscHandler",
     "handlerConfig": {
       "operation": "delay"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "minutes", "dataType": "number", "defaultValue": 1, "constraints": { "min": 0 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
     "hidden": true
   },
   {
     "id": "cancel.schedule",
     "displayName": "Cancel Schedule",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.cancel_task",
     "handler": "ScheduleHandler",
     "handlerConfig": {
-      "operation": "schedule"
+      "operation": "cancel_task"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "task_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cancelled", "dataType": "boolean" },
+      { "name": "status", "dataType": "string" },
+      { "name": "task", "dataType": "scheduled_task" }
+    ],
     "hidden": true
   }
 ]

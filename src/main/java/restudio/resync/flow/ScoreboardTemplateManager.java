@@ -75,9 +75,20 @@ public final class ScoreboardTemplateManager {
         if (player == null) {
             return;
         }
-        player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager != null) {
+            player.setScoreboard(manager.getMainScoreboard());
+        }
         ACTIVE_SCOREBOARDS.remove(player.getUniqueId());
         publishState(player, null);
+    }
+
+    public static boolean showTemplate(Player player, String scoreboardId, boolean usePapi) {
+        FlowStorage storage = getFlowStorage();
+        if (storage == null || scoreboardId == null || scoreboardId.isBlank()) {
+            return false;
+        }
+        return showTemplate(player, storage.getScoreboard(scoreboardId), usePapi);
     }
 
     public static boolean showTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {

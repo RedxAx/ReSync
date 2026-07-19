@@ -2,21 +2,21 @@ package restudio.resync.runtime;
 
 public final class ReSyncRuntimeContentAccess {
     private static LootTableService lootTableService;
-    private static VillageProfileService villageProfileService;
+    private static TradeProfileService tradeProfileService;
     private static NpcService npcService;
 
     private ReSyncRuntimeContentAccess() {
     }
 
-    public static void configure(LootTableService lootService, VillageProfileService villageService, NpcService npcRuntimeService) {
+    public static void configure(LootTableService lootService, TradeProfileService tradeService, NpcService npcRuntimeService) {
         lootTableService = lootService;
-        villageProfileService = villageService;
+        tradeProfileService = tradeService;
         npcService = npcRuntimeService;
     }
 
     public static void clear() {
         lootTableService = null;
-        villageProfileService = null;
+        tradeProfileService = null;
         npcService = null;
     }
 
@@ -24,8 +24,8 @@ public final class ReSyncRuntimeContentAccess {
         return lootTableService;
     }
 
-    public static VillageProfileService villageProfiles() {
-        return villageProfileService;
+    public static TradeProfileService tradeProfiles() {
+        return tradeProfileService;
     }
 
     public static NpcService npcs() {

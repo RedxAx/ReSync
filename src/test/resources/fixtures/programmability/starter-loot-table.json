@@ -1,0 +1,22 @@
+{
+  "id": "starter",
+  "enabled": true,
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "item": "minecraft:stone",
+          "weight": 1,
+          "chance": 100,
+          "minAmount": 3,
+          "maxAmount": 3,
+          "components": {
+            "displayName": "Starter Stone",
+            "customModelData": 77
+          }
+        }
+      ]
+    }
+  ]
+}

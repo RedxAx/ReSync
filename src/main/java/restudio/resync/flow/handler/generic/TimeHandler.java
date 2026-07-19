@@ -1,50 +1,68 @@
 package restudio.resync.flow.handler.generic;
 
+import org.bukkit.Bukkit;
+import org.bukkit.World;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAccessor;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class TimeHandler implements NodeHandler {
-    private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private static final String DEFAULT_PATTERN = "uuuu-MM-dd HH:mm:ss";
+    private final Clock clock;
+    private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new HashMap<>();
 
     public TimeHandler() {
+        this(Clock.systemUTC());
+    }
+
+    TimeHandler(Clock clock) {
+        this.clock = clock;
+
         operations.put("time_current", (ctx, node) -> {
-            long millis = System.currentTimeMillis();
-            ctx.setOutput(node, "time", millis);
+            ctx.setOutput(node, "time", clock.millis());
+            succeed(ctx, node);
         });
 
         operations.put("time_format", (ctx, node) -> {
             long time = ctx.getInputValue(node, "time", Long.class, 0L);
-            String pattern = ctx.getInputValue(node, "format", String.class, "yyyy-MM-dd HH:mm:ss");
+            String pattern = ctx.getInputValue(node, "format", String.class, DEFAULT_PATTERN);
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-                String result = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).format(formatter);
+                DateTimeFormatter formatter = formatter(pattern, resolveLocale(ctx, node));
+                String result = Instant.ofEpochMilli(time).atZone(resolveZone(ctx, node)).format(formatter);
                 ctx.setOutput(node, "string", result);
-            } catch (Exception e) {
+                succeed(ctx, node);
+            } catch (Exception exception) {
                 ctx.setOutput(node, "string", "");
+                fail(ctx, node, exception);
             }
         });
 
         operations.put("time_parse", (ctx, node) -> {
-            String string = ctx.getInputValue(node, "string", String.class, "");
-            String pattern = ctx.getInputValue(node, "format", String.class, "yyyy-MM-dd HH:mm:ss");
+            String value = ctx.getInputValue(node, "string", String.class, "");
+            String pattern = ctx.getInputValue(node, "format", String.class, DEFAULT_PATTERN);
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
-                LocalDateTime dateTime = LocalDateTime.parse(string, formatter);
-                long millis = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                ctx.setOutput(node, "time", millis);
-            } catch (Exception e) {
+                DateTimeFormatter formatter = formatter(pattern, resolveLocale(ctx, node));
+                ctx.setOutput(node, "time", parse(value, formatter, resolveZone(ctx, node)).toEpochMilli());
+                succeed(ctx, node);
+            } catch (Exception exception) {
                 ctx.setOutput(node, "time", 0L);
+                fail(ctx, node, exception);
             }
         });
 
@@ -52,45 +70,63 @@ public class TimeHandler implements NodeHandler {
             long time = ctx.getInputValue(node, "time", Long.class, 0L);
             long amount = ctx.getInputValue(node, "amount", Long.class, 0L);
             String unit = ctx.getInputValue(node, "unit", String.class, "seconds");
-            Instant instant = Instant.ofEpochMilli(time);
-            Instant result;
-            switch (unit.toLowerCase()) {
-                case "minutes" -> result = instant.plus(amount, ChronoUnit.MINUTES);
-                case "hours" -> result = instant.plus(amount, ChronoUnit.HOURS);
-                case "days" -> result = instant.plus(amount, ChronoUnit.DAYS);
-                case "weeks" -> result = instant.plus(amount, ChronoUnit.WEEKS);
-                case "months" -> result = instant.atZone(ZoneId.systemDefault()).plusMonths(amount).toInstant();
-                case "years" -> result = instant.atZone(ZoneId.systemDefault()).plusYears(amount).toInstant();
-                default -> result = instant.plus(amount, ChronoUnit.SECONDS);
+            try {
+                Instant result = add(Instant.ofEpochMilli(time), amount, unit, resolveZone(ctx, node));
+                ctx.setOutput(node, "time", result.toEpochMilli());
+                succeed(ctx, node);
+            } catch (Exception exception) {
+                ctx.setOutput(node, "time", time);
+                fail(ctx, node, exception);
             }
-            ctx.setOutput(node, "time", result.toEpochMilli());
         });
 
         operations.put("time_diff", (ctx, node) -> {
-            long time1 = ctx.getInputValue(node, "time1", Long.class, 0L);
-            long time2 = ctx.getInputValue(node, "time2", Long.class, 0L);
-            long diff = Math.abs(time1 - time2);
-            ctx.setOutput(node, "diff", diff);
+            long first = ctx.getInputValue(node, "time1", Long.class, 0L);
+            long second = ctx.getInputValue(node, "time2", Long.class, 0L);
+            String unit = ctx.getInputValue(node, "unit", String.class, "milliseconds");
+            try {
+                long signed = Math.subtractExact(second, first);
+                if (signed == Long.MIN_VALUE) {
+                    throw new ArithmeticException("Time difference overflow");
+                }
+                ctx.setOutput(node, "diff", Math.abs(signed));
+                ctx.setOutput(node, "signed_diff", signed);
+                ctx.setOutput(node, "unit_diff", differenceInUnit(signed, unit));
+                succeed(ctx, node);
+            } catch (Exception exception) {
+                ctx.setOutput(node, "diff", Long.MAX_VALUE);
+                ctx.setOutput(node, "signed_diff", second >= first ? Long.MAX_VALUE : Long.MIN_VALUE);
+                ctx.setOutput(node, "unit_diff", second >= first ? Long.MAX_VALUE : Long.MIN_VALUE);
+                fail(ctx, node, exception);
+            }
         });
 
         operations.put("time_to_ticks", (ctx, node) -> {
             long seconds = ctx.getInputValue(node, "seconds", Long.class, 0L);
-            ctx.setOutput(node, "ticks", seconds * 20L);
-        });
-
-        operations.put("time_get_current_time", (ctx, node) -> {
-            org.bukkit.World world = ctx.getInputValue(node, "world", org.bukkit.World.class, null);
-            if (world != null) {
-                ctx.setOutput(node, "time", (int) world.getTime());
-            } else {
-                ctx.setOutput(node, "time", 0);
+            try {
+                ctx.setOutput(node, "ticks", Math.multiplyExact(seconds, 20L));
+                succeed(ctx, node);
+            } catch (Exception exception) {
+                ctx.setOutput(node, "ticks", seconds >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE);
+                fail(ctx, node, exception);
             }
         });
 
-        operations.put("time_get_current_ticks", (ctx, node) -> {
-            ctx.setOutput(node, "ticks", (int) org.bukkit.Bukkit.getCurrentTick());
+        operations.put("time_get_current_time", (ctx, node) -> {
+            World world = ctx.getInputValue(node, "world", World.class, null);
+            if (world == null) {
+                ctx.setOutput(node, "time", 0L);
+                fail(ctx, node, new IllegalArgumentException("World is required"));
+                return;
+            }
+            ctx.setOutput(node, "time", world.getTime());
+            succeed(ctx, node);
         });
 
+        operations.put("time_get_current_ticks", (ctx, node) -> {
+            ctx.setOutput(node, "ticks", (long) Bukkit.getCurrentTick());
+            succeed(ctx, node);
+        });
     }
 
     public void registerTo(HandlerRegistry registry) {
@@ -100,10 +136,86 @@ public class TimeHandler implements NodeHandler {
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
-        BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        BiConsumer<FlowContext, FlowNode> handler = operation != null ? operations.get(operation) : null;
+        if (handler == null) {
+            throw new IllegalArgumentException("Unknown time operation: " + operation);
         }
+        handler.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private DateTimeFormatter formatter(String pattern, Locale locale) {
+        if (pattern == null || pattern.isBlank()) {
+            throw new IllegalArgumentException("Time pattern is required");
+        }
+        return DateTimeFormatter.ofPattern(pattern, locale).withResolverStyle(ResolverStyle.STRICT);
+    }
+
+    private Instant parse(String value, DateTimeFormatter formatter, ZoneId zoneId) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Time value is required");
+        }
+        TemporalAccessor parsed = formatter.parseBest(value, ZonedDateTime::from, OffsetDateTime::from,
+            LocalDateTime::from);
+        return switch (parsed) {
+            case ZonedDateTime zoned -> zoned.toInstant();
+            case OffsetDateTime offset -> offset.toInstant();
+            case LocalDateTime local -> local.atZone(zoneId).toInstant();
+            default -> throw new IllegalArgumentException("Time pattern does not contain a complete date and time");
+        };
+    }
+
+    private Instant add(Instant instant, long amount, String unit, ZoneId zoneId) {
+        String normalized = unit != null ? unit.trim().toLowerCase(Locale.ROOT) : "";
+        return switch (normalized) {
+            case "millisecond", "milliseconds", "ms" -> instant.plus(amount, ChronoUnit.MILLIS);
+            case "tick", "ticks" -> instant.plus(Math.multiplyExact(amount, 50L), ChronoUnit.MILLIS);
+            case "second", "seconds", "s" -> instant.plus(amount, ChronoUnit.SECONDS);
+            case "minute", "minutes", "m" -> instant.plus(amount, ChronoUnit.MINUTES);
+            case "hour", "hours", "h" -> instant.plus(amount, ChronoUnit.HOURS);
+            case "day", "days", "d" -> instant.plus(amount, ChronoUnit.DAYS);
+            case "week", "weeks", "w" -> instant.plus(amount, ChronoUnit.WEEKS);
+            case "month", "months" -> instant.atZone(zoneId).plusMonths(amount).toInstant();
+            case "year", "years", "y" -> instant.atZone(zoneId).plusYears(amount).toInstant();
+            default -> throw new IllegalArgumentException("Unknown time unit: " + unit);
+        };
+    }
+
+    private long differenceInUnit(long milliseconds, String unit) {
+        String normalized = unit != null ? unit.trim().toLowerCase(Locale.ROOT) : "";
+        long divisor = switch (normalized) {
+            case "millisecond", "milliseconds", "ms" -> 1L;
+            case "tick", "ticks" -> 50L;
+            case "second", "seconds", "s" -> 1_000L;
+            case "minute", "minutes", "m" -> 60_000L;
+            case "hour", "hours", "h" -> 3_600_000L;
+            case "day", "days", "d" -> 86_400_000L;
+            case "week", "weeks", "w" -> 604_800_000L;
+            default -> throw new IllegalArgumentException("Unknown time unit: " + unit);
+        };
+        return milliseconds / divisor;
+    }
+
+    private ZoneId resolveZone(FlowContext context, FlowNode node) {
+        String zone = context.getInputValue(node, "time_zone", String.class, "");
+        if (zone == null || zone.isBlank()) {
+            return ZoneId.of("UTC");
+        }
+        return ZoneId.of(zone.trim());
+    }
+
+    private Locale resolveLocale(FlowContext context, FlowNode node) {
+        String languageTag = context.getInputValue(node, "locale", String.class, "");
+        return languageTag == null || languageTag.isBlank() ? Locale.ROOT : new Locale.Builder().setLanguageTag(languageTag.trim()).build();
+    }
+
+    private void succeed(FlowContext context, FlowNode node) {
+        context.setOutput(node, "valid", true);
+        context.setOutput(node, "error", "");
+    }
+
+    private void fail(FlowContext context, FlowNode node, Exception exception) {
+        context.setOutput(node, "valid", false);
+        context.setOutput(node, "error", exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName());
     }
 }

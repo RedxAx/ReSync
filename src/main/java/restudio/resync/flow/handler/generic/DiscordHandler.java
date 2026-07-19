@@ -5,21 +5,24 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import restudio.flow.data.FlowNode;
-import restudio.resync.Log;
+import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 public class DiscordHandler implements NodeHandler {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -121,13 +124,18 @@ public class DiscordHandler implements NodeHandler {
         });
         operations.put("discord_color_from_hex", (ctx, node) -> {
             String hexColor = ctx.getInputValue(node, "hex_color", String.class, "#000000");
-            int color = 0;
+            if (hexColor == null) {
+                throw new IllegalArgumentException("Discord embed color is required");
+            }
+            String hex = hexColor.startsWith("#") ? hexColor.substring(1) : hexColor;
+            if (hex.length() != 6) {
+                throw new IllegalArgumentException("Discord embed color must contain six hexadecimal digits");
+            }
+            int color;
             try {
-                String hex = hexColor.replace("#", "");
-                if (hex.length() == 6) {
-                    color = Integer.parseInt(hex, 16);
-                }
-            } catch (Exception ignored) {
+                color = Integer.parseInt(hex, 16);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Discord embed color is invalid: " + hexColor, exception);
             }
             ctx.setOutput(node, "color", color);
             ctx.triggerOutput("flow");
@@ -136,7 +144,10 @@ public class DiscordHandler implements NodeHandler {
             int red = ctx.getInputValue(node, "red", Integer.class, 0);
             int green = ctx.getInputValue(node, "green", Integer.class, 0);
             int blue = ctx.getInputValue(node, "blue", Integer.class, 0);
-            ctx.setOutput(node, "color", ((red & 0xFF) << 16) | ((green & 0xFF) << 8) | (blue & 0xFF));
+            if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) {
+                throw new IllegalArgumentException("Discord embed RGB channels must be between 0 and 255");
+            }
+            ctx.setOutput(node, "color", (red << 16) | (green << 8) | blue);
             ctx.triggerOutput("flow");
         });
         operations.put("discord_webhook_edit", (ctx, node) -> {
@@ -234,25 +245,39 @@ public class DiscordHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown Discord operation: " + operation);
         }
+        op.accept(ctx, node);
     }
 
-    private void sendAsync(FlowContext ctx, FlowNode node, java.util.function.Supplier<Boolean> call) {
+    private void sendAsync(FlowContext ctx, FlowNode node, Supplier<Boolean> call) {
         ctx.runAsync(() -> {
-            boolean success = call.get();
+            FlowOperationResult<Boolean> result;
+            try {
+                boolean success = call.get();
+                result = success ? FlowOperationResult.success(true)
+                    : FlowOperationResult.failure("DISCORD_HTTP_STATUS_ERROR", "Discord rejected the webhook request", Map.of());
+            } catch (RuntimeException exception) {
+                String message = exception.getMessage() != null && !exception.getMessage().isBlank() ? exception.getMessage() : "Discord webhook request failed";
+                result = FlowOperationResult.failure("DISCORD_REQUEST_FAILED", message, Map.of());
+            }
+            FlowOperationResult<Boolean> completion = result;
             ctx.runSync(() -> {
-                ctx.setOutput(node, "success", success);
-                ctx.triggerOutput("flow");
+                ctx.setOutput(node, "operation_result", completion);
+                ctx.setOutput(node, "success", completion.success());
+                ctx.setOutput(node, "error_code", completion.errorCode());
+                ctx.setOutput(node, "message", completion.message());
+                ctx.triggerOutput(completion.success() ? "flow" : "failed");
             });
         });
     }
 
     private boolean sendWebhook(String webhookUrl, String content, Object embedOrEmbeds, String username, String avatarUrl, boolean tts, String messageId) {
         try {
-            URL url = new URL(webhookUrl);
+            URL url = validateWebhookUrl(webhookUrl, null);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setConnectTimeout(10000);
@@ -282,16 +307,16 @@ public class DiscordHandler implements NodeHandler {
 
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
-        } catch (Exception e) {
-            Log.error("[Flow] Discord webhook error: " + e.getMessage());
-            return false;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Discord webhook send failed", exception);
         }
     }
 
     private boolean editWebhookMessage(String webhookUrl, String messageId, String content, List<Map<String, Object>> embeds) {
         try {
-            URL url = new URL(webhookUrl + "/messages/" + messageId);
+            URL url = validateWebhookUrl(webhookUrl, messageId);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("PATCH");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setConnectTimeout(10000);
@@ -313,25 +338,45 @@ public class DiscordHandler implements NodeHandler {
 
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
-        } catch (Exception e) {
-            Log.error("[Flow] Discord webhook edit error: " + e.getMessage());
-            return false;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Discord webhook edit failed", exception);
         }
     }
 
     private boolean deleteWebhookMessage(String webhookUrl, String messageId) {
         try {
-            URL url = new URL(webhookUrl + "/messages/" + messageId);
+            URL url = validateWebhookUrl(webhookUrl, messageId);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("DELETE");
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
             int responseCode = connection.getResponseCode();
             return responseCode >= 200 && responseCode < 300;
-        } catch (Exception e) {
-            Log.error("[Flow] Discord webhook delete error: " + e.getMessage());
-            return false;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Discord webhook delete failed", exception);
         }
+    }
+
+    private URL validateWebhookUrl(String value, String messageId) throws Exception {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Discord webhook URL is required");
+        }
+        URI uri = URI.create(value);
+        String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null || uri.getPort() != -1 && uri.getPort() != 443
+            || !(host.equals("discord.com") || host.endsWith(".discord.com") || host.equals("discordapp.com") || host.endsWith(".discordapp.com"))
+            || uri.getPath() == null || !uri.getPath().startsWith("/api/webhooks/")) {
+            throw new IllegalArgumentException("Discord webhook URL must use the official HTTPS webhook endpoint");
+        }
+        if (messageId == null) {
+            return uri.toURL();
+        }
+        if (!messageId.matches("[0-9]+")) {
+            throw new IllegalArgumentException("Discord message ID is invalid");
+        }
+        String path = uri.getPath().endsWith("/") ? uri.getPath() : uri.getPath() + "/";
+        return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), path + "messages/" + messageId, uri.getQuery(), null).toURL();
     }
 
     private JsonArray toEmbeds(Object embedOrEmbeds) {

@@ -97,7 +97,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" }
+      { "name": "entities", "dataType": "list<entity>" }
     ]
   },
   {
@@ -275,7 +275,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" }
+      { "name": "entities", "dataType": "list<entity>" }
     ]
   },
   {
@@ -295,7 +295,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" }
+      { "name": "entities", "dataType": "list<entity>" }
     ]
   },
   {
@@ -726,7 +726,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "blocks", "dataType": "list" },
+      { "name": "blocks", "dataType": "list<block>" },
       { "name": "count", "dataType": "number" }
     ]
   },
@@ -850,13 +850,13 @@
     "handlerConfig": { "operation": "filter_entities" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
       { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "count", "dataType": "number" }
     ]
   },
@@ -868,13 +868,13 @@
     "handlerConfig": { "operation": "sort_entities" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "location", "dataType": "location" },
       { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["nearest", "farthest"], "defaultValue": "nearest" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" }
+      { "name": "entities", "dataType": "list<entity>" }
     ]
   },
   {
@@ -885,12 +885,12 @@
     "handlerConfig": { "operation": "limit_entities" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "limit", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "count", "dataType": "number" }
     ]
   },
@@ -1125,7 +1125,7 @@
       { "name": "found", "pinType": "FLOW", "dataType": "execution" },
       { "name": "empty", "pinType": "FLOW", "dataType": "execution" },
       { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "entity", "dataType": "entity" },
       { "name": "count", "dataType": "number" },
       { "name": "has_result", "dataType": "boolean" },
@@ -1144,7 +1144,7 @@
       { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["damage", "heal", "potion", "ignite", "freeze", "stun", "root", "silence", "disarm", "launch", "pull", "push", "knockback", "set_velocity", "no_damage_ticks", "shield", "mark", "remove_mark", "life_steal"], "defaultValue": "damage" },
       { "name": "target_source", "dataType": "string", "widget": "DROPDOWN", "options": ["event target", "target", "entities"], "defaultValue": "event target" },
       { "name": "target", "dataType": "entity", "visibleWhen": { "target_source": "target" } },
-      { "name": "entities", "dataType": "list", "visibleWhen": { "target_source": "entities" } },
+      { "name": "entities", "dataType": "list<entity>", "visibleWhen": { "target_source": "entities" } },
       { "name": "location", "dataType": "location", "visibleWhen": { "mode": "pull,push,knockback" } },
       { "name": "direction", "dataType": "vector", "visibleWhen": { "mode": "launch" } },
       { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "damage,heal,shield,life_steal" } },
@@ -1203,7 +1203,7 @@
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "entities", "dataType": "list" },
+      { "name": "entities", "dataType": "list<entity>" },
       { "name": "affected", "dataType": "number" },
       { "name": "location", "dataType": "location" },
       { "name": "cooldown_ticks_left", "dataType": "number" }

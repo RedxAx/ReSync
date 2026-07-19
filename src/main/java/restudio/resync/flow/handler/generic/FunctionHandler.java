@@ -2,11 +2,8 @@ package restudio.resync.flow.handler.generic;
 
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
-import restudio.resync.Log;
-import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
-import restudio.resync.flow.FlowRuntimeAccess;
-import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
@@ -23,24 +20,18 @@ public class FunctionHandler implements NodeHandler {
     public FunctionHandler() {
         operations.put("call_function", (ctx, node) -> {
             String functionName = ctx.getInputValue(node, "function", String.class, "");
-            FlowStorage storage = FlowRuntimeAccess.getStorage();
-            if (storage == null) {
-                storage = new FlowStorage(ReSync.getInstance());
+            if (functionName == null || functionName.isBlank()) {
+                throw new FlowHandlerException("FUNCTION_ID_REQUIRED", "Function ID is required", "Select an existing function");
             }
-            FlowGraph functionGraph = storage.getGraph(functionName);
-            if (functionGraph != null) {
-                String returnNodeId = ctx.resolveNodeId(node);
-                ctx.getRuntime().callFunction(functionGraph, returnNodeId);
-            } else {
-                Log.warn("[Flow] Function not found: " + functionName);
-                ctx.triggerOutput("flow");
-            }
+            throw new FlowHandlerException("FUNCTION_DISPATCH_INVALID", "Function call bypassed executor dispatch",
+                "Reload the Flow runtime and retry the function call", Map.of("functionId", functionName));
         });
 
         operations.put("return_value", (ctx, node) -> {
             Object returnValue = ctx.getInputValue(node, "value", Object.class, null);
             if (!ctx.getRuntime().returnFromFunction(returnValue)) {
-                Log.warn("[Flow] return called outside function");
+                throw new FlowHandlerException("FUNCTION_RETURN_OUTSIDE_CALL", "Return was used outside an active function call",
+                    "Move Return into a callable function path");
             }
         });
 
@@ -75,12 +66,20 @@ public class FunctionHandler implements NodeHandler {
 
         operations.put("function_input", (ctx, node) -> {
             String name = ctx.getInputValue(node, "name", String.class, "");
+            if (name == null || name.isBlank()) {
+                throw new FlowHandlerException("FUNCTION_INPUT_NAME_REQUIRED", "Function input name is required",
+                    "Select a declared function input");
+            }
             Object value = ctx.getRuntime().getFunctionInput(name);
             ctx.setOutput(node, "value", value);
         });
 
         operations.put("function_output", (ctx, node) -> {
             String name = ctx.getInputValue(node, "name", String.class, "");
+            if (name == null || name.isBlank()) {
+                throw new FlowHandlerException("FUNCTION_OUTPUT_NAME_REQUIRED", "Function output name is required",
+                    "Select a declared function output");
+            }
             Object value = ctx.getInputValue(node, "value", Object.class, null);
             Map<String, Object> values = new HashMap<>();
             values.put(name, value);
@@ -98,9 +97,10 @@ public class FunctionHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown function operation: " + operation);
         }
+        op.accept(ctx, node);
         if (operation != null && selfManagingOutputs.contains(operation)) {
             return;
         }

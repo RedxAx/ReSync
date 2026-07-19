@@ -1,15 +1,19 @@
 package restudio.resync.flow.handler.generic;
 
 import net.luckperms.api.LuckPerms;
+import net.luckperms.api.context.ImmutableContextSet;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.Node;
+import net.luckperms.api.node.types.InheritanceNode;
 import net.luckperms.api.node.types.MetaNode;
 import net.luckperms.api.node.types.PermissionNode;
 import net.luckperms.api.node.types.PrefixNode;
 import net.luckperms.api.node.types.SuffixNode;
 import net.luckperms.api.query.QueryOptions;
+import net.luckperms.api.query.QueryMode;
 import net.luckperms.api.track.Track;
+import net.luckperms.api.util.Result;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -19,23 +23,27 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 public class PermissionHandler implements NodeHandler {
-    private static final String PERMISSION_COUNT_KEY = "__permission_count";
-    private static final int MAX_PERMISSION_INPUTS = 32;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public PermissionHandler() {
         operations.put("perm_has", (ctx, node) -> {
+            ctx.setOutput(node, "resolved_context", Map.of());
             if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
                 ctx.setOutput(node, "success", false);
                 ctx.setOutput(node, "error", "LuckPerms not available");
                 ctx.setOutput(node, "has", false);
+                ctx.setOutput(node, "count", 0);
                 return;
             }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
@@ -44,6 +52,7 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "success", false);
                 ctx.setOutput(node, "error", player == null ? "Player is null" : "Permission is empty");
                 ctx.setOutput(node, "has", false);
+                ctx.setOutput(node, "count", 0);
                 return;
             }
             LuckPerms lp = getLuckPerms();
@@ -51,6 +60,7 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "success", false);
                 ctx.setOutput(node, "error", "LuckPerms service not available");
                 ctx.setOutput(node, "has", false);
+                ctx.setOutput(node, "count", 0);
                 return;
             }
             User user = lp.getUserManager().getUser(player.getUniqueId());
@@ -58,17 +68,19 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "success", false);
                 ctx.setOutput(node, "error", "User not found");
                 ctx.setOutput(node, "has", false);
+                ctx.setOutput(node, "count", 0);
                 return;
             }
-            QueryOptions queryOptions = getQueryOptions(lp, user);
+            QueryOptions queryOptions = getQueryOptions(lp, user, ctx.getInputValue(node, "context"));
             var permissionData = user.getCachedData().getPermissionData(queryOptions);
-            boolean findAll = "Find All".equalsIgnoreCase(ctx.getInputValue(node, "mode", String.class, "Find Any"));
-            boolean has = findAll
-                    ? permissions.stream().allMatch(permission -> permissionData.checkPermission(permission).asBoolean())
-                    : permissions.stream().anyMatch(permission -> permissionData.checkPermission(permission).asBoolean());
+            long count = permissions.stream().filter(permission -> permissionData.checkPermission(permission).asBoolean()).count();
+            String mode = ctx.getInputValue(node, "mode", String.class, "Find Any");
+            boolean has = matchesMode(count, permissions.size(), mode);
             ctx.setOutput(node, "success", true);
             ctx.setOutput(node, "error", "");
             ctx.setOutput(node, "has", has);
+            ctx.setOutput(node, "count", Math.toIntExact(count));
+            ctx.setOutput(node, "resolved_context", queryOptions.context().toMap());
         });
 
         operations.put("perm_add", (ctx, node) -> {
@@ -98,7 +110,7 @@ public class PermissionHandler implements NodeHandler {
             }
             Node permNode = PermissionNode.builder(permission).build();
             user.data().add(permNode);
-            lp.getUserManager().saveUser(user);
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -129,7 +141,7 @@ public class PermissionHandler implements NodeHandler {
             }
             Node permNode = PermissionNode.builder(permission).build();
             user.data().remove(permNode);
-            lp.getUserManager().saveUser(user);
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -235,8 +247,13 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "error", "Group not found");
                 return;
             }
-            user.setPrimaryGroup(group);
-            lp.getUserManager().saveUser(user);
+            Result result = user.setPrimaryGroup(group);
+            if (!result.wasSuccessful()) {
+                ctx.setOutput(node, "success", false);
+                ctx.setOutput(node, "error", "Primary group change was rejected");
+                return;
+            }
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -268,7 +285,7 @@ public class PermissionHandler implements NodeHandler {
             }
             Node permNode = PermissionNode.builder(permission).expiry(duration, TimeUnit.SECONDS).build();
             user.data().add(permNode);
-            lp.getUserManager().saveUser(user);
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -398,9 +415,11 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "error", "User not found");
                 return;
             }
+            user.getNodes().stream().filter(MetaNode.class::isInstance).map(MetaNode.class::cast)
+                    .filter(existing -> existing.getMetaKey().equalsIgnoreCase(key)).toList().forEach(existing -> user.data().remove(existing));
             Node metaNode = MetaNode.builder(key, value).build();
             user.data().add(metaNode);
-            lp.getUserManager().saveUser(user);
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -438,7 +457,7 @@ public class PermissionHandler implements NodeHandler {
             for (Node n : toRemove) {
                 user.data().remove(n);
             }
-            lp.getUserManager().saveUser(user);
+            persistUser(ctx, lp, user);
             ctx.setOutput(node, "success", true);
         });
 
@@ -512,335 +531,280 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "inherits", false);
                 return;
             }
+            if (lp.getGroupManager().getGroup(parent) == null) {
+                ctx.setOutput(node, "success", false);
+                ctx.setOutput(node, "error", "Parent group not found");
+                ctx.setOutput(node, "inherits", false);
+                return;
+            }
             QueryOptions queryOptions = getStaticQueryOptions(lp);
-            boolean inherits = groupObj.getCachedData().getPermissionData(queryOptions)
-                    .checkPermission("group." + parent).asBoolean();
+            boolean inherits = groupObj.getInheritedGroups(queryOptions).stream().anyMatch(candidate -> candidate.getName().equalsIgnoreCase(parent));
             ctx.setOutput(node, "success", true);
             ctx.setOutput(node, "inherits", inherits);
         });
 
         operations.put("perm_add_group", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            if (player == null || group.isEmpty()) {
-                ctx.setOutput(node, "success", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            if (player == null || group.isBlank()) {
+                fail(ctx, node, player == null ? "Player is null" : "Group is empty");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
             Group groupObj = lp.getGroupManager().getGroup(group);
             if (groupObj == null) {
-                ctx.setOutput(node, "success", false);
+                fail(ctx, node, "Group not found");
                 return;
             }
-            user.data().add(PermissionNode.builder("group." + group).build());
-            lp.getUserManager().saveUser(user);
-            ctx.setOutput(node, "success", true);
+            user.data().add(InheritanceNode.builder(groupObj).build());
+            persistUser(ctx, lp, user);
+            succeed(ctx, node);
         });
 
         operations.put("perm_remove_group", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            if (player == null || group.isEmpty()) {
-                ctx.setOutput(node, "success", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            if (player == null || group.isBlank()) {
+                fail(ctx, node, player == null ? "Player is null" : "Group is empty");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            user.data().remove(PermissionNode.builder("group." + group).build());
-            lp.getUserManager().saveUser(user);
-            ctx.setOutput(node, "success", true);
+            user.data().remove(InheritanceNode.builder(group).build());
+            persistUser(ctx, lp, user);
+            succeed(ctx, node);
         });
 
         operations.put("perm_has_group", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "has", false);
-                return;
-            }
+            ctx.setOutput(node, "has", false);
             Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            if (player == null || group.isEmpty()) {
-                ctx.setOutput(node, "has", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            if (player == null || group.isBlank()) {
+                fail(ctx, node, player == null ? "Player is null" : "Group is empty");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "has", false);
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "has", false);
                 return;
             }
             QueryOptions queryOptions = getQueryOptions(lp, user);
             boolean has = user.getInheritedGroups(queryOptions).stream()
                     .anyMatch(g -> g.getName().equalsIgnoreCase(group));
             ctx.setOutput(node, "has", has);
+            succeed(ctx, node);
         });
 
         operations.put("perm_get_permissions", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
-                return;
-            }
+            ctx.setOutput(node, "permissions", List.of());
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             if (player == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
+                fail(ctx, node, "Player is null");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
                 return;
             }
-            List<String> perms = new ArrayList<>();
-            user.getNodes().forEach(n -> {
-                if (n instanceof PermissionNode) {
-                    perms.add(((PermissionNode) n).getPermission());
-                }
-            });
+            List<String> perms = user.getNodes().stream().filter(PermissionNode.class::isInstance).map(PermissionNode.class::cast)
+                    .map(PermissionNode::getPermission).distinct().sorted().toList();
             ctx.setOutput(node, "permissions", perms);
+            succeed(ctx, node);
         });
 
         operations.put("perm_get_primary_group", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "group", "");
-                return;
-            }
+            ctx.setOutput(node, "group", "");
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             if (player == null) {
-                ctx.setOutput(node, "group", "");
+                fail(ctx, node, "Player is null");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "group", "");
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "group", "");
                 return;
             }
             ctx.setOutput(node, "group", user.getPrimaryGroup());
+            succeed(ctx, node);
         });
 
         operations.put("perm_get_all_groups", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "groups", new ArrayList<>());
-                return;
-            }
-            LuckPerms lp = getLuckPerms();
+            ctx.setOutput(node, "groups", List.of());
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "groups", new ArrayList<>());
                 return;
             }
-            List<String> groups = new ArrayList<>();
-            lp.getGroupManager().getLoadedGroups().forEach(g -> groups.add(g.getName()));
+            List<String> groups = lp.getGroupManager().getLoadedGroups().stream().map(Group::getName).sorted().toList();
             ctx.setOutput(node, "groups", groups);
+            succeed(ctx, node);
         });
 
         operations.put("perm_group_add_permission", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            String permission = ctx.getInputValue(node, "permission", String.class, "").trim();
+            if (group.isBlank() || permission.isBlank()) {
+                fail(ctx, node, group.isBlank() ? "Group is empty" : "Permission is empty");
                 return;
             }
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            String permission = ctx.getInputValue(node, "permission", String.class, "");
-            if (group.isEmpty() || permission.isEmpty()) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
             Group groupObj = lp.getGroupManager().getGroup(group);
             if (groupObj == null) {
-                ctx.setOutput(node, "success", false);
+                fail(ctx, node, "Group not found");
                 return;
             }
             groupObj.data().add(PermissionNode.builder(permission).build());
-            lp.getGroupManager().saveGroup(groupObj);
-            ctx.setOutput(node, "success", true);
+            persistGroup(ctx, lp, groupObj);
+            succeed(ctx, node);
         });
 
         operations.put("perm_group_has_permission", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "has", false);
+            ctx.setOutput(node, "has", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            String permission = ctx.getInputValue(node, "permission", String.class, "").trim();
+            if (group.isBlank() || permission.isBlank()) {
+                fail(ctx, node, group.isBlank() ? "Group is empty" : "Permission is empty");
                 return;
             }
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            String permission = ctx.getInputValue(node, "permission", String.class, "");
-            if (group.isEmpty() || permission.isEmpty()) {
-                ctx.setOutput(node, "has", false);
-                return;
-            }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "has", false);
                 return;
             }
             Group groupObj = lp.getGroupManager().getGroup(group);
             if (groupObj == null) {
-                ctx.setOutput(node, "has", false);
+                fail(ctx, node, "Group not found");
                 return;
             }
             QueryOptions queryOptions = getStaticQueryOptions(lp);
             boolean has = groupObj.getCachedData().getPermissionData(queryOptions)
                     .checkPermission(permission).asBoolean();
             ctx.setOutput(node, "has", has);
+            succeed(ctx, node);
         });
 
         operations.put("perm_group_remove_permission", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            String permission = ctx.getInputValue(node, "permission", String.class, "").trim();
+            if (group.isBlank() || permission.isBlank()) {
+                fail(ctx, node, group.isBlank() ? "Group is empty" : "Permission is empty");
                 return;
             }
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            String permission = ctx.getInputValue(node, "permission", String.class, "");
-            if (group.isEmpty() || permission.isEmpty()) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
             Group groupObj = lp.getGroupManager().getGroup(group);
             if (groupObj == null) {
-                ctx.setOutput(node, "success", false);
+                fail(ctx, node, "Group not found");
                 return;
             }
             groupObj.data().remove(PermissionNode.builder(permission).build());
-            lp.getGroupManager().saveGroup(groupObj);
-            ctx.setOutput(node, "success", true);
+            persistGroup(ctx, lp, groupObj);
+            succeed(ctx, node);
         });
 
         operations.put("perm_get_group_permissions", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
+            ctx.setOutput(node, "permissions", List.of());
+            String group = ctx.getInputValue(node, "group", String.class, "").trim();
+            if (group.isBlank()) {
+                fail(ctx, node, "Group is empty");
                 return;
             }
-            String group = ctx.getInputValue(node, "group", String.class, "");
-            if (group.isEmpty()) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
-                return;
-            }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
                 return;
             }
             Group groupObj = lp.getGroupManager().getGroup(group);
             if (groupObj == null) {
-                ctx.setOutput(node, "permissions", new ArrayList<>());
+                fail(ctx, node, "Group not found");
                 return;
             }
-            List<String> perms = new ArrayList<>();
-            groupObj.getNodes().forEach(n -> {
-                if (n instanceof PermissionNode) {
-                    perms.add(((PermissionNode) n).getPermission());
-                }
-            });
+            List<String> perms = groupObj.getNodes().stream().filter(PermissionNode.class::isInstance).map(PermissionNode.class::cast)
+                    .map(PermissionNode::getPermission).distinct().sorted().toList();
             ctx.setOutput(node, "permissions", perms);
+            succeed(ctx, node);
         });
 
         operations.put("perm_set_prefix", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String prefix = ctx.getInputValue(node, "prefix", String.class, "");
             if (player == null) {
-                ctx.setOutput(node, "success", false);
+                fail(ctx, node, "Player is null");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            user.data().add(PrefixNode.builder(prefix, 100).build());
-            lp.getUserManager().saveUser(user);
-            ctx.setOutput(node, "success", true);
+            user.getNodes().stream().filter(PrefixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
+            if (!prefix.isEmpty()) {
+                user.data().add(PrefixNode.builder(prefix, 100).build());
+            }
+            persistUser(ctx, lp, user);
+            succeed(ctx, node);
         });
 
         operations.put("perm_set_suffix", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) {
-                ctx.setOutput(node, "success", false);
-                return;
-            }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String suffix = ctx.getInputValue(node, "suffix", String.class, "");
             if (player == null) {
-                ctx.setOutput(node, "success", false);
+                fail(ctx, node, "Player is null");
                 return;
             }
-            LuckPerms lp = getLuckPerms();
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            User user = lp.getUserManager().getUser(player.getUniqueId());
+            User user = requireUser(ctx, node, lp, player);
             if (user == null) {
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            user.data().add(SuffixNode.builder(suffix, 100).build());
-            lp.getUserManager().saveUser(user);
-            ctx.setOutput(node, "success", true);
+            user.getNodes().stream().filter(SuffixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
+            if (!suffix.isEmpty()) {
+                user.data().add(SuffixNode.builder(suffix, 100).build());
+            }
+            persistUser(ctx, lp, user);
+            succeed(ctx, node);
         });
 
         operations.put("perm_list_tracks", (ctx, node) -> {
-            LuckPerms lp = getLuckPerms();
+            ctx.setOutput(node, "tracks", List.of());
+            LuckPerms lp = requireLuckPerms(ctx, node);
             if (lp == null) {
-                ctx.setOutput(node, "tracks", new ArrayList<>());
-                ctx.setOutput(node, "success", false);
                 return;
             }
-            List<String> tracks = new ArrayList<>();
-            lp.getTrackManager().getLoadedTracks().forEach(track -> tracks.add(track.getName()));
+            List<String> tracks = lp.getTrackManager().getLoadedTracks().stream().map(Track::getName).sorted().toList();
             ctx.setOutput(node, "tracks", tracks);
-            ctx.setOutput(node, "success", true);
+            succeed(ctx, node);
         });
 
         operations.put("perm_promote", (ctx, node) -> {
@@ -854,28 +818,47 @@ public class PermissionHandler implements NodeHandler {
     }
 
     private List<String> resolvePermissions(FlowContext ctx, FlowNode node) {
-        int count = 1;
-        if (node.getInputValues() != null) {
-            Object storedCount = node.getInputValues().get(PERMISSION_COUNT_KEY);
-            if (storedCount instanceof Number number) {
-                count = number.intValue();
-            } else if (storedCount != null) {
-                try {
-                    count = Integer.parseInt(storedCount.toString());
-                } catch (NumberFormatException ignored) {
+        return ctx.getRepeatableInputValues(node, "permission", String.class).stream().map(String::trim).filter(value -> !value.isBlank()).toList();
+    }
+
+    static boolean matchesMode(long matching, int total, String mode) {
+        return switch (mode != null ? mode.toLowerCase(Locale.ROOT) : "find any") {
+            case "find all", "all" -> matching == total;
+            case "find none", "none" -> matching == 0;
+            case "find any", "any", "count" -> matching > 0;
+            default -> throw new IllegalArgumentException("Unknown permission match mode: " + mode);
+        };
+    }
+
+    static Map<String, List<String>> normalizePermissionContext(Object value) {
+        if (value == null) {
+            return Map.of();
+        }
+        if (!(value instanceof Map<?, ?> input)) {
+            throw new IllegalArgumentException("Permission context must be a map");
+        }
+        Map<String, List<String>> output = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : input.entrySet()) {
+            String key = entry.getKey() != null ? String.valueOf(entry.getKey()).trim().toLowerCase(Locale.ROOT) : "";
+            if (key.isBlank()) {
+                throw new IllegalArgumentException("Permission context keys cannot be blank");
+            }
+            Object rawValue = entry.getValue();
+            Collection<?> values = rawValue instanceof Collection<?> collection ? collection : rawValue != null ? List.of(rawValue) : List.of();
+            LinkedHashSet<String> normalizedValues = new LinkedHashSet<>();
+            for (Object raw : values) {
+                String normalized = raw != null ? String.valueOf(raw).trim().toLowerCase(Locale.ROOT) : "";
+                if (normalized.isBlank()) {
+                    throw new IllegalArgumentException("Permission context values cannot be blank");
                 }
+                normalizedValues.add(normalized);
             }
-        }
-        count = Math.clamp(count, 1, MAX_PERMISSION_INPUTS);
-        List<String> permissions = new ArrayList<>();
-        for (int index = 1; index <= count; index++) {
-            String pin = index == 1 ? "permission" : "permission_" + index;
-            String permission = ctx.getInputValue(node, pin, String.class, "").trim();
-            if (!permission.isBlank()) {
-                permissions.add(permission);
+            if (normalizedValues.isEmpty()) {
+                throw new IllegalArgumentException("Permission context values cannot be empty");
             }
+            output.put(key, List.copyOf(normalizedValues));
         }
-        return permissions;
+        return Map.copyOf(output);
     }
 
     private void mutateTrackPosition(FlowContext ctx, FlowNode node, boolean promote) {
@@ -896,10 +879,15 @@ public class PermissionHandler implements NodeHandler {
             ctx.triggerOutput("failure_flow");
             return;
         }
-        Object result = promote ? track.promote(user, getQueryOptions(lp, user).context()) : track.demote(user, getQueryOptions(lp, user).context());
-        lp.getUserManager().saveUser(user);
+        Result result = promote ? track.promote(user, getQueryOptions(lp, user).context()) : track.demote(user, getQueryOptions(lp, user).context());
+        ctx.setOutput(node, "result", result.toString());
+        if (!result.wasSuccessful()) {
+            ctx.setOutput(node, "success", false);
+            ctx.triggerOutput("failure_flow");
+            return;
+        }
+        persistUser(ctx, lp, user);
         ctx.setOutput(node, "success", true);
-        ctx.setOutput(node, "result", result != null ? result.toString() : "");
         ctx.triggerOutput("success_flow");
     }
 
@@ -908,9 +896,58 @@ public class PermissionHandler implements NodeHandler {
         return registration != null ? registration.getProvider() : null;
     }
 
+    private LuckPerms requireLuckPerms(FlowContext ctx, FlowNode node) {
+        LuckPerms luckPerms = getLuckPerms();
+        if (luckPerms == null) {
+            fail(ctx, node, "LuckPerms service not available");
+        }
+        return luckPerms;
+    }
+
+    private User requireUser(FlowContext ctx, FlowNode node, LuckPerms luckPerms, Player player) {
+        User user = luckPerms.getUserManager().getUser(player.getUniqueId());
+        if (user == null) {
+            fail(ctx, node, "User not found");
+        }
+        return user;
+    }
+
+    private void succeed(FlowContext ctx, FlowNode node) {
+        ctx.setOutput(node, "success", true);
+        ctx.setOutput(node, "error", "");
+    }
+
+    private void fail(FlowContext ctx, FlowNode node, String error) {
+        ctx.setOutput(node, "success", false);
+        ctx.setOutput(node, "error", error);
+    }
+
+    private void persistUser(FlowContext ctx, LuckPerms luckPerms, User user) {
+        ctx.runAsyncBeforeContinuation(() -> luckPerms.getUserManager().saveUser(user).join());
+    }
+
+    private void persistGroup(FlowContext ctx, LuckPerms luckPerms, Group group) {
+        ctx.runAsyncBeforeContinuation(() -> luckPerms.getGroupManager().saveGroup(group).join());
+    }
+
     private QueryOptions getQueryOptions(LuckPerms lp, User user) {
         return lp.getContextManager().getQueryOptions(user)
                 .orElse(lp.getContextManager().getStaticQueryOptions());
+    }
+
+    private QueryOptions getQueryOptions(LuckPerms lp, User user, Object explicitContext) {
+        QueryOptions base = getQueryOptions(lp, user);
+        Map<String, List<String>> values = normalizePermissionContext(explicitContext);
+        if (values.isEmpty()) {
+            return base;
+        }
+        ImmutableContextSet.Builder builder = ImmutableContextSet.builder();
+        if (base.mode() == QueryMode.CONTEXTUAL) {
+            builder.addAll(base.context());
+        }
+        values.forEach((key, entries) -> entries.forEach(value -> builder.add(key, value)));
+        ImmutableContextSet context = builder.build();
+        return base.mode() == QueryMode.CONTEXTUAL ? base.toBuilder().context(context).build() : QueryOptions.contextual(context, base.flags());
     }
 
     private QueryOptions getStaticQueryOptions(LuckPerms lp) {
@@ -926,7 +963,11 @@ public class PermissionHandler implements NodeHandler {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op != null) {
+            ctx.setOutput(node, "success", false);
+            ctx.setOutput(node, "error", "");
             op.accept(ctx, node);
+        } else {
+            throw new IllegalArgumentException("Unknown permission operation: " + operation);
         }
         ctx.triggerOutput("flow");
     }

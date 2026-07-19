@@ -1,169 +1,169 @@
 [
   {
     "id": "color.from.rgb",
-    "displayName": "Color From RGB",
+    "displayName": "RGB Color",
+    "description": "Create an RGB color from red, green, and blue channels.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "rgb", "create"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_from_rgb"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_from_rgb"},
+    "inputs": [
+      {"name": "red", "dataType": "integer", "defaultValue": "0", "constraints": {"min": 0, "max": 255}},
+      {"name": "green", "dataType": "integer", "defaultValue": "0", "constraints": {"min": 0, "max": 255}},
+      {"name": "blue", "dataType": "integer", "defaultValue": "0", "constraints": {"min": 0, "max": 255}}
+    ],
+    "outputs": [
+      {"name": "color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "color.from.hex",
     "displayName": "Color From Hex",
+    "description": "Parse a three-digit or six-digit hexadecimal RGB color.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "hex", "parse"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_from_hex"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_from_hex"},
+    "inputs": [
+      {"name": "hex_string", "dataType": "string", "widget": "COLOR", "defaultValue": "#FFFFFF"}
+    ],
+    "outputs": [
+      {"name": "color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "color.to.hex",
     "displayName": "Color To Hex",
+    "description": "Format an RGB color as a six-digit hexadecimal value.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "hex", "format"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_to_hex"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_to_hex"},
+    "inputs": [
+      {"name": "color", "dataType": "rgb_color"}
+    ],
+    "outputs": [
+      {"name": "hex_string", "dataType": "string"}
+    ]
   },
   {
     "id": "color.to.rgb",
-    "displayName": "Color To RGB",
+    "displayName": "Color Channels",
+    "description": "Read the red, green, and blue channels of an RGB color.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "rgb", "channels"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_to_rgb"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_to_rgb"},
+    "inputs": [
+      {"name": "color", "dataType": "rgb_color"}
+    ],
+    "outputs": [
+      {"name": "red", "dataType": "integer"},
+      {"name": "green", "dataType": "integer"},
+      {"name": "blue", "dataType": "integer"}
+    ]
   },
   {
     "id": "color.invert",
-    "displayName": "Color Invert",
+    "displayName": "Invert Color",
+    "description": "Invert every RGB channel.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "invert"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_invert"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_invert"},
+    "inputs": [
+      {"name": "color", "dataType": "rgb_color"}
+    ],
+    "outputs": [
+      {"name": "inverted_color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "color.brighten",
-    "displayName": "Color Brighten",
+    "displayName": "Brighten Color",
+    "description": "Brighten an RGB color by a normalized amount.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "brighten"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_brighten"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_brighten"},
+    "inputs": [
+      {"name": "color", "dataType": "rgb_color"},
+      {"name": "amount", "dataType": "number", "defaultValue": "0.2", "constraints": {"min": 0, "max": 1}}
+    ],
+    "outputs": [
+      {"name": "brightened_color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "color.darken",
-    "displayName": "Color Darken",
+    "displayName": "Darken Color",
+    "description": "Darken an RGB color by a normalized amount.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "tags": ["color", "darken"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_darken"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "handlerConfig": {"operation": "color_darken"},
+    "inputs": [
+      {"name": "color", "dataType": "rgb_color"},
+      {"name": "amount", "dataType": "number", "defaultValue": "0.2", "constraints": {"min": 0, "max": 1}}
+    ],
+    "outputs": [
+      {"name": "darkened_color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "utility.color_blend",
-    "displayName": "Color Blend",
+    "displayName": "Blend Colors",
+    "description": "Blend two RGB colors using a normalized ratio.",
     "category": "UTILITY",
+    "schemaVersion": 2,
+    "tags": ["color", "blend", "mix"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_blend"
-    },
+    "handlerConfig": {"operation": "color_blend"},
     "inputs": [
-      {
-        "name": "color1",
-        "dataType": "color"
-      },
-      {
-        "name": "color2",
-        "dataType": "color"
-      },
-      {
-        "name": "ratio",
-        "dataType": "number"
-      }
+      {"name": "color1", "dataType": "rgb_color"},
+      {"name": "color2", "dataType": "rgb_color"},
+      {"name": "ratio", "dataType": "number", "defaultValue": "0.5", "constraints": {"min": 0, "max": 1}}
     ],
     "outputs": [
-      {
-        "name": "mixed_color",
-        "dataType": "color"
-      }
+      {"name": "mixed_color", "dataType": "rgb_color"}
     ]
   },
   {
     "id": "utility.color_random",
-    "displayName": "Color Random",
+    "displayName": "Random RGB Color",
+    "description": "Create a random RGB color.",
     "category": "UTILITY",
+    "schemaVersion": 2,
+    "tags": ["color", "random", "rgb"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_random"
-    },
+    "handlerConfig": {"operation": "color_random"},
+    "inputs": [],
     "outputs": [
-      {
-        "name": "color",
-        "dataType": "color"
-      }
-    ],
-    "inputs": []
+      {"name": "color", "dataType": "rgb_color"}
+    ]
   },
   {
     "id": "utility.color_distance",
     "displayName": "Color Distance",
+    "description": "Measure Euclidean distance between two RGB colors.",
     "category": "UTILITY",
+    "schemaVersion": 2,
+    "tags": ["color", "distance", "compare"],
     "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "color_distance"
-    },
+    "handlerConfig": {"operation": "color_distance"},
     "inputs": [
-      {
-        "name": "color1",
-        "dataType": "color"
-      },
-      {
-        "name": "color2",
-        "dataType": "color"
-      }
+      {"name": "color1", "dataType": "rgb_color"},
+      {"name": "color2", "dataType": "rgb_color"}
     ],
     "outputs": [
-      {
-        "name": "distance",
-        "dataType": "number"
-      }
+      {"name": "distance", "dataType": "number"}
     ]
-  },
-  {
-    "id": "color.mix",
-    "displayName": "Color Mix",
-    "category": "UTILITY",
-    "handler": "ColorHandler",
-    "handlerConfig": {
-      "operation": "mix"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
   }
 ]
-

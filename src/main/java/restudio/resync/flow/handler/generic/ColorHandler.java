@@ -8,6 +8,7 @@ import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 
 public class ColorHandler implements NodeHandler {
@@ -24,7 +25,14 @@ public class ColorHandler implements NodeHandler {
 
         operations.put("color_from_hex", (ctx, node) -> {
             String hexString = ctx.getInputValue(node, "hex_string", String.class, "#FFFFFF");
-            Color color = Color.fromRGB(Integer.parseInt(hexString.replace("#", ""), 16));
+            String hex = hexString.strip().replace("#", "");
+            if (hex.length() == 3) {
+                hex = "" + hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
+            }
+            if (hex.length() != 6) {
+                throw new IllegalArgumentException("Invalid RGB color: " + hexString);
+            }
+            Color color = Color.fromRGB(Integer.parseInt(hex, 16));
             ctx.setOutput(node, "color", color);
         });
 
@@ -48,7 +56,7 @@ public class ColorHandler implements NodeHandler {
         operations.put("color_blend", (ctx, node) -> {
             Color color1 = ctx.getInputValue(node, "color1", Color.class, Color.WHITE);
             Color color2 = ctx.getInputValue(node, "color2", Color.class, Color.BLACK);
-            Double ratio = ctx.getInputValue(node, "ratio", Double.class, 0.5);
+            double ratio = Math.clamp(ctx.getInputValue(node, "ratio", Double.class, 0.5), 0.0, 1.0);
             int mixedRed = (int) (color1.getRed() + (color2.getRed() - color1.getRed()) * ratio);
             int mixedGreen = (int) (color1.getGreen() + (color2.getGreen() - color1.getGreen()) * ratio);
             int mixedBlue = (int) (color1.getBlue() + (color2.getBlue() - color1.getBlue()) * ratio);
@@ -58,7 +66,7 @@ public class ColorHandler implements NodeHandler {
         operations.put("mix", (ctx, node) -> {
             Color color1 = ctx.getInputValue(node, "color1", Color.class, Color.WHITE);
             Color color2 = ctx.getInputValue(node, "color2", Color.class, Color.BLACK);
-            Double ratio = ctx.getInputValue(node, "ratio", Double.class, 0.5);
+            double ratio = Math.clamp(ctx.getInputValue(node, "ratio", Double.class, 0.5), 0.0, 1.0);
             int mixedRed = (int) (color1.getRed() + (color2.getRed() - color1.getRed()) * ratio);
             int mixedGreen = (int) (color1.getGreen() + (color2.getGreen() - color1.getGreen()) * ratio);
             int mixedBlue = (int) (color1.getBlue() + (color2.getBlue() - color1.getBlue()) * ratio);
@@ -72,7 +80,7 @@ public class ColorHandler implements NodeHandler {
 
         operations.put("color_brighten", (ctx, node) -> {
             Color color = ctx.getInputValue(node, "color", Color.class, Color.WHITE);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.2);
+            double amount = Math.clamp(ctx.getInputValue(node, "amount", Double.class, 0.2), 0.0, 1.0);
             int newRed = (int) Math.min(255, color.getRed() + color.getRed() * amount);
             int newGreen = (int) Math.min(255, color.getGreen() + color.getGreen() * amount);
             int newBlue = (int) Math.min(255, color.getBlue() + color.getBlue() * amount);
@@ -81,7 +89,7 @@ public class ColorHandler implements NodeHandler {
 
         operations.put("color_darken", (ctx, node) -> {
             Color color = ctx.getInputValue(node, "color", Color.class, Color.WHITE);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.2);
+            double amount = Math.clamp(ctx.getInputValue(node, "amount", Double.class, 0.2), 0.0, 1.0);
             int newRed = (int) Math.max(0, color.getRed() - color.getRed() * amount);
             int newGreen = (int) Math.max(0, color.getGreen() - color.getGreen() * amount);
             int newBlue = (int) Math.max(0, color.getBlue() - color.getBlue() * amount);
@@ -89,7 +97,8 @@ public class ColorHandler implements NodeHandler {
         });
 
         operations.put("color_random", (ctx, node) -> {
-            ctx.setOutput(node, "color", Color.fromRGB((int) (Math.random() * 256), (int) (Math.random() * 256), (int) (Math.random() * 256)));
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            ctx.setOutput(node, "color", Color.fromRGB(random.nextInt(256), random.nextInt(256), random.nextInt(256)));
         });
 
         operations.put("color_distance", (ctx, node) -> {
@@ -108,9 +117,10 @@ public class ColorHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown color operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

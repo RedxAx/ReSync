@@ -25,7 +25,8 @@ public class RuntimeNotificationService {
                     context.getCodec().sendMessage(session.getConnection().getFrameSender(), error, 0, false);
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            Log.warn("Failed to broadcast a ReSync runtime error: " + exception.getMessage(), exception);
         }
         Log.warn(message);
     }

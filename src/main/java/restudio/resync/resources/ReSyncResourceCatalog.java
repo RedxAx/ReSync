@@ -24,7 +24,7 @@ public final class ReSyncResourceCatalog {
     public static final String TEXT_TEMPLATE = "text_template";
     public static final String ADVANCEMENT_TREE = "advancement_tree";
     public static final String DIALOG = "dialog";
-    public static final String VILLAGE_PROFILE = "village_profile";
+    public static final String TRADE_PROFILE = "trade_profile";
     public static final String NPC_DEFINITION = "npc_definition";
     public static final String LOOT_TABLE = "loot_table";
     public static final String WORLDGEN = "worldgen";

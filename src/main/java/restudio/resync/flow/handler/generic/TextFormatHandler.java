@@ -12,6 +12,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 import restudio.resync.flow.util.TextFormatter;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -116,14 +117,18 @@ public class TextFormatHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown text format operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 
     private static ClickEvent.Action parseClickAction(String action) {
-        String lower = action.toLowerCase();
+        if (action == null || action.isBlank()) {
+            throw new IllegalArgumentException("Click action is required");
+        }
+        String lower = action.toLowerCase(Locale.ROOT);
         if (lower.equals("run_command")) {
             return ClickEvent.Action.RUN_COMMAND;
         }
@@ -136,19 +141,25 @@ public class TextFormatHandler implements NodeHandler {
         if (lower.equals("change_page")) {
             return ClickEvent.Action.CHANGE_PAGE;
         }
-        return ClickEvent.Action.OPEN_URL;
+        if (lower.equals("open_url")) {
+            return ClickEvent.Action.OPEN_URL;
+        }
+        throw new IllegalArgumentException("Unknown click action: " + action);
     }
 
     private static NamedTextColor parseColor(String colorName) {
         if (colorName == null || colorName.isEmpty()) {
             return NamedTextColor.WHITE;
         }
-        try {
-            NamedTextColor color = NamedTextColor.NAMES.value(colorName.toLowerCase());
-            if (color != null) return color;
-        } catch (IllegalArgumentException ignored) {
+        String normalized = colorName.toLowerCase(Locale.ROOT);
+        NamedTextColor color = NamedTextColor.NAMES.value(normalized);
+        if (color != null) {
+            return color;
         }
-        NamedTextColor legacy = LEGACY_COLORS.get(colorName.toLowerCase());
-        return legacy != null ? legacy : NamedTextColor.WHITE;
+        NamedTextColor legacy = LEGACY_COLORS.get(normalized);
+        if (legacy != null) {
+            return legacy;
+        }
+        throw new IllegalArgumentException("Unknown text color: " + colorName);
     }
 }

@@ -158,7 +158,7 @@
     "outputs": [
       {
         "name": "players",
-        "dataType": "list"
+        "dataType": "list<player>"
       }
     ]
   },
@@ -194,7 +194,7 @@
     "outputs": [
       {
         "name": "teams",
-        "dataType": "list"
+        "dataType": "list<team>"
       }
     ],
     "inputs": []

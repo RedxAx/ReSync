@@ -107,9 +107,10 @@ public class DebugHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown debug operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

@@ -2,6 +2,7 @@ package restudio.resync.flow.handler.generic;
 
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -73,13 +74,15 @@ public class NetworkFlowHandler implements NodeHandler {
         ReSyncNetworkAgent agent = agent();
         ctx.setOutput(node, "connected", agent != null && agent.connected());
         ctx.setOutput(node, "network_id", agent == null ? "" : agent.networkId());
-        ctx.setOutput(node, "node_id", agent == null ? "" : agent.nodeId());
+        ctx.setOutput(node, "node_id", reference("network_node", agent == null ? "" : agent.nodeId(), agent != null,
+            Map.of("networkId", agent == null ? "" : agent.networkId())));
         ctx.triggerOutput("flow");
     }
 
     private void networkServers(FlowContext ctx, FlowNode node) {
         ReSyncNetworkAgent agent = requireAgent();
-        List<Map<String, Object>> servers = agent.presenceSnapshot().values().stream().filter(observed -> observed.capacity() > 0).sorted((left, right) -> left.nodeId().compareToIgnoreCase(right.nodeId())).map(this::presence).toList();
+        List<FlowResourceReference> servers = agent.presenceSnapshot().values().stream().filter(observed -> observed.capacity() > 0)
+            .sorted((left, right) -> left.nodeId().compareToIgnoreCase(right.nodeId())).map(this::presence).toList();
         ctx.setOutput(node, "servers", servers);
         ctx.setOutput(node, "count", servers.size());
         ctx.triggerOutput("flow");
@@ -90,7 +93,7 @@ public class NetworkFlowHandler implements NodeHandler {
         String nodeId = ctx.getInputValue(node, "node_id", String.class, "");
         NetworkNodePresence observed = agent.presenceSnapshot().get(nodeId);
         ctx.setOutput(node, "found", observed != null);
-        ctx.setOutput(node, "server", observed == null ? Map.of() : presence(observed));
+        ctx.setOutput(node, "server", observed == null ? reference("network_node", nodeId, false, Map.of()) : presence(observed));
         ctx.setOutput(node, "status", observed == null ? "UNKNOWN" : observed.status().name());
         ctx.setOutput(node, "players", observed == null ? 0 : observed.players());
         ctx.setOutput(node, "capacity", observed == null ? 0 : observed.capacity());
@@ -107,6 +110,7 @@ public class NetworkFlowHandler implements NodeHandler {
         async(ctx, node, () -> agent.getVariable(scope, scopeId, key).join(), (optional, ignored) -> {
             Optional<NetworkVariable> result = optional;
             ctx.setOutput(node, "exists", result.isPresent());
+            ctx.setOutput(node, "variable", result.map(this::variable).orElse(null));
             ctx.setOutput(node, "value", result.map(NetworkFlowValues::decode).orElse(null));
             ctx.setOutput(node, "type", result.map(variable -> variable.type().name()).orElse(""));
             ctx.setOutput(node, "revision", result.map(NetworkVariable::revision).orElse(0L));
@@ -196,7 +200,8 @@ public class NetworkFlowHandler implements NodeHandler {
                 ctx.runSync(() -> {
                     ctx.setOutput(node, "transferred", result.successful());
                     ctx.setOutput(node, "status", result.status().name());
-                    ctx.setOutput(node, "server", result.routeName());
+                    ctx.setOutput(node, "server", reference("network_route", result.routeName(), result.successful(), Map.of("status", result.status().name())));
+                    ctx.setOutput(node, "transfer_result", transferResult("", player.getUniqueId(), "", "", result));
                     ctx.setOutput(node, "success", result.successful());
                     ctx.setOutput(node, "error", result.successful() ? "" : result.status().name());
                     ctx.triggerOutput(result.successful() ? "flow" : "failed");
@@ -228,7 +233,8 @@ public class NetworkFlowHandler implements NodeHandler {
                     ctx.setOutput(node, "fence_epoch", transfer.fenceEpoch());
                     ctx.setOutput(node, "transferred", result.successful());
                     ctx.setOutput(node, "status", result.status().name());
-                    ctx.setOutput(node, "server", result.routeName());
+                    ctx.setOutput(node, "server", reference("network_route", result.routeName(), result.successful(), Map.of("status", result.status().name())));
+                    ctx.setOutput(node, "transfer_result", transferResult(transfer.transferId(), playerId, agent.nodeId(), targetNodeId, result));
                     ctx.setOutput(node, "success", result.successful());
                     ctx.setOutput(node, "error", result.successful() ? "" : result.status().name());
                     ctx.triggerOutput(result.successful() ? "flow" : "failed");
@@ -257,6 +263,7 @@ public class NetworkFlowHandler implements NodeHandler {
                 T result = operation.get();
                 ctx.runSync(() -> {
                     if (result instanceof NetworkVariable variable) {
+                        ctx.setOutput(node, "variable", variable(variable));
                         ctx.setOutput(node, "value", NetworkFlowValues.decode(variable));
                         ctx.setOutput(node, "type", variable.type().name());
                         ctx.setOutput(node, "revision", variable.revision());
@@ -279,18 +286,49 @@ public class NetworkFlowHandler implements NodeHandler {
         ctx.triggerOutput("failed");
     }
 
-    private Map<String, Object> presence(NetworkNodePresence presence) {
+    private FlowResourceReference presence(NetworkNodePresence presence) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("status", presence.status().name());
+        metadata.put("players", presence.players());
+        metadata.put("capacity", presence.capacity());
+        metadata.put("tps", presence.tps());
+        metadata.put("mspt", presence.mspt());
+        metadata.put("heapUsed", presence.heapUsed());
+        metadata.put("heapMaximum", presence.heapMaximum());
+        metadata.put("observedAt", presence.observedAt());
+        return reference("network_node", presence.nodeId(), true, metadata);
+    }
+
+    private Map<String, Object> variable(NetworkVariable variable) {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("node_id", presence.nodeId());
-        value.put("status", presence.status().name());
-        value.put("players", presence.players());
-        value.put("capacity", presence.capacity());
-        value.put("tps", presence.tps());
-        value.put("mspt", presence.mspt());
-        value.put("heap_used", presence.heapUsed());
-        value.put("heap_maximum", presence.heapMaximum());
-        value.put("observed_at", presence.observedAt());
+        value.put("networkId", variable.networkId());
+        value.put("scope", variable.scope().name());
+        value.put("scopeId", variable.scopeId());
+        value.put("key", variable.key());
+        value.put("type", variable.type().name());
+        value.put("value", NetworkFlowValues.decode(variable));
+        value.put("revision", variable.revision());
+        value.put("expiresAt", variable.expiresAt());
+        value.put("originNodeId", variable.originNodeId());
+        value.put("updatedAt", variable.updatedAt());
         return value;
+    }
+
+    private Map<String, Object> transferResult(String transferId, UUID playerId, String sourceNodeId, String targetNodeId,
+                                                NetworkPlayerRouteResult result) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("transferId", transferId);
+        value.put("playerId", playerId.toString());
+        value.put("sourceNodeId", sourceNodeId);
+        value.put("targetNodeId", targetNodeId);
+        value.put("route", result.routeName());
+        value.put("status", result.status().name());
+        value.put("successful", result.successful());
+        return value;
+    }
+
+    private FlowResourceReference reference(String kind, String id, boolean available, Map<String, Object> metadata) {
+        return new FlowResourceReference(kind, id, "network", available, metadata);
     }
 
     private ReSyncNetworkAgent requireAgent() {

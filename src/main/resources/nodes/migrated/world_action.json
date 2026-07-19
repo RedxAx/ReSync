@@ -60,7 +60,7 @@
     "outputs": [
       {
         "name": "worlds_list",
-        "dataType": "list"
+        "dataType": "list<world>"
       }
     ],
     "inputs": []
@@ -235,6 +235,10 @@
     "id": "world.world_auto_save_set",
     "displayName": "World Auto Save Set",
     "category": "WORLD",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "world.world_set_auto_save",
     "handler": "WorldActionHandler",
     "handlerConfig": {
       "operation": "world_auto_save_set"
@@ -320,7 +324,7 @@
     "outputs": [
       {
         "name": "snapshot",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       },
       {
         "name": "flow",
@@ -348,7 +352,7 @@
     "outputs": [
       {
         "name": "worlds",
-        "dataType": "list"
+        "dataType": "list<world>"
       },
       {
         "name": "flow",
@@ -419,7 +423,7 @@
     "outputs": [
       {
         "name": "portals",
-        "dataType": "list"
+        "dataType": "list<any>"
       },
       {
         "name": "flow",
@@ -483,7 +487,7 @@
     "outputs": [
       {
         "name": "game_rules",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       },
       {
         "name": "flow",
@@ -504,7 +508,7 @@
     "outputs": [
       {
         "name": "descriptors",
-        "dataType": "list"
+        "dataType": "list<any>"
       },
       {
         "name": "flow",
@@ -555,7 +559,7 @@
     "outputs": [
       {
         "name": "snapshot",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       },
       {
         "name": "flow",
@@ -632,7 +636,11 @@
   {
     "id": "world.world_set_auto_save",
     "displayName": "World Set Auto Save",
+    "description": "Enable or disable automatic saving for a world.",
     "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["world", "save", "automatic"],
     "handler": "WorldActionHandler",
     "handlerConfig": {
       "operation": "world_set_auto_save"
@@ -658,8 +666,7 @@
         "pinType": "FLOW",
         "dataType": "execution"
       }
-    ],
-    "hidden": true
+    ]
   },
   {
     "id": "world.world_spawn_lightning",
@@ -791,8 +798,18 @@
   },
   {
     "id": "world.world_management_create_world",
-    "displayName": "World Management Create World",
+    "displayName": "Create World",
+    "description": "Create and register a world with an optional built-in, plugin, or ReSync WorldGen project generator.",
     "category": "WORLD",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "tags": ["world", "create", "generator", "worldgen"],
+    "examples": ["Choose WorldGen Project as the generator, then select a project to compile and install its datapack before world creation."],
+    "authorizationPolicy": "trusted_server_flow",
+    "destructive": false,
+    "auditPolicy": "world_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "recommended": true,
     "handler": "WorldActionHandler",
     "handlerConfig": {
       "operation": "world_management_create_world"
@@ -805,19 +822,37 @@
       },
       {
         "name": "world_name",
-        "dataType": "string"
+        "dataType": "string",
+        "description": "New world folder and registry name"
       },
       {
         "name": "seed",
-        "dataType": "string"
+        "dataType": "string",
+        "optional": true,
+        "description": "Numeric or textual seed"
       },
       {
         "name": "environment",
-        "dataType": "string"
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": ["NORMAL", "NETHER", "THE_END"],
+        "defaultValue": "NORMAL"
       },
       {
         "name": "generator",
-        "dataType": "string"
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:world_generator",
+        "optional": true
+      },
+      {
+        "name": "generator_config",
+        "dataType": "worldgen_project",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:worldgen",
+        "optional": true,
+        "visibleWhen": {"generator": "worldgen_project"},
+        "description": "WorldGen project used when the selected generator is WorldGen Project"
       }
     ],
     "outputs": [
@@ -825,9 +860,29 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "world",
+        "dataType": "world"
       }
-    ],
-    "hidden": true
+    ]
   },
   {
     "id": "world.world_management_scan_worlds",
@@ -1920,14 +1975,14 @@
       },
       {
         "name": "snapshot",
-        "dataType": "map",
+        "dataType": "map<any,any>",
         "visibleWhen": {
           "action": "get_snapshot,get_map_snapshot"
         }
       },
       {
         "name": "worlds",
-        "dataType": "list",
+        "dataType": "list<world>",
         "visibleWhen": {
           "action": "get_worlds"
         }
@@ -1941,7 +1996,7 @@
       },
       {
         "name": "portals",
-        "dataType": "list",
+        "dataType": "list<any>",
         "visibleWhen": {
           "action": "get_portals"
         }
@@ -1955,14 +2010,14 @@
       },
       {
         "name": "game_rules",
-        "dataType": "map",
+        "dataType": "map<any,any>",
         "visibleWhen": {
           "action": "get_game_rules"
         }
       },
       {
         "name": "descriptors",
-        "dataType": "list",
+        "dataType": "list<any>",
         "visibleWhen": {
           "action": "get_game_rule_descriptors"
         }
@@ -2240,7 +2295,7 @@
       },
       {
         "name": "entities",
-        "dataType": "list",
+        "dataType": "list<entity>",
         "visibleWhen": {
           "action": "get",
           "property": "entities"
@@ -2248,7 +2303,7 @@
       },
       {
         "name": "players",
-        "dataType": "list",
+        "dataType": "list<player>",
         "visibleWhen": {
           "action": "get",
           "property": "players"

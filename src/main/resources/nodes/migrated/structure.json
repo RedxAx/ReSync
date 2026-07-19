@@ -128,7 +128,7 @@
       },
       {
         "name": "structures",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ]
   },

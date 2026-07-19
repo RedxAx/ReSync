@@ -99,7 +99,7 @@ public class LootTableService implements Listener {
             }
         }
         List<ItemStack> items = List.copyOf(result);
-        dispatch(table, items.isEmpty() ? "deniedRollFlow" : "afterRollFlow", rollContext, items, event);
+        dispatch(table, "afterRollFlow", rollContext, items, event);
         return items;
     }
 
@@ -339,14 +339,7 @@ public class LootTableService implements Listener {
         if (damageEvent == null) {
             return "";
         }
-        try {
-            Object source = damageEvent.getClass().getMethod("getDamageSource").invoke(damageEvent);
-            Object type = source != null ? source.getClass().getMethod("getDamageType").invoke(source) : null;
-            Object key = type != null ? type.getClass().getMethod("getKey").invoke(type) : null;
-            return key != null ? key.toString() : "";
-        } catch (ReflectiveOperationException ignored) {
-            return "";
-        }
+        return damageEvent.getDamageSource().getDamageType().getKey().toString();
     }
 
     private String normalizeDamageType(String value) {
@@ -734,35 +727,42 @@ public class LootTableService implements Listener {
     }
 
     private int integer(JsonObject object, String key, int fallback) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return fallback;
         try {
-            return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsInt() : fallback;
-        } catch (Exception ignored) {
-            return fallback;
+            return object.get(key).getAsInt();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Loot definition field must be an integer: " + key, exception);
         }
     }
 
     private int integer(JsonElement element, int fallback) {
+        if (element == null || element.isJsonNull()) return fallback;
         try {
-            return element != null && !element.isJsonNull() ? element.getAsInt() : fallback;
-        } catch (Exception ignored) {
-            return fallback;
+            return element.getAsInt();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Loot definition value must be an integer", exception);
         }
     }
 
     private Integer optionalInteger(JsonObject object, String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return null;
         try {
-            return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsInt() : null;
-        } catch (Exception ignored) {
-            return null;
+            return object.get(key).getAsInt();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Loot definition field must be an integer: " + key, exception);
         }
     }
 
     private double decimal(JsonObject object, String key, double fallback) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return fallback;
+        double value;
         try {
-            return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsDouble() : fallback;
-        } catch (Exception ignored) {
-            return fallback;
+            value = object.get(key).getAsDouble();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Loot definition field must be a number: " + key, exception);
         }
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("Loot definition field must be finite: " + key);
+        return value;
     }
 
     private List<String> stringList(JsonElement element) {
@@ -815,7 +815,7 @@ public class LootTableService implements Listener {
         }
         try {
             return TextFormatter.applyItemTextDefaults(COMPONENT_SERIALIZER.deserialize(element.toString()));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException componentFailure) {
             String text = componentText(element);
             return lore ? TextFormatter.parseItemLore(text) : TextFormatter.parseItemName(text);
         }
@@ -839,10 +839,11 @@ public class LootTableService implements Listener {
     }
 
     private boolean bool(JsonObject object, String key, boolean fallback) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return fallback;
         try {
-            return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsBoolean() : fallback;
-        } catch (Exception ignored) {
-            return fallback;
+            return object.get(key).getAsBoolean();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Loot definition field must be a boolean: " + key, exception);
         }
     }
 

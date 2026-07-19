@@ -17,7 +17,10 @@ import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomTriggerRule;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
+import restudio.resync.Log;
 import restudio.resync.api.OptionCatalogItem;
+import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 
@@ -29,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomContentService {
@@ -39,15 +43,20 @@ public class CustomContentService {
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> tickActivations = new ConcurrentHashMap<>();
     private final Map<String, CompiledContentDefinition> compiledDefinitions = new ConcurrentHashMap<>();
+    private final BoundedDiagnosticDeduplicator reportedDispatchFailures = new BoundedDiagnosticDeduplicator(1024);
     private final VanillaContentProvider vanillaProvider;
     private final CustomContentItemReconciler itemReconciler;
     private long currentTick;
 
     public CustomContentService(CustomContentStorage contentStorage, FlowStorage flowStorage, FlowExecutor executor) {
+        this(contentStorage, flowStorage, executor, new ItemAttributeSchemaService());
+    }
+
+    public CustomContentService(CustomContentStorage contentStorage, FlowStorage flowStorage, FlowExecutor executor, ItemAttributeSchemaService attributeSchemaService) {
         this.contentStorage = contentStorage;
         this.flowStorage = flowStorage;
         this.executor = executor;
-        this.vanillaProvider = new VanillaContentProvider();
+        this.vanillaProvider = new VanillaContentProvider(contentStorage.getPlugin(), attributeSchemaService);
         this.itemReconciler = new CustomContentItemReconciler(contentStorage, this);
         registerProvider(vanillaProvider);
         if (Bukkit.getPluginManager().getPlugin("Nexo") != null) {
@@ -102,6 +111,27 @@ public class CustomContentService {
             case "armor" -> nexoProvider.armorIds();
             default -> List.of();
         };
+    }
+
+    public List<OptionCatalogItem> getProviderOptionCatalog(String providerId, String catalog) {
+        if (providerId == null || catalog == null) {
+            return List.of();
+        }
+        CustomContentProvider provider = providers.get(providerId.toLowerCase(Locale.ROOT));
+        if (!(provider instanceof NexoContentProvider nexoProvider) || !nexoProvider.isAvailable()) {
+            return List.of();
+        }
+        String contentType = catalog.toLowerCase(Locale.ROOT);
+        return getProviderOptionIds(providerId, contentType).stream().map(externalId -> {
+            Map<String, Object> metadata = new HashMap<>(ItemStackPreviewMetadata.fromStack(nexoProvider.createExternalItem(externalId, 1)));
+            metadata.put("aliases", List.of(externalId, externalId.replace('_', ' ')));
+            metadata.put("available", true);
+            metadata.put("owner", providerId);
+            metadata.put("provider", providerId);
+            metadata.put("contentType", contentType);
+            return new OptionCatalogItem(externalId, externalId, formatMaterialLabel(contentType) + " provided by " + providerId + ".", "",
+                formatMaterialLabel(providerId), metadata);
+        }).toList();
     }
 
     public List<OptionCatalogItem> recipeItemCatalog() {
@@ -412,6 +442,7 @@ public class CustomContentService {
             }
             FlowGraph graph = graphFor(definition, binding.getFlowId());
             if (graph == null) {
+                reportDispatchFailure(contentId, trigger, "FLOW_TARGET_UNRESOLVED: Ability " + binding.getId() + " targets missing flow: " + binding.getFlowId(), null);
                 continue;
             }
             Map<String, Object> vars = new HashMap<>();
@@ -427,7 +458,37 @@ public class CustomContentService {
                 cancellable.setCancelled(true);
                 vars.put("event.cancelled", true);
             }
-            executor.execute(graph, findStartNode(graph), player, event, vars);
+            String customContentStart = findCustomContentStartNode(graph);
+            CompletableFuture<Void> execution = customContentStart != null
+                ? executor.execute(graph, customContentStart, player, event, vars)
+                : executor.execute(graph, player, event, vars);
+            execution.whenComplete((ignored, failure) -> {
+                if (failure == null) {
+                    return;
+                }
+                reportDispatchFailure(contentId, trigger, null, failure);
+            });
+        }
+    }
+
+    private void reportDispatchFailure(String contentId, String trigger, String message, Throwable failure) {
+        Throwable cause = failure;
+        while (cause != null && cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String resolvedMessage = message;
+        if (resolvedMessage == null || resolvedMessage.isBlank()) {
+            resolvedMessage = cause != null && cause.getMessage() != null && !cause.getMessage().isBlank() ? cause.getMessage()
+                : cause != null ? cause.getClass().getSimpleName() : "Unknown custom content dispatch failure";
+        }
+        String failureKey = contentId + '\u0000' + trigger + '\u0000' + resolvedMessage;
+        if (!reportedDispatchFailures.add(failureKey)) {
+            return;
+        }
+        if (cause != null) {
+            Log.warn("Custom content flow failed for " + contentId + " (" + trigger + "): " + resolvedMessage, cause);
+        } else {
+            Log.warn("Custom content flow failed for " + contentId + " (" + trigger + "): " + resolvedMessage);
         }
     }
 
@@ -485,7 +546,7 @@ public class CustomContentService {
             if (rule.isRequireSneaking() && !player.isSneaking()) {
                 return false;
             }
-            if (rule.isRequireOnGround() && !player.isOnGround()) {
+            if (rule.isRequireOnGround() && !isOnGround(player)) {
                 return false;
             }
             String world = player.getWorld().getName();
@@ -546,6 +607,11 @@ public class CustomContentService {
         return true;
     }
 
+    @SuppressWarnings("deprecation")
+    private boolean isOnGround(Player player) {
+        return player.isOnGround();
+    }
+
     private String cooldownKey(CustomContentDefinition definition, CustomAbilityBinding binding, Player player, Map<String, Object> vars) {
         String scope = binding.getRule().getCooldownScope() != null ? binding.getRule().getCooldownScope().toLowerCase(Locale.ROOT) : "player";
         String base = binding.getId() != null ? binding.getId() : definition.getId() + ":" + binding.getTrigger();
@@ -557,11 +623,11 @@ public class CustomContentService {
         };
     }
 
-    private String findStartNode(FlowGraph graph) {
+    private String findCustomContentStartNode(FlowGraph graph) {
         if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
             return null;
         }
-        for (Map.Entry<String, restudio.flow.data.FlowNode> entry : graph.getNodes().entrySet()) {
+        for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
             String type = entry.getValue() != null ? entry.getValue().getType() : null;
             if (CustomContentGraphAdapter.typeFromNode(type) != null) {
                 return entry.getKey();
@@ -570,7 +636,7 @@ public class CustomContentService {
                 return entry.getKey();
             }
         }
-        return graph.getNodes().keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER).findFirst().orElse(null);
+        return null;
     }
 
     public VanillaContentProvider getVanillaProvider() {

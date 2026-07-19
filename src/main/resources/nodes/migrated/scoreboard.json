@@ -191,7 +191,7 @@
     "outputs": [
       {
         "name": "objectives",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ],
     "inputs": []
@@ -368,6 +368,7 @@
   {
     "id": "scoreboard.show.template",
     "displayName": "Show Scoreboard Template",
+    "schemaVersion": 2,
     "category": "SCOREBOARD",
     "handler": "ScoreboardHandler",
     "handlerConfig": {
@@ -385,7 +386,8 @@
       },
       {
         "name": "scoreboard_id",
-        "dataType": "string"
+        "dataType": "resource_reference<scoreboard>",
+        "optionsSource": "server:resync:scoreboard"
       },
       {
         "name": "use_papi",

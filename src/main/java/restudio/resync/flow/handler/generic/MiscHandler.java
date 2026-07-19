@@ -4,7 +4,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
-import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -32,15 +31,30 @@ public class MiscHandler implements NodeHandler {
 
         operations.put("cancel_event", (ctx, node) -> {
             Boolean cancel = ctx.getInputValue(node, "cancel", Boolean.class, true);
-            if (Boolean.TRUE.equals(cancel) && ctx.getEvent() instanceof Cancellable cancellable) {
-                cancellable.setCancelled(true);
-            }
+            boolean success = !Boolean.TRUE.equals(cancel) || ctx.setEventCancelled(true);
+            ctx.setOutput(node, "success", success);
+            ctx.setOutput(node, "error_code", success ? "" : "EVENT_WINDOW_CLOSED");
         });
 
         operations.put("delay", (ctx, node) -> {
-            int ticks = ctx.getInputValue(node, "ticks", Integer.class, 20);
-            ctx.setOutput(node, "done", true);
-            ctx.runLater(() -> ctx.triggerOutput("flow"), ticks);
+            String type = node.getType();
+            long delayMillis;
+            if ("delay.seconds".equals(type)) {
+                delayMillis = durationMillis(ctx.getInputValue(node, "seconds", Number.class, 1), 1_000L, "Delay seconds");
+            } else if ("delay.minutes".equals(type)) {
+                delayMillis = durationMillis(ctx.getInputValue(node, "minutes", Number.class, 1), 60_000L, "Delay minutes");
+            } else {
+                Number ticks = ctx.getInputValue(node, "ticks", Number.class, 20);
+                if (ticks == null || !Double.isFinite(ticks.doubleValue()) || ticks.doubleValue() != Math.rint(ticks.doubleValue())) {
+                    throw new IllegalArgumentException("Delay ticks must be a whole number");
+                }
+                delayMillis = durationMillis(ticks, 50L, "Delay ticks");
+            }
+            ctx.setOutput(node, "done", false);
+            ctx.runAfterMillisBeforeContinuation(() -> {
+                ctx.setOutput(node, "done", true);
+                ctx.triggerOutput("flow");
+            }, delayMillis);
         });
 
         operations.put("event_caller", (ctx, node) -> {
@@ -85,26 +99,19 @@ public class MiscHandler implements NodeHandler {
         operations.put("time_parse", (ctx, node) -> {
             String dateString = ctx.getInputValue(node, "date_string", String.class, "");
             String pattern = ctx.getInputValue(node, "format_pattern", String.class, "yyyy-MM-dd HH:mm:ss");
-            long timestampMs = 0;
             try {
                 LocalDateTime dateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern(pattern));
-                timestampMs = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            } catch (Exception ignored) {
+                ctx.setOutput(node, "timestamp_ms", dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Time value does not match pattern " + pattern + ": " + dateString, exception);
             }
-            ctx.setOutput(node, "timestamp_ms", timestampMs);
         });
 
         operations.put("time_add", (ctx, node) -> {
             Long timestampMs = ctx.getInputValue(node, "timestamp_ms", Long.class, System.currentTimeMillis());
             Long amount = ctx.getInputValue(node, "amount", Long.class, 0L);
             String unit = ctx.getInputValue(node, "unit", String.class, "milliseconds");
-            ChronoUnit chronoUnit = switch (unit) {
-                case "seconds" -> ChronoUnit.SECONDS;
-                case "minutes" -> ChronoUnit.MINUTES;
-                case "hours" -> ChronoUnit.HOURS;
-                case "days" -> ChronoUnit.DAYS;
-                default -> ChronoUnit.MILLIS;
-            };
+            ChronoUnit chronoUnit = chronoUnit(unit);
             Instant instant = Instant.ofEpochMilli(timestampMs).plus(amount, chronoUnit);
             ctx.setOutput(node, "new_timestamp", instant.toEpochMilli());
         });
@@ -115,13 +122,7 @@ public class MiscHandler implements NodeHandler {
             String unit = ctx.getInputValue(node, "unit", String.class, "milliseconds");
             Instant instant1 = Instant.ofEpochMilli(timestamp1Ms);
             Instant instant2 = Instant.ofEpochMilli(timestamp2Ms);
-            ChronoUnit chronoUnit = switch (unit) {
-                case "seconds" -> ChronoUnit.SECONDS;
-                case "minutes" -> ChronoUnit.MINUTES;
-                case "hours" -> ChronoUnit.HOURS;
-                case "days" -> ChronoUnit.DAYS;
-                default -> ChronoUnit.MILLIS;
-            };
+            ChronoUnit chronoUnit = chronoUnit(unit);
             long diff = chronoUnit.between(instant1, instant2);
             ctx.setOutput(node, "diff_value", diff);
         });
@@ -167,16 +168,17 @@ public class MiscHandler implements NodeHandler {
             switch (level) {
                 case "warning" -> Log.warn(message);
                 case "severe" -> Log.error(message);
-                default -> Log.info(message);
+                case "info" -> Log.info(message);
+                default -> throw new IllegalArgumentException("Unknown console log level: " + level);
             }
         });
 
         operations.put("run_async", (ctx, node) -> {
-            Bukkit.getScheduler().runTaskAsynchronously(ReSync.getInstance(), () -> ctx.triggerOutput("async_flow"));
+            ctx.runAsync(() -> ctx.triggerOutput("async_flow"));
         });
 
         operations.put("run_sync", (ctx, node) -> {
-            Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> ctx.triggerOutput("sync_flow"));
+            ctx.runSync(() -> ctx.triggerOutput("sync_flow"));
         });
     }
 
@@ -188,12 +190,34 @@ public class MiscHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown miscellaneous operation: " + operation);
         }
+        op.accept(ctx, node);
         if (operation != null && selfManagingOutputs.contains(operation)) {
             return;
         }
         ctx.triggerOutput("flow");
+    }
+
+    private static ChronoUnit chronoUnit(String unit) {
+        return switch (unit) {
+            case "milliseconds" -> ChronoUnit.MILLIS;
+            case "seconds" -> ChronoUnit.SECONDS;
+            case "minutes" -> ChronoUnit.MINUTES;
+            case "hours" -> ChronoUnit.HOURS;
+            case "days" -> ChronoUnit.DAYS;
+            default -> throw new IllegalArgumentException("Unknown time unit: " + unit);
+        };
+    }
+
+    private static long durationMillis(Number amount, long unitMillis, String label) {
+        if (amount == null) throw new IllegalArgumentException(label + " is required");
+        double value = amount.doubleValue();
+        double millis = value * unitMillis;
+        if (!Double.isFinite(value) || value < 0.0 || !Double.isFinite(millis) || millis > Long.MAX_VALUE) {
+            throw new IllegalArgumentException(label + " must be a finite non-negative duration");
+        }
+        return (long) Math.ceil(millis);
     }
 }

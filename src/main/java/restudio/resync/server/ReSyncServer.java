@@ -1,6 +1,8 @@
 package restudio.resync.server;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -8,6 +10,7 @@ import org.bukkit.entity.Player;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.api.RuntimeDataRegistry;
 import restudio.resync.api.ReSyncExtensionData;
 import restudio.resync.api.ReSyncExtensionManager;
 import restudio.resync.compression.CompressionPool;
@@ -29,6 +32,7 @@ import restudio.resync.messages.MessageLogService;
 import restudio.resync.modules.ChunkTransportModule;
 import restudio.resync.modules.ChatModule;
 import restudio.resync.modules.AdvancementModule;
+import restudio.resync.modules.FlowJobModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.MessageRewriteModule;
@@ -71,6 +75,7 @@ import restudio.resync.text.ReTextService;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -80,6 +85,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReSyncServer {
+    private static final List<String> FLOW_CONTRACT_CAPABILITIES = List.of("nodes", "types", "categories", "properties", "resources", "catalogs", "conversions", "extensions", "deltas", "diagnostics", "contextual_catalogs", "authorization", "destructive_safety", "function_tests", "jobs", "job_events");
     private static final Gson GSON = new Gson();
     private final ReSync plugin;
     private final ReSyncConfig config;
@@ -158,7 +164,9 @@ public class ReSyncServer {
         moduleContext.registerService(PlayerTrackingService.class, new PlayerTrackingManager(plugin));
         moduleContext.registerService(PlayerSessionLinkService.class, new DefaultPlayerSessionLinkService());
         moduleContext.registerService(ModuleContext.class, moduleContext);
-        moduleContext.registerService(OptionCatalogRegistry.class, new OptionCatalogRegistry());
+        RuntimeDataRegistry runtimeData = new RuntimeDataRegistry();
+        moduleContext.registerService(RuntimeDataRegistry.class, runtimeData);
+        moduleContext.registerService(OptionCatalogRegistry.class, new OptionCatalogRegistry(runtimeData));
         moduleContext.registerService(ReSyncExtensionData.class, new ReSyncExtensionData());
         moduleContext.registerService(ReSyncJsonResourceStorage.class, jsonResourceStorage);
         moduleContext.registerService(MessageLogService.class, new MessageLogService());
@@ -182,17 +190,24 @@ public class ReSyncServer {
     }
 
     private void registerModules() {
-        moduleRegistry.registerModule(new ChunkTransportModule());
-        moduleRegistry.registerModule(new PlayerNpcPacketModule());
-        moduleRegistry.registerModule(new FlowRuntimeModule());
-        moduleRegistry.registerModule(new ChatModule());
-        moduleRegistry.registerModule(new MotdModule());
-        moduleRegistry.registerModule(new MessageRewriteModule());
-        moduleRegistry.registerModule(new RecipeModule());
-        moduleRegistry.registerModule(new AdvancementModule());
-        moduleRegistry.registerModule(new PlayerTrackingModule());
-        moduleRegistry.registerModule(new WorldManagementModule());
-        moduleRegistry.registerModule(new WorldGenModule());
+        coreModules().forEach(moduleRegistry::registerModule);
+    }
+
+    static List<Module> coreModules() {
+        return List.of(
+            new ChunkTransportModule(),
+            new PlayerNpcPacketModule(),
+            new FlowJobModule(),
+            new FlowRuntimeModule(),
+            new ChatModule(),
+            new MotdModule(),
+            new MessageRewriteModule(),
+            new RecipeModule(),
+            new AdvancementModule(),
+            new PlayerTrackingModule(),
+            new WorldManagementModule(),
+            new WorldGenModule()
+        );
     }
 
     private void startScheduler() {
@@ -405,6 +420,7 @@ public class ReSyncServer {
 
         info.setClientId(req.getClientId());
         info.setClientVersion(req.getClientVersion());
+        info.setClientCapabilities(clientCapabilities(req.getCapabilitiesJson()));
         info.setState(ConnectionState.AUTHENTICATED);
         sessionManager.createSession(info, identity);
 
@@ -419,11 +435,40 @@ public class ReSyncServer {
         response.setWorlds(worlds);
         response.setSupportedTileSizes(new int[]{32, 64, 128, 256});
         response.setChannels(channelMuxer.getNumericChannels());
-        response.setCapabilitiesJson(GSON.toJson(capabilitySnapshot()));
+        Map<String, Object> capabilities = new LinkedHashMap<>(capabilitySnapshot());
+        List<String> negotiatedFlowCapabilities = FLOW_CONTRACT_CAPABILITIES.stream().filter(info.getClientCapabilities()::contains).toList();
+        capabilities.put("flowContract", Map.of(
+            "version", 2,
+            "minimumClientVersion", 2,
+            "supported", FLOW_CONTRACT_CAPABILITIES,
+            "negotiated", negotiatedFlowCapabilities
+        ));
+        response.setCapabilitiesJson(GSON.toJson(capabilities));
 
         codec.sendMessage(info.getFrameSender(), response, 0, false);
         publishChannelSnapshot(info);
         Log.fine("Client authenticated: " + req.getClientId());
+    }
+
+    private Set<String> clientCapabilities(String json) {
+        if (json == null || json.isBlank()) {
+            return Set.of();
+        }
+        try {
+            JsonElement root = JsonParser.parseString(json);
+            if (!root.isJsonArray()) {
+                return Set.of();
+            }
+            Set<String> capabilities = new LinkedHashSet<>();
+            for (JsonElement element : root.getAsJsonArray()) {
+                if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString() && !element.getAsString().isBlank()) {
+                    capabilities.add(element.getAsString());
+                }
+            }
+            return Set.copyOf(capabilities);
+        } catch (RuntimeException exception) {
+            return Set.of();
+        }
     }
 
     private boolean hasBridgeAccess(Player player) {

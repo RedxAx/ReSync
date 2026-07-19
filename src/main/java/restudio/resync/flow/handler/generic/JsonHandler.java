@@ -28,8 +28,8 @@ public class JsonHandler implements NodeHandler {
                 JsonElement element = JsonParser.parseString(jsonString);
                 Object result = GSON.fromJson(element, Object.class);
                 ctx.setOutput(node, "object", result);
-            } catch (Exception e) {
-                ctx.setOutput(node, "object", new HashMap<>());
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Invalid JSON input", exception);
             }
         });
 
@@ -174,9 +174,10 @@ public class JsonHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown JSON operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

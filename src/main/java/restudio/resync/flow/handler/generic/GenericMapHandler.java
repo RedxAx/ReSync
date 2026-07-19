@@ -6,7 +6,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,7 +22,7 @@ public class GenericMapHandler implements NodeHandler {
 
     private void registerOperations() {
         operations.put("create", (ctx, node) -> {
-            ctx.setOutput(node, "map", new HashMap<>());
+            ctx.setOutput(node, "map", new LinkedHashMap<>());
         });
         operations.put("get", (ctx, node) -> {
             Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, Map.of());
@@ -30,7 +30,7 @@ public class GenericMapHandler implements NodeHandler {
             ctx.setOutput(node, "value", map.get(key));
         });
         operations.put("set", (ctx, node) -> {
-            Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, new HashMap<>());
+            Map<String, Object> map = mutableMap(ctx, node, "map");
             String key = ctx.getInputValue(node, "key", String.class, "");
             Object value = ctx.getInputValue(node, "value", null);
             map.put(key, value);
@@ -63,29 +63,34 @@ public class GenericMapHandler implements NodeHandler {
             ctx.setOutput(node, "is_empty", map.isEmpty());
         });
         operations.put("remove", (ctx, node) -> {
-            Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, new HashMap<>());
+            Map<String, Object> map = mutableMap(ctx, node, "map");
             String key = ctx.getInputValue(node, "key", String.class, "");
             map.remove(key);
             ctx.setOutput(node, "map", map);
         });
         operations.put("clear", (ctx, node) -> {
-            Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, new HashMap<>());
+            Map<String, Object> map = mutableMap(ctx, node, "map");
             map.clear();
             ctx.setOutput(node, "map", map);
         });
         operations.put("merge", (ctx, node) -> {
-            Map<String, Object> mapA = ctx.getInputValue(node, "mapA", Map.class, new HashMap<>());
-            Map<String, Object> mapB = ctx.getInputValue(node, "mapB", Map.class, new HashMap<>());
-            Map<String, Object> result = new HashMap<>(mapA);
+            Map<String, Object> mapA = ctx.getInputValue(node, "mapA", Map.class, Map.of());
+            Map<String, Object> mapB = ctx.getInputValue(node, "mapB", Map.class, Map.of());
+            Map<String, Object> result = new LinkedHashMap<>(mapA);
             result.putAll(mapB);
             ctx.setOutput(node, "map", result);
         });
         operations.put("put_all", (ctx, node) -> {
-            Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, new HashMap<>());
+            Map<String, Object> map = mutableMap(ctx, node, "map");
             Map<String, Object> other = ctx.getInputValue(node, "other", Map.class, Map.of());
             map.putAll(other);
             ctx.setOutput(node, "map", map);
         });
+    }
+
+    private Map<String, Object> mutableMap(FlowContext context, FlowNode node, String pinName) {
+        Map<String, Object> map = context.getInputValue(node, pinName, Map.class, Map.of());
+        return new LinkedHashMap<>(map);
     }
 
     public void registerTo(HandlerRegistry registry) {
@@ -98,6 +103,8 @@ public class GenericMapHandler implements NodeHandler {
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op != null) {
             op.accept(ctx, node);
+        } else {
+            throw new IllegalArgumentException("Unknown map operation: " + operation);
         }
         ctx.triggerOutput("flow");
     }

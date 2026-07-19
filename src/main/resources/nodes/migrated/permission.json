@@ -19,7 +19,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -73,7 +75,7 @@
       },
       {
         "name": "groups",
-        "dataType": "list"
+        "dataType": "list<permission_group>"
       }
     ]
   },
@@ -177,12 +179,23 @@
         "name": "mode",
         "dataType": "string",
         "widget": "DROPDOWN",
-        "options": ["Find Any", "Find All"],
+        "options": ["Find Any", "Find All", "Find None", "Count"],
         "defaultValue": "Find Any"
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission",
+        "repeatable": {
+          "groupId": "permissions",
+          "minItems": 1,
+          "maxItems": 32,
+          "itemLabel": "Permission"
+        }
+      },
+      {
+        "name": "context",
+        "dataType": "permission_context",
+        "optional": true
       }
     ],
     "outputs": [
@@ -202,6 +215,14 @@
       {
         "name": "has",
         "dataType": "boolean"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      },
+      {
+        "name": "resolved_context",
+        "dataType": "permission_context"
       }
     ]
   },
@@ -225,7 +246,7 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -264,7 +285,7 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -303,7 +324,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -346,11 +369,16 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       },
       {
         "name": "duration",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 3600,
+        "constraints": {
+          "min": 1,
+          "max": 315360000
+        }
       }
     ],
     "outputs": [
@@ -529,7 +557,7 @@
       },
       {
         "name": "permissions",
-        "dataType": "list"
+        "dataType": "list<permission>"
       }
     ]
   },
@@ -549,11 +577,15 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       },
       {
         "name": "parent_group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -605,7 +637,18 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission",
+        "repeatable": {
+          "groupId": "permissions",
+          "minItems": 1,
+          "maxItems": 32,
+          "itemLabel": "Permission"
+        }
+      },
+      {
+        "name": "context",
+        "dataType": "permission_context",
+        "optional": true
       }
     ],
     "outputs": [
@@ -625,6 +668,14 @@
       {
         "name": "has",
         "dataType": "boolean"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      },
+      {
+        "name": "resolved_context",
+        "dataType": "permission_context"
       }
     ]
   },
@@ -650,7 +701,7 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -691,7 +742,7 @@
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -730,7 +781,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -769,7 +822,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -808,7 +863,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -866,7 +923,7 @@
       },
       {
         "name": "permissions",
-        "dataType": "list"
+        "dataType": "list<permission>"
       }
     ]
   },
@@ -905,7 +962,7 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group"
       }
     ]
   },
@@ -933,7 +990,7 @@
       },
       {
         "name": "groups",
-        "dataType": "list"
+        "dataType": "list<permission_group>"
       }
     ],
     "inputs": [
@@ -960,11 +1017,13 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -999,11 +1058,13 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -1042,11 +1103,13 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       },
       {
         "name": "permission",
-        "dataType": "string"
+        "dataType": "permission"
       }
     ],
     "outputs": [
@@ -1081,7 +1144,9 @@
       },
       {
         "name": "group",
-        "dataType": "string"
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group"
       }
     ],
     "outputs": [
@@ -1100,7 +1165,7 @@
       },
       {
         "name": "permissions",
-        "dataType": "list"
+        "dataType": "list<permission>"
       }
     ]
   },
@@ -1202,7 +1267,9 @@
       },
       {
         "name": "track",
-        "dataType": "string"
+        "dataType": "permission_track",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:track"
       }
     ],
     "outputs": [
@@ -1246,7 +1313,9 @@
       },
       {
         "name": "track",
-        "dataType": "string"
+        "dataType": "permission_track",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:track"
       }
     ],
     "outputs": [
@@ -1297,7 +1366,7 @@
       },
       {
         "name": "tracks",
-        "dataType": "list"
+        "dataType": "list<permission_track>"
       }
     ]
   }

@@ -3,6 +3,7 @@ package restudio.resync.storage;
 import restudio.resync.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -15,7 +16,7 @@ public class AsyncStorageExecutor {
         thread.setDaemon(true);
         return thread;
     });
-    private final List<CompletableFuture<Void>> pending = java.util.Collections.synchronizedList(new ArrayList<>());
+    private final List<CompletableFuture<Void>> pending = Collections.synchronizedList(new ArrayList<>());
 
     public void submit(Runnable task) {
         CompletableFuture<Void> future = CompletableFuture.runAsync(task, executor)

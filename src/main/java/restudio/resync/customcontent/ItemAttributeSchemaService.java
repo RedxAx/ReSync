@@ -692,7 +692,7 @@ public class ItemAttributeSchemaService {
         candidates.put("minecraft:can_break", List.of(List.of(Map.of("blocks", "minecraft:stone"))));
         candidates.put("minecraft:can_place_on", List.of(List.of(Map.of("blocks", "minecraft:stone"))));
         candidates.put("minecraft:attribute_modifiers", List.of(List.of(Map.of(
-                "type", "minecraft:generic.attack_damage",
+                "type", "minecraft:attack_damage",
                 "amount", 1.0,
                 "operation", "add_value",
                 "slot", "mainhand",

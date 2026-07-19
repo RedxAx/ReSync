@@ -10,7 +10,7 @@
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,any>"
       }
     ]
   },
@@ -25,7 +25,7 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "key",
@@ -35,7 +35,7 @@
     "outputs": [
       {
         "name": "value",
-        "dataType": "any"
+        "dataType": "type:t"
       }
     ]
   },
@@ -50,17 +50,21 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "key",
         "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
       }
     ],
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ]
   },
@@ -75,7 +79,7 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "key",
@@ -100,7 +104,11 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
       }
     ],
     "outputs": [
@@ -121,13 +129,13 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ],
     "outputs": [
       {
         "name": "keys",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ]
   },
@@ -142,13 +150,13 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ],
     "outputs": [
       {
         "name": "values",
-        "dataType": "list"
+        "dataType": "list<type:t>"
       }
     ]
   },
@@ -163,7 +171,7 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       }
     ],
     "outputs": [
@@ -184,7 +192,7 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       }
     ],
     "outputs": [
@@ -205,7 +213,7 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "key",
@@ -215,7 +223,7 @@
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ]
   },
@@ -230,13 +238,13 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ],
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ]
   },
@@ -251,17 +259,17 @@
     "inputs": [
       {
         "name": "mapA",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "mapB",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ],
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ]
   },
@@ -276,19 +284,18 @@
     "inputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       },
       {
         "name": "other",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ],
     "outputs": [
       {
         "name": "map",
-        "dataType": "map"
+        "dataType": "map<string,type:t>"
       }
     ]
   }
 ]
-

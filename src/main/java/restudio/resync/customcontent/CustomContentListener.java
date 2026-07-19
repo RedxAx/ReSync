@@ -45,7 +45,7 @@ public class CustomContentListener implements Listener {
         this.service = service;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem() != null ? event.getItem() : itemInHand(player, event.getHand());
@@ -69,7 +69,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (isDamageAbilitySuppressed()) {
             return;
@@ -115,7 +115,7 @@ public class CustomContentListener implements Listener {
         return SUPPRESSED_DAMAGE_DEPTH.get() > 0;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBlockPlace(BlockPlaceEvent event) {
         ItemStack item = event.getItemInHand();
         String contentId = service.identifyItem(item);
@@ -132,7 +132,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBlockBreak(BlockBreakEvent event) {
         Location location = event.getBlock().getLocation();
         String blockId = service.identifyBlock(location);
@@ -146,7 +146,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onMove(PlayerMoveEvent event) {
         if (event.getTo() == null || event.getFrom().getBlockX() == event.getTo().getBlockX() && event.getFrom().getBlockY() == event.getTo().getBlockY() && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
             return;
@@ -158,7 +158,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onRedstone(BlockRedstoneEvent event) {
         Location location = event.getBlock().getLocation();
         String blockId = service.identifyBlock(location);
@@ -170,7 +170,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onConsume(PlayerItemConsumeEvent event) {
         String contentId = service.identifyItem(event.getItem());
         if (contentId != null) {
@@ -178,7 +178,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDrop(PlayerDropItemEvent event) {
         ItemStack item = event.getItemDrop().getItemStack();
         String contentId = service.identifyItem(item);
@@ -187,7 +187,7 @@ public class CustomContentListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;

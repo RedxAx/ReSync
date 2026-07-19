@@ -1,5 +1,8 @@
 package restudio.resync.flow.triggers;
 
+import org.bukkit.entity.Damageable;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
@@ -15,10 +18,23 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldSaveEvent;
 import org.bukkit.event.world.TimeSkipEvent;
+import restudio.resync.flow.jobs.FlowJobCompletedEvent;
 
 import java.util.Map;
 
 public class TriggerDefinitions {
+
+    @FlowTrigger(eventType = "flow_job_completed", nodeType = "event.job.completed", eventClass = FlowJobCompletedEvent.class, playerEvent = false)
+    public void onFlowJobCompleted(FlowJobCompletedEvent event, Map<String, Object> vars) {
+        vars.put("event.job", event.getReference());
+        vars.put("event.job_id", event.getSnapshot().id());
+        vars.put("event.job_kind", event.getSnapshot().kind());
+        vars.put("event.job_owner", event.getSnapshot().owner());
+        vars.put("event.job_state", event.getSnapshot().state().name());
+        vars.put("event.job_progress", event.getSnapshot().progress());
+        vars.put("event.job_metadata", event.getSnapshot().metadata());
+        vars.put("event.job_outcome", event.getSnapshot().outcome());
+    }
 
     @FlowTrigger(eventType = "player_join", eventClass = PlayerJoinEvent.class)
     public void onPlayerJoin(PlayerJoinEvent event, Map<String, Object> vars) {
@@ -76,7 +92,7 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "entity_damage", nodeType = "event:player_damage", eventClass = EntityDamageEvent.class, playerEvent = true)
     public void onEntityDamage(EntityDamageEvent event, Map<String, Object> vars) {
-        if (!(event.getEntity() instanceof org.bukkit.entity.Player)) return;
+        if (!(event.getEntity() instanceof Player)) return;
         Object damager = null;
         if (event instanceof EntityDamageByEntityEvent entityDamage) {
             damager = entityDamage.getDamager();
@@ -191,13 +207,13 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "projectile_launch", eventClass = ProjectileLaunchEvent.class, playerEvent = true)
     public void onProjectileLaunch(ProjectileLaunchEvent event, Map<String, Object> vars) {
-        if (!(event.getEntity().getShooter() instanceof org.bukkit.entity.Player)) return;
+        if (!(event.getEntity().getShooter() instanceof Player)) return;
         vars.put("event.projectile", event.getEntity());
     }
 
     @FlowTrigger(eventType = "projectile_hit", eventClass = ProjectileHitEvent.class, playerEvent = true)
     public void onProjectileHit(ProjectileHitEvent event, Map<String, Object> vars) {
-        if (!(event.getEntity().getShooter() instanceof org.bukkit.entity.Player)) return;
+        if (!(event.getEntity().getShooter() instanceof Player)) return;
         vars.put("event.projectile", event.getEntity());
         vars.put("event.hit_entity", event.getHitEntity());
     }
@@ -226,7 +242,7 @@ public class TriggerDefinitions {
     @FlowTrigger(eventType = "entity_tame", eventClass = EntityTameEvent.class, playerEvent = false)
     public void onEntityTame(EntityTameEvent event, Map<String, Object> vars) {
         vars.put("event.entity", event.getEntity());
-        vars.put("event.tamer", event.getOwner() instanceof org.bukkit.entity.Entity e ? e : null);
+        vars.put("event.tamer", event.getOwner() instanceof Entity e ? e : null);
         vars.put("event.entity_type", event.getEntityType().name());
     }
 
@@ -263,7 +279,7 @@ public class TriggerDefinitions {
         vars.put("event.entity", event.getEntity());
         vars.put("event.amount", event.getAmount());
         double newHealth = event.getAmount();
-        if (event.getEntity() instanceof org.bukkit.entity.Damageable damageable) {
+        if (event.getEntity() instanceof Damageable damageable) {
             newHealth = damageable.getHealth() + event.getAmount();
         }
         vars.put("event.new_health", newHealth);
@@ -335,7 +351,7 @@ public class TriggerDefinitions {
     public void onBlockGrow(BlockGrowEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
         vars.put("event.location", event.getBlock().getLocation());
-        vars.put("event.new_state", event.getNewState());
+        vars.put("event.new_state", event.getNewState().getType());
     }
 
     @FlowTrigger(eventType = "block_from_to", eventClass = BlockFromToEvent.class, playerEvent = false)
@@ -375,14 +391,14 @@ public class TriggerDefinitions {
     @FlowTrigger(eventType = "block_fade", eventClass = BlockFadeEvent.class, playerEvent = false)
     public void onBlockFade(BlockFadeEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
-        vars.put("event.new_state", event.getNewState());
+        vars.put("event.new_state", event.getNewState().getType());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
     @FlowTrigger(eventType = "block_form", eventClass = BlockFormEvent.class, playerEvent = false)
     public void onBlockForm(BlockFormEvent event, Map<String, Object> vars) {
         vars.put("event.block", event.getBlock());
-        vars.put("event.new_state", event.getNewState());
+        vars.put("event.new_state", event.getNewState().getType());
         vars.put("event.location", event.getBlock().getLocation());
     }
 
@@ -476,7 +492,7 @@ public class TriggerDefinitions {
         vars.put("event.is_cancelled", event.isCancelled());
     }
 
-    public org.bukkit.entity.Player extractCraftPlayer(CraftItemEvent event) {
-        return (org.bukkit.entity.Player) event.getWhoClicked();
+    public Player extractCraftPlayer(CraftItemEvent event) {
+        return (Player) event.getWhoClicked();
     }
 }

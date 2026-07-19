@@ -10,12 +10,14 @@ import org.bukkit.World;
 import restudio.flow.data.FlowDataType;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
+import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.jobs.JobManager;
 import restudio.resync.jobs.JobRecord;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.WorldGenOperationService;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
@@ -35,7 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WorldGenModule implements Module {
-    private static final ModuleMetadata METADATA = ModuleMetadata.of("worldGen", "WorldGen", "worldgen");
+    private static final ModuleMetadata METADATA = ModuleMetadata.of("worldGen", "WorldGen", "worldgen").withDependencies("flowJobs");
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final Gson gson = new GsonBuilder()
         .registerTypeAdapter(FlowDataType.class, new TypeAdapter<FlowDataType>() {
@@ -68,8 +70,12 @@ public class WorldGenModule implements Module {
         this.channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         this.previewManager = new WorldGenPreviewManager(context.getPlugin());
         this.projectStorage = new WorldGenProjectStorage(context.getPlugin());
+        context.registerService(WorldGenProjectStorage.class, projectStorage);
+        FlowJobRegistry flowJobs = context.getRequiredService(FlowJobRegistry.class);
+        WorldGenOperationService operationService = new WorldGenOperationService(context.getPlugin(), projectStorage, previewManager, flowJobs);
+        context.registerService(WorldGenOperationService.class, operationService);
         this.runtimeListener = new WorldGenRuntimeListener(context.getPlugin());
-        this.jobManager = new JobManager(job -> broadcastJob("jobStatus", job.snapshot()));
+        this.jobManager = new JobManager(flowJobs, job -> broadcastJob("jobStatus", job.snapshot()));
         this.runtimeListener.start();
         WorldGenNodeDefinitions.registerDefaults(WorldGenNodeRegistry.getInstance());
         previewManager.cleanupOrphanedPreviews();

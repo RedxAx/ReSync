@@ -452,7 +452,7 @@
       },
       {
         "name": "flags_list",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ],
     "outputs": [
@@ -654,7 +654,7 @@
     "outputs": [
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ]
   },

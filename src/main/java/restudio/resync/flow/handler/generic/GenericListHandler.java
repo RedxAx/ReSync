@@ -13,11 +13,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -38,14 +41,14 @@ public class GenericListHandler implements NodeHandler {
             ctx.setOutput(node, "list", new ArrayList<>());
         });
         operations.put("add", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
-            Object item = ctx.getInputValue(node, "item", null);
+            List<Object> list = mutableList(ctx, node);
+            Object item = ctx.getInputValue(node, "value", null);
             list.add(item);
             ctx.setOutput(node, "list", list);
         });
         operations.put("add_at", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
-            Object item = ctx.getInputValue(node, "item", null);
+            List<Object> list = mutableList(ctx, node);
+            Object item = ctx.getInputValue(node, "value", null);
             Integer index = ctx.getInputValue(node, "index", Integer.class, 0);
             if (index >= 0 && index <= list.size()) {
                 list.add(index, item);
@@ -53,13 +56,13 @@ public class GenericListHandler implements NodeHandler {
             ctx.setOutput(node, "list", list);
         });
         operations.put("remove", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
-            Object item = ctx.getInputValue(node, "item", null);
+            List<Object> list = mutableList(ctx, node);
+            Object item = ctx.getInputValue(node, "value", null);
             list.remove(item);
             ctx.setOutput(node, "list", list);
         });
         operations.put("remove_at", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
+            List<Object> list = mutableList(ctx, node);
             Integer index = ctx.getInputValue(node, "index", Integer.class, 0);
             if (index >= 0 && index < list.size()) {
                 list.remove((int) index);
@@ -74,12 +77,12 @@ public class GenericListHandler implements NodeHandler {
         });
         operations.put("index_of", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Object item = ctx.getInputValue(node, "item", null);
+            Object item = ctx.getInputValue(node, "value", null);
             ctx.setOutput(node, "index", list.indexOf(item));
         });
         operations.put("contains", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Object item = ctx.getInputValue(node, "item", null);
+            Object item = ctx.getInputValue(node, "value", null);
             ctx.setOutput(node, "contains", list.contains(item));
         });
         operations.put("size", (ctx, node) -> {
@@ -88,17 +91,17 @@ public class GenericListHandler implements NodeHandler {
         });
         operations.put("is_empty", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            ctx.setOutput(node, "is_empty", list.isEmpty());
+            ctx.setOutput(node, "empty", list.isEmpty());
         });
         operations.put("clear", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
+            List<Object> list = mutableList(ctx, node);
             list.clear();
             ctx.setOutput(node, "list", list);
         });
         operations.put("set", (ctx, node) -> {
-            List<Object> list = ctx.getInputValue(node, "list", List.class, new ArrayList<>());
+            List<Object> list = mutableList(ctx, node);
             Integer index = ctx.getInputValue(node, "index", Integer.class, 0);
-            Object item = ctx.getInputValue(node, "item", null);
+            Object item = ctx.getInputValue(node, "value", null);
             if (index >= 0 && index < list.size()) {
                 list.set(index, item);
             }
@@ -122,8 +125,8 @@ public class GenericListHandler implements NodeHandler {
     private void registerTransformOperations() {
         operations.put("slice", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Integer start = ctx.getInputValue(node, "start", Integer.class, 0);
-            Integer end = ctx.getInputValue(node, "end", Integer.class, 0);
+            Integer start = ctx.getInputValue(node, "start_index", Integer.class, 0);
+            Integer end = ctx.getInputValue(node, "end_index", Integer.class, list.size());
             if (start < 0) start = list.size() + start;
             if (end < 0) end = list.size() + end;
             if (start < 0) start = 0;
@@ -132,7 +135,7 @@ public class GenericListHandler implements NodeHandler {
             if (end > list.size()) end = list.size();
             List<Object> result = new ArrayList<>();
             for (int i = start; i < end; i++) result.add(list.get(i));
-            ctx.setOutput(node, "list", result);
+            ctx.setOutput(node, "slice_list", result);
         });
         operations.put("sublist", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -150,13 +153,13 @@ public class GenericListHandler implements NodeHandler {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             List<Object> result = new ArrayList<>(list);
             Collections.reverse(result);
-            ctx.setOutput(node, "list", result);
+            ctx.setOutput(node, "reversed_list", result);
         });
         operations.put("shuffle", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             List<Object> result = new ArrayList<>(list);
             Collections.shuffle(result);
-            ctx.setOutput(node, "list", result);
+            ctx.setOutput(node, "shuffled_list", result);
         });
         operations.put("sort", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -165,12 +168,13 @@ public class GenericListHandler implements NodeHandler {
                 if (a == null && b == null) return 0;
                 if (a == null) return 1;
                 if (b == null) return -1;
-                if (a instanceof Comparable && b instanceof Comparable) {
-                    return ((Comparable<Object>) a).compareTo(b);
-                }
-                return String.valueOf(a).compareTo(String.valueOf(b));
+                return compare(a, b);
             });
-            ctx.setOutput(node, "list", result);
+            String order = ctx.getInputValue(node, "sort_order", String.class, "ascending");
+            if ("descending".equalsIgnoreCase(order) || "desc".equalsIgnoreCase(order)) {
+                Collections.reverse(result);
+            }
+            ctx.setOutput(node, "sorted_list", result);
         });
         operations.put("sort_descending", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -179,77 +183,86 @@ public class GenericListHandler implements NodeHandler {
                 if (a == null && b == null) return 0;
                 if (a == null) return -1;
                 if (b == null) return 1;
-                if (a instanceof Comparable && b instanceof Comparable) {
-                    return ((Comparable<Object>) b).compareTo(a);
-                }
-                return String.valueOf(b).compareTo(String.valueOf(a));
+                return compare(b, a);
             });
             ctx.setOutput(node, "list", result);
         });
         operations.put("filter", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             FlowGraph subGraph = ctx.extractSubGraph(node, "sub_flow");
-            List<Object> result = new ArrayList<>();
             if (subGraph != null && !subGraph.getNodes().isEmpty()) {
+                CompletableFuture<List<Object>> result = CompletableFuture.completedFuture(new ArrayList<>());
                 for (int i = 0; i < list.size(); i++) {
                     Object item = list.get(i);
-                    if (item == null) continue;
+                    if (item == null) {
+                        continue;
+                    }
                     Map<String, Object> inputs = new HashMap<>();
                     inputs.put("element", item);
                     inputs.put("index", i);
-                    Boolean keep = ctx.executeSubFlowBoolean(subGraph, node, inputs);
-                    if (Boolean.TRUE.equals(keep)) {
-                        result.add(item);
-                    }
+                    result = result.thenCompose(filtered -> ctx.executeSubFlowBooleanAsync(subGraph, node, inputs).thenApply(keep -> {
+                        if (Boolean.TRUE.equals(keep)) {
+                            filtered.add(item);
+                        }
+                        return filtered;
+                    }));
                 }
+                ctx.awaitBeforeContinuation(result.thenAccept(filtered -> ctx.setOutput(node, "filtered_list", filtered)));
             } else {
-                String condition = ctx.getInputValue(node, "condition", String.class, "");
+                List<Object> result = new ArrayList<>();
+                String property = ctx.getInputValue(node, "property_name", String.class, "");
+                String operator = ctx.getInputValue(node, "operator", String.class, "equals");
+                Object compareValue = ctx.getInputValue(node, "compare_value", null);
                 for (Object item : list) {
-                    if (item == null) continue;
-                    if (condition.isBlank()) {
-                        result.add(item);
-                        continue;
-                    }
-                    if (matchesFilterCondition(item, condition)) {
+                    if (matchesPredicate(item, property, operator, compareValue)) {
                         result.add(item);
                     }
                 }
+                ctx.setOutput(node, "filtered_list", result);
             }
-            ctx.setOutput(node, "list", result);
         });
         operations.put("map", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             FlowGraph subGraph = ctx.extractSubGraph(node, "sub_flow");
-            List<Object> result = new ArrayList<>();
             if (subGraph != null && !subGraph.getNodes().isEmpty()) {
+                CompletableFuture<List<Object>> result = CompletableFuture.completedFuture(new ArrayList<>());
                 for (int i = 0; i < list.size(); i++) {
                     Object item = list.get(i);
                     Map<String, Object> inputs = new HashMap<>();
                     inputs.put("element", item);
                     inputs.put("index", i);
-                    Object mapped = ctx.executeSubFlowObject(subGraph, node, inputs);
-                    result.add(mapped);
+                    result = result.thenCompose(mapped -> ctx.executeSubFlowObjectAsync(subGraph, node, inputs).thenApply(value -> {
+                        mapped.add(value);
+                        return mapped;
+                    }));
                 }
+                ctx.awaitBeforeContinuation(result.thenAccept(mapped -> ctx.setOutput(node, "transformed_list", mapped)));
             } else {
-                String transform = ctx.getInputValue(node, "transform", String.class, "");
+                List<Object> result = new ArrayList<>();
+                String transform = ctx.getInputValue(node, "transformation_type", String.class, "");
                 for (Object item : list) {
                     result.add(applyMapTransform(item, transform));
                 }
+                ctx.setOutput(node, "transformed_list", result);
             }
-            ctx.setOutput(node, "list", result);
         });
         operations.put("reduce", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Object initial = ctx.getInputValue(node, "initial", null);
-            Object result = initial;
-            for (Object item : list) {
-                if (item instanceof Number && result instanceof Number) {
-                    result = ((Number) result).doubleValue() + ((Number) item).doubleValue();
-                } else {
-                    result = result != null ? result.toString() + item.toString() : item.toString();
+            String operation = ctx.getInputValue(node, "operation", String.class, "sum");
+            Object result;
+            if ("concat".equalsIgnoreCase(operation)) {
+                String separator = ctx.getInputValue(node, "separator", String.class, "");
+                result = list.stream().map(String::valueOf).collect(Collectors.joining(separator));
+            } else {
+                double sum = 0.0;
+                for (Object item : list) {
+                    if (item instanceof Number number) {
+                        sum += number.doubleValue();
+                    }
                 }
+                result = sum;
             }
-            ctx.setOutput(node, "value", result);
+            ctx.setOutput(node, "result", result);
         });
         operations.put("flatten", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -261,11 +274,11 @@ public class GenericListHandler implements NodeHandler {
                     result.add(item);
                 }
             }
-            ctx.setOutput(node, "list", result);
+            ctx.setOutput(node, "flattened_list", result);
         });
         operations.put("unique", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            ctx.setOutput(node, "list", new ArrayList<>(new LinkedHashSet<>(list)));
+            ctx.setOutput(node, "unique_list", new ArrayList<>(new LinkedHashSet<>(list)));
         });
         operations.put("join", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -280,18 +293,18 @@ public class GenericListHandler implements NodeHandler {
             ctx.setOutput(node, "list", result);
         });
         operations.put("intersect", (ctx, node) -> {
-            List<Object> listA = ctx.getInputValue(node, "listA", List.class, List.of());
-            List<Object> listB = ctx.getInputValue(node, "listB", List.class, List.of());
-            ctx.setOutput(node, "list", listA.stream().filter(listB::contains).distinct().collect(Collectors.toList()));
+            List<Object> listA = ctx.getInputValue(node, "list1", List.class, List.of());
+            List<Object> listB = ctx.getInputValue(node, "list2", List.class, List.of());
+            ctx.setOutput(node, "intersection_list", listA.stream().filter(listB::contains).distinct().collect(Collectors.toList()));
         });
         operations.put("difference", (ctx, node) -> {
-            List<Object> listA = ctx.getInputValue(node, "listA", List.class, List.of());
-            List<Object> listB = ctx.getInputValue(node, "listB", List.class, List.of());
-            ctx.setOutput(node, "list", listA.stream().filter(item -> !listB.contains(item)).collect(Collectors.toList()));
+            List<Object> listA = ctx.getInputValue(node, "list1", List.class, List.of());
+            List<Object> listB = ctx.getInputValue(node, "list2", List.class, List.of());
+            ctx.setOutput(node, "difference_list", listA.stream().filter(item -> !listB.contains(item)).collect(Collectors.toList()));
         });
         operations.put("zip", (ctx, node) -> {
-            List<Object> listA = ctx.getInputValue(node, "listA", List.class, List.of());
-            List<Object> listB = ctx.getInputValue(node, "listB", List.class, List.of());
+            List<Object> listA = ctx.getInputValue(node, "list1", List.class, List.of());
+            List<Object> listB = ctx.getInputValue(node, "list2", List.class, List.of());
             List<Object> result = new ArrayList<>();
             int minSize = Math.min(listA.size(), listB.size());
             for (int i = 0; i < minSize; i++) {
@@ -300,7 +313,7 @@ public class GenericListHandler implements NodeHandler {
                 pair.put("second", listB.get(i));
                 result.add(pair);
             }
-            ctx.setOutput(node, "list", result);
+            ctx.setOutput(node, "pairs_list", result);
         });
     }
 
@@ -324,14 +337,48 @@ public class GenericListHandler implements NodeHandler {
         });
         operations.put("find_first", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Object target = ctx.getInputValue(node, "target", null);
-            ctx.setOutput(node, "index", list.indexOf(target));
+            String property = ctx.getInputValue(node, "property_name", String.class, "");
+            String operator = ctx.getInputValue(node, "operator", String.class, "equals");
+            Object compareValue = ctx.getInputValue(node, "compare_value", null);
+            Object found = list.stream().filter(item -> matchesPredicate(item, property, operator, compareValue)).findFirst().orElse(null);
+            ctx.setOutput(node, "found_element", found);
         });
         operations.put("count", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
-            Object target = ctx.getInputValue(node, "target", null);
+            Object target = ctx.getInputValue(node, "value", null);
             long count = list.stream().filter(item -> Objects.equals(item, target)).count();
             ctx.setOutput(node, "count", (int) count);
+        });
+        operations.put("group_by", (ctx, node) -> {
+            List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
+            String property = ctx.getInputValue(node, "property_name", String.class, "");
+            Map<String, List<Object>> groups = new LinkedHashMap<>();
+            for (Object item : list) {
+                Object key = property.isBlank() ? item : extractProperty(item, property);
+                groups.computeIfAbsent(String.valueOf(key), ignored -> new ArrayList<>()).add(item);
+            }
+            ctx.setOutput(node, "groups", groups);
+        });
+        operations.put("any", (ctx, node) -> {
+            List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
+            String property = ctx.getInputValue(node, "property_name", String.class, "");
+            String operator = ctx.getInputValue(node, "operator", String.class, "equals");
+            Object compareValue = ctx.getInputValue(node, "compare_value", null);
+            ctx.setOutput(node, "matches", list.stream().anyMatch(item -> matchesPredicate(item, property, operator, compareValue)));
+        });
+        operations.put("all", (ctx, node) -> {
+            List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
+            String property = ctx.getInputValue(node, "property_name", String.class, "");
+            String operator = ctx.getInputValue(node, "operator", String.class, "equals");
+            Object compareValue = ctx.getInputValue(node, "compare_value", null);
+            ctx.setOutput(node, "matches", list.stream().allMatch(item -> matchesPredicate(item, property, operator, compareValue)));
+        });
+        operations.put("none", (ctx, node) -> {
+            List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
+            String property = ctx.getInputValue(node, "property_name", String.class, "");
+            String operator = ctx.getInputValue(node, "operator", String.class, "equals");
+            Object compareValue = ctx.getInputValue(node, "compare_value", null);
+            ctx.setOutput(node, "matches", list.stream().noneMatch(item -> matchesPredicate(item, property, operator, compareValue)));
         });
         operations.put("sum", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
@@ -425,24 +472,13 @@ public class GenericListHandler implements NodeHandler {
         operations.put("sort_by_property", (ctx, node) -> {
             List<Object> list = ctx.getInputValue(node, "list", List.class, List.of());
             String property = ctx.getInputValue(node, "property", String.class, "");
+            if (property == null || property.isBlank()) {
+                throw new IllegalArgumentException("Sort property is required");
+            }
             List<Object> result = new ArrayList<>(list);
             result.sort((a, b) -> {
-                Object valA = null;
-                Object valB = null;
-                if (a != null) {
-                    try {
-                        Method method = a.getClass().getMethod("get" + property.substring(0, 1).toUpperCase() + property.substring(1));
-                        valA = method.invoke(a);
-                    } catch (Exception ignored) {
-                    }
-                }
-                if (b != null) {
-                    try {
-                        Method method = b.getClass().getMethod("get" + property.substring(0, 1).toUpperCase() + property.substring(1));
-                        valB = method.invoke(b);
-                    } catch (Exception ignored) {
-                    }
-                }
+                Object valA = a != null ? extractProperty(a, property) : null;
+                Object valB = b != null ? extractProperty(b, property) : null;
                 if (valA == null && valB == null) return 0;
                 if (valA == null) return 1;
                 if (valB == null) return -1;
@@ -648,6 +684,56 @@ public class GenericListHandler implements NodeHandler {
         });
     }
 
+    private static boolean matchesPredicate(Object item, String property, String operator, Object compareValue) {
+        Object value = property == null || property.isBlank() ? item : extractProperty(item, property);
+        String normalized = operator == null ? "equals" : operator.strip().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        return switch (normalized) {
+            case "equals", "equal", "==" -> valuesEqual(value, compareValue);
+            case "not_equals", "not_equal", "!=" -> !valuesEqual(value, compareValue);
+            case "greater_than", ">" -> value != null && compareValue != null && compare(value, compareValue) > 0;
+            case "greater_than_or_equal", "greater_or_equal", ">=" -> value != null && compareValue != null && compare(value, compareValue) >= 0;
+            case "less_than", "<" -> value != null && compareValue != null && compare(value, compareValue) < 0;
+            case "less_than_or_equal", "less_or_equal", "<=" -> value != null && compareValue != null && compare(value, compareValue) <= 0;
+            case "contains" -> value instanceof Collection<?> collection ? collection.contains(compareValue)
+                : value != null && compareValue != null && String.valueOf(value).contains(String.valueOf(compareValue));
+            case "contains_ignore_case" -> value != null && compareValue != null
+                && String.valueOf(value).toLowerCase(Locale.ROOT).contains(String.valueOf(compareValue).toLowerCase(Locale.ROOT));
+            case "starts_with" -> value != null && compareValue != null && String.valueOf(value).startsWith(String.valueOf(compareValue));
+            case "ends_with" -> value != null && compareValue != null && String.valueOf(value).endsWith(String.valueOf(compareValue));
+            case "is_null" -> value == null;
+            case "is_not_null", "exists" -> value != null;
+            case "is_empty" -> value == null || value instanceof String string && string.isEmpty()
+                || value instanceof Collection<?> collection && collection.isEmpty()
+                || value instanceof Map<?, ?> map && map.isEmpty();
+            case "is_not_empty" -> value != null && (!(value instanceof String string) || !string.isEmpty())
+                && (!(value instanceof Collection<?> collection) || !collection.isEmpty())
+                && (!(value instanceof Map<?, ?> map) || !map.isEmpty());
+            default -> false;
+        };
+    }
+
+    private static List<Object> mutableList(FlowContext context, FlowNode node) {
+        List<Object> list = context.getInputValue(node, "list", List.class, List.of());
+        return new ArrayList<>(list);
+    }
+
+    private static boolean valuesEqual(Object left, Object right) {
+        if (left instanceof Number leftNumber && right instanceof Number rightNumber) {
+            return Double.compare(leftNumber.doubleValue(), rightNumber.doubleValue()) == 0;
+        }
+        return Objects.equals(left, right);
+    }
+
+    private static int compare(Object left, Object right) {
+        if (left instanceof Number leftNumber && right instanceof Number rightNumber) {
+            return Double.compare(leftNumber.doubleValue(), rightNumber.doubleValue());
+        }
+        if (left instanceof Comparable<?> && left.getClass().isInstance(right)) {
+            return ((Comparable<Object>) left).compareTo(right);
+        }
+        return String.valueOf(left).compareTo(String.valueOf(right));
+    }
+
     private static boolean matchesFilterCondition(Object item, String condition) {
         String lower = condition.toLowerCase();
         if (lower.startsWith("type:")) {
@@ -666,14 +752,16 @@ public class GenericListHandler implements NodeHandler {
             try {
                 double target = Double.parseDouble(lower.substring(1).trim());
                 return n.doubleValue() > target;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Invalid numeric list filter: " + condition, exception);
             }
         }
         if (item instanceof Number n && lower.startsWith("<")) {
             try {
                 double target = Double.parseDouble(lower.substring(1).trim());
                 return n.doubleValue() < target;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Invalid numeric list filter: " + condition, exception);
             }
         }
         return String.valueOf(item).toLowerCase().contains(lower);
@@ -703,6 +791,12 @@ public class GenericListHandler implements NodeHandler {
     }
 
     private static Object extractProperty(Object item, String property) {
+        if (item == null) {
+            return null;
+        }
+        if (property == null || property.isBlank()) {
+            throw new IllegalArgumentException("List item property is required");
+        }
         if (item instanceof Entity entity) {
             return switch (property.toLowerCase()) {
                 case "name", "custom_name" -> entity.getCustomName();
@@ -710,25 +804,28 @@ public class GenericListHandler implements NodeHandler {
                 case "uuid" -> entity.getUniqueId().toString();
                 case "world" -> entity.getWorld().getName();
                 case "location" -> entity.getLocation();
-                default -> null;
+                default -> throw new IllegalArgumentException("Unknown entity list property: " + property);
             };
         }
         if (item instanceof ItemStack stack) {
             return switch (property.toLowerCase()) {
                 case "type", "material" -> stack.getType().name();
                 case "amount" -> stack.getAmount();
-                default -> null;
+                default -> throw new IllegalArgumentException("Unknown item list property: " + property);
             };
         }
         if (item instanceof Map<?, ?> map) {
+            if (!map.containsKey(property)) {
+                throw new IllegalArgumentException("Map list property is missing: " + property);
+            }
             return map.get(property);
         }
         try {
             Method method = item.getClass().getMethod("get" + property.substring(0, 1).toUpperCase() + property.substring(1));
             return method.invoke(item);
-        } catch (Exception ignored) {
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("Unknown list property " + property + " for " + item.getClass().getSimpleName(), exception);
         }
-        return null;
     }
 
     private static boolean matchesType(Object item, String typeName) {
@@ -754,6 +851,8 @@ public class GenericListHandler implements NodeHandler {
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op != null) {
             op.accept(ctx, node);
+        } else {
+            throw new IllegalArgumentException("Unknown list operation: " + operation);
         }
         ctx.triggerOutput("flow");
     }

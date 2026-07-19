@@ -2,15 +2,16 @@ package restudio.resync.flow.handler.generic;
 
 import com.google.gson.Gson;
 import restudio.flow.data.FlowNode;
-import restudio.resync.Log;
+import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
-import java.net.URL;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,15 +19,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class HttpHandler implements NodeHandler {
     private static final Gson GSON = new Gson();
     private static final int DEFAULT_TIMEOUT_MS = 10000;
+    private static final Set<String> SUPPORTED_METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
-    private volatile int timeoutMs = DEFAULT_TIMEOUT_MS;
+    private volatile int legacyTimeoutMs = DEFAULT_TIMEOUT_MS;
 
     public HttpHandler() {
         operations.put("http_get", (ctx, node) -> executeRequest(ctx, node, "GET", null, null, false));
@@ -82,7 +85,11 @@ public class HttpHandler implements NodeHandler {
                 if (!body.isBlank()) {
                     json = GSON.fromJson(body, Object.class);
                 }
-            } catch (Exception ignored) {
+                ctx.setOutput(node, "valid", true);
+                ctx.setOutput(node, "error", "");
+            } catch (RuntimeException exception) {
+                ctx.setOutput(node, "valid", false);
+                ctx.setOutput(node, "error", message(exception, "Invalid JSON response"));
             }
             ctx.setOutput(node, "json", json);
             ctx.triggerOutput("flow");
@@ -110,8 +117,15 @@ public class HttpHandler implements NodeHandler {
             ctx.triggerOutput("flow");
         });
         operations.put("http_set_timeout", (ctx, node) -> {
-            timeoutMs = ctx.getInputValue(node, "timeout_ms", Integer.class, DEFAULT_TIMEOUT_MS);
-            ctx.triggerOutput("flow");
+            int timeout = ctx.getInputValue(node, "timeout_ms", Integer.class, DEFAULT_TIMEOUT_MS);
+            boolean valid = timeout >= 100 && timeout <= 120_000;
+            if (valid) {
+                legacyTimeoutMs = timeout;
+            }
+            ctx.setOutput(node, "success", valid);
+            ctx.setOutput(node, "error_code", valid ? "" : "HTTP_TIMEOUT_INVALID");
+            ctx.setOutput(node, "message", valid ? "" : "HTTP timeout must be between 100 and 120000 milliseconds");
+            ctx.triggerOutput(valid ? "flow" : "failed");
         });
         operations.put("http_encode_url", (ctx, node) -> {
             String url = ctx.getInputValue(node, "url", String.class, "");
@@ -122,8 +136,12 @@ public class HttpHandler implements NodeHandler {
             String url = ctx.getInputValue(node, "url", String.class, "");
             String decoded = url;
             try {
-                decoded = java.net.URLDecoder.decode(url, StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+                decoded = URLDecoder.decode(url, StandardCharsets.UTF_8);
+                ctx.setOutput(node, "valid", true);
+                ctx.setOutput(node, "error", "");
+            } catch (IllegalArgumentException exception) {
+                ctx.setOutput(node, "valid", false);
+                ctx.setOutput(node, "error", message(exception, "Invalid URL encoding"));
             }
             ctx.setOutput(node, "decoded_url", decoded);
             ctx.triggerOutput("flow");
@@ -138,42 +156,57 @@ public class HttpHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown HTTP operation: " + operation);
         }
+        op.accept(ctx, node);
     }
 
     private void executeRequest(FlowContext ctx, FlowNode node, String fixedMethod, Map<String, Object> fixedBody, Map<String, Object> fixedHeaders, boolean dynamic) {
-        String method = dynamic ? ctx.getInputValue(node, "method", String.class, "GET").toUpperCase() : fixedMethod;
+        String method = dynamic ? ctx.getInputValue(node, "method", String.class, "GET") : fixedMethod;
         String url = ctx.getInputValue(node, "url", String.class, "");
         Map<String, Object> body = fixedBody != null ? fixedBody : ctx.getInputValue(node, "body", Map.class, null);
         Map<String, Object> headers = fixedHeaders != null ? fixedHeaders : ctx.getInputValue(node, "headers", Map.class, new HashMap<>());
         Map<String, Object> queryParams = dynamic ? ctx.getInputValue(node, "query_params", Map.class, null) : null;
-        String finalUrl = queryParams != null && !queryParams.isEmpty() ? buildQueryString(url, queryParams) : url;
+        int timeout = ctx.getInputValue(node, "timeout_ms", Integer.class, legacyTimeoutMs);
 
         ctx.runAsync(() -> {
-            Map<String, Object> response;
+            FlowOperationResult<Map<String, Object>> result;
+            Map<String, Object> response = Map.of();
+            String normalizedMethod = method != null ? method.toUpperCase() : "";
+            String finalUrl = url != null ? url : "";
             try {
-                response = makeHttpRequest(method, finalUrl, body, headers);
-            } catch (Exception e) {
-                Log.error("[Flow] HTTP " + method + " error: " + e.getMessage());
-                response = createErrorResponse(e.getMessage());
+                normalizedMethod = validateMethod(method);
+                finalUrl = queryParams != null && !queryParams.isEmpty() ? buildQueryString(url, queryParams) : url;
+                response = makeHttpRequest(normalizedMethod, finalUrl, body, headers, validateTimeout(timeout));
+                int status = ((Number) response.getOrDefault("status_code", -1)).intValue();
+                result = status >= 200 && status < 300
+                    ? new FlowOperationResult<>(true, response, "", "", Map.of("method", normalizedMethod, "url", finalUrl, "status", status))
+                    : FlowOperationResult.failure("HTTP_STATUS_ERROR", "HTTP request returned status " + status,
+                        Map.of("method", normalizedMethod, "url", finalUrl, "status", status));
+            } catch (Exception exception) {
+                String error = message(exception, "HTTP request failed");
+                response = createErrorResponse(error);
+                result = FlowOperationResult.failure(httpErrorCode(exception), error, Map.of("method", normalizedMethod, "url", finalUrl));
             }
             Map<String, Object> finalResponse = response;
+            FlowOperationResult<Map<String, Object>> finalResult = result;
             ctx.runSync(() -> {
                 ctx.setOutput(node, "response", finalResponse);
-                ctx.triggerOutput("flow");
+                setResult(ctx, node, finalResult);
+                ctx.triggerOutput(finalResult.success() ? "flow" : "failed");
             });
         });
     }
 
-    private Map<String, Object> makeHttpRequest(String method, String url, Map<String, Object> body, Map<String, Object> headers) throws Exception {
+    private Map<String, Object> makeHttpRequest(String method, String url, Map<String, Object> body, Map<String, Object> headers, int timeoutMs) throws Exception {
         if (url == null || url.isBlank()) {
-            return createErrorResponse("Empty URL");
+            throw new IllegalArgumentException("HTTP URL is required");
         }
 
+        URI uri = validateUri(url);
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(timeoutMs)).build();
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(new URI(url)).timeout(Duration.ofMillis(timeoutMs));
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder().uri(uri).timeout(Duration.ofMillis(timeoutMs));
 
         if (headers != null) {
             for (Map.Entry<String, Object> entry : headers.entrySet()) {
@@ -206,6 +239,47 @@ public class HttpHandler implements NodeHandler {
         return responseMap;
     }
 
+    URI validateUri(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("HTTP URL is required");
+        }
+        URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException exception) {
+            throw new IllegalArgumentException("HTTP URL is invalid", exception);
+        }
+        if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IllegalArgumentException("HTTP URL must use http or https");
+        }
+        if (uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new IllegalArgumentException("HTTP URL host is required");
+        }
+        return uri;
+    }
+
+    String validateMethod(String method) {
+        String normalized = method != null ? method.trim().toUpperCase() : "";
+        if (!SUPPORTED_METHODS.contains(normalized)) {
+            throw new IllegalArgumentException("HTTP method must be GET, POST, PUT, PATCH, or DELETE");
+        }
+        return normalized;
+    }
+
+    int validateTimeout(int timeout) {
+        if (timeout < 100 || timeout > 120_000) {
+            throw new IllegalArgumentException("HTTP timeout must be between 100 and 120000 milliseconds");
+        }
+        return timeout;
+    }
+
+    private void setResult(FlowContext context, FlowNode node, FlowOperationResult<Map<String, Object>> result) {
+        context.setOutput(node, "result", result);
+        context.setOutput(node, "success", result.success());
+        context.setOutput(node, "error_code", result.errorCode());
+        context.setOutput(node, "message", result.message());
+    }
+
     private String buildQueryString(String url, Map<String, Object> params) {
         String query = buildQueryStringFromParams(params);
         if (query.isEmpty()) {
@@ -235,7 +309,7 @@ public class HttpHandler implements NodeHandler {
     private Map<String, Object> createErrorResponse(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status_code", -1);
-        response.put("body", "{\"error\": \"" + message + "\"}");
+        response.put("body", GSON.toJson(Map.of("error", message != null ? message : "")));
         response.put("headers", new HashMap<>());
         response.put("success", false);
         response.put("error", message);
@@ -248,5 +322,23 @@ public class HttpHandler implements NodeHandler {
             target.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
         }
         return target;
+    }
+
+    private String message(Exception exception, String fallback) {
+        return exception.getMessage() != null && !exception.getMessage().isBlank() ? exception.getMessage() : fallback;
+    }
+
+    private String httpErrorCode(Exception exception) {
+        String error = message(exception, "");
+        if (error.startsWith("HTTP URL")) {
+            return "HTTP_URL_INVALID";
+        }
+        if (error.startsWith("HTTP method")) {
+            return "HTTP_METHOD_INVALID";
+        }
+        if (error.startsWith("HTTP timeout")) {
+            return "HTTP_TIMEOUT_INVALID";
+        }
+        return "HTTP_REQUEST_FAILED";
     }
 }

@@ -5,19 +5,190 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowSerializer;
+import restudio.resync.modules.flow.FlowResourcePacketRouter;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.world.WorldManagementService;
+import restudio.resync.world.WorldRegistryEntry;
+import restudio.resync.world.WorldSnapshot;
+import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.data.WorldGenNode;
+import restudio.resync.worldgen.data.WorldGenProject;
 
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowStorageAssetMigrationTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void migrationPrunesMissingFileBackedResourcesButKeepsRuntimeWorldEntries() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path items = assets.resolve("Content").resolve("Items");
+        Files.createDirectories(items);
+        Files.writeString(items.resolve("present.json"), """
+            {"resourceType":"custom_content","id":"present","type":"item"}
+            """);
+        Files.writeString(assets.resolve("project.json"), """
+            {
+              "serverId": "project",
+              "folders": [],
+              "resources": [
+                {"type":"custom_content","id":"present","displayName":"Present","path":"Content/Items","sortOrder":0},
+                {"type":"custom_content","id":"missing","displayName":"Missing","path":"Content/Items","sortOrder":1},
+                {"type":"gui","id":"Secondary","displayName":"Secondary","path":"GUIs","sortOrder":2},
+                {"type":"world","id":"world","displayName":"world","path":"Worlds","sortOrder":3}
+              ]
+            }
+            """);
+
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+
+        String project = Files.readString(assets.resolve("project.json"));
+        assertTrue(project.contains("\"type\":\"custom_content\",\"id\":\"present\""));
+        assertFalse(project.contains("\"id\":\"missing\""));
+        assertFalse(project.contains("\"id\":\"Secondary\""));
+        assertTrue(project.contains("\"type\":\"world\",\"id\":\"world\""));
+
+        Gson gson = new Gson();
+        JsonAssetStore<JsonObject> store = new JsonAssetStore<>(assets, tempDir.resolve("custom-content"), ReSyncResourceCatalog.CUSTOM_CONTENT,
+            "Content/Items", json -> gson.fromJson(json, JsonObject.class), gson::toJson, this::id);
+        store.delete("present");
+
+        assertFalse(storage.getProjectMetadata("project").contains("\"id\": \"present\""));
+    }
+
+    @Test
+    void graphStoragePreservesFlowFunctionAndCommandResourceTypes() throws Exception {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph flow = FlowSerializer.deserialize("""
+            {"id":"regular","version":2,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        FlowGraph function = FlowSerializer.deserialize("""
+            {"id":"lookup","version":2,"function":true,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        FlowGraph command = FlowSerializer.deserialize("""
+            {"id":"restart","version":2,"nodes":{"start":{"type":"event.resync.command","version":1,"x":0,"y":0,"inputValues":{}}},"connections":[],"localVariables":[]}
+            """);
+
+        storage.saveGraph(flow);
+        storage.saveGraph(function);
+        storage.saveGraph(command);
+
+        assertEquals("flow", storage.getGraphResourceType("regular"));
+        assertEquals("function", storage.getGraphResourceType("lookup"));
+        assertEquals("command", storage.getGraphResourceType("restart"));
+        assertEquals(List.of("regular"), storage.listGraphIds("flow"));
+        assertEquals(List.of("lookup"), storage.listGraphIds("function"));
+        assertEquals(List.of("restart"), storage.listGraphIds("command"));
+        try (var paths = Files.walk(tempDir.resolve("assets"))) {
+            Path commandFile = paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().equals("restart.json"))
+                .findFirst()
+                .orElseThrow();
+            assertTrue(Files.readString(commandFile).contains("\"resourceType\":\"command\""));
+        }
+    }
+
+    @Test
+    void graphReclassificationMovesOneStableAssetWithoutLeavingShadowCopies() throws Exception {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph graph = FlowSerializer.deserialize("""
+            {"id":"convertible","version":2,"function":true,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(graph);
+        graph.setFunction(false);
+        graph.getNodes().put("start", FlowSerializer.deserialize("""
+            {"id":"temporary","version":2,"nodes":{"start":{"type":"event.resync.command","version":1,"x":0,"y":0,"inputValues":{}}},"connections":[],"localVariables":[]}
+            """).getNodes().get("start"));
+
+        storage.saveGraph(graph);
+
+        assertEquals("command", storage.getGraphResourceType("convertible"));
+        try (var paths = Files.walk(tempDir.resolve("assets"))) {
+            List<Path> matching = paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().equals("convertible.json"))
+                .toList();
+            assertEquals(1, matching.size());
+            assertTrue(Files.readString(matching.getFirst()).contains("\"resourceType\":\"command\""));
+        }
+        String project = Files.readString(tempDir.resolve("assets").resolve("project.json"));
+        assertTrue(project.contains("\"type\":\"command\",\"id\":\"convertible\""));
+        assertFalse(project.contains("\"type\":\"function\",\"id\":\"convertible\""));
+    }
+
+    @Test
+    void graphResourcesUseTheManagedLifecycleRegistry() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        new FlowResourcePacketRouter(storage, null, null, null, null, null, null, registry, ignored -> {
+        });
+        FlowGraph flow = FlowSerializer.deserialize("""
+            {"id":"managed","version":2,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+
+        assertTrue(registry.create(ReSyncResourceCatalog.FLOW, flow).success());
+        assertEquals("managed", registry.discover(ReSyncResourceCatalog.FLOW, "manage").value().getFirst().id());
+        assertTrue(registry.duplicate(ReSyncResourceCatalog.FLOW, "managed", "copy").success());
+        assertEquals(List.of("copy", "managed"), storage.listGraphIds(ReSyncResourceCatalog.FLOW));
+        assertFalse(registry.create(ReSyncResourceCatalog.FUNCTION, flow).success());
+        assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.FLOW.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
+        assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.FUNCTION.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
+        assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.COMMAND.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
+    }
+
+    @Test
+    void worldResourcesExposeDiscoveryWithoutBypassingWorldSafetyOperations() {
+        WorldRegistryEntry entry = new WorldRegistryEntry();
+        entry.setWorldName("survival");
+        entry.setLoaded(true);
+        WorldSnapshot snapshot = new WorldSnapshot();
+        snapshot.setWorlds(List.of(entry));
+        WorldManagementService service = (WorldManagementService) Proxy.newProxyInstance(
+            WorldManagementService.class.getClassLoader(),
+            new Class<?>[]{WorldManagementService.class},
+            (proxy, method, arguments) -> "createSnapshot".equals(method.getName()) ? snapshot : null
+        );
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        FlowResourcePacketRouter router = new FlowResourcePacketRouter(new FlowStorage(tempDir.toFile()), null, null, null, null, null, null, registry, ignored -> {
+        });
+        router.registerExternalLifecycle(null, service);
+
+        assertEquals("survival", registry.discover(ReSyncResourceCatalog.WORLD, "surv").value().getFirst().id());
+        assertEquals("survival", ((WorldRegistryEntry) registry.get(ReSyncResourceCatalog.WORLD, "SURVIVAL").value()).getWorldName());
+        assertFalse(registry.delete(ReSyncResourceCatalog.WORLD, "survival").success());
+        assertEquals("RESOURCE_OPERATION_UNSUPPORTED", registry.delete(ReSyncResourceCatalog.WORLD, "survival").errorCode());
+    }
+
+    @Test
+    void worldGenResourcesUseValidatedDurableLifecycleOperations() {
+        WorldGenProjectStorage worldGenStorage = new WorldGenProjectStorage(tempDir.toFile());
+        WorldGenProject project = new WorldGenProject();
+        project.setId("overworld-plus");
+        project.getTerrainGraph().getNodes().put("height", new WorldGenNode("output_height", 0, 0, Map.of("height", 72.0f)));
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        FlowResourcePacketRouter router = new FlowResourcePacketRouter(new FlowStorage(tempDir.toFile()), null, null, null, null, null, null, registry, ignored -> {
+        });
+        router.registerExternalLifecycle(worldGenStorage, null);
+
+        assertTrue(registry.create(ReSyncResourceCatalog.WORLDGEN, project).success());
+        assertTrue(registry.duplicate(ReSyncResourceCatalog.WORLDGEN, "overworld-plus", "overworld-copy").success());
+        assertEquals(List.of("overworld-copy", "overworld-plus"), worldGenStorage.listProjectIds());
+        assertTrue(registry.reload(ReSyncResourceCatalog.WORLDGEN, "overworld-plus").success());
+        assertTrue(registry.delete(ReSyncResourceCatalog.WORLDGEN, "overworld-copy").success());
+    }
 
     @Test
     void migrationPreservesDiskFoldersAndNormalizesAssetNames() throws Exception {

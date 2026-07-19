@@ -36,7 +36,7 @@ class CustomizationResourceCatalogTest {
         assertEquals("Text/Templates", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.TEXT_TEMPLATE));
         assertEquals("Content/Advancements", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.ADVANCEMENT_TREE));
         assertEquals("Content/Dialogs", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.DIALOG));
-        assertEquals("Content/Villages", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.VILLAGE_PROFILE));
+        assertEquals("Content/Trades", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.TRADE_PROFILE));
         assertEquals("Content/NPCs", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.NPC_DEFINITION));
         assertEquals("Content/Loot Tables", ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.LOOT_TABLE));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xA8));

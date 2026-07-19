@@ -1,5 +1,11 @@
 package restudio.resync.resources;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import restudio.resync.Log;
 import restudio.resync.storage.StorageSafety;
 
@@ -11,9 +17,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class JsonAssetStore<T> {
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public interface JsonReader<T> {
         T read(String json);
     }
@@ -135,11 +143,43 @@ public class JsonAssetStore<T> {
                 deleteAssetFile(assetFile);
             }
             deleteMatchingAssetFiles(safeId);
+            removeProjectMetadataResource(safeId);
             fileIndex.remove(safeId);
             cache.remove(safeId);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to delete " + typeId + ": " + safeId, exception);
         }
+    }
+
+    private void removeProjectMetadataResource(String id) throws IOException {
+        Path projectFile = assetsRoot.resolve("project.json");
+        if (!Files.exists(projectFile)) {
+            return;
+        }
+        JsonElement parsed;
+        try {
+            parsed = JsonParser.parseString(StorageSafety.readUtf8(projectFile));
+        } catch (RuntimeException exception) {
+            Log.warn("Failed to update project metadata after deleting " + typeId + ": " + exception.getMessage());
+            return;
+        }
+        if (!parsed.isJsonObject()) {
+            return;
+        }
+        JsonObject project = parsed.getAsJsonObject();
+        JsonArray resources = project.has("resources") && project.get("resources").isJsonArray() ? project.getAsJsonArray("resources") : null;
+        if (resources == null) {
+            return;
+        }
+        boolean changed = resources.asList().removeIf(element -> element != null && element.isJsonObject()
+            && typeId.equals(text(element.getAsJsonObject(), "type")) && id.equals(text(element.getAsJsonObject(), "id")));
+        if (changed) {
+            StorageSafety.writeUtf8Atomic(projectFile, GSON.toJson(project));
+        }
+    }
+
+    private String text(JsonObject object, String key) {
+        return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : "";
     }
 
     public List<String> listIds() {
@@ -165,37 +205,79 @@ public class JsonAssetStore<T> {
             invalidateFileIndex();
             return;
         }
+        boolean migrationComplete = !hasUnexpectedLegacyFiles();
         try (Stream<Path> paths = Files.list(legacyDirectory)) {
             for (Path file : paths.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".json")).toList()) {
                 String fileName = file.getFileName().toString();
                 String id = fileName.substring(0, fileName.length() - 5);
                 if (safeId(id, "migrate") == null) {
+                    migrationComplete = false;
                     continue;
                 }
-                T value = null;
                 try {
-                    value = reader.read(StorageSafety.readUtf8(file));
-                } catch (IOException exception) {
-                    Log.warn("Failed to read legacy " + typeId + " asset: " + id + " - " + exception.getMessage());
-                }
-                Path target = defaultAssetFile(id, value);
-                String json = AssetFileFormat.withResourceType(StorageSafety.readUtf8(file), typeId);
-                if (Files.exists(target)) {
-                    String targetType = AssetFileFormat.readResourceType(target);
-                    if (!typeId.equals(targetType)) {
-                        target = conflictAssetFile(id, 1);
+                    String sourceJson = StorageSafety.readUtf8(file);
+                    T value = reader.read(sourceJson);
+                    if (value == null || !id.equals(safeId(idExtractor.id(value), "migrate"))) {
+                        migrationComplete = false;
+                        Log.warn("Failed to validate legacy " + typeId + " asset: " + id);
+                        continue;
                     }
+                    backupLegacyAsset(file, sourceJson);
+                    Path target = defaultAssetFile(id, value);
+                    String json = AssetFileFormat.withResourceType(sourceJson, typeId);
+                    if (Files.exists(target)) {
+                        String targetType = AssetFileFormat.readResourceType(target);
+                        if (!typeId.equals(targetType)) {
+                            target = conflictAssetFile(id, 1);
+                        }
+                    }
+                    if (!Files.exists(target) || !typeId.equals(AssetFileFormat.readResourceType(target))) {
+                        StorageSafety.writeUtf8Atomic(target, json);
+                    }
+                    if (!validMigratedAsset(target, id)) {
+                        migrationComplete = false;
+                        Log.warn("Failed to verify migrated " + typeId + " asset: " + id);
+                    }
+                } catch (IOException | RuntimeException exception) {
+                    migrationComplete = false;
+                    Log.warn("Failed to migrate legacy " + typeId + " asset: " + id + " - " + exception.getMessage());
                 }
-                if (Files.exists(target) && typeId.equals(AssetFileFormat.readResourceType(target))) {
-                    continue;
-                }
-                StorageSafety.writeUtf8Atomic(target, json);
             }
         } catch (IOException exception) {
+            migrationComplete = false;
             Log.warn("Failed to migrate " + typeId + " assets: " + exception.getMessage());
         }
-        deleteLegacyDirectory();
+        if (migrationComplete) {
+            deleteLegacyDirectory();
+        }
         invalidateFileIndex();
+    }
+
+    private boolean hasUnexpectedLegacyFiles() {
+        try (Stream<Path> paths = Files.walk(legacyDirectory)) {
+            return paths.anyMatch(path -> Files.isRegularFile(path)
+                && (!legacyDirectory.equals(path.getParent()) || !path.getFileName().toString().endsWith(".json")));
+        } catch (IOException exception) {
+            Log.warn("Failed to inspect legacy " + typeId + " assets: " + exception.getMessage());
+            return true;
+        }
+    }
+
+    private void backupLegacyAsset(Path source, String json) throws IOException {
+        Path backup = assetsRoot.resolve("migration-backups").resolve(typeId).resolve("legacy").resolve(source.getFileName().toString());
+        if (Files.notExists(backup)) {
+            StorageSafety.writeUtf8Atomic(backup, json);
+        }
+    }
+
+    private boolean validMigratedAsset(Path target, String expectedId) {
+        try {
+            T value = reader.read(StorageSafety.readUtf8(target));
+            return value != null && expectedId.equals(safeId(idExtractor.id(value), "verify migration"))
+                && typeId.equals(AssetFileFormat.readResourceType(target));
+        } catch (IOException | RuntimeException exception) {
+            return false;
+        }
     }
 
     private void migrateAssetRootFiles() {
@@ -232,6 +314,34 @@ public class JsonAssetStore<T> {
     public void clearCache() {
         cache.clear();
         invalidateFileIndex();
+    }
+
+    public T reload(String id) {
+        return reload(id, null);
+    }
+
+    public T reload(String id, Consumer<T> validator) {
+        String safeId = safeId(id, "reload");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid " + typeId + " id");
+        }
+        T previous = cache.get(safeId);
+        cache.remove(safeId);
+        invalidateFileIndex();
+        T value = get(safeId);
+        try {
+            if (value != null && validator != null) {
+                validator.accept(value);
+            }
+            return value;
+        } catch (RuntimeException exception) {
+            if (previous != null) {
+                cache.put(safeId, previous);
+            } else {
+                cache.remove(safeId);
+            }
+            throw exception;
+        }
     }
 
     public Path findAssetFile(String id) {

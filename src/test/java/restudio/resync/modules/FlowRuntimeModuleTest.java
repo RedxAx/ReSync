@@ -6,6 +6,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowRuntimeModuleTest {
     @Test
@@ -22,5 +23,12 @@ class FlowRuntimeModuleTest {
         String second = FlowRuntimeModule.resourceCatalogRevision("dialog", List.of("alpha", "bravo"));
 
         assertEquals(first, second);
+    }
+
+    @Test
+    void runtimeDeclaresItsAuthoritativeServiceDependencies() {
+        List<String> dependencies = new FlowRuntimeModule().getMetadata().dependencies();
+
+        assertTrue(dependencies.containsAll(List.of("flowJobs", "playerNpcPackets", "worldGen", "worldManagement")));
     }
 }

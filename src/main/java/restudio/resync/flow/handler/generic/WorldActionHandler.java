@@ -5,10 +5,10 @@ import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.WorldBorder;
 import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -20,8 +20,8 @@ import restudio.resync.world.WorldPortal;
 import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSnapshot;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -34,6 +34,7 @@ public class WorldActionHandler implements NodeHandler {
             Double x = ctx.getInputValue(node, "x", Double.class, 0.0);
             Double y = ctx.getInputValue(node, "y", Double.class, 0.0);
             Double z = ctx.getInputValue(node, "z", Double.class, 0.0);
+            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) throw new IllegalArgumentException("Location coordinates must be finite");
             World world = null;
             Player player = ctx.getPlayer();
             if (player != null) {
@@ -41,12 +42,13 @@ public class WorldActionHandler implements NodeHandler {
             } else if (!Bukkit.getWorlds().isEmpty()) {
                 world = Bukkit.getWorlds().getFirst();
             }
-            if (world == null) return;
+            if (world == null) throw new IllegalStateException("No world is available");
             ctx.setOutput(node, "location", new Location(world, x, y, z));
         });
 
         operations.put("world_get_by_name", (ctx, node) -> {
             String worldName = ctx.getInputValue(node, "world_name", String.class, "");
+            if (worldName == null || worldName.isBlank()) throw new IllegalArgumentException("World name is required");
             ctx.setOutput(node, "world", Bukkit.getWorld(worldName));
         });
 
@@ -55,148 +57,135 @@ public class WorldActionHandler implements NodeHandler {
         });
 
         operations.put("world_set_time", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Long timeTicks = ctx.getInputValue(node, "time_ticks", Long.class, 0L);
-            if (world != null) world.setTime(timeTicks);
+            world.setTime(timeTicks);
         });
 
         operations.put("world_get_time", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) ctx.setOutput(node, "time_ticks", world.getTime());
+            ctx.setOutput(node, "time_ticks", requireWorld(ctx, node).getTime());
         });
 
         operations.put("world_set_full_time", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Long fullTimeTicks = ctx.getInputValue(node, "full_time_ticks", Long.class, 0L);
-            if (world != null) world.setFullTime(fullTimeTicks);
+            if (fullTimeTicks < 0) throw new IllegalArgumentException("World full time cannot be negative");
+            world.setFullTime(fullTimeTicks);
         });
 
         operations.put("world_get_full_time", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) ctx.setOutput(node, "full_time_ticks", world.getFullTime());
+            ctx.setOutput(node, "full_time_ticks", requireWorld(ctx, node).getFullTime());
         });
 
         operations.put("world_set_day_time", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Long time = ctx.getInputValue(node, "time", Long.class, 0L);
-            if (world != null) world.setTime(time);
+            world.setTime(time);
         });
 
         operations.put("world_set_weather", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             String weatherType = ctx.getInputValue(node, "weather_type", String.class, "clear");
             Integer durationTicks = ctx.getInputValue(node, "duration_ticks", Integer.class, 0);
-            if (world != null) {
-                switch (weatherType) {
-                    case "clear", "clear_all" -> { world.setStorm(false); world.setThundering(false); }
-                    case "rain" -> { world.setStorm(true); world.setThundering(false); }
-                    case "thunder", "downfall" -> { world.setStorm(true); world.setThundering(true); }
-                }
-                if (durationTicks > 0) {
-                    world.setWeatherDuration(durationTicks);
-                    world.setThunderDuration(durationTicks);
-                }
+            if (weatherType == null) throw new IllegalArgumentException("Weather type is required");
+            if (durationTicks < 0) throw new IllegalArgumentException("Weather duration cannot be negative");
+            switch (weatherType.toLowerCase(Locale.ROOT)) {
+                case "clear", "clear_all" -> { world.setStorm(false); world.setThundering(false); }
+                case "rain" -> { world.setStorm(true); world.setThundering(false); }
+                case "thunder", "downfall" -> { world.setStorm(true); world.setThundering(true); }
+                default -> throw new IllegalArgumentException("Unknown weather type: " + weatherType);
+            }
+            if (durationTicks > 0) {
+                world.setWeatherDuration(durationTicks);
+                world.setThunderDuration(durationTicks);
             }
         });
 
         operations.put("world_get_weather", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) {
-                ctx.setOutput(node, "weather_type", world.isThundering() ? "thunder" : world.hasStorm() ? "rain" : "clear");
-                ctx.setOutput(node, "thundering", world.isThundering());
-                ctx.setOutput(node, "has_storm", world.hasStorm());
-            }
+            World world = requireWorld(ctx, node);
+            ctx.setOutput(node, "weather_type", world.isThundering() ? "thunder" : world.hasStorm() ? "rain" : "clear");
+            ctx.setOutput(node, "thundering", world.isThundering());
+            ctx.setOutput(node, "has_storm", world.hasStorm());
         });
 
         operations.put("world_spawn_set", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            if (world != null && location != null) world.setSpawnLocation(location);
+            World world = requireWorld(ctx, node);
+            Location location = requireWorldLocation(ctx, node, "location", world);
+            world.setSpawnLocation(location);
         });
 
         operations.put("world_spawn_get", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) ctx.setOutput(node, "spawn_location", world.getSpawnLocation());
+            ctx.setOutput(node, "spawn_location", requireWorld(ctx, node).getSpawnLocation());
         });
 
         operations.put("world_set_difficulty", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             String difficultyStr = ctx.getInputValue(node, "difficulty", String.class, "normal");
-            if (world != null) {
-                Difficulty difficulty = switch (difficultyStr.toLowerCase()) {
-                    case "peaceful" -> Difficulty.PEACEFUL;
-                    case "easy" -> Difficulty.EASY;
-                    case "hard" -> Difficulty.HARD;
-                    default -> Difficulty.NORMAL;
-                };
-                world.setDifficulty(difficulty);
+            if (difficultyStr == null) throw new IllegalArgumentException("World difficulty is required");
+            try {
+                world.setDifficulty(Difficulty.valueOf(difficultyStr.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown world difficulty: " + difficultyStr, exception);
             }
         });
 
         operations.put("world_get_difficulty", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) ctx.setOutput(node, "difficulty", world.getDifficulty().name().toLowerCase());
+            ctx.setOutput(node, "difficulty", requireWorld(ctx, node).getDifficulty().name().toLowerCase(Locale.ROOT));
         });
 
         operations.put("world_set_pvp", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Boolean pvpEnabled = ctx.getInputValue(node, "pvp_enabled", Boolean.class, false);
-            if (world != null) world.setPVP(pvpEnabled);
+            world.setPVP(Boolean.TRUE.equals(pvpEnabled));
         });
 
         operations.put("world_get_pvp", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) ctx.setOutput(node, "pvp_enabled", world.getPVP());
+            ctx.setOutput(node, "pvp_enabled", requireWorld(ctx, node).getPVP());
         });
 
         operations.put("world_save", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            if (world != null) world.save();
+            requireWorld(ctx, node).save();
         });
 
         operations.put("world_auto_save_set", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Long intervalTicks = ctx.getInputValue(node, "interval_ticks", Long.class, 0L);
-            if (world != null) world.setTicksPerAnimalSpawns(intervalTicks.intValue());
+            world.setAutoSave(intervalTicks > 0);
         });
 
         operations.put("world_set_spawn_limits", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Integer monsters = ctx.getInputValue(node, "monsters", Integer.class, 0);
             Integer animals = ctx.getInputValue(node, "animals", Integer.class, 0);
             Integer waterAmbient = ctx.getInputValue(node, "water_ambient", Integer.class, 0);
             Integer waterAnimals = ctx.getInputValue(node, "water_animals", Integer.class, 0);
             Integer waterUnderground = ctx.getInputValue(node, "water_underground", Integer.class, 0);
-            if (world != null) {
-                world.setMonsterSpawnLimit(monsters);
-                world.setAnimalSpawnLimit(animals);
-                world.setWaterAmbientSpawnLimit(waterAmbient);
-                world.setWaterAnimalSpawnLimit(waterAnimals);
-                world.setWaterUndergroundCreatureSpawnLimit(waterUnderground);
-            }
+            if (monsters < 0 || animals < 0 || waterAmbient < 0 || waterAnimals < 0 || waterUnderground < 0) throw new IllegalArgumentException("World spawn limits cannot be negative");
+            world.setMonsterSpawnLimit(monsters);
+            world.setAnimalSpawnLimit(animals);
+            world.setWaterAmbientSpawnLimit(waterAmbient);
+            world.setWaterAnimalSpawnLimit(waterAnimals);
+            world.setWaterUndergroundCreatureSpawnLimit(waterUnderground);
         });
 
         operations.put("world_management_get_snapshot", (ctx, node) -> {
-            WorldManagementService service = getWorldManagementService();
-            if (service != null) ctx.setOutput(node, "snapshot", service.createSnapshot());
+            ctx.setOutput(node, "snapshot", requireWorldManagementService().createSnapshot());
         });
 
         operations.put("world_management_get_worlds", (ctx, node) -> {
-            WorldManagementService service = getWorldManagementService();
-            WorldSnapshot snapshot = service != null ? service.createSnapshot() : null;
-            ctx.setOutput(node, "worlds", snapshot != null ? snapshot.getWorlds() : Collections.emptyList());
+            WorldSnapshot snapshot = requireWorldManagementService().createSnapshot();
+            ctx.setOutput(node, "worlds", snapshot.getWorlds());
         });
 
         operations.put("world_management_get_world", (ctx, node) -> {
             String worldName = ctx.getInputValue(node, "world_name", String.class, "");
-            WorldManagementService service = getWorldManagementService();
+            if (worldName == null || worldName.isBlank()) throw new IllegalArgumentException("World name is required");
+            WorldManagementService service = requireWorldManagementService();
             WorldRegistryEntry match = null;
-            if (service != null) {
-                for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
-                    if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
-                        match = entry;
-                        break;
-                    }
+            for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
+                if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
+                    match = entry;
+                    break;
                 }
             }
             ctx.setOutput(node, "world", match);
@@ -206,40 +195,38 @@ public class WorldActionHandler implements NodeHandler {
             String worldName = ctx.getInputValue(node, "world_name", String.class, "");
             WorldManagementService service = getWorldManagementService();
             if (service == null) {
-                ctx.setOutput(node, "portals", Collections.emptyList());
-                return;
+                throw new IllegalStateException("World management service is unavailable");
             }
             ctx.setOutput(node, "portals", worldName == null || worldName.isBlank() ? service.getPortals() : service.getPortalsByWorld(worldName));
         });
 
         operations.put("world_management_get_portal", (ctx, node) -> {
-            WorldManagementService service = getWorldManagementService();
-            ctx.setOutput(node, "portal", service == null ? null : service.getPortal(ctx.getInputValue(node, "portal_id", String.class, "")));
+            String portalId = ctx.getInputValue(node, "portal_id", String.class, "");
+            if (portalId == null || portalId.isBlank()) throw new IllegalArgumentException("Portal ID is required");
+            ctx.setOutput(node, "portal", requireWorldManagementService().getPortal(portalId));
         });
 
         operations.put("world_management_get_game_rules", (ctx, node) -> {
             String worldName = ctx.getInputValue(node, "world_name", String.class, "");
-            WorldManagementService service = getWorldManagementService();
+            if (worldName == null || worldName.isBlank()) throw new IllegalArgumentException("World name is required");
+            WorldManagementService service = requireWorldManagementService();
             Map<String, String> gameRules = new LinkedHashMap<>();
-            if (service != null) {
-                for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
-                    if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
-                        gameRules.putAll(entry.getGameRules());
-                        break;
-                    }
+            for (WorldRegistryEntry entry : service.createSnapshot().getWorlds()) {
+                if (entry != null && entry.getWorldName() != null && entry.getWorldName().equalsIgnoreCase(worldName)) {
+                    gameRules.putAll(entry.getGameRules());
+                    break;
                 }
             }
             ctx.setOutput(node, "game_rules", gameRules);
         });
 
         operations.put("world_management_get_game_rule_descriptors", (ctx, node) -> {
-            WorldManagementService service = getWorldManagementService();
-            ctx.setOutput(node, "descriptors", service == null ? Collections.emptyList() : service.getGameRuleDescriptors());
+            ctx.setOutput(node, "descriptors", requireWorldManagementService().getGameRuleDescriptors());
         });
 
         operations.put("world_management_get_map_snapshot", (ctx, node) -> {
             WorldManagementService service = getWorldManagementService();
-            if (service == null) return;
+            if (service == null) throw new IllegalStateException("World management service is unavailable");
             WorldMapQuery query = new WorldMapQuery();
             query.setWorldName(ctx.getInputValue(node, "world_name", String.class, ""));
             query.setCenterX(ctx.getInputValue(node, "center_x", Double.class, 0.0));
@@ -251,8 +238,7 @@ public class WorldActionHandler implements NodeHandler {
         operations.put("world_management", (ctx, node) -> {
             String action = ctx.getInputValue(node, "action", String.class, "");
             if (action == null || action.isBlank()) {
-                ctx.triggerOutput("flow");
-                return;
+                throw new IllegalArgumentException("World management action is required");
             }
             String operationId = action.startsWith("world_management_") ? action : "world_management_" + action;
             BiConsumer<FlowContext, FlowNode> operation = operations.get(operationId);
@@ -265,123 +251,74 @@ public class WorldActionHandler implements NodeHandler {
                 operation = operations.get(operationId);
             }
             if (operation == null) {
-                ctx.triggerOutput("flow");
-                return;
+                throw new IllegalArgumentException("Unknown world management action: " + action);
             }
             operation.accept(ctx, node);
-            if (action.startsWith("get_") || operationId.contains("_get_")) {
-                ctx.triggerOutput("flow");
-            }
         });
 
         operations.put("world_set_spawn", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            if (world == null || location == null) return;
-            Runnable spawnTask = () -> world.setSpawnLocation(location);
-            if (Bukkit.isPrimaryThread()) {
-                spawnTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), spawnTask);
-            }
+            World world = requireWorld(ctx, node);
+            world.setSpawnLocation(requireWorldLocation(ctx, node, "location", world));
         });
 
         operations.put("world_set_keep_spawn", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Boolean keepSpawn = ctx.getInputValue(node, "keep_spawn_time", Boolean.class, true);
-            if (world == null) return;
-            Runnable keepSpawnTask = () -> world.setKeepSpawnInMemory(keepSpawn);
-            if (Bukkit.isPrimaryThread()) {
-                keepSpawnTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), keepSpawnTask);
-            }
+            world.setKeepSpawnInMemory(Boolean.TRUE.equals(keepSpawn));
         });
 
         operations.put("world_set_auto_save", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Boolean autoSave = ctx.getInputValue(node, "auto_save", Boolean.class, true);
-            if (world == null) return;
-            Runnable autoSaveTask = () -> world.setAutoSave(autoSave);
-            if (Bukkit.isPrimaryThread()) {
-                autoSaveTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), autoSaveTask);
-            }
+            world.setAutoSave(Boolean.TRUE.equals(autoSave));
         });
 
         operations.put("world_spawn_lightning", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
+            World world = requireWorld(ctx, node);
+            Location location = requireWorldLocation(ctx, node, "location", world);
             String effectName = ctx.getInputValue(node, "effect", String.class, "strike");
-            if (world == null || location == null) return;
-            Runnable lightningTask = () -> {
-                boolean effect = effectName.equalsIgnoreCase("effect") || effectName.equalsIgnoreCase("visual");
-                world.strikeLightningEffect(location);
-                if (!effect) {
-                    world.strikeLightning(location);
-                }
-            };
-            if (Bukkit.isPrimaryThread()) {
-                lightningTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), lightningTask);
+            if (effectName == null) throw new IllegalArgumentException("Lightning effect is required");
+            switch (effectName.toLowerCase(Locale.ROOT)) {
+                case "effect", "visual" -> world.strikeLightningEffect(location);
+                case "strike", "lightning" -> world.strikeLightning(location);
+                default -> throw new IllegalArgumentException("Unknown lightning effect: " + effectName);
             }
         });
 
         operations.put("world_set_border_size", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Double size = ctx.getInputValue(node, "size", Double.class, 500.0);
-            if (world == null) return;
-            Runnable borderTask = () -> {
-                WorldBorder border = world.getWorldBorder();
-                border.setSize(size);
-            };
-            if (Bukkit.isPrimaryThread()) {
-                borderTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), borderTask);
-            }
+            if (!Double.isFinite(size) || size < 1 || size > 59_999_968) throw new IllegalArgumentException("World border size must be between 1 and 59999968");
+            world.getWorldBorder().setSize(size);
         });
 
         operations.put("world_set_border_damage", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Double damage = ctx.getInputValue(node, "damage_amount", Double.class, 1.0);
-            if (world == null) return;
-            Runnable borderDamageTask = () -> {
-                WorldBorder border = world.getWorldBorder();
-                border.setDamageAmount(damage);
-            };
-            if (Bukkit.isPrimaryThread()) {
-                borderDamageTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), borderDamageTask);
-            }
+            if (!Double.isFinite(damage) || damage < 0) throw new IllegalArgumentException("World border damage must be a finite non-negative number");
+            world.getWorldBorder().setDamageAmount(damage);
         });
 
         operations.put("world_set_border_warning", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             Integer warningDistance = ctx.getInputValue(node, "warning_distance", Integer.class, 5);
-            if (world == null) return;
-            Runnable borderWarningTask = () -> {
-                WorldBorder border = world.getWorldBorder();
-                border.setWarningDistance(warningDistance);
-            };
-            if (Bukkit.isPrimaryThread()) {
-                borderWarningTask.run();
-            } else {
-                Bukkit.getScheduler().runTask(ReSync.getInstance(), borderWarningTask);
-            }
+            if (warningDistance < 0) throw new IllegalArgumentException("World border warning distance cannot be negative");
+            world.getWorldBorder().setWarningDistance(warningDistance);
         });
 
         operations.put("world_management_create_world", (ctx, node) -> {
             WorldManagementService service = getWorldManagementService();
+            Object generatorConfigValue = ctx.getInputValue(node, "generator_config");
+            String generatorConfig = generatorConfigValue instanceof FlowResourceReference reference
+                ? reference.id()
+                : generatorConfigValue == null ? "" : String.valueOf(generatorConfigValue);
             WorldOperationResult result = service != null
                 ? service.createWorld(
                 ctx.getInputValue(node, "world_name", String.class, ""),
                 ctx.getInputValue(node, "seed", String.class, ""),
                 ctx.getInputValue(node, "environment", String.class, ""),
-                ctx.getInputValue(node, "generator", String.class, "")
+                ctx.getInputValue(node, "generator", String.class, ""),
+                generatorConfig
             )
                 : WorldOperationResult.failure("createWorld", null, "WorldManagementUnavailable");
             applyResult(ctx, node, result, null);
@@ -630,7 +567,7 @@ public class WorldActionHandler implements NodeHandler {
         });
 
         operations.put("world_properties", (ctx, node) -> {
-            World world = ctx.getInputValue(node, "world", World.class, null);
+            World world = requireWorld(ctx, node);
             String property = ctx.getInputValue(node, "property", String.class, "");
             String action = ctx.getInputValue(node, "action", String.class, "get");
             String gamerule = ctx.getInputValue(node, "gamerule", String.class, "");
@@ -647,34 +584,34 @@ public class WorldActionHandler implements NodeHandler {
             boolean success = false;
             Object result = null;
 
-            if (world != null && property != null && action != null) {
-                if ("set".equalsIgnoreCase(action)) {
+            if (property == null || property.isBlank()) throw new IllegalArgumentException("World property is required");
+            if (action == null || action.isBlank()) throw new IllegalArgumentException("World property action is required");
+            if ("set".equalsIgnoreCase(action)) {
                     switch (property.toLowerCase()) {
                         case "gamerule" -> {
-                            if (!gamerule.isBlank()) {
-                                try {
-                                    GameRule rule = GameRule.getByName(gamerule);
-                                    if (rule != null) {
-                                        Object parsed = parseGameRuleValue(rule, gameruleValue);
-                                        if (parsed != null) {
-                                            world.setGameRule(rule, parsed);
-                                            success = true;
-                                        }
-                                    }
-                                } catch (Exception ignored) {
-                                }
+                            if (gamerule.isBlank()) {
+                                throw new IllegalArgumentException("Game rule is required");
                             }
+                            GameRule rule = GameRule.getByName(gamerule);
+                            if (rule == null) {
+                                throw new IllegalArgumentException("Unknown game rule: " + gamerule);
+                            }
+                            Object parsed = parseGameRuleValue(rule, gameruleValue);
+                            world.setGameRule(rule, parsed);
+                            success = true;
                         }
                         case "time" -> {
-                            world.setTime(Math.max(0L, time));
+                            if (time < 0) throw new IllegalArgumentException("World day time cannot be negative");
+                            world.setTime(time);
                             success = true;
                         }
                         case "full_time" -> {
-                            world.setFullTime(Math.max(0L, fullTime));
+                            if (fullTime < 0) throw new IllegalArgumentException("World full time cannot be negative");
+                            world.setFullTime(fullTime);
                             success = true;
                         }
                         case "weather" -> {
-                            String normalized = weather.toLowerCase();
+                            String normalized = weather.toLowerCase(Locale.ROOT);
                             switch (normalized) {
                                 case "rain", "storm" -> {
                                     world.setStorm(true);
@@ -691,33 +628,39 @@ public class WorldActionHandler implements NodeHandler {
                                     world.setThundering(false);
                                     success = true;
                                 }
-                                default -> {
-                                }
+                                default -> throw new IllegalArgumentException("Unknown weather mode: " + weather);
                             }
                         }
                         case "difficulty" -> {
                             try {
-                                Difficulty worldDifficulty = Difficulty.valueOf(difficulty.toUpperCase());
+                                Difficulty worldDifficulty = Difficulty.valueOf(difficulty.toUpperCase(Locale.ROOT));
                                 world.setDifficulty(worldDifficulty);
                                 success = true;
-                            } catch (IllegalArgumentException ignored) {
+                            } catch (IllegalArgumentException exception) {
+                                throw new IllegalArgumentException("Unknown world difficulty: " + difficulty, exception);
                             }
                         }
                         case "spawn" -> {
-                            if (location != null) {
-                                world.setSpawnLocation(location);
-                                success = true;
-                            }
+                            if (location == null) throw new IllegalArgumentException("World spawn location is required");
+                            if (location.getWorld() == null || !location.getWorld().equals(world)) throw new IllegalArgumentException("Spawn location must be in the selected world");
+                            world.setSpawnLocation(location);
+                            success = true;
                         }
                         case "biome" -> {
-                            if (location != null && !biome.isBlank()) {
-                                try {
-                                    Biome worldBiome = Biome.valueOf(biome.toUpperCase());
-                                    world.setBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ(), worldBiome);
-                                    success = true;
-                                } catch (IllegalArgumentException ignored) {
-                                }
+                            if (location == null || biome.isBlank()) {
+                                throw new IllegalArgumentException("Biome world location and value are required");
                             }
+                            if (location.getWorld() == null || !location.getWorld().equals(world)) {
+                                throw new IllegalArgumentException("Biome location must be in the selected world");
+                            }
+                            Biome worldBiome;
+                            try {
+                                worldBiome = Biome.valueOf(biome.toUpperCase(Locale.ROOT));
+                            } catch (IllegalArgumentException exception) {
+                                throw new IllegalArgumentException("Unknown biome: " + biome, exception);
+                            }
+                            world.setBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ(), worldBiome);
+                            success = true;
                         }
                         case "pvp" -> {
                             world.setPVP(Boolean.TRUE.equals(pvp));
@@ -731,20 +674,20 @@ public class WorldActionHandler implements NodeHandler {
                             world.setKeepSpawnInMemory(Boolean.TRUE.equals(keepSpawn));
                             success = true;
                         }
+                        default -> throw new IllegalArgumentException("Unknown writable world property: " + property);
                     }
-                } else {
+            } else if ("get".equalsIgnoreCase(action)) {
                     switch (property.toLowerCase()) {
                         case "gamerule" -> {
-                            if (!gamerule.isBlank()) {
-                                try {
-                                    GameRule rule = GameRule.getByName(gamerule);
-                                    if (rule != null) {
-                                        result = world.getGameRuleValue(rule);
-                                        success = true;
-                                    }
-                                } catch (Exception ignored) {
-                                }
+                            if (gamerule.isBlank()) {
+                                throw new IllegalArgumentException("Game rule is required");
                             }
+                            GameRule rule = GameRule.getByName(gamerule);
+                            if (rule == null) {
+                                throw new IllegalArgumentException("Unknown game rule: " + gamerule);
+                            }
+                            result = world.getGameRuleValue(rule);
+                            success = true;
                         }
                         case "time" -> {
                             result = world.getTime();
@@ -773,10 +716,10 @@ public class WorldActionHandler implements NodeHandler {
                             success = true;
                         }
                         case "biome" -> {
-                            if (location != null) {
-                                result = world.getBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ()).name();
-                                success = true;
-                            }
+                            if (location == null) throw new IllegalArgumentException("Biome location is required");
+                            if (location.getWorld() == null || !location.getWorld().equals(world)) throw new IllegalArgumentException("Biome location must be in the selected world");
+                            result = world.getBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ()).name();
+                            success = true;
                         }
                         case "seed" -> {
                             result = world.getSeed();
@@ -828,10 +771,13 @@ public class WorldActionHandler implements NodeHandler {
                             result = world.getKeepSpawnInMemory();
                             success = true;
                         }
+                        default -> throw new IllegalArgumentException("Unknown readable world property: " + property);
                     }
-                }
+            } else {
+                throw new IllegalArgumentException("Unknown world property action: " + action);
             }
 
+            if (!success) throw new IllegalArgumentException("World property operation is unsupported: " + property + "." + action);
             ctx.setOutput(node, "success", success);
             ctx.setOutput(node, "result", result);
             if (!"set".equalsIgnoreCase(action) && result != null && property != null && !property.isBlank()) {
@@ -848,10 +794,11 @@ public class WorldActionHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown world action operation: " + operation);
         }
-        ctx.triggerOutput("flow");
+        op.accept(ctx, node);
+        ctx.triggerOutput(Boolean.FALSE.equals(ctx.getOutput(node, "success")) ? "failed" : "flow");
     }
 
     private static WorldManagementService getWorldManagementService() {
@@ -860,10 +807,35 @@ public class WorldActionHandler implements NodeHandler {
         return plugin.getReSyncServer().getWorldManagementService();
     }
 
+    private static WorldManagementService requireWorldManagementService() {
+        WorldManagementService service = getWorldManagementService();
+        if (service == null) throw new IllegalStateException("World management service is unavailable");
+        return service;
+    }
+
+    private static World requireWorld(FlowContext context, FlowNode node) {
+        World world = context.getInputValue(node, "world", World.class, null);
+        if (world == null) throw new IllegalArgumentException("World is required");
+        return world;
+    }
+
+    private static Location requireWorldLocation(FlowContext context, FlowNode node, String inputName, World world) {
+        Location location = context.getInputValue(node, inputName, Location.class, null);
+        if (location == null) throw new IllegalArgumentException("Location input is required: " + inputName);
+        if (location.getWorld() == null || !location.getWorld().equals(world)) throw new IllegalArgumentException("Location must be in the selected world: " + inputName);
+        return location;
+    }
+
     private static void applyResult(FlowContext ctx, FlowNode node, WorldOperationResult result, String portalId) {
         boolean success = result != null && result.isSuccess();
         ctx.setOutput(node, "success", success);
         ctx.setOutput(node, "message", result != null ? result.getMessage() : "WorldManagementUnavailable");
+        ctx.setOutput(node, "error_code", success ? "" : result != null && result.getData().get("errorCode") != null
+            ? String.valueOf(result.getData().get("errorCode"))
+            : result != null ? result.getMessage() : "WORLD_MANAGEMENT_UNAVAILABLE");
+        if (success && result != null && result.getWorldName() != null) {
+            ctx.setOutput(node, "world", Bukkit.getWorld(result.getWorldName()));
+        }
         if (result != null && result.getData().containsKey("count")) {
             ctx.setOutput(node, "count", result.getData().get("count"));
         }
@@ -883,9 +855,19 @@ public class WorldActionHandler implements NodeHandler {
     }
 
     private static Object parseGameRuleValue(GameRule rule, Object value) {
-        if (value == null || rule == null) return null;
-        if (rule.getType() == Boolean.class) return Boolean.valueOf(String.valueOf(value));
-        if (rule.getType() == Integer.class) return Integer.valueOf(String.valueOf(value));
-        return String.valueOf(value);
+        if (value == null || rule == null) {
+            throw new IllegalArgumentException("Game rule and value are required");
+        }
+        if (rule.getType() == Boolean.class) {
+            String normalized = String.valueOf(value).toLowerCase(Locale.ROOT);
+            if (!normalized.equals("true") && !normalized.equals("false")) {
+                throw new IllegalArgumentException("Boolean game rule value must be true or false");
+            }
+            return Boolean.valueOf(normalized);
+        }
+        if (rule.getType() == Integer.class) {
+            return Integer.valueOf(String.valueOf(value));
+        }
+        throw new IllegalArgumentException("Unsupported game rule type: " + rule.getType().getName());
     }
 }

@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "type",
           "data",
@@ -189,7 +189,7 @@
       },
       {
         "name": "container_items",
-        "dataType": "list",
+        "dataType": "list<any>",
         "visibleWhen": {
           "action": "get",
           "property": "container_items"
@@ -233,7 +233,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "type",
           "data",

@@ -1,15 +1,14 @@
 package restudio.resync.flow.handler.generic;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.Registry;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
-import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -19,8 +18,9 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.util.Map;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -29,651 +29,11 @@ public class ParticleHandler implements NodeHandler {
     private static final int MAX_TEXT_IMAGE_WIDTH = 512;
     private static final int MAX_TEXT_IMAGE_HEIGHT = 160;
     private static final int MAX_TEXT_PARTICLES = 500;
+    private static final int MAX_PARTICLES_PER_ACTION = 10_000;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public ParticleHandler() {
         operations.put("particle_apply", this::applyParticle);
-
-        operations.put("particle_spawn", (ctx, node) -> {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 1);
-            Double offsetX = ctx.getInputValue(node, "offset_x", Double.class, 0.0);
-            Double offsetY = ctx.getInputValue(node, "offset_y", Double.class, 0.0);
-            Double offsetZ = ctx.getInputValue(node, "offset_z", Double.class, 0.0);
-            Double speed = ctx.getInputValue(node, "speed", Double.class, 0.0);
-
-            if (location != null && location.getWorld() != null) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    if (Bukkit.isPrimaryThread()) {
-                        location.getWorld().spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> location.getWorld().spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_area", (ctx, node) -> {
-            Location minLocation = ctx.getInputValue(node, "min_location", Location.class, null);
-            Location maxLocation = ctx.getInputValue(node, "max_location", Location.class, null);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer density = ctx.getInputValue(node, "density", Integer.class, 10);
-
-            if (minLocation != null && maxLocation != null && minLocation.getWorld() != null && minLocation.getWorld().equals(maxLocation.getWorld())) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    double stepX = Math.max(0.5, (maxLocation.getX() - minLocation.getX()) / Math.max(1, density));
-                    double stepY = Math.max(0.5, (maxLocation.getY() - minLocation.getY()) / Math.max(1, density));
-                    double stepZ = Math.max(0.5, (maxLocation.getZ() - minLocation.getZ()) / Math.max(1, density));
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (double x = minLocation.getX(); x <= maxLocation.getX(); x += stepX) {
-                            for (double y = minLocation.getY(); y <= maxLocation.getY(); y += stepY) {
-                                for (double z = minLocation.getZ(); z <= maxLocation.getZ(); z += stepZ) {
-                                    Location loc = new Location(minLocation.getWorld(), x, y, z);
-                                    minLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                }
-                            }
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (double x = minLocation.getX(); x <= maxLocation.getX(); x += stepX) {
-                                for (double y = minLocation.getY(); y <= maxLocation.getY(); y += stepY) {
-                                    for (double z = minLocation.getZ(); z <= maxLocation.getZ(); z += stepZ) {
-                                        Location loc = new Location(minLocation.getWorld(), x, y, z);
-                                        minLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_line", (ctx, node) -> {
-            Location startLocation = ctx.getInputValue(node, "start_location", Location.class, null);
-            Location endLocation = ctx.getInputValue(node, "end_location", Location.class, null);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer density = ctx.getInputValue(node, "density", Integer.class, 10);
-
-            if (startLocation != null && endLocation != null && startLocation.getWorld() != null && startLocation.getWorld().equals(endLocation.getWorld())) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    double distance = startLocation.distance(endLocation);
-                    double step = distance / Math.max(1, density);
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (double d = 0; d <= distance; d += step) {
-                            double ratio = d / distance;
-                            double x = startLocation.getX() + (endLocation.getX() - startLocation.getX()) * ratio;
-                            double y = startLocation.getY() + (endLocation.getY() - startLocation.getY()) * ratio;
-                            double z = startLocation.getZ() + (endLocation.getZ() - startLocation.getZ()) * ratio;
-                            Location loc = new Location(startLocation.getWorld(), x, y, z);
-                            startLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (double d = 0; d <= distance; d += step) {
-                                double ratio = d / distance;
-                                double x = startLocation.getX() + (endLocation.getX() - startLocation.getX()) * ratio;
-                                double y = startLocation.getY() + (endLocation.getY() - startLocation.getY()) * ratio;
-                                double z = startLocation.getZ() + (endLocation.getZ() - startLocation.getZ()) * ratio;
-                                Location loc = new Location(startLocation.getWorld(), x, y, z);
-                                startLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_circle", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 5.0);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer points = ctx.getInputValue(node, "points", Integer.class, 20);
-
-            if (centerLocation != null && centerLocation.getWorld() != null && radius > 0 && points > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < points; i++) {
-                            double angle = (2 * Math.PI * i) / points;
-                            double x = centerLocation.getX() + radius * Math.cos(angle);
-                            double z = centerLocation.getZ() + radius * Math.sin(angle);
-                            Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY(), z);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < points; i++) {
-                                double angle = (2 * Math.PI * i) / points;
-                                double x = centerLocation.getX() + radius * Math.cos(angle);
-                                double z = centerLocation.getZ() + radius * Math.sin(angle);
-                                Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY(), z);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_sphere", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 5.0);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer points = ctx.getInputValue(node, "points", Integer.class, 50);
-
-            if (centerLocation != null && centerLocation.getWorld() != null && radius > 0 && points > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    double phi = Math.PI * (3.0 - Math.sqrt(5.0));
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < points; i++) {
-                            double y = 1.0 - (i / (double) (points - 1)) * 2.0;
-                            double radiusAtY = Math.sqrt(1.0 - y * y);
-                            double theta = phi * i;
-                            double x = Math.cos(theta) * radiusAtY;
-                            double z = Math.sin(theta) * radiusAtY;
-                            Location loc = new Location(centerLocation.getWorld(),
-                                    centerLocation.getX() + x * radius,
-                                    centerLocation.getY() + y * radius,
-                                    centerLocation.getZ() + z * radius);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < points; i++) {
-                                double y = 1.0 - (i / (double) (points - 1)) * 2.0;
-                                double radiusAtY = Math.sqrt(1.0 - y * y);
-                                double theta = phi * i;
-                                double x = Math.cos(theta) * radiusAtY;
-                                double z = Math.sin(theta) * radiusAtY;
-                                Location loc = new Location(centerLocation.getWorld(),
-                                        centerLocation.getX() + x * radius,
-                                        centerLocation.getY() + y * radius,
-                                        centerLocation.getZ() + z * radius);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_block_dust", (ctx, node) -> {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String blockTypeName = ctx.getInputValue(node, "block_type", String.class, "STONE");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 10);
-
-            if (location != null && location.getWorld() != null) {
-                Material blockType = Material.getMaterial(blockTypeName.toUpperCase());
-                if (blockType != null && blockType.isBlock()) {
-                    BlockData blockData = blockType.createBlockData();
-                    if (Bukkit.isPrimaryThread()) {
-                        location.getWorld().spawnParticle(Particle.BLOCK, location, count, blockData);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () ->
-                                location.getWorld().spawnParticle(Particle.BLOCK, location, count, blockData));
-                    }
-                }
-            }
-        });
-
-        operations.put("particle_item_break", (ctx, node) -> {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String itemTypeName = ctx.getInputValue(node, "item_type", String.class, "STONE");
-
-            if (location != null && location.getWorld() != null) {
-                Material itemType = Material.getMaterial(itemTypeName.toUpperCase());
-                if (itemType != null && itemType.isItem()) {
-                    if (Bukkit.isPrimaryThread()) {
-                        location.getWorld().spawnParticle(Particle.ITEM, location, 1, 0, 0, 0, 0,
-                                new ItemStack(itemType));
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () ->
-                                location.getWorld().spawnParticle(Particle.ITEM, location, 1, 0, 0, 0, 0,
-                                        new ItemStack(itemType)));
-                    }
-                }
-            }
-        });
-
-        operations.put("particle_explosion", (ctx, node) -> {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            Boolean large = ctx.getInputValue(node, "large", Boolean.class, false);
-
-            if (location != null && location.getWorld() != null) {
-                try {
-                    if (Bukkit.isPrimaryThread()) {
-                        if (large) {
-                            location.getWorld().spawnParticle(Particle.LAVA, location, 20, 1.0, 1.0, 1.0, 0.1);
-                        } else {
-                            location.getWorld().spawnParticle(Particle.FLAME, location, 30, 0.5, 0.5, 0.5, 0.05);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            if (large) {
-                                location.getWorld().spawnParticle(Particle.LAVA, location, 20, 1.0, 1.0, 1.0, 0.1);
-                            } else {
-                                location.getWorld().spawnParticle(Particle.FLAME, location, 30, 0.5, 0.5, 0.5, 0.05);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_player_spawn", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 1);
-            Double offsetX = ctx.getInputValue(node, "offset_x", Double.class, 0.0);
-            Double offsetY = ctx.getInputValue(node, "offset_y", Double.class, 0.0);
-            Double offsetZ = ctx.getInputValue(node, "offset_z", Double.class, 0.0);
-            Double speed = ctx.getInputValue(node, "speed", Double.class, 0.0);
-
-            if (player != null && location != null && location.getWorld() != null) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    if (Bukkit.isPrimaryThread()) {
-                        player.spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () ->
-                                player.spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_ellipse", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double radiusX = ctx.getInputValue(node, "radius_x", Double.class, 5.0);
-            Double radiusZ = ctx.getInputValue(node, "radius_z", Double.class, 3.0);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 30);
-
-            if (centerLocation != null && centerLocation.getWorld() != null && count > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < count; i++) {
-                            double angle = (2 * Math.PI * i) / count;
-                            double x = centerLocation.getX() + radiusX * Math.cos(angle);
-                            double z = centerLocation.getZ() + radiusZ * Math.sin(angle);
-                            Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY(), z);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < count; i++) {
-                                double angle = (2 * Math.PI * i) / count;
-                                double x = centerLocation.getX() + radiusX * Math.cos(angle);
-                                double z = centerLocation.getZ() + radiusZ * Math.sin(angle);
-                                Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY(), z);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_spiral", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 3.0);
-            Double height = ctx.getInputValue(node, "height", Double.class, 5.0);
-            Integer rotations = ctx.getInputValue(node, "rotations", Integer.class, 2);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 50);
-
-            if (centerLocation != null && centerLocation.getWorld() != null && count > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < count; i++) {
-                            double angle = (2 * Math.PI * rotations * i) / count;
-                            double y = (height * i) / count;
-                            double x = centerLocation.getX() + radius * Math.cos(angle);
-                            double z = centerLocation.getZ() + radius * Math.sin(angle);
-                            Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY() + y, z);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < count; i++) {
-                                double angle = (2 * Math.PI * rotations * i) / count;
-                                double y = (height * i) / count;
-                                double x = centerLocation.getX() + radius * Math.cos(angle);
-                                double z = centerLocation.getZ() + radius * Math.sin(angle);
-                                Location loc = new Location(centerLocation.getWorld(), x, centerLocation.getY() + y, z);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_cone", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double height = ctx.getInputValue(node, "height", Double.class, 5.0);
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 3.0);
-            Vector directionVector = ctx.getInputValue(node, "direction_vector", Vector.class, new Vector(0, 1, 0));
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 50);
-
-            if (centerLocation != null && centerLocation.getWorld() != null && count > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    Vector direction = directionVector.clone().normalize();
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < count; i++) {
-                            double progress = (double) i / count;
-                            double currentRadius = radius * progress;
-                            double currentHeight = height * progress;
-                            double angle = (2 * Math.PI * i) % (2 * Math.PI);
-
-                            Vector radial = new Vector(Math.cos(angle), 0, Math.sin(angle));
-                            Vector side = direction.clone().getCrossProduct(new Vector(0, 1, 0)).normalize();
-                            if (side.length() == 0) side = new Vector(1, 0, 0);
-                            Vector up = side.clone().getCrossProduct(direction).normalize();
-
-                            Vector offset = side.clone().multiply(radial.getX()).add(up.clone().multiply(radial.getZ())).multiply(currentRadius);
-                            Vector heightOffset = direction.clone().multiply(currentHeight);
-
-                            Location loc = centerLocation.clone().add(offset).add(heightOffset);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < count; i++) {
-                                double progress = (double) i / count;
-                                double currentRadius = radius * progress;
-                                double currentHeight = height * progress;
-                                double angle = (2 * Math.PI * i) % (2 * Math.PI);
-
-                                Vector radial = new Vector(Math.cos(angle), 0, Math.sin(angle));
-                                Vector side = direction.clone().getCrossProduct(new Vector(0, 1, 0)).normalize();
-                                if (side.length() == 0) side = new Vector(1, 0, 0);
-                                Vector up = side.clone().getCrossProduct(direction).normalize();
-
-                                Vector offset = side.clone().multiply(radial.getX()).add(up.clone().multiply(radial.getZ())).multiply(currentRadius);
-                                Vector heightOffset = direction.clone().multiply(currentHeight);
-
-                                Location loc = centerLocation.clone().add(offset).add(heightOffset);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_ring", (ctx, node) -> {
-            Location centerLocation = ctx.getInputValue(node, "center_location", Location.class, null);
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 5.0);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Integer count = ctx.getInputValue(node, "count", Integer.class, 30);
-            String axis = ctx.getInputValue(node, "axis", String.class, "y");
-
-            if (centerLocation != null && centerLocation.getWorld() != null && radius > 0 && count > 0) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i < count; i++) {
-                            double angle = (2 * Math.PI * i) / count;
-                            double x, y, z;
-
-                            switch (axis.toLowerCase()) {
-                                case "x" -> {
-                                    x = centerLocation.getX();
-                                    y = centerLocation.getY() + radius * Math.cos(angle);
-                                    z = centerLocation.getZ() + radius * Math.sin(angle);
-                                }
-                                case "y" -> {
-                                    x = centerLocation.getX() + radius * Math.cos(angle);
-                                    y = centerLocation.getY();
-                                    z = centerLocation.getZ() + radius * Math.sin(angle);
-                                }
-                                case "z" -> {
-                                    x = centerLocation.getX() + radius * Math.cos(angle);
-                                    y = centerLocation.getY() + radius * Math.sin(angle);
-                                    z = centerLocation.getZ();
-                                }
-                                default -> {
-                                    x = centerLocation.getX() + radius * Math.cos(angle);
-                                    y = centerLocation.getY();
-                                    z = centerLocation.getZ() + radius * Math.sin(angle);
-                                }
-                            }
-
-                            Location loc = new Location(centerLocation.getWorld(), x, y, z);
-                            centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i < count; i++) {
-                                double angle = (2 * Math.PI * i) / count;
-                                double x, y, z;
-
-                                switch (axis.toLowerCase()) {
-                                    case "x" -> {
-                                        x = centerLocation.getX();
-                                        y = centerLocation.getY() + radius * Math.cos(angle);
-                                        z = centerLocation.getZ() + radius * Math.sin(angle);
-                                    }
-                                    case "y" -> {
-                                        x = centerLocation.getX() + radius * Math.cos(angle);
-                                        y = centerLocation.getY();
-                                        z = centerLocation.getZ() + radius * Math.sin(angle);
-                                    }
-                                    case "z" -> {
-                                        x = centerLocation.getX() + radius * Math.cos(angle);
-                                        y = centerLocation.getY() + radius * Math.sin(angle);
-                                        z = centerLocation.getZ();
-                                    }
-                                    default -> {
-                                        x = centerLocation.getX() + radius * Math.cos(angle);
-                                        y = centerLocation.getY();
-                                        z = centerLocation.getZ() + radius * Math.sin(angle);
-                                    }
-                                }
-
-                                Location loc = new Location(centerLocation.getWorld(), x, y, z);
-                                centerLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_cube", (ctx, node) -> {
-            Location minLocation = ctx.getInputValue(node, "min_location", Location.class, null);
-            Location maxLocation = ctx.getInputValue(node, "max_location", Location.class, null);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Boolean isFilled = ctx.getInputValue(node, "is_filled", Boolean.class, false);
-
-            if (minLocation != null && maxLocation != null && minLocation.getWorld() != null && minLocation.getWorld().equals(maxLocation.getWorld())) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    double minX = Math.min(minLocation.getX(), maxLocation.getX());
-                    double maxX = Math.max(minLocation.getX(), maxLocation.getX());
-                    double minY = Math.min(minLocation.getY(), maxLocation.getY());
-                    double maxY = Math.max(minLocation.getY(), maxLocation.getY());
-                    double minZ = Math.min(minLocation.getZ(), maxLocation.getZ());
-                    double maxZ = Math.max(minLocation.getZ(), maxLocation.getZ());
-                    double step = isFilled ? 0.5 : 1.0;
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (double x = minX; x <= maxX; x += step) {
-                            for (double y = minY; y <= maxY; y += step) {
-                                for (double z = minZ; z <= maxZ; z += step) {
-                                    boolean onEdge = Math.abs(x - minX) < step || Math.abs(x - maxX) < step ||
-                                            Math.abs(y - minY) < step || Math.abs(y - maxY) < step ||
-                                            Math.abs(z - minZ) < step || Math.abs(z - maxZ) < step;
-
-                                    if (isFilled || onEdge) {
-                                        Location loc = new Location(minLocation.getWorld(), x, y, z);
-                                        minLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (double x = minX; x <= maxX; x += step) {
-                                for (double y = minY; y <= maxY; y += step) {
-                                    for (double z = minZ; z <= maxZ; z += step) {
-                                        boolean onEdge = Math.abs(x - minX) < step || Math.abs(x - maxX) < step ||
-                                                Math.abs(y - minY) < step || Math.abs(y - maxY) < step ||
-                                                Math.abs(z - minZ) < step || Math.abs(z - maxZ) < step;
-
-                                        if (isFilled || onEdge) {
-                                            Location loc = new Location(minLocation.getWorld(), x, y, z);
-                                            minLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_wave", (ctx, node) -> {
-            Location startLocation = ctx.getInputValue(node, "start_location", Location.class, null);
-            Vector direction = ctx.getInputValue(node, "direction", Vector.class, new Vector(1, 0, 0));
-            Double amplitude = ctx.getInputValue(node, "amplitude", Double.class, 1.0);
-            Double frequency = ctx.getInputValue(node, "frequency", Double.class, 0.5);
-            Double length = ctx.getInputValue(node, "length", Double.class, 10.0);
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-
-            if (startLocation != null && startLocation.getWorld() != null) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    Vector dir = direction.clone().normalize();
-                    int steps = (int) (length * 10);
-
-                    if (Bukkit.isPrimaryThread()) {
-                        for (int i = 0; i <= steps; i++) {
-                            double distance = (length * i) / steps;
-                            double waveOffset = Math.sin(distance * frequency) * amplitude;
-
-                            Vector forward = dir.clone().multiply(distance);
-                            Vector waveUp = new Vector(0, 1, 0);
-                            Vector waveDir = dir.clone().getCrossProduct(waveUp).normalize();
-                            if (waveDir.length() < 0.1) waveDir = new Vector(0, 0, 1);
-                            Vector offset = waveDir.multiply(waveOffset);
-
-                            Location loc = startLocation.clone().add(forward).add(offset);
-                            startLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            for (int i = 0; i <= steps; i++) {
-                                double distance = (length * i) / steps;
-                                double waveOffset = Math.sin(distance * frequency) * amplitude;
-
-                                Vector forward = dir.clone().multiply(distance);
-                                Vector waveUp = new Vector(0, 1, 0);
-                                Vector waveDir = dir.clone().getCrossProduct(waveUp).normalize();
-                                if (waveDir.length() < 0.1) waveDir = new Vector(0, 0, 1);
-                                Vector offset = waveDir.multiply(waveOffset);
-
-                                Location loc = startLocation.clone().add(forward).add(offset);
-                                startLocation.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                            }
-                        });
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
-        operations.put("particle_text", (ctx, node) -> {
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            String text = clampText(ctx.getInputValue(node, "text", String.class, "A"));
-            String particleName = ctx.getInputValue(node, "particle_type", String.class, "FLAME");
-            Double size = ctx.getInputValue(node, "size", Double.class, 0.3);
-
-            if (location != null && location.getWorld() != null && text != null && !text.isEmpty()) {
-                try {
-                    Particle particle = Particle.valueOf(particleName.toUpperCase());
-                    Font font = new Font("Arial", Font.BOLD, 100);
-                    BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D measureGraphics = measure.createGraphics();
-                    measureGraphics.setFont(font);
-                    FontMetrics fm = measureGraphics.getFontMetrics();
-                    int textWidth = fm.stringWidth(text);
-                    int textHeight = fm.getHeight();
-                    int imageWidth = Math.min(MAX_TEXT_IMAGE_WIDTH, Math.max(64, textWidth + 24));
-                    int imageHeight = Math.min(MAX_TEXT_IMAGE_HEIGHT, Math.max(64, textHeight + 24));
-                    measureGraphics.dispose();
-                    BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D g2d = image.createGraphics();
-                    g2d.setFont(font);
-                    g2d.setColor(Color.WHITE);
-                    g2d.drawString(text, 12, 12 + fm.getAscent());
-                    g2d.dispose();
-
-                    int minPixelX = imageWidth;
-                    int maxPixelX = 0;
-                    int minPixelY = imageHeight;
-                    int maxPixelY = 0;
-                    for (int y = 0; y < imageHeight; y += 2) {
-                        for (int x = 0; x < imageWidth; x += 2) {
-                            int rgb = image.getRGB(x, y);
-                            if ((rgb & 0xFF000000) != 0) {
-                                minPixelX = Math.min(minPixelX, x);
-                                maxPixelX = Math.max(maxPixelX, x);
-                                minPixelY = Math.min(minPixelY, y);
-                                maxPixelY = Math.max(maxPixelY, y);
-                            }
-                        }
-                    }
-                    if (minPixelX > maxPixelX || minPixelY > maxPixelY) {
-                        return;
-                    }
-                    double centerPixelX = (minPixelX + maxPixelX) / 2.0;
-                    double centerPixelY = (minPixelY + maxPixelY) / 2.0;
-                    double particleScale = Math.max(0.005, size) / 10.0;
-
-                    if (Bukkit.isPrimaryThread()) {
-                        emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
-        });
-
         operations.put("particle_spawn", (ctx, node) -> applyLegacyParticle(ctx, node, "point"));
         operations.put("particle_area", (ctx, node) -> applyLegacyParticle(ctx, node, "area"));
         operations.put("particle_player_spawn", (ctx, node) -> applyLegacyParticle(ctx, node, "player"));
@@ -693,7 +53,7 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private void applyLegacyParticle(FlowContext ctx, FlowNode node, String mode) {
-        Map<String, Object> inputs = new java.util.HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
+        Map<String, Object> inputs = new HashMap<>(node.getInputValues() != null ? node.getInputValues() : Map.of());
         inputs.put("mode", mode);
         copyIfMissing(inputs, "particle", "particle_type");
         copyIfMissing(inputs, "location", "center_location");
@@ -719,7 +79,7 @@ public class ParticleHandler implements NodeHandler {
             case "point", "spawn" -> spawnPoint(ctx, node, particle);
             case "burst" -> spawnBurst(ctx, node, particle);
             case "player", "player_spawn" -> spawnForPlayer(ctx, node, particle);
-            case "area" -> spawnArea(ctx, node, particle, true);
+            case "area" -> spawnArea(ctx, node, particle);
             case "line" -> spawnLine(ctx, node, particle);
             case "circle" -> spawnCircle(ctx, node, particle);
             case "ring" -> spawnRing(ctx, node, particle);
@@ -733,47 +93,54 @@ public class ParticleHandler implements NodeHandler {
             case "block_dust", "block" -> spawnBlockDust(ctx, node);
             case "item_break", "item" -> spawnItemBreak(ctx, node);
             case "explosion" -> spawnExplosion(ctx, node);
-            default -> spawnPoint(ctx, node, particle);
+            default -> throw new IllegalArgumentException("Unknown particle mode: " + spawnType);
         }
     }
 
     private void spawnPoint(FlowContext ctx, FlowNode node, Particle particle) {
         Location location = location(ctx, node, "location");
-        if (!valid(location)) return;
-        int count = integer(ctx, node, "count", 1);
+        requireLocation(location);
+        int count = boundedCount(integer(ctx, node, "count", 1), 0, "count");
         double offsetX = decimal(ctx, node, "offset_x", 0.0);
         double offsetY = decimal(ctx, node, "offset_y", 0.0);
         double offsetZ = decimal(ctx, node, "offset_z", 0.0);
         double speed = decimal(ctx, node, "speed", 0.0);
+        requireParticleMotion(offsetX, offsetY, offsetZ, speed);
         run(location, () -> location.getWorld().spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
     }
 
     private void spawnBurst(FlowContext ctx, FlowNode node, Particle particle) {
         Location location = location(ctx, node, "location");
-        if (!valid(location)) return;
-        int count = integer(ctx, node, "count", 24);
+        requireLocation(location);
+        int count = boundedCount(integer(ctx, node, "count", 24), 0, "count");
         double spread = decimal(ctx, node, "spread", 0.6);
         double speed = decimal(ctx, node, "speed", 0.02);
+        if (spread < 0.0 || spread > 1024.0) throw new IllegalArgumentException("Particle burst spread must be between 0 and 1024");
+        requireParticleMotion(spread, spread, spread, speed);
         run(location, () -> location.getWorld().spawnParticle(particle, location, count, spread, spread, spread, speed, null));
     }
 
     private void spawnForPlayer(FlowContext ctx, FlowNode node, Particle particle) {
         Player player = ctx.getInputValue(node, "player", Player.class, null);
         Location location = location(ctx, node, "location");
-        if (player == null || !valid(location)) return;
-        int count = integer(ctx, node, "count", 1);
+        if (player == null) {
+            throw new IllegalArgumentException("Player is required");
+        }
+        requireLocation(location);
+        int count = boundedCount(integer(ctx, node, "count", 1), 0, "count");
         double offsetX = decimal(ctx, node, "offset_x", 0.0);
         double offsetY = decimal(ctx, node, "offset_y", 0.0);
         double offsetZ = decimal(ctx, node, "offset_z", 0.0);
         double speed = decimal(ctx, node, "speed", 0.0);
+        requireParticleMotion(offsetX, offsetY, offsetZ, speed);
         run(location, () -> player.spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, speed, null));
     }
 
-    private void spawnArea(FlowContext ctx, FlowNode node, Particle particle, boolean filled) {
+    private void spawnArea(FlowContext ctx, FlowNode node, Particle particle) {
         Location min = location(ctx, node, "min_location");
         Location max = location(ctx, node, "max_location");
-        if (!sameWorld(min, max)) return;
-        int density = Math.max(1, integer(ctx, node, "density", 10));
+        requireSameWorld(min, max);
+        int density = boundedCount(integer(ctx, node, "density", 10), 1, "density");
         double stepX = Math.max(0.5, Math.abs(max.getX() - min.getX()) / density);
         double stepY = Math.max(0.5, Math.abs(max.getY() - min.getY()) / density);
         double stepZ = Math.max(0.5, Math.abs(max.getZ() - min.getZ()) / density);
@@ -783,6 +150,7 @@ public class ParticleHandler implements NodeHandler {
         double maxY = Math.max(min.getY(), max.getY());
         double minZ = Math.min(min.getZ(), max.getZ());
         double maxZ = Math.max(min.getZ(), max.getZ());
+        requireParticleBudget(axisSamples(minX, maxX, stepX), axisSamples(minY, maxY, stepY), axisSamples(minZ, maxZ, stepZ));
         run(min, () -> {
             for (double x = minX; x <= maxX; x += stepX) {
                 for (double y = minY; y <= maxY; y += stepY) {
@@ -798,8 +166,9 @@ public class ParticleHandler implements NodeHandler {
     private void spawnLine(FlowContext ctx, FlowNode node, Particle particle) {
         Location start = location(ctx, node, "start_location");
         Location end = location(ctx, node, "end_location");
-        if (!sameWorld(start, end)) return;
-        int density = Math.max(1, integer(ctx, node, "density", 10));
+        requireSameWorld(start, end);
+        int density = boundedCount(integer(ctx, node, "density", 10), 1, "density");
+        requireParticleBudget(density + 1L);
         double distance = start.distance(end);
         if (distance <= 0.0) {
             run(start, () -> start.getWorld().spawnParticle(particle, start, 1, 0, 0, 0, 0));
@@ -819,9 +188,9 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnCircle(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
-        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
-        int count = Math.max(1, integer(ctx, node, "count", integer(ctx, node, "points", 30)));
+        requireLocation(center);
+        double radius = nonNegative(decimal(ctx, node, "radius", 3.0), "Particle circle radius");
+        int count = boundedCount(integer(ctx, node, "count", integer(ctx, node, "points", 30)), 1, "count");
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double angle = (2 * Math.PI * i) / count;
@@ -833,10 +202,13 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnRing(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
-        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
-        int count = Math.max(1, integer(ctx, node, "count", 30));
+        requireLocation(center);
+        double radius = nonNegative(decimal(ctx, node, "radius", 3.0), "Particle ring radius");
+        int count = boundedCount(integer(ctx, node, "count", 30), 1, "count");
         String axis = text(ctx, node, "axis", "y").toLowerCase(Locale.ROOT);
+        if (!axis.equals("x") && !axis.equals("y") && !axis.equals("z")) {
+            throw new IllegalArgumentException("Particle ring axis must be x, y, or z");
+        }
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double angle = (2 * Math.PI * i) / count;
@@ -854,11 +226,12 @@ public class ParticleHandler implements NodeHandler {
                         y = center.getY() + radius * Math.sin(angle);
                         z = center.getZ();
                     }
-                    default -> {
+                    case "y" -> {
                         x = center.getX() + radius * Math.cos(angle);
                         y = center.getY();
                         z = center.getZ() + radius * Math.sin(angle);
                     }
+                    default -> throw new IllegalStateException("Unexpected particle ring axis: " + axis);
                 }
                 center.getWorld().spawnParticle(particle, new Location(center.getWorld(), x, y, z), 1, 0, 0, 0, 0);
             }
@@ -867,9 +240,9 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnSphere(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
-        double radius = Math.max(0.0, decimal(ctx, node, "radius", 3.0));
-        int count = Math.max(2, integer(ctx, node, "count", integer(ctx, node, "points", 50)));
+        requireLocation(center);
+        double radius = nonNegative(decimal(ctx, node, "radius", 3.0), "Particle sphere radius");
+        int count = boundedCount(integer(ctx, node, "count", integer(ctx, node, "points", 50)), 2, "count");
         run(center, () -> {
             double phi = Math.PI * (3.0 - Math.sqrt(5.0));
             for (int i = 0; i < count; i++) {
@@ -886,10 +259,12 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnEllipse(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
+        requireLocation(center);
         double radiusX = decimal(ctx, node, "radius_x", 5.0);
         double radiusZ = decimal(ctx, node, "radius_z", 3.0);
-        int count = Math.max(1, integer(ctx, node, "count", 30));
+        nonNegative(radiusX, "Particle ellipse X radius");
+        nonNegative(radiusZ, "Particle ellipse Z radius");
+        int count = boundedCount(integer(ctx, node, "count", 30), 1, "count");
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double angle = (2 * Math.PI * i) / count;
@@ -901,11 +276,14 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnSpiral(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
+        requireLocation(center);
         double radius = decimal(ctx, node, "radius", 3.0);
         double height = decimal(ctx, node, "height", 5.0);
         double rotations = decimal(ctx, node, "rotations", 3.0);
-        int count = Math.max(1, integer(ctx, node, "count", 100));
+        nonNegative(radius, "Particle spiral radius");
+        nonNegative(height, "Particle spiral height");
+        if (rotations <= 0.0 || rotations > 100.0) throw new IllegalArgumentException("Particle spiral rotations must be between 0 and 100");
+        int count = boundedCount(integer(ctx, node, "count", 100), 1, "count");
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double angle = (2 * Math.PI * rotations * i) / count;
@@ -918,10 +296,12 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnCone(FlowContext ctx, FlowNode node, Particle particle) {
         Location center = location(ctx, node, "location");
-        if (!valid(center)) return;
+        requireLocation(center);
         double radius = decimal(ctx, node, "radius", 3.0);
         double height = decimal(ctx, node, "height", 5.0);
-        int count = Math.max(1, integer(ctx, node, "count", 50));
+        nonNegative(radius, "Particle cone radius");
+        nonNegative(height, "Particle cone height");
+        int count = boundedCount(integer(ctx, node, "count", 50), 1, "count");
         run(center, () -> {
             for (int i = 0; i < count; i++) {
                 double progress = i / (double) count;
@@ -938,15 +318,17 @@ public class ParticleHandler implements NodeHandler {
     private void spawnCube(FlowContext ctx, FlowNode node, Particle particle) {
         Location min = location(ctx, node, "min_location");
         Location max = location(ctx, node, "max_location");
-        if (!sameWorld(min, max)) return;
+        requireSameWorld(min, max);
         boolean filled = bool(ctx, node, "filled", bool(ctx, node, "is_filled", false));
-        double step = Math.max(0.1, decimal(ctx, node, "step", filled ? 0.5 : 1.0));
+        double step = decimal(ctx, node, "step", filled ? 0.5 : 1.0);
+        if (step < 0.1) throw new IllegalArgumentException("Particle cube step must be at least 0.1");
         double minX = Math.min(min.getX(), max.getX());
         double maxX = Math.max(min.getX(), max.getX());
         double minY = Math.min(min.getY(), max.getY());
         double maxY = Math.max(min.getY(), max.getY());
         double minZ = Math.min(min.getZ(), max.getZ());
         double maxZ = Math.max(min.getZ(), max.getZ());
+        requireParticleBudget(axisSamples(minX, maxX, step), axisSamples(minY, maxY, step), axisSamples(minZ, maxZ, step));
         run(min, () -> {
             for (double x = minX; x <= maxX; x += step) {
                 for (double y = minY; y <= maxY; y += step) {
@@ -963,12 +345,17 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnWave(FlowContext ctx, FlowNode node, Particle particle) {
         Location start = location(ctx, node, "start_location");
-        if (!valid(start)) return;
+        requireLocation(start);
         Vector direction = ctx.getInputValue(node, "direction", Vector.class, new Vector(1, 0, 0));
         double amplitude = decimal(ctx, node, "amplitude", 1.0);
         double frequency = decimal(ctx, node, "frequency", 0.5);
         double length = decimal(ctx, node, "length", 10.0);
-        int steps = Math.max(1, (int) (length * 10));
+        nonNegative(length, "Particle wave length");
+        if (Math.abs(amplitude) > 1024.0) throw new IllegalArgumentException("Particle wave amplitude cannot exceed 1024");
+        if (Math.abs(frequency) > 1000.0) throw new IllegalArgumentException("Particle wave frequency cannot exceed 1000");
+        requireDirection(direction, "Particle wave direction");
+        int steps = boundedCount((int) Math.ceil(length * 10.0), 1, "steps");
+        requireParticleBudget(steps + 1L);
         Vector dir = direction.clone().normalize();
         run(start, () -> {
             for (int i = 0; i <= steps; i++) {
@@ -985,9 +372,13 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnText(FlowContext ctx, FlowNode node, Particle particle) {
         Location location = location(ctx, node, "location");
-        String text = clampText(text(ctx, node, "text", "A"));
+        String text = requireText(text(ctx, node, "text", "A"));
         double size = decimal(ctx, node, "size", 0.3);
-        if (!valid(location) || text.isEmpty()) return;
+        requireLocation(location);
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("Particle text is required");
+        }
+        if (size <= 0.0 || size > 10.0) throw new IllegalArgumentException("Particle text size must be between 0 and 10");
         run(location, () -> {
             Font font = new Font("Arial", Font.BOLD, 100);
             BufferedImage measure = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
@@ -996,6 +387,10 @@ public class ParticleHandler implements NodeHandler {
             FontMetrics fm = measureGraphics.getFontMetrics();
             int textWidth = fm.stringWidth(text);
             int textHeight = fm.getHeight();
+            if (textWidth + 24 > MAX_TEXT_IMAGE_WIDTH || textHeight + 24 > MAX_TEXT_IMAGE_HEIGHT) {
+                measureGraphics.dispose();
+                throw new IllegalArgumentException("Particle text exceeds the render bounds");
+            }
             int imageWidth = Math.min(MAX_TEXT_IMAGE_WIDTH, Math.max(64, textWidth + 24));
             int imageHeight = Math.min(MAX_TEXT_IMAGE_HEIGHT, Math.max(64, textHeight + 24));
             measureGraphics.dispose();
@@ -1021,29 +416,43 @@ public class ParticleHandler implements NodeHandler {
                 }
             }
             if (minPixelX > maxPixelX || minPixelY > maxPixelY) {
-                return;
+                throw new IllegalArgumentException("Particle text did not produce renderable pixels");
             }
             double centerPixelX = (minPixelX + maxPixelX) / 2.0;
             double centerPixelY = (minPixelY + maxPixelY) / 2.0;
-            double particleScale = Math.max(0.005, size) / 10.0;
+            double particleScale = size / 10.0;
             emitTextParticles(location, particle, image, imageWidth, imageHeight, centerPixelX, centerPixelY, particleScale);
         });
     }
 
-    private String clampText(String text) {
+    private String requireText(String text) {
         String value = text != null ? text : "";
-        return value.length() > MAX_TEXT_LENGTH ? value.substring(0, MAX_TEXT_LENGTH) : value;
+        if (value.length() > MAX_TEXT_LENGTH) throw new IllegalArgumentException("Particle text cannot exceed " + MAX_TEXT_LENGTH + " characters");
+        return value;
     }
 
     private void emitTextParticles(Location location, Particle particle, BufferedImage image, int imageWidth, int imageHeight, double centerPixelX, double centerPixelY, double particleScale) {
+        int opaquePixels = 0;
+        for (int y = 0; y < imageHeight; y += 2) {
+            for (int x = 0; x < imageWidth; x += 2) {
+                if ((image.getRGB(x, y) & 0xFF000000) != 0) opaquePixels++;
+            }
+        }
+        double interval = opaquePixels > MAX_TEXT_PARTICLES ? opaquePixels / (double) MAX_TEXT_PARTICLES : 1.0;
+        double nextEmission = 0.0;
+        int visited = 0;
         int emitted = 0;
-        for (int y = 0; y < imageHeight && emitted < MAX_TEXT_PARTICLES; y += 2) {
-            for (int x = 0; x < imageWidth && emitted < MAX_TEXT_PARTICLES; x += 2) {
+        for (int y = 0; y < imageHeight; y += 2) {
+            for (int x = 0; x < imageWidth; x += 2) {
                 int rgb = image.getRGB(x, y);
                 if ((rgb & 0xFF000000) != 0) {
-                    Location loc = location.clone().add((x - centerPixelX) * particleScale, (centerPixelY - y) * particleScale, 0);
-                    location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
-                    emitted++;
+                    if (emitted < MAX_TEXT_PARTICLES && visited >= Math.floor(nextEmission)) {
+                        Location loc = location.clone().add((x - centerPixelX) * particleScale, (centerPixelY - y) * particleScale, 0);
+                        location.getWorld().spawnParticle(particle, loc, 1, 0, 0, 0, 0);
+                        emitted++;
+                        nextEmission += interval;
+                    }
+                    visited++;
                 }
             }
         }
@@ -1051,25 +460,29 @@ public class ParticleHandler implements NodeHandler {
 
     private void spawnBlockDust(FlowContext ctx, FlowNode node) {
         Location location = location(ctx, node, "location");
-        if (!valid(location)) return;
+        requireLocation(location);
         Material blockType = Material.getMaterial(text(ctx, node, "block_type", "STONE").toUpperCase(Locale.ROOT));
-        if (blockType == null || !blockType.isBlock()) return;
-        int count = integer(ctx, node, "count", 10);
+        if (blockType == null || !blockType.isBlock()) {
+            throw new IllegalArgumentException("Particle block material is invalid");
+        }
+        int count = boundedCount(integer(ctx, node, "count", 10), 0, "count");
         BlockData blockData = blockType.createBlockData();
         run(location, () -> location.getWorld().spawnParticle(Particle.BLOCK, location, count, blockData));
     }
 
     private void spawnItemBreak(FlowContext ctx, FlowNode node) {
         Location location = location(ctx, node, "location");
-        if (!valid(location)) return;
+        requireLocation(location);
         Material itemType = Material.getMaterial(text(ctx, node, "item_type", "STONE").toUpperCase(Locale.ROOT));
-        if (itemType == null || !itemType.isItem()) return;
+        if (itemType == null || !itemType.isItem()) {
+            throw new IllegalArgumentException("Particle item material is invalid");
+        }
         run(location, () -> location.getWorld().spawnParticle(Particle.ITEM, location, 1, 0, 0, 0, 0, new ItemStack(itemType)));
     }
 
     private void spawnExplosion(FlowContext ctx, FlowNode node) {
         Location location = location(ctx, node, "location");
-        if (!valid(location)) return;
+        requireLocation(location);
         boolean large = bool(ctx, node, "large", false);
         run(location, () -> {
             if (large) {
@@ -1081,10 +494,13 @@ public class ParticleHandler implements NodeHandler {
     }
 
     private Particle parseParticle(String name) {
-        String value = name == null || name.isBlank() ? "FLAME" : name.trim();
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Particle is required");
+        }
+        String value = name.trim();
         if (value.contains(":")) {
             String key = value.toLowerCase(Locale.ROOT);
-            for (Particle particle : org.bukkit.Registry.PARTICLE_TYPE) {
+            for (Particle particle : Registry.PARTICLE_TYPE) {
                 if (particle.getKey().toString().equalsIgnoreCase(key)) {
                     return particle;
                 }
@@ -1094,32 +510,86 @@ public class ParticleHandler implements NodeHandler {
         value = value.replace('.', '_').replace('-', '_');
         try {
             return Particle.valueOf(value.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            return Particle.FLAME;
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown particle: " + name, exception);
         }
     }
 
     private void run(Location location, Runnable task) {
-        if (!valid(location) || task == null) return;
-        Runnable safeTask = () -> {
-            try {
-                task.run();
-            } catch (Exception ignored) {
-            }
-        };
-        if (Bukkit.isPrimaryThread()) {
-            safeTask.run();
-        } else {
-            Bukkit.getScheduler().runTask(ReSync.getInstance(), safeTask);
+        requireLocation(location);
+        if (task == null) {
+            throw new IllegalArgumentException("Particle task is required");
         }
+        task.run();
     }
 
     private boolean valid(Location location) {
         return location != null && location.getWorld() != null;
     }
 
-    private boolean sameWorld(Location first, Location second) {
-        return valid(first) && valid(second) && first.getWorld().equals(second.getWorld());
+    private int boundedCount(int value, int minimum, String name) {
+        if (value < minimum || value > MAX_PARTICLES_PER_ACTION) {
+            throw new IllegalArgumentException("Particle " + name + " must be between " + minimum + " and " + MAX_PARTICLES_PER_ACTION);
+        }
+        return value;
+    }
+
+    private double nonNegative(double value, String name) {
+        if (value < 0.0 || value > 1024.0) throw new IllegalArgumentException(name + " must be between 0 and 1024");
+        return value;
+    }
+
+    private void requireParticleMotion(double offsetX, double offsetY, double offsetZ, double speed) {
+        if (Math.abs(offsetX) > 1024.0 || Math.abs(offsetY) > 1024.0 || Math.abs(offsetZ) > 1024.0) {
+            throw new IllegalArgumentException("Particle offsets cannot exceed 1024");
+        }
+        if (speed < 0.0 || speed > 100.0) throw new IllegalArgumentException("Particle speed must be between 0 and 100");
+    }
+
+    private void requireDirection(Vector direction, String name) {
+        if (direction == null || !Double.isFinite(direction.getX()) || !Double.isFinite(direction.getY()) || !Double.isFinite(direction.getZ())
+            || direction.lengthSquared() == 0.0) {
+            throw new IllegalArgumentException(name + " must be finite and non-zero");
+        }
+    }
+
+    private long axisSamples(double minimum, double maximum, double step) {
+        if (!Double.isFinite(minimum) || !Double.isFinite(maximum) || !Double.isFinite(step) || step <= 0.0) {
+            throw new IllegalArgumentException("Particle area coordinates and step must be finite");
+        }
+        double samples = Math.floor((maximum - minimum) / step) + 1.0;
+        if (!Double.isFinite(samples) || samples > MAX_PARTICLES_PER_ACTION) {
+            throw new IllegalArgumentException("Particle area exceeds the action budget");
+        }
+        return Math.max(1L, (long) samples);
+    }
+
+    private void requireParticleBudget(long... dimensions) {
+        long total = 1L;
+        try {
+            for (long dimension : dimensions) {
+                total = Math.multiplyExact(total, dimension);
+            }
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("Particle action budget overflow", exception);
+        }
+        if (total > MAX_PARTICLES_PER_ACTION) {
+            throw new IllegalArgumentException("Particle action exceeds the " + MAX_PARTICLES_PER_ACTION + " particle limit");
+        }
+    }
+
+    private void requireLocation(Location location) {
+        if (!valid(location)) {
+            throw new IllegalArgumentException("World location is required");
+        }
+    }
+
+    private void requireSameWorld(Location first, Location second) {
+        requireLocation(first);
+        requireLocation(second);
+        if (!first.getWorld().equals(second.getWorld())) {
+            throw new IllegalArgumentException("Particle locations must be in the same world");
+        }
     }
 
     private Location location(FlowContext ctx, FlowNode node, String pin) {
@@ -1134,13 +604,25 @@ public class ParticleHandler implements NodeHandler {
     private int integer(FlowContext ctx, FlowNode node, String pin, int fallback) {
         Object value = ctx.getInputValue(node, pin);
         if (value instanceof Number number) {
-            return number.intValue();
+            double numeric = number.doubleValue();
+            if (!Double.isFinite(numeric) || numeric != Math.rint(numeric) || numeric < Integer.MIN_VALUE || numeric > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Particle input " + pin + " must be a whole number");
+            }
+            return (int) numeric;
         }
         if (value instanceof String text && !text.isBlank()) {
             try {
-                return (int) Double.parseDouble(text);
-            } catch (NumberFormatException ignored) {
+                double numeric = Double.parseDouble(text);
+                if (!Double.isFinite(numeric) || numeric != Math.rint(numeric) || numeric < Integer.MIN_VALUE || numeric > Integer.MAX_VALUE) {
+                    throw new IllegalArgumentException("Particle input " + pin + " must be a whole number");
+                }
+                return (int) numeric;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Particle input " + pin + " must be a number", exception);
             }
+        }
+        if (value != null) {
+            throw new IllegalArgumentException("Particle input " + pin + " must be a number");
         }
         return fallback;
     }
@@ -1148,13 +630,25 @@ public class ParticleHandler implements NodeHandler {
     private double decimal(FlowContext ctx, FlowNode node, String pin, double fallback) {
         Object value = ctx.getInputValue(node, pin);
         if (value instanceof Number number) {
-            return number.doubleValue();
+            double numeric = number.doubleValue();
+            if (!Double.isFinite(numeric)) {
+                throw new IllegalArgumentException("Particle input " + pin + " must be finite");
+            }
+            return numeric;
         }
         if (value instanceof String text && !text.isBlank()) {
             try {
-                return Double.parseDouble(text);
-            } catch (NumberFormatException ignored) {
+                double numeric = Double.parseDouble(text);
+                if (!Double.isFinite(numeric)) {
+                    throw new IllegalArgumentException("Particle input " + pin + " must be finite");
+                }
+                return numeric;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Particle input " + pin + " must be a number", exception);
             }
+        }
+        if (value != null) {
+            throw new IllegalArgumentException("Particle input " + pin + " must be a number");
         }
         return fallback;
     }
@@ -1170,11 +664,16 @@ public class ParticleHandler implements NodeHandler {
 
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
+        executeInline(ctx, node);
+        ctx.triggerOutput("flow");
+    }
+
+    void executeInline(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown particle operation: " + operation);
         }
-        ctx.triggerOutput("flow");
+        op.accept(ctx, node);
     }
 }

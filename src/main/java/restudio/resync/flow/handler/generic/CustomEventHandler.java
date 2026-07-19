@@ -75,10 +75,10 @@ public class CustomEventHandler implements NodeHandler {
         operations.put("custom_event_get_data", (ctx, node) -> {
             String eventId = ctx.getInputValue(node, "event_id", String.class, "");
             if (eventId != null && !eventId.isEmpty()) {
-                java.util.Map<String, Object> data = CustomEventManager.getInstance().getLastEventData(eventId);
-                ctx.setOutput(node, "data", data != null ? data : new java.util.HashMap<>());
+                Map<String, Object> data = CustomEventManager.getInstance().getLastEventData(eventId);
+                ctx.setOutput(node, "data", data != null ? data : new HashMap<>());
             } else {
-                ctx.setOutput(node, "data", new java.util.HashMap<>());
+                ctx.setOutput(node, "data", new HashMap<>());
             }
         });
 
@@ -92,9 +92,10 @@ public class CustomEventHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown custom event operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 

@@ -17,6 +17,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
@@ -148,7 +149,7 @@ public class MotdModule implements Module, Listener {
 
     private boolean isValidIconFile(File file) {
         try {
-            byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+            byte[] bytes = Files.readAllBytes(file.toPath());
             return validPngIcon(bytes) != null;
         } catch (Exception e) {
             return false;

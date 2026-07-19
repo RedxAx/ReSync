@@ -106,13 +106,16 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private volatile BukkitTask lockTask;
     private volatile Object economy;
 
-    public WorldManagementManager(ReSync plugin, PlayerTrackingService trackingService) {
+    public WorldManagementManager(ReSync plugin, PlayerTrackingService trackingService, WorldGenProjectStorage worldGenProjectStorage) {
         this.plugin = plugin;
         this.trackingService = trackingService;
         this.storage = new WorldStateStorage(plugin);
-        this.worldGenProjectStorage = new WorldGenProjectStorage(plugin);
+        if (worldGenProjectStorage == null) {
+            throw new IllegalArgumentException("WorldGen project storage is required");
+        }
+        this.worldGenProjectStorage = worldGenProjectStorage;
         this.worldGenDatapackCompiler = new WorldGenDatapackCompiler(plugin);
-        this.worldGenDatapackInstaller = new WorldGenDatapackInstaller(plugin);
+        this.worldGenDatapackInstaller = new WorldGenDatapackInstaller();
         this.mapService = new DefaultWorldMapService();
         for (WorldRegistryEntry entry : storage.loadWorlds()) {
             if (entry == null || entry.getWorldName() == null || entry.getWorldName().isBlank()) {
@@ -769,8 +772,16 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (parsedSeed != null) {
             creator.seed(parsedSeed);
         }
-        compileWorldGenDatapack(generator, generatorConfig, normalizedName);
-        TerrainPipelineHolder worldGenPipeline = createWorldGenPipeline(generator, generatorConfig);
+        WorldGenDatapackBuild worldGenDatapack;
+        TerrainPipelineHolder worldGenPipeline;
+        try {
+            worldGenPipeline = createWorldGenPipeline(generator, generatorConfig);
+            worldGenDatapack = compileWorldGenDatapack(generator, generatorConfig, normalizedName);
+        } catch (RuntimeException exception) {
+            return WorldOperationResult.failure("createWorld", normalizedName, "WorldGenPreparationFailed")
+                .withData("errorCode", "WORLDGEN_PREPARATION_FAILED")
+                .withData("details", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
+        }
         ChunkGenerator chunkGenerator = worldGenPipeline != null ? new NodeGraphChunkGenerator(worldGenPipeline) : createGenerator(generator, generatorConfig);
         if (worldGenPipeline != null) {
             creator.generator(chunkGenerator);
@@ -796,7 +807,14 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         persistWorlds();
         publishMessage(WorldChannelMessage.event("worldCreated", buildWorldStatePayload(entry)));
         publishSnapshotEvent();
-        return WorldOperationResult.success("createWorld", world.getName(), "WorldCreated").withData("world", entry.copy());
+        WorldOperationResult result = WorldOperationResult.success("createWorld", world.getName(), "WorldCreated").withData("world", entry.copy());
+        if (worldGenDatapack != null) {
+            result.withData("worldGenProjectId", worldGenDatapack.getProjectId())
+                .withData("worldGenDatapack", worldGenDatapack.getPackName())
+                .withData("worldGenDatapackFiles", worldGenDatapack.getFileCount())
+                .withData("worldGenWarnings", List.copyOf(worldGenDatapack.getWarnings()));
+        }
+        return result;
     }
 
     private WorldOperationResult scanUnregisteredWorldsSync() {
@@ -2106,7 +2124,12 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (project == null) {
             throw new IllegalArgumentException("WorldGen Project Missing");
         }
-        return null;
+        WorldGenDatapackBuild build = worldGenDatapackCompiler.compile(project, worldGenDatapackCompiler.generatedRoot(), System.currentTimeMillis());
+        WorldGenDatapackInstaller.InstallResult install = worldGenDatapackInstaller.install(build, worldName);
+        if (!install.installed()) {
+            throw new IllegalStateException(install.message() == null || install.message().isBlank() ? "WorldGen Datapack Install Failed" : install.message());
+        }
+        return build;
     }
 
     private void applyProfileState(WorldRegistryEntry entry, World world) {

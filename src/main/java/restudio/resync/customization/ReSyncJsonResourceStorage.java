@@ -106,6 +106,30 @@ public class ReSyncJsonResourceStorage {
         notifyListeners(type, id, null, true);
     }
 
+    public JsonObject reload(String type, String id) {
+        JsonAssetStore<JsonObject> store = stores.get(type);
+        if (store == null) {
+            throw new IllegalArgumentException("Unknown resource type: " + type);
+        }
+        JsonObject value;
+        try {
+            value = store.reload(id, candidate -> {
+                normalizeAssetId(candidate, id);
+                for (ResourceMutationInterceptor interceptor : interceptors) {
+                    interceptor.beforeSave(type, candidate);
+                }
+            });
+        } catch (RuntimeException failure) {
+            notifySaveFailure(type, null, failure);
+            throw failure;
+        }
+        normalizeAssetId(value, id);
+        if (value != null) {
+            notifyListeners(type, id, value, false);
+        }
+        return value;
+    }
+
     public void addListener(ResourceListener listener) {
         if (listener != null) {
             listeners.add(listener);
@@ -120,6 +144,10 @@ public class ReSyncJsonResourceStorage {
         if (interceptor != null) {
             interceptors.add(interceptor);
         }
+    }
+
+    public void removeInterceptor(ResourceMutationInterceptor interceptor) {
+        interceptors.remove(interceptor);
     }
 
     public void migrateLegacyAssets() {
@@ -167,7 +195,7 @@ public class ReSyncJsonResourceStorage {
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> "text-templates";
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> "advancement-trees";
             case ReSyncResourceCatalog.DIALOG -> "dialogs";
-            case ReSyncResourceCatalog.VILLAGE_PROFILE -> "village-profiles";
+            case ReSyncResourceCatalog.TRADE_PROFILE -> "trade-profiles";
             case ReSyncResourceCatalog.NPC_DEFINITION -> "npcs";
             case ReSyncResourceCatalog.LOOT_TABLE -> "loot-tables";
             default -> type;

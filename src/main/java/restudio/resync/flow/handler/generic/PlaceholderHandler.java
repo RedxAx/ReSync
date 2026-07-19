@@ -4,11 +4,13 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowOperationResult;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -18,83 +20,52 @@ public class PlaceholderHandler implements NodeHandler {
     public PlaceholderHandler() {
         operations.put("placeholder_parse", (ctx, node) -> {
             if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_API_UNAVAILABLE", "PlaceholderAPI is unavailable", Map.of()), "");
                 return;
             }
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (text == null || text.isEmpty()) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_TEXT_REQUIRED", "Placeholder text is required", Map.of()), "");
                 return;
             }
-            try {
-                String result = PlaceholderAPI.setPlaceholders(player, text);
-                ctx.setOutput(node, "success", true);
-                ctx.setOutput(node, "result", result);
-            } catch (Exception e) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", text);
-            }
+            executePlaceholder(ctx, node, text, () -> PlaceholderAPI.setPlaceholders(player, text));
         });
 
-        operations.put("placeholder_set", (ctx, node) -> {
+        BiConsumer<FlowContext, FlowNode> relational = (ctx, node) -> {
             if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_API_UNAVAILABLE", "PlaceholderAPI is unavailable", Map.of()), "");
                 return;
             }
             Player playerOne = ctx.getInputValue(node, "player_one", Player.class, null);
             Player playerTwo = ctx.getInputValue(node, "player_two", Player.class, null);
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (text == null || text.isEmpty()) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_TEXT_REQUIRED", "Placeholder text is required", Map.of()), "");
                 return;
             }
-            try {
-                String result = PlaceholderAPI.setRelationalPlaceholders(playerOne, playerTwo, text);
-                ctx.setOutput(node, "success", true);
-                ctx.setOutput(node, "result", result);
-            } catch (Exception e) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", text);
-            }
-        });
+            executePlaceholder(ctx, node, text, () -> PlaceholderAPI.setRelationalPlaceholders(playerOne, playerTwo, text));
+        };
+        operations.put("placeholder_set", relational);
+        operations.put("placeholder_set_relational", relational);
 
         operations.put("placeholder_remove", (ctx, node) -> {
             if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_API_UNAVAILABLE", "PlaceholderAPI is unavailable", Map.of()), "");
                 return;
             }
             String text = ctx.getInputValue(node, "text", String.class, "");
             if (text == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", "");
+                complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_TEXT_REQUIRED", "Placeholder text is required", Map.of()), "");
                 return;
             }
-            try {
-                String result = PlaceholderAPI.setBracketPlaceholders(null, text);
-                ctx.setOutput(node, "success", true);
-                ctx.setOutput(node, "result", result);
-            } catch (Exception e) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "result", text);
-            }
-        });
-
-        operations.put("placeholder_set_relational", (ctx, node) -> {
-            String key = ctx.getInputValue(node, "key", String.class, "");
-            String value = ctx.getInputValue(node, "value", String.class, "");
-            // Relational placeholder requires placeholder API integration
+            executePlaceholder(ctx, node, text, () -> PlaceholderAPI.setBracketPlaceholders(null, text));
         });
 
         operations.put("placeholder_strip_brackets", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
             String result = text.replace("%", "").replace("{", "").replace("}", "");
-            ctx.setOutput(node, "result", result);
+            complete(ctx, node, FlowOperationResult.success(result), result);
         });
 
     }
@@ -107,9 +78,28 @@ public class PlaceholderHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown placeholder operation: " + operation);
         }
-        ctx.triggerOutput("flow");
+        op.accept(ctx, node);
+    }
+
+    private void executePlaceholder(FlowContext ctx, FlowNode node, String fallback, Supplier<String> operation) {
+        try {
+            String value = operation.get();
+            complete(ctx, node, FlowOperationResult.success(value), value);
+        } catch (RuntimeException exception) {
+            String message = exception.getMessage() != null && !exception.getMessage().isBlank() ? exception.getMessage() : "Placeholder operation failed";
+            complete(ctx, node, FlowOperationResult.failure("PLACEHOLDER_OPERATION_FAILED", message, Map.of()), fallback);
+        }
+    }
+
+    private void complete(FlowContext ctx, FlowNode node, FlowOperationResult<String> operationResult, String value) {
+        ctx.setOutput(node, "result", value);
+        ctx.setOutput(node, "operation_result", operationResult);
+        ctx.setOutput(node, "success", operationResult.success());
+        ctx.setOutput(node, "error_code", operationResult.errorCode());
+        ctx.setOutput(node, "message", operationResult.message());
+        ctx.triggerOutput(operationResult.success() ? "flow" : "failed");
     }
 }

@@ -318,7 +318,7 @@ class CustomContentCompatibilityTest {
         String storageSource = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/CustomContentStorage.java"));
         String flowModuleSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/FlowModule.java"));
         String resourceRouterSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/FlowResourcePacketRouter.java"));
-        String catalogSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/FlowOptionCatalogPacketHandler.java"));
+        String catalogSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/BuiltinOptionCatalogService.java"));
         String uiSchemaSource = Files.readString(Path.of("src/main/resources/resync/item_attribute_ui_schema.json"));
 
         assertTrue(source.contains("exampleMaterials()"));

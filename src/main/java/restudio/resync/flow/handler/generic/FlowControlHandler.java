@@ -1,22 +1,24 @@
 package restudio.resync.flow.handler.generic;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
-import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 
 public class FlowControlHandler implements NodeHandler {
+    private static final Set<String> SUPPORTED_OPERATIONS = Set.of(
+        "if", "switch_case", "branch_random", "branch_all", "break_loop", "continue_loop",
+        "loop", "loop_count", "loop_for_each", "loop_for_each_player", "loop_for_each_entity", "loop_interval", "loop_while"
+    );
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public FlowControlHandler() {
@@ -30,7 +32,7 @@ public class FlowControlHandler implements NodeHandler {
             List<?> cases = ctx.getInputValue(node, "cases", List.class, List.of());
             int matchedIndex = -1;
             for (int i = 0; i < cases.size(); i++) {
-                if (String.valueOf(cases.get(i)).equals(String.valueOf(value))) {
+                if (caseMatches(cases.get(i), value)) {
                     matchedIndex = i;
                     break;
                 }
@@ -42,7 +44,7 @@ public class FlowControlHandler implements NodeHandler {
 
         operations.put("branch_random", (ctx, node) -> {
             int branches = ctx.getInputValue(node, "branches", Integer.class, 2);
-            int selected = (int) (Math.random() * branches);
+            int selected = ThreadLocalRandom.current().nextInt(Math.clamp(branches, 1, 4));
             ctx.setOutput(node, "selected", selected);
             ctx.triggerOutput("branch_" + selected);
         });
@@ -54,138 +56,39 @@ public class FlowControlHandler implements NodeHandler {
             ctx.triggerOutput("branch_3");
         });
 
-        operations.put("loop_count", (ctx, node) -> {
-            int count = ctx.getInputValue(node, "count", Integer.class, 1);
-            ctx.getRuntime().resetLoopControl();
-            CompletableFuture<Void> loopFuture = CompletableFuture.completedFuture(null);
-            for (int i = 0; i < count; i++) {
-                final int index = i;
-                loopFuture = loopFuture.thenCompose(v -> {
-                    if (ctx.getRuntime().isBreakLoopRequested()) return CompletableFuture.completedFuture(null);
-                    ctx.setOutput(node, "index", index);
-                    ctx.getRuntime().resetLoopControl();
-                    return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
-                });
-            }
-            loopFuture.thenRun(() -> {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-            });
-        });
-
-        operations.put("loop_for_each", (ctx, node) -> {
-            List<?> list = ctx.getInputValue(node, "list", List.class, List.of());
-            ctx.getRuntime().resetLoopControl();
-            if (list.isEmpty()) {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-                return;
-            }
-            CompletableFuture<Void> loopFuture = CompletableFuture.completedFuture(null);
-            for (int i = 0; i < list.size(); i++) {
-                final int index = i;
-                final Object element = list.get(i);
-                loopFuture = loopFuture.thenCompose(v -> {
-                    if (ctx.getRuntime().isBreakLoopRequested()) return CompletableFuture.completedFuture(null);
-                    if (ctx.getRuntime().isContinueLoopRequested()) return CompletableFuture.completedFuture(null);
-                    ctx.setOutput(node, "index", index);
-                    ctx.setOutput(node, "element", element);
-                    ctx.getRuntime().resetLoopControl();
-                    return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
-                });
-            }
-            loopFuture.thenRun(() -> {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-            });
-        });
-
-        operations.put("loop_for_each_player", (ctx, node) -> {
-            List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-            ctx.getRuntime().resetLoopControl();
-            if (players.isEmpty()) {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-                return;
-            }
-            CompletableFuture<Void> loopFuture = CompletableFuture.completedFuture(null);
-            for (int i = 0; i < players.size(); i++) {
-                final int index = i;
-                final Player player = players.get(i);
-                loopFuture = loopFuture.thenCompose(v -> {
-                    if (ctx.getRuntime().isBreakLoopRequested()) return CompletableFuture.completedFuture(null);
-                    if (ctx.getRuntime().isContinueLoopRequested()) return CompletableFuture.completedFuture(null);
-                    ctx.setOutput(node, "index", index);
-                    ctx.setOutput(node, "player", player);
-                    ctx.getRuntime().resetLoopControl();
-                    return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
-                });
-            }
-            loopFuture.thenRun(() -> {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-            });
-        });
-
-        operations.put("loop_for_each_entity", (ctx, node) -> {
-            Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
-            Location center = ctx.getInputValue(node, "center", Location.class,
-                    ctx.getPlayer() != null ? ctx.getPlayer().getLocation() : null);
-            if (center == null) {
-                ctx.triggerOutput("completed");
-                return;
-            }
-            List<Entity> entities = new ArrayList<>(center.getWorld().getNearbyEntities(center, radius, radius, radius));
-            ctx.getRuntime().resetLoopControl();
-            if (entities.isEmpty()) {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-                return;
-            }
-            CompletableFuture<Void> loopFuture = CompletableFuture.completedFuture(null);
-            for (int i = 0; i < entities.size(); i++) {
-                final int index = i;
-                final Entity entity = entities.get(i);
-                loopFuture = loopFuture.thenCompose(v -> {
-                    if (ctx.getRuntime().isBreakLoopRequested()) return CompletableFuture.completedFuture(null);
-                    if (ctx.getRuntime().isContinueLoopRequested()) return CompletableFuture.completedFuture(null);
-                    ctx.setOutput(node, "index", index);
-                    ctx.setOutput(node, "entity", entity);
-                    ctx.getRuntime().resetLoopControl();
-                    return ctx.runLater(() -> ctx.triggerOutput("loop"), 1);
-                });
-            }
-            loopFuture.thenRun(() -> {
-                ctx.getRuntime().resetLoopControl();
-                ctx.setOutput(node, "completed", true);
-                ctx.triggerOutput("completed");
-            });
-        });
-
-        operations.put("loop_while", (ctx, node) -> {
-            Boolean condition = ctx.getInputValue(node, "condition", Boolean.class, false);
-            ctx.triggerOutput(Boolean.TRUE.equals(condition) ? "loop" : "completed");
-        });
-
         operations.put("break_loop", (ctx, node) -> {
-            ctx.getRuntime().setBreakLoopRequested(true);
-            ctx.triggerOutput("flow");
+            if (!ctx.getRuntime().requestLoopBreak()) {
+                throw new IllegalStateException("Break can only run inside a loop");
+            }
+            ctx.haltContinuation();
         });
 
         operations.put("continue_loop", (ctx, node) -> {
-            ctx.getRuntime().setContinueLoopRequested(true);
-            ctx.triggerOutput("flow");
+            if (!ctx.getRuntime().requestLoopContinue()) {
+                throw new IllegalStateException("Continue can only run inside a loop");
+            }
+            ctx.haltContinuation();
         });
     }
 
     public void registerTo(HandlerRegistry registry) {
         registry.register("FlowControlHandler", this);
+    }
+
+    private static boolean caseMatches(Object caseValue, Object value) {
+        if (caseValue instanceof Number caseNumber && value instanceof Number valueNumber) {
+            try {
+                return new BigDecimal(caseNumber.toString()).compareTo(new BigDecimal(valueNumber.toString())) == 0;
+            } catch (NumberFormatException exception) {
+                return Double.compare(caseNumber.doubleValue(), valueNumber.doubleValue()) == 0;
+            }
+        }
+        return Objects.equals(caseValue, value);
+    }
+
+    @Override
+    public Set<String> getSupportedOperations() {
+        return SUPPORTED_OPERATIONS;
     }
 
     @Override
@@ -195,7 +98,7 @@ public class FlowControlHandler implements NodeHandler {
         if (op != null) {
             op.accept(ctx, node);
         } else {
-            ctx.triggerOutput("flow");
+            throw new IllegalArgumentException("Unknown flow control operation: " + operation);
         }
     }
 }

@@ -1,10 +1,10 @@
 package restudio.resync.flow.handler.generic;
 
-import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.AnimalTamer;
 import org.bukkit.entity.Animals;
@@ -29,16 +29,16 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
-import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -48,248 +48,187 @@ public class EntityActionHandler implements NodeHandler {
 
     public EntityActionHandler() {
         operations.put("entity_set_type", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            String entityType = ctx.getInputValue(node, "entity_type", String.class, "PIG");
-            if (entity != null && entityType != null) {
-                try {
-                    Location loc = entity.getLocation();
-                    entity.remove();
-                    EntityType newType = EntityType.valueOf(entityType.toUpperCase());
-                    if (loc.getWorld() != null) {
-                        loc.getWorld().spawnEntity(loc, newType);
-                    }
-                } catch (IllegalArgumentException e) {
-                    Log.warn("[Flow] Invalid entity type: " + entityType);
-                }
+            Entity entity = requireEntity(ctx, node);
+            String typeName = ctx.getInputValue(node, "entity_type", String.class, "PIG");
+            Location location = entity.getLocation();
+            if (location.getWorld() == null) {
+                throw new IllegalArgumentException("Entity world is unavailable");
             }
+            EntityType newType = entityType(typeName);
+            location.getWorld().spawnEntity(location, newType);
+            entity.remove();
         });
 
         operations.put("entity_set_rotation", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity != null) {
-                Location location = entity.getLocation();
-                Float yaw = ctx.getInputValue(node, "yaw", Float.class, location.getYaw());
-                Float pitch = ctx.getInputValue(node, "pitch", Float.class, location.getPitch());
-                location.setYaw(yaw);
-                location.setPitch(pitch);
-                entity.teleport(location);
-            }
+            Entity entity = requireEntity(ctx, node);
+            Location location = entity.getLocation();
+            Float yaw = ctx.getInputValue(node, "yaw", Float.class, location.getYaw());
+            Float pitch = ctx.getInputValue(node, "pitch", Float.class, location.getPitch());
+            if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) throw new IllegalArgumentException("Entity rotation must be finite");
+            location.setYaw(yaw);
+            location.setPitch(pitch);
+            if (!entity.teleport(location)) throw new IllegalStateException("Entity rotation could not be applied");
         });
 
         operations.put("entity_set_damage", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double damage = ctx.getInputValue(node, "damage", Double.class, 1.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.ATTACK_DAMAGE) != null) {
-                living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(damage);
-            }
+            requireAttribute(ctx, node, Attribute.ATTACK_DAMAGE).setBaseValue(requireNonNegative(damage, "Entity attack damage"));
         });
 
         operations.put("entity_set_armor_value", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double armor = ctx.getInputValue(node, "armor", Double.class, 0.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.ARMOR) != null) {
-                living.getAttribute(Attribute.ARMOR).setBaseValue(armor);
-            }
+            requireAttribute(ctx, node, Attribute.ARMOR).setBaseValue(requireNonNegative(armor, "Entity armor"));
         });
 
         operations.put("entity_set_follow_range", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double range = ctx.getInputValue(node, "range", Double.class, 32.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.FOLLOW_RANGE) != null) {
-                living.getAttribute(Attribute.FOLLOW_RANGE).setBaseValue(range);
-            }
+            requireAttribute(ctx, node, Attribute.FOLLOW_RANGE).setBaseValue(requireNonNegative(range, "Entity follow range"));
         });
 
         operations.put("entity_set_knockback_resistance", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
             Double resistance = ctx.getInputValue(node, "resistance", Double.class, 0.0);
-            if (entity instanceof LivingEntity living && living.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null) {
-                living.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(resistance);
-            }
+            double value = requireNonNegative(resistance, "Entity knockback resistance");
+            if (value > 1) throw new IllegalArgumentException("Entity knockback resistance cannot exceed 1");
+            requireAttribute(ctx, node, Attribute.KNOCKBACK_RESISTANCE).setBaseValue(value);
         });
 
         operations.put("entity_set_wet", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            Boolean wet = ctx.getInputValue(node, "wet", Boolean.class, false);
-            if (entity != null) {
-                entity.setVisualFire(wet);
-            }
+            requireEntity(ctx, node);
+            throw new UnsupportedOperationException("Minecraft does not expose a writable generic entity wet state");
         });
 
         operations.put("entity_set_shaking", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             Boolean shaking = ctx.getInputValue(node, "shaking", Boolean.class, false);
-            if (entity != null) {
-                entity.setVisualFire(shaking);
-            }
+            entity.setFreezeTicks(Boolean.TRUE.equals(shaking) ? entity.getMaxFreezeTicks() : 0);
         });
 
         operations.put("entity_set_owner", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             Entity owner = ctx.getInputValue(node, "owner", Entity.class, null);
-            if (entity instanceof Tameable tameable && owner instanceof AnimalTamer tamer) {
-                tameable.setOwner(tamer);
-            }
+            if (!(entity instanceof Tameable tameable)) throw new IllegalArgumentException("Entity cannot be tamed");
+            if (!(owner instanceof AnimalTamer tamer)) throw new IllegalArgumentException("Entity owner must be an animal tamer");
+            tameable.setOwner(tamer);
         });
 
         operations.put("entity_set_angry", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             Boolean angry = ctx.getInputValue(node, "angry", Boolean.class, true);
-            if (entity != null) {
-                try {
-                    if (entity.getClass().getMethod("setAngry", int.class) != null) {
-                        entity.getClass().getMethod("setAngry", int.class).invoke(entity, Boolean.TRUE.equals(angry) ? 1000 : 0);
-                    }
-                } catch (Exception ignored) {
-                }
+            if (!(entity instanceof Mob mob)) {
+                throw new IllegalArgumentException("Entity does not support anger state");
+            }
+            if (!Boolean.TRUE.equals(angry)) {
+                mob.setTarget(null);
+            } else if (mob.getTarget() == null) {
+                throw new IllegalArgumentException("An angry entity requires an active target");
             }
         });
 
         operations.put("entity_set_love_mode", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 600);
-            if (entity instanceof Animals animals) {
-                animals.setLoveModeTicks(ticks);
-            }
+            if (!(entity instanceof Animals animals)) throw new IllegalArgumentException("Entity does not support love mode");
+            if (ticks < 0 || ticks > 72_000) throw new IllegalArgumentException("Love mode ticks must be between 0 and 72000");
+            animals.setLoveModeTicks(ticks);
         });
 
         operations.put("entity_set_color", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             String colorName = ctx.getInputValue(node, "color", String.class, "WHITE");
-            if (entity != null && colorName != null) {
-                try {
-                    DyeColor color = DyeColor.valueOf(colorName.toUpperCase());
-                    try {
-                        entity.getClass().getMethod("setColor", DyeColor.class).invoke(entity, color);
-                    } catch (Exception ignored) {
-                    }
-                } catch (IllegalArgumentException e) {
-                    Log.warn("[Flow] Invalid dye color: " + colorName);
-                }
+            if (colorName == null || colorName.isBlank()) throw new IllegalArgumentException("Entity dye color is required");
+            DyeColor color;
+            try {
+                color = DyeColor.valueOf(colorName.toUpperCase(Locale.ROOT));
+                entity.getClass().getMethod("setColor", DyeColor.class).invoke(entity, color);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown dye color: " + colorName, exception);
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalArgumentException("Entity does not support dye color: " + entity.getType(), exception);
             }
         });
 
         operations.put("entity_set_variant", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             String variant = ctx.getInputValue(node, "variant", String.class, "");
-            if (entity != null && variant != null) {
-                if (entity instanceof Frog frog) {
-                    try {
-                        frog.setVariant(Frog.Variant.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Villager villager) {
-                    try {
-                        villager.setVillagerType(Villager.Type.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Cat cat) {
-                    try {
-                        cat.setCatType(Cat.Type.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Fox fox) {
-                    try {
-                        fox.setFoxType(Fox.Type.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof MushroomCow cow) {
-                    try {
-                        cow.setVariant(MushroomCow.Variant.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Llama llama) {
-                    try {
-                        llama.setColor(Llama.Color.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Rabbit rabbit) {
-                    try {
-                        rabbit.setRabbitType(Rabbit.Type.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Axolotl axolotl) {
-                    try {
-                        axolotl.setVariant(Axolotl.Variant.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof Parrot parrot) {
-                    try {
-                        parrot.setVariant(Parrot.Variant.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                } else if (entity instanceof TropicalFish fish) {
-                    try {
-                        fish.setPattern(TropicalFish.Pattern.valueOf(variant.toUpperCase()));
-                    } catch (IllegalArgumentException ignored) {
-                    }
-                }
+            if (variant == null || variant.isBlank()) {
+                throw new IllegalArgumentException("Entity variant is required");
+            }
+            String normalized = variant.toUpperCase(Locale.ROOT);
+            switch (entity) {
+                case Frog frog -> frog.setVariant(Frog.Variant.valueOf(normalized));
+                case Villager villager -> villager.setVillagerType(Villager.Type.valueOf(normalized));
+                case Cat cat -> cat.setCatType(Cat.Type.valueOf(normalized));
+                case Fox fox -> fox.setFoxType(Fox.Type.valueOf(normalized));
+                case MushroomCow cow -> cow.setVariant(MushroomCow.Variant.valueOf(normalized));
+                case Llama llama -> llama.setColor(Llama.Color.valueOf(normalized));
+                case Rabbit rabbit -> rabbit.setRabbitType(Rabbit.Type.valueOf(normalized));
+                case Axolotl axolotl -> axolotl.setVariant(Axolotl.Variant.valueOf(normalized));
+                case Parrot parrot -> parrot.setVariant(Parrot.Variant.valueOf(normalized));
+                case TropicalFish fish -> fish.setPattern(TropicalFish.Pattern.valueOf(normalized));
+                default -> throw new IllegalArgumentException("Entity does not support variants: " + entity.getType());
             }
         });
 
         operations.put("entity_set_held_item", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            if (entity instanceof Mob mob && item != null && mob.getEquipment() != null) {
-                mob.getEquipment().setItemInMainHand(item);
-            }
+            if (!(entity instanceof Mob mob) || mob.getEquipment() == null) throw new IllegalArgumentException("Entity does not support held equipment");
+            mob.getEquipment().setItemInMainHand(item);
         });
 
         operations.put("entity_set_armor", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            LivingEntity living = requireLivingEntity(ctx, node);
             String slot = ctx.getInputValue(node, "slot", String.class, "HEAD");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            if (entity instanceof LivingEntity living && item != null && living.getEquipment() != null) {
-                switch (slot.toUpperCase()) {
-                    case "HEAD" -> living.getEquipment().setHelmet(item);
-                    case "CHEST" -> living.getEquipment().setChestplate(item);
-                    case "LEGS" -> living.getEquipment().setLeggings(item);
-                    case "FEET" -> living.getEquipment().setBoots(item);
-                    case "HAND" -> living.getEquipment().setItemInMainHand(item);
-                    case "OFFHAND" -> living.getEquipment().setItemInOffHand(item);
-                }
+            if (living.getEquipment() == null) throw new IllegalArgumentException("Entity does not support equipment");
+            switch (slot.toUpperCase(Locale.ROOT)) {
+                case "HEAD" -> living.getEquipment().setHelmet(item);
+                case "CHEST" -> living.getEquipment().setChestplate(item);
+                case "LEGS" -> living.getEquipment().setLeggings(item);
+                case "FEET" -> living.getEquipment().setBoots(item);
+                case "HAND" -> living.getEquipment().setItemInMainHand(item);
+                case "OFFHAND" -> living.getEquipment().setItemInOffHand(item);
+                default -> throw new IllegalArgumentException("Unknown entity equipment slot: " + slot);
             }
         });
 
         operations.put("entity_set_drop_chances", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Mob living = requireMob(ctx, node);
             Double chance = ctx.getInputValue(node, "chance", Double.class, 0.085);
-            if (entity instanceof LivingEntity living && living.getEquipment() != null) {
-                float floatChance = chance.floatValue();
-                living.getEquipment().setDropChance(EquipmentSlot.HAND, floatChance);
-                living.getEquipment().setDropChance(EquipmentSlot.OFF_HAND, floatChance);
-                living.getEquipment().setDropChance(EquipmentSlot.HEAD, floatChance);
-                living.getEquipment().setDropChance(EquipmentSlot.CHEST, floatChance);
-                living.getEquipment().setDropChance(EquipmentSlot.LEGS, floatChance);
-                living.getEquipment().setDropChance(EquipmentSlot.FEET, floatChance);
-            }
+            if (living.getEquipment() == null) throw new IllegalArgumentException("Entity does not support equipment drops");
+            if (!Double.isFinite(chance) || chance < 0 || chance > 1) throw new IllegalArgumentException("Equipment drop chance must be between 0 and 1");
+            float floatChance = chance.floatValue();
+            living.getEquipment().setDropChance(EquipmentSlot.HAND, floatChance);
+            living.getEquipment().setDropChance(EquipmentSlot.OFF_HAND, floatChance);
+            living.getEquipment().setDropChance(EquipmentSlot.HEAD, floatChance);
+            living.getEquipment().setDropChance(EquipmentSlot.CHEST, floatChance);
+            living.getEquipment().setDropChance(EquipmentSlot.LEGS, floatChance);
+            living.getEquipment().setDropChance(EquipmentSlot.FEET, floatChance);
         });
 
         operations.put("entity_add_drop", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            if (entity != null && item != null) {
-                entity.getWorld().dropItemNaturally(entity.getLocation(), item);
-            }
+            if (item == null || item.getType().isAir()) throw new IllegalArgumentException("Drop item is required");
+            entity.getWorld().dropItemNaturally(entity.getLocation(), item.clone());
         });
 
         operations.put("entity_clear_drops", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity instanceof LivingEntity living && living.getEquipment() != null) {
-                living.getEquipment().clear();
+            Mob living = requireMob(ctx, node);
+            if (living.getEquipment() == null) throw new IllegalArgumentException("Entity does not support equipment drops");
+            for (EquipmentSlot slot : List.of(EquipmentSlot.HAND, EquipmentSlot.OFF_HAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
+                living.getEquipment().setDropChance(slot, 0);
             }
         });
 
         operations.put("entity_pickup_item", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            LivingEntity living = requireLivingEntity(ctx, node);
             Boolean canPickup = ctx.getInputValue(node, "can_pickup", Boolean.class, true);
-            if (entity instanceof LivingEntity living) {
-                living.setCanPickupItems(canPickup);
-            }
+            living.setCanPickupItems(canPickup);
         });
 
         operations.put("entity_state", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+            Entity entity = requireEntity(ctx, node);
             String property = ctx.getInputValue(node, "property", String.class, "");
             String action = ctx.getInputValue(node, "action", String.class, "get");
             String stringValue = ctx.getInputValue(node, "string_value", String.class, "");
@@ -299,8 +238,9 @@ public class EntityActionHandler implements NodeHandler {
             boolean success = false;
             Object result = null;
 
-            if (entity != null && property != null && action != null) {
-                switch (property.toLowerCase()) {
+            if (property == null || property.isBlank()) throw new IllegalArgumentException("Entity state property is required");
+            if (action == null || !List.of("get", "set", "do").contains(action.toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Unknown entity state action: " + action);
+            switch (property.toLowerCase(Locale.ROOT)) {
                     case "name" -> {
                         if ("set".equalsIgnoreCase(action)) {
                             entity.setCustomName(stringValue);
@@ -348,7 +288,7 @@ public class EntityActionHandler implements NodeHandler {
                     }
                     case "burning" -> {
                         if ("set".equalsIgnoreCase(action)) {
-                            int ticks = numberValue.intValue();
+                            int ticks = requireWholeNumber(numberValue, "Entity fire ticks", 0, Integer.MAX_VALUE);
                             entity.setFireTicks(ticks);
                             success = true;
                         } else if ("get".equalsIgnoreCase(action)) {
@@ -358,7 +298,7 @@ public class EntityActionHandler implements NodeHandler {
                     }
                     case "frozen" -> {
                         if ("set".equalsIgnoreCase(action)) {
-                            int ticks = numberValue.intValue();
+                            int ticks = requireWholeNumber(numberValue, "Entity freeze ticks", 0, entity.getMaxFreezeTicks());
                             entity.setFreezeTicks(ticks);
                             success = true;
                         } else if ("get".equalsIgnoreCase(action)) {
@@ -390,26 +330,32 @@ public class EntityActionHandler implements NodeHandler {
                         }
                     }
                     case "max_health" -> {
-                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                            if ("set".equalsIgnoreCase(action)) {
-                                double maxHealth = numberValue;
-                                living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHealth);
-                                success = true;
-                            } else if ("get".equalsIgnoreCase(action)) {
-                                result = living.getMaxHealth();
-                                success = true;
+                        if (entity instanceof LivingEntity living) {
+                            AttributeInstance maximumHealth = living.getAttribute(Attribute.MAX_HEALTH);
+                            if (maximumHealth != null) {
+                                if ("set".equalsIgnoreCase(action)) {
+                                    double maxHealth = requirePositive(numberValue, "Entity maximum health");
+                                    maximumHealth.setBaseValue(maxHealth);
+                                    if (living.getHealth() > maximumHealth.getValue()) FlowMutations.setHealth(ctx, living, maximumHealth.getValue());
+                                    success = true;
+                                } else if ("get".equalsIgnoreCase(action)) {
+                                    result = maximumHealth.getValue();
+                                    success = true;
+                                }
                             }
                         }
                     }
                     case "speed" -> {
-                        if (entity instanceof LivingEntity living && living.getAttribute(Attribute.MOVEMENT_SPEED) != null) {
-                            if ("set".equalsIgnoreCase(action)) {
-                                double speed = numberValue;
-                                living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(speed);
-                                success = true;
-                            } else if ("get".equalsIgnoreCase(action)) {
-                                result = living.getAttribute(Attribute.MOVEMENT_SPEED).getBaseValue();
-                                success = true;
+                        if (entity instanceof LivingEntity living) {
+                            AttributeInstance movementSpeed = living.getAttribute(Attribute.MOVEMENT_SPEED);
+                            if (movementSpeed != null) {
+                                if ("set".equalsIgnoreCase(action)) {
+                                    movementSpeed.setBaseValue(requireNonNegative(numberValue, "Entity movement speed"));
+                                    success = true;
+                                } else if ("get".equalsIgnoreCase(action)) {
+                                    result = movementSpeed.getBaseValue();
+                                    success = true;
+                                }
                             }
                         }
                     }
@@ -422,6 +368,8 @@ public class EntityActionHandler implements NodeHandler {
                                 } else if (entityValue == null) {
                                     mob.setTarget(null);
                                     success = true;
+                                } else {
+                                    throw new IllegalArgumentException("Entity target must be living");
                                 }
                             } else if ("get".equalsIgnoreCase(action)) {
                                 result = mob.getTarget();
@@ -489,6 +437,37 @@ public class EntityActionHandler implements NodeHandler {
                             }
                         }
                     }
+                    case "ai" -> {
+                        if (entity instanceof LivingEntity living) {
+                            if ("set".equalsIgnoreCase(action)) {
+                                living.setAI(Boolean.TRUE.equals(booleanValue));
+                                success = true;
+                            } else if ("get".equalsIgnoreCase(action)) {
+                                result = living.hasAI();
+                                success = true;
+                            }
+                        }
+                    }
+                    case "gravity" -> {
+                        if ("set".equalsIgnoreCase(action)) {
+                            entity.setGravity(Boolean.TRUE.equals(booleanValue));
+                            success = true;
+                        } else if ("get".equalsIgnoreCase(action)) {
+                            result = entity.hasGravity();
+                            success = true;
+                        }
+                    }
+                    case "collidable" -> {
+                        if (entity instanceof LivingEntity living) {
+                            if ("set".equalsIgnoreCase(action)) {
+                                living.setCollidable(Boolean.TRUE.equals(booleanValue));
+                                success = true;
+                            } else if ("get".equalsIgnoreCase(action)) {
+                                result = living.isCollidable();
+                                success = true;
+                            }
+                        }
+                    }
                     case "kill" -> {
                         if ("do".equalsIgnoreCase(action) && entity instanceof LivingEntity living) {
                             FlowMutations.setHealth(ctx, living, 0.0);
@@ -507,8 +486,9 @@ public class EntityActionHandler implements NodeHandler {
                             success = true;
                         }
                     }
-                }
             }
+
+            if (!success) throw new IllegalArgumentException("Entity state property or action is unsupported for " + entity.getType() + ": " + property + "." + action);
 
             ctx.setOutput(node, "success", success);
             ctx.setOutput(node, "result", result);
@@ -517,63 +497,104 @@ public class EntityActionHandler implements NodeHandler {
             }
         });
 
-        operations.put("entity_spawn", (ctx, node) -> {
-            String entityType = ctx.getInputValue(node, "entity_type", String.class, "ZOMBIE");
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            Entity spawned = null;
-            if (location != null && location.getWorld() != null) {
-                try {
-                    spawned = location.getWorld().spawnEntity(location, EntityType.valueOf(entityType.toUpperCase()));
-                } catch (IllegalArgumentException e) {
-                    Log.warn("[Flow] Invalid entity type: " + entityType);
+        operations.put("entity_data", (ctx, node) -> {
+            Entity entity = requireEntity(ctx, node);
+            String property = ctx.getInputValue(node, "property", String.class, "");
+            String action = ctx.getInputValue(node, "action", String.class, "get");
+            if ("get".equalsIgnoreCase(action)) {
+                ctx.setOutput(node, "value", EntityDataAccess.get(entity, property));
+            } else if ("set".equalsIgnoreCase(action)) {
+                EntityDataAccess.set(ctx, entity, property, ctx.getInputValue(node, "value", Object.class, null));
+            } else {
+                throw new IllegalArgumentException("Unknown entity data action: " + action);
+            }
+            ctx.setOutput(node, "entity", entity);
+            ctx.setOutput(node, "success", true);
+        });
+
+        operations.put("entity_typed_data", (ctx, node) -> {
+            Entity entity = requireEntity(ctx, node);
+            String property = typedProperty(ctx, node);
+            String action = ctx.getInputValue(node, "action", String.class, "get");
+            String valuePin = node.getHandlerConfig().getString("valuePin", "value");
+            if ("get".equalsIgnoreCase(action)) {
+                ctx.setOutput(node, valuePin, EntityDataAccess.get(entity, property));
+            } else if ("set".equalsIgnoreCase(action)) {
+                EntityDataAccess.set(ctx, entity, property, ctx.getInputValue(node, valuePin, Object.class, null));
+            } else {
+                throw new IllegalArgumentException("Unknown entity data action: " + action);
+            }
+            ctx.setOutput(node, "entity", entity);
+            ctx.setOutput(node, "success", true);
+        });
+
+        operations.put("entity_data_entry", (ctx, node) -> {
+            Map<String, Object> data = new LinkedHashMap<>();
+            Object existing = ctx.getInputValue(node, "data", Object.class, null);
+            if (existing != null) {
+                if (!(existing instanceof Map<?, ?> values)) throw new IllegalArgumentException("Entity data input must be Entity Data");
+                for (Map.Entry<?, ?> entry : values.entrySet()) {
+                    if (entry.getKey() != null) data.put(entry.getKey().toString(), entry.getValue());
                 }
             }
-            ctx.setOutput(node, "entity", spawned);
+            String valuePin = node.getHandlerConfig().getString("valuePin", "value");
+            data.put(typedProperty(ctx, node), ctx.getInputValue(node, valuePin, Object.class, null));
+            ctx.setOutput(node, "data", data);
+        });
+
+        operations.put("entity_apply_data", (ctx, node) -> {
+            Entity entity = requireEntity(ctx, node);
+            EntityDataAccess.apply(ctx, entity, ctx.getInputValue(node, "data", Object.class, null));
+            ctx.setOutput(node, "entity", entity);
+            ctx.setOutput(node, "success", true);
+        });
+
+        operations.put("entity_spawn", (ctx, node) -> {
+            String typeName = ctx.getInputValue(node, "entity_type", String.class, "ZOMBIE");
+            Location location = ctx.getInputValue(node, "location", Location.class, null);
+            if (location == null || location.getWorld() == null) {
+                throw new IllegalArgumentException("Entity spawn world location is required");
+            }
+            Entity entity = location.getWorld().spawnEntity(location, entityType(typeName));
+            try {
+                EntityDataAccess.apply(ctx, entity, ctx.getInputValue(node, "data", Object.class, null));
+            } catch (RuntimeException exception) {
+                entity.remove();
+                throw exception;
+            }
+            ctx.setOutput(node, "entity", entity);
         });
 
         operations.put("entity_despawn", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity != null) {
-                entity.remove();
-            }
+            requireEntity(ctx, node).remove();
         });
 
         operations.put("entity_get_nearby", (ctx, node) -> {
-            Location center = ctx.getInputValue(node, "center", Location.class, null);
+            Location center = requireLocation(ctx, node, "center");
             Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
             String typeFilter = ctx.getInputValue(node, "entity_type", String.class, null);
             List<Entity> entities = new ArrayList<>();
-            if (center != null && center.getWorld() != null) {
-                entities.addAll(center.getWorld().getNearbyEntities(center, radius, radius, radius));
-                if (typeFilter != null) {
-                    try {
-                        EntityType filterType = EntityType.valueOf(typeFilter.toUpperCase());
-                        entities.removeIf(entity -> entity.getType() != filterType);
-                    } catch (IllegalArgumentException e) {
-                        Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
-                    }
-                }
+            requireRadius(radius);
+            entities.addAll(center.getWorld().getNearbyEntities(center, radius, radius, radius));
+            if (typeFilter != null && !typeFilter.isBlank()) {
+                EntityType filterType = entityType(typeFilter);
+                entities.removeIf(entity -> entity.getType() != filterType);
             }
             ctx.setOutput(node, "entities", entities);
         });
 
         operations.put("entity_get_all", (ctx, node) -> {
             World world = ctx.getInputValue(node, "world", World.class, null);
+            if (world == null) throw new IllegalArgumentException("World is required");
             String typeFilter = ctx.getInputValue(node, "entity_type", String.class, null);
             List<Entity> entities = new ArrayList<>();
-            if (world != null) {
-                if (typeFilter == null) {
-                    entities.addAll(world.getEntities());
-                } else {
-                    try {
-                        EntityType filterType = EntityType.valueOf(typeFilter.toUpperCase());
-                        for (Entity entity : world.getEntities()) {
-                            if (entity.getType() == filterType) {
-                                entities.add(entity);
-                            }
-                        }
-                    } catch (IllegalArgumentException e) {
-                        Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
+            if (typeFilter == null || typeFilter.isBlank()) {
+                entities.addAll(world.getEntities());
+            } else {
+                EntityType filterType = entityType(typeFilter);
+                for (Entity entity : world.getEntities()) {
+                    if (entity.getType() == filterType) {
+                        entities.add(entity);
                     }
                 }
             }
@@ -581,64 +602,50 @@ public class EntityActionHandler implements NodeHandler {
         });
 
         operations.put("entity_teleport", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            Location location = ctx.getInputValue(node, "location", Location.class, null);
-            if (entity != null && location != null) {
-                entity.teleport(location);
-            }
+            Entity entity = requireEntity(ctx, node);
+            Location location = requireLocation(ctx, node, "location");
+            if (!entity.teleport(location)) throw new IllegalStateException("Entity could not be teleported");
         });
 
         operations.put("entity_remove", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity != null) {
-                entity.remove();
-            }
+            requireEntity(ctx, node).remove();
         });
 
         operations.put("entity_get_player_nearby", (ctx, node) -> {
-            Location center = ctx.getInputValue(node, "center", Location.class, null);
+            Location center = requireLocation(ctx, node, "center");
             Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
+            requireRadius(radius);
             List<Player> players = new ArrayList<>();
-            if (center != null && center.getWorld() != null) {
-                for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
-                    if (entity instanceof Player player) {
-                        players.add(player);
-                    }
+            for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
+                if (entity instanceof Player player) {
+                    players.add(player);
                 }
             }
             ctx.setOutput(node, "players", players);
         });
 
         operations.put("entity_get_mob_nearby", (ctx, node) -> {
-            Location center = ctx.getInputValue(node, "center", Location.class, null);
+            Location center = requireLocation(ctx, node, "center");
             Double radius = ctx.getInputValue(node, "radius", Double.class, 10.0);
+            requireRadius(radius);
             String typeFilter = ctx.getInputValue(node, "entity_type", String.class, null);
             List<Entity> mobs = new ArrayList<>();
-            if (center != null && center.getWorld() != null) {
-                EntityType filterType = null;
-                if (typeFilter != null) {
-                    try {
-                        filterType = EntityType.valueOf(typeFilter.toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        Log.warn("[Flow] Invalid entity type filter: " + typeFilter);
-                    }
+            EntityType filterType = typeFilter != null && !typeFilter.isBlank() ? entityType(typeFilter) : null;
+            for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
+                if (entity instanceof Player) {
+                    continue;
                 }
-                for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
-                    if (entity instanceof Player) {
-                        continue;
-                    }
-                    if (filterType == null || entity.getType() == filterType) {
-                        mobs.add(entity);
-                    }
+                if (filterType == null || entity.getType() == filterType) {
+                    mobs.add(entity);
                 }
             }
             ctx.setOutput(node, "mobs", mobs);
         });
 
         operations.put("entity_is_alive", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            boolean isValid = entity != null && entity.isValid();
-            boolean isDead = entity == null || entity.isDead();
+            Entity entity = requireEntity(ctx, node);
+            boolean isValid = entity.isValid();
+            boolean isDead = entity.isDead();
             boolean isAlive = isValid && !isDead;
             ctx.setOutput(node, "is_alive", isAlive);
             ctx.setOutput(node, "is_valid", isValid);
@@ -646,19 +653,7 @@ public class EntityActionHandler implements NodeHandler {
         });
 
         operations.put("entity_get_info", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity == null) {
-                ctx.setOutput(node, "entity_type", "");
-                ctx.setOutput(node, "uuid", "");
-                ctx.setOutput(node, "name", "");
-                ctx.setOutput(node, "custom_name", "");
-                ctx.setOutput(node, "location", null);
-                ctx.setOutput(node, "world_name", "");
-                ctx.setOutput(node, "ticks_lived", 0);
-                ctx.setOutput(node, "is_dead", true);
-                ctx.setOutput(node, "is_valid", false);
-                return;
-            }
+            Entity entity = requireEntity(ctx, node);
             Location location = entity.getLocation();
             ctx.setOutput(node, "entity_type", entity.getType().name());
             ctx.setOutput(node, "uuid", entity.getUniqueId().toString());
@@ -673,46 +668,28 @@ public class EntityActionHandler implements NodeHandler {
         });
 
         operations.put("entity_get_health", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (entity instanceof LivingEntity living) {
-                double maxHealth = 0.0;
-                if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                    maxHealth = living.getAttribute(Attribute.MAX_HEALTH).getValue();
-                }
-                ctx.setOutput(node, "health", living.getHealth());
-                ctx.setOutput(node, "max_health", maxHealth);
-                ctx.setOutput(node, "absorption", living.getAbsorptionAmount());
-                return;
-            }
-            ctx.setOutput(node, "health", 0.0);
-            ctx.setOutput(node, "max_health", 0.0);
-            ctx.setOutput(node, "absorption", 0.0);
+            LivingEntity living = requireLivingEntity(ctx, node);
+            AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth == null) throw new IllegalArgumentException("Entity does not expose maximum health");
+            ctx.setOutput(node, "health", living.getHealth());
+            ctx.setOutput(node, "max_health", maxHealth.getValue());
+            ctx.setOutput(node, "absorption", living.getAbsorptionAmount());
         });
 
         operations.put("entity_get_velocity", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            Vector velocity = entity != null ? entity.getVelocity() : null;
-            ctx.setOutput(node, "velocity", velocity);
+            ctx.setOutput(node, "velocity", requireEntity(ctx, node).getVelocity());
         });
 
         operations.put("entity_get_fire_ticks", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            ctx.setOutput(node, "fire_ticks", entity != null ? entity.getFireTicks() : 0);
+            ctx.setOutput(node, "fire_ticks", requireEntity(ctx, node).getFireTicks());
         });
 
         operations.put("entity_get_freeze_ticks", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            ctx.setOutput(node, "freeze_ticks", entity != null ? entity.getFreezeTicks() : 0);
+            ctx.setOutput(node, "freeze_ticks", requireEntity(ctx, node).getFreezeTicks());
         });
 
         operations.put("entity_get_last_damage", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            if (!(entity instanceof LivingEntity living)) {
-                ctx.setOutput(node, "damage", 0.0);
-                ctx.setOutput(node, "cause", "");
-                ctx.setOutput(node, "damager", null);
-                return;
-            }
+            LivingEntity living = requireLivingEntity(ctx, node);
             EntityDamageEvent damageEvent = living.getLastDamageCause();
             double damage = 0.0;
             String cause = "";
@@ -730,8 +707,7 @@ public class EntityActionHandler implements NodeHandler {
         });
 
         operations.put("entity_get_location", (ctx, node) -> {
-            Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-            ctx.setOutput(node, "location", entity != null ? entity.getLocation() : null);
+            ctx.setOutput(node, "location", requireEntity(ctx, node).getLocation());
         });
     }
 
@@ -743,10 +719,85 @@ public class EntityActionHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown entity action operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private static EntityType entityType(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Entity type is required");
+        }
+        String normalized = value.toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("MINECRAFT:")) {
+            normalized = normalized.substring("MINECRAFT:".length());
+        }
+        try {
+            return EntityType.valueOf(normalized);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown entity type: " + value, exception);
+        }
+    }
+
+    private static String typedProperty(FlowContext context, FlowNode node) {
+        String property = context.getInputValue(node, "property", String.class, "");
+        if (property == null || property.isBlank()) throw new IllegalArgumentException("Entity data property is required");
+        String prefix = node.getHandlerConfig().getString("propertyPrefix", "");
+        return prefix + property;
+    }
+
+    private static Entity requireEntity(FlowContext context, FlowNode node) {
+        Entity entity = context.getInputValue(node, "entity", Entity.class, null);
+        if (entity == null) throw new IllegalArgumentException("Entity is required");
+        return entity;
+    }
+
+    private static LivingEntity requireLivingEntity(FlowContext context, FlowNode node) {
+        Entity entity = requireEntity(context, node);
+        if (!(entity instanceof LivingEntity living)) throw new IllegalArgumentException("Entity must be living");
+        return living;
+    }
+
+    private static Mob requireMob(FlowContext context, FlowNode node) {
+        LivingEntity living = requireLivingEntity(context, node);
+        if (!(living instanceof Mob mob)) throw new IllegalArgumentException("Entity must be a mob");
+        return mob;
+    }
+
+    private static AttributeInstance requireAttribute(FlowContext context, FlowNode node, Attribute attribute) {
+        LivingEntity entity = requireLivingEntity(context, node);
+        AttributeInstance instance = entity.getAttribute(attribute);
+        if (instance == null) throw new IllegalArgumentException("Entity does not support attribute: " + attribute.getKey());
+        return instance;
+    }
+
+    private static Location requireLocation(FlowContext context, FlowNode node, String inputName) {
+        Location location = context.getInputValue(node, inputName, Location.class, null);
+        if (location == null || location.getWorld() == null) throw new IllegalArgumentException("Location input is required: " + inputName);
+        return location;
+    }
+
+    private static double requireNonNegative(double value, String field) {
+        if (!Double.isFinite(value) || value < 0) throw new IllegalArgumentException(field + " must be a finite non-negative number");
+        return value;
+    }
+
+    private static double requirePositive(double value, String field) {
+        if (!Double.isFinite(value) || value <= 0) throw new IllegalArgumentException(field + " must be a finite positive number");
+        return value;
+    }
+
+    private static int requireWholeNumber(double value, String field, int minimum, int maximum) {
+        if (!Double.isFinite(value) || value != Math.rint(value) || value < minimum || value > maximum) {
+            throw new IllegalArgumentException(field + " must be a whole number between " + minimum + " and " + maximum);
+        }
+        return (int) value;
+    }
+
+    private static void requireRadius(double radius) {
+        if (!Double.isFinite(radius) || radius < 0 || radius > 128) throw new IllegalArgumentException("Entity search radius must be between 0 and 128");
     }
 
 }

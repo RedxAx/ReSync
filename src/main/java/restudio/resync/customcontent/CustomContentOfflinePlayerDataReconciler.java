@@ -92,7 +92,7 @@ class CustomContentOfflinePlayerDataReconciler {
             return;
         }
         try (var stream = Files.list(directory)) {
-            for (Path file : stream.filter(path -> path.getFileName().toString().endsWith(".dat")).toList()) {
+            for (Path file : stream.filter(path -> playerIdFromFile(path) != null).toList()) {
                 if (!pluginActive(plugin)) {
                     return;
                 }
@@ -274,27 +274,29 @@ class CustomContentOfflinePlayerDataReconciler {
     }
 
     private boolean isOnlinePlayerFile(Path file, Set<UUID> onlinePlayers) {
-        String name = file.getFileName().toString();
-        if (!name.endsWith(".dat")) {
-            return false;
-        }
-        try {
-            UUID playerId = UUID.fromString(name.substring(0, name.length() - 4));
-            return onlinePlayers.contains(playerId);
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
+        UUID playerId = playerIdFromFile(file);
+        return playerId != null && onlinePlayers.contains(playerId);
     }
 
     private boolean isCurrentlyOnlinePlayerFile(Path file) {
+        UUID playerId = playerIdFromFile(file);
+        return playerId != null && Bukkit.getPlayer(playerId) != null;
+    }
+
+    static UUID playerIdFromFile(Path file) {
+        if (file == null || file.getFileName() == null) {
+            return null;
+        }
         String name = file.getFileName().toString();
         if (!name.endsWith(".dat")) {
-            return false;
+            return null;
         }
+        String value = name.substring(0, name.length() - 4);
         try {
-            return Bukkit.getPlayer(UUID.fromString(name.substring(0, name.length() - 4))) != null;
+            UUID playerId = UUID.fromString(value);
+            return playerId.toString().equalsIgnoreCase(value) ? playerId : null;
         } catch (IllegalArgumentException ignored) {
-            return false;
+            return null;
         }
     }
 
@@ -624,10 +626,6 @@ class CustomContentOfflinePlayerDataReconciler {
                 array.add(value);
             }
             return array;
-        }
-
-        private static List<NbtTag> fromJsonObject(JsonObject object) {
-            return fromJsonObject(object, List.of());
         }
 
         private static List<NbtTag> fromJsonObject(JsonObject object, List<NbtTag> template) {

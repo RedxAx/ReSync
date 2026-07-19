@@ -1,12 +1,15 @@
 package restudio.resync.flow;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.flow.migration.IdCompatibilityLayer;
+import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -14,6 +17,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class FlowRuntime {
     private static final String PASSTHROUGH_OUTPUT_PREFIX = "__passthrough:";
@@ -23,15 +32,17 @@ public class FlowRuntime {
     private final Map<String, Object> globalVariables;
     private final Map<String, Object> eventVariables;
     private final TypeAdapterRegistry typeAdapter;
-    private final ThreadLocal<String> triggeredOutputPin = ThreadLocal.withInitial(() -> null);
+    private final NodeDefinitionRegistry nodeDefinitions;
+    private final IdCompatibilityLayer compatibility = new IdCompatibilityLayer();
+    private final AtomicReference<String> triggeredOutputPin = new AtomicReference<>();
     private final ThreadLocal<Set<String>> resolvingPassthroughOutputs = ThreadLocal.withInitial(HashSet::new);
-    private final Set<String> evaluatingNodes = new HashSet<>();
-    private final ThreadLocal<Set<String>> executingFlowNodes = ThreadLocal.withInitial(HashSet::new);
+    private final Set<String> evaluatingNodes = ConcurrentHashMap.newKeySet();
+    private final Set<String> executingFlowNodes = ConcurrentHashMap.newKeySet();
     private final Map<String, Object> functionInputs = new HashMap<>();
+    private final ExecutionAuthority executionAuthority;
 
     private final Deque<Frame> callStack = new ArrayDeque<>();
-    private boolean breakLoopRequested = false;
-    private boolean continueLoopRequested = false;
+    private final Deque<LoopControl> loopControls = new ArrayDeque<>();
     private boolean functionReturnRequested = false;
     private String returnedCallerNodeId;
     private String debugSessionId;
@@ -50,17 +61,41 @@ public class FlowRuntime {
         }
     }
 
+    private static final class LoopControl {
+        private boolean breakRequested;
+        private boolean continueRequested;
+    }
+
+    private static final class ExecutionAuthority {
+        private final AtomicInteger operations = new AtomicInteger();
+        private final AtomicBoolean eventMutationOpen = new AtomicBoolean();
+        private final long startedAtNanos = System.nanoTime();
+        private final String executionId = UUID.randomUUID().toString();
+    }
+
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
-        this(graph, typeAdapter, globalVariables, new HashMap<>());
+        this(graph, typeAdapter, globalVariables, new HashMap<>(), null);
     }
 
     public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables) {
+        this(graph, typeAdapter, globalVariables, eventVariables, null);
+    }
+
+    public FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
+                       NodeDefinitionRegistry nodeDefinitions) {
+        this(graph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, new ExecutionAuthority());
+    }
+
+    private FlowRuntime(FlowGraph graph, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables, Map<String, Object> eventVariables,
+                        NodeDefinitionRegistry nodeDefinitions, ExecutionAuthority executionAuthority) {
         this.graph = graph;
         this.nodeOutputs = new HashMap<>();
         this.localVariables = new HashMap<>();
-        this.globalVariables = globalVariables != null ? globalVariables : new HashMap<>();
+        this.globalVariables = concurrentVariables(globalVariables);
         this.eventVariables = eventVariables != null ? eventVariables : new HashMap<>();
         this.typeAdapter = typeAdapter;
+        this.nodeDefinitions = nodeDefinitions;
+        this.executionAuthority = executionAuthority;
 
         if (graph.getLocalVariables() != null) {
             graph.getLocalVariables().forEach(var -> localVariables.put(var.getName(), var.getInitialValue()));
@@ -69,11 +104,34 @@ public class FlowRuntime {
         initializeServerGlobals();
     }
 
+    private Map<String, Object> concurrentVariables(Map<String, Object> variables) {
+        if (variables instanceof ConcurrentMap<?, ?>) {
+            return variables;
+        }
+        Map<String, Object> concurrent = new ConcurrentHashMap<>();
+        if (variables != null) {
+            variables.forEach((key, value) -> {
+                if (key != null && value != null) {
+                    concurrent.put(key, value);
+                }
+            });
+        }
+        return concurrent;
+    }
+
+    public FlowRuntime createSubRuntime(FlowGraph subGraph) {
+        return new FlowRuntime(subGraph, typeAdapter, globalVariables, eventVariables, nodeDefinitions, executionAuthority);
+    }
+
     private void initializeServerGlobals() {
-        globalVariables.put("server.name", Bukkit.getServer().getName());
+        Server server = Bukkit.getServer();
+        if (server == null) {
+            return;
+        }
+        globalVariables.put("server.name", server.getName());
         globalVariables.put("server.version", Bukkit.getVersion());
         globalVariables.put("server.bukkit_version", Bukkit.getBukkitVersion());
-        globalVariables.put("server.port", Bukkit.getServer().getPort());
+        globalVariables.put("server.port", server.getPort());
     }
 
     public void triggerOutput(String pinName) {
@@ -81,9 +139,7 @@ public class FlowRuntime {
     }
 
     public String consumeTriggeredOutput() {
-        String pin = triggeredOutputPin.get();
-        triggeredOutputPin.set(null);
-        return pin;
+        return triggeredOutputPin.getAndSet(null);
     }
 
     public String getTriggeredOutputPin() {
@@ -111,14 +167,14 @@ public class FlowRuntime {
 
     private Object resolveInputRaw(FlowNode node, String pinName, Set<String> resolvingTemplates) {
         String nodeId = findNodeId(node);
-        if (nodeId == null) return null;
-
-        for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
-            if (conn.getTargetPin().equals(pinName)) {
-                if (conn.getEditorSourceNodeId() != null && !conn.getEditorSourceNodeId().isBlank() && isPassthroughOutputPin(conn.getEditorSourcePin())) {
-                    return getNodeOutput(conn.getEditorSourceNodeId(), conn.getEditorSourcePin());
+        if (nodeId != null) {
+            for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
+                if (conn.getTargetPin().equals(pinName)) {
+                    if (conn.getEditorSourceNodeId() != null && !conn.getEditorSourceNodeId().isBlank() && isPassthroughOutputPin(conn.getEditorSourcePin())) {
+                        return getNodeOutput(conn.getEditorSourceNodeId(), conn.getEditorSourcePin());
+                    }
+                    return getNodeOutput(conn.getSourceNodeId(), conn.getSourcePin());
                 }
-                return getNodeOutput(conn.getSourceNodeId(), conn.getSourcePin());
             }
         }
 
@@ -130,7 +186,54 @@ public class FlowRuntime {
             return value;
         }
 
+        return resolveDefinitionDefault(node, pinName);
+    }
+
+    private Object resolveDefinitionDefault(FlowNode node, String pinName) {
+        if (nodeDefinitions == null || node == null || node.getType() == null || pinName == null) {
+            return null;
+        }
+        NodeDefinition definition = getDefinition(node);
+        if (definition == null) {
+            return null;
+        }
+        NodeDefinition.PinDefinition pin = inputDefinition(definition, pinName);
+        if (pin == null || pin.getDefaultValue() == null) {
+            return null;
+        }
+        Class<?> targetType = pin.getDataType() != null ? pin.getDataType().getJavaType() : null;
+        if (targetType == null || targetType == Object.class) {
+            return pin.getDefaultValue();
+        }
+        Object adapted = typeAdapter.adapt(pin.getDefaultValue(), targetType);
+        return adapted != null ? adapted : pin.getDefaultValue();
+    }
+
+    private NodeDefinition.PinDefinition inputDefinition(NodeDefinition definition, String pinName) {
+        NodeDefinition.PinDefinition direct = definition.getInputs().stream().filter(candidate -> pinName.equals(candidate.getName())).findFirst().orElse(null);
+        if (direct != null) {
+            return direct;
+        }
+        for (NodeDefinition.PinDefinition candidate : definition.getInputs()) {
+            NodeDefinition.RepeatablePin repeatable = candidate.getRepeatable();
+            String prefix = candidate.getName() + "_";
+            if (repeatable == null || !pinName.startsWith(prefix)) {
+                continue;
+            }
+            String suffix = pinName.substring(prefix.length());
+            if (!suffix.isEmpty() && suffix.length() <= 9 && suffix.chars().allMatch(Character::isDigit)) {
+                int index = Integer.parseInt(suffix);
+                if (index >= 2 && index <= repeatable.getMaxItems()) return candidate;
+            }
+        }
         return null;
+    }
+
+    public NodeDefinition getDefinition(FlowNode node) {
+        if (nodeDefinitions == null || node == null || node.getType() == null) {
+            return null;
+        }
+        return nodeDefinitions.get(compatibility.mapToNew(node.getType()));
     }
 
     private String renderStringTemplate(FlowNode node, String pinName, String template, Set<String> resolvingTemplates) {
@@ -183,6 +286,18 @@ public class FlowRuntime {
         }
     }
 
+    public void openEventMutationWindow(boolean available) {
+        executionAuthority.eventMutationOpen.set(available);
+    }
+
+    public void closeEventMutationWindow() {
+        executionAuthority.eventMutationOpen.set(false);
+    }
+
+    public boolean isEventMutationOpen() {
+        return executionAuthority.eventMutationOpen.get();
+    }
+
     private boolean isTemplateReservedInput(String pinName, String name) {
         if (name == null || name.isBlank()) {
             return true;
@@ -219,9 +334,17 @@ public class FlowRuntime {
 
     public void setVariable(String name, Object value) {
         if (name.startsWith("server.")) {
-            globalVariables.put(name, value);
+            if (value == null) {
+                globalVariables.remove(name);
+            } else {
+                globalVariables.put(name, value);
+            }
         } else {
-            localVariables.put(name, value);
+            if (value == null) {
+                localVariables.remove(name);
+            } else {
+                localVariables.put(name, value);
+            }
         }
     }
 
@@ -316,11 +439,44 @@ public class FlowRuntime {
     }
 
     public boolean beginFlowExecution(String nodeId) {
-        return executingFlowNodes.get().add(nodeId);
+        return beginFlowExecution(graph, nodeId);
     }
 
     public void endFlowExecution(String nodeId) {
-        executingFlowNodes.get().remove(nodeId);
+        endFlowExecution(graph, nodeId);
+    }
+
+    public boolean beginFlowExecution(FlowGraph executionGraph, String nodeId) {
+        return executingFlowNodes.add(executionNodeKey(executionGraph, nodeId));
+    }
+
+    public void endFlowExecution(FlowGraph executionGraph, String nodeId) {
+        executingFlowNodes.remove(executionNodeKey(executionGraph, nodeId));
+    }
+
+    public void resetFlowExecutionPath() {
+        executingFlowNodes.clear();
+    }
+
+    private String executionNodeKey(FlowGraph executionGraph, String nodeId) {
+        String graphId = executionGraph != null && executionGraph.getId() != null ? executionGraph.getId() : "";
+        return graphId + '\u0000' + nodeId;
+    }
+
+    public boolean acquireExecutionOperation(int maximumOperations) {
+        return executionAuthority.operations.incrementAndGet() <= maximumOperations;
+    }
+
+    public boolean isWithinElapsedBudget(long maximumDurationMillis) {
+        return maximumDurationMillis <= 0 || elapsedMillis() <= maximumDurationMillis;
+    }
+
+    public long elapsedMillis() {
+        return Math.max(0L, (System.nanoTime() - executionAuthority.startedAtNanos) / 1_000_000L);
+    }
+
+    public String getExecutionId() {
+        return executionAuthority.executionId;
     }
 
     public Map<String, Object> getLocalVariables() {
@@ -434,46 +590,99 @@ public class FlowRuntime {
     }
 
     public String findFunctionStartNodeId() {
+        return findFunctionStartNodeId(graph);
+    }
+
+    public static String findFunctionStartNodeId(FlowGraph graph) {
         if (graph == null || graph.getNodes() == null) {
             return null;
         }
-        for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() != null && isFunctionStartType(entry.getValue().getType())) {
-                return entry.getKey();
-            }
-        }
-        List<Map.Entry<String, FlowNode>> entries = new ArrayList<>(graph.getNodes().entrySet());
-        entries.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
-        return entries.isEmpty() ? null : entries.getFirst().getKey();
+        return graph.getNodes().entrySet().stream()
+            .filter(entry -> entry.getValue() != null && isFunctionStartType(entry.getValue().getType()))
+            .map(Map.Entry::getKey)
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .findFirst()
+            .orElse(null);
     }
 
-    private boolean isFunctionStartType(String type) {
+    private static boolean isFunctionStartType(String type) {
         return "function_start".equals(type) || "function.start".equals(type) || "function.function_start".equals(type);
     }
     
     public void setBreakLoopRequested(boolean requested) {
-        this.breakLoopRequested = requested;
+        LoopControl control = loopControls.peek();
+        if (control != null) {
+            control.breakRequested = requested;
+            if (requested) {
+                control.continueRequested = false;
+            }
+        }
     }
     
     public boolean isBreakLoopRequested() {
-        return breakLoopRequested;
+        LoopControl control = loopControls.peek();
+        return control != null && control.breakRequested;
     }
     
     public void setContinueLoopRequested(boolean requested) {
-        this.continueLoopRequested = requested;
+        LoopControl control = loopControls.peek();
+        if (control != null && !control.breakRequested) {
+            control.continueRequested = requested;
+        }
     }
     
     public boolean isContinueLoopRequested() {
-        return continueLoopRequested;
+        LoopControl control = loopControls.peek();
+        return control != null && control.continueRequested;
     }
     
     public void resetLoopControl() {
-        this.breakLoopRequested = false;
-        this.continueLoopRequested = false;
+        LoopControl control = loopControls.peek();
+        if (control != null) {
+            control.breakRequested = false;
+            control.continueRequested = false;
+        }
+    }
+
+    public void beginLoopControl() {
+        loopControls.push(new LoopControl());
+    }
+
+    public void endLoopControl() {
+        if (!loopControls.isEmpty()) {
+            loopControls.pop();
+        }
+    }
+
+    public boolean requestLoopBreak() {
+        if (loopControls.isEmpty()) {
+            return false;
+        }
+        setBreakLoopRequested(true);
+        return true;
+    }
+
+    public boolean requestLoopContinue() {
+        if (loopControls.isEmpty()) {
+            return false;
+        }
+        setContinueLoopRequested(true);
+        return true;
+    }
+
+    public boolean consumeContinueLoopRequested() {
+        LoopControl control = loopControls.peek();
+        if (control == null || !control.continueRequested) {
+            return false;
+        }
+        control.continueRequested = false;
+        return true;
     }
 
     public void cleanupThreadLocals() {
-        triggeredOutputPin.remove();
-        executingFlowNodes.remove();
+        triggeredOutputPin.set(null);
+        resolvingPassthroughOutputs.remove();
+        evaluatingNodes.clear();
+        executingFlowNodes.clear();
     }
 }

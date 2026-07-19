@@ -1,6 +1,5 @@
 plugins {
     id("java")
-    id("com.gradleup.shadow") version "8.3.0"
 }
 
 group = "restudio.resync"
@@ -13,9 +12,12 @@ repositories {
 
 dependencies {
     implementation(project(":ReSyncCore"))
-    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7") {
+        exclude(group = "org.slf4j")
+    }
     compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
     annotationProcessor("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    testImplementation("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
 }
@@ -29,13 +31,7 @@ java {
 }
 
 tasks {
-    build {
-        dependsOn(shadowJar)
-    }
-
-    shadowJar {
-        archiveClassifier.set("")
-        mergeServiceFiles()
-        relocate("org.java_websocket", "restudio.resync.velocity.libs.websocket")
+    jar {
+        archiveClassifier.set("component")
     }
 }

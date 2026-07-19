@@ -250,7 +250,7 @@
     "outputs": [
       {
         "name": "wrapped_lines_list",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ],
     "handler": "GenericStringHandler",
@@ -674,7 +674,7 @@
     "outputs": [
       {
         "name": "result",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ],
     "handler": "GenericStringHandler",
@@ -689,7 +689,7 @@
     "inputs": [
       {
         "name": "list",
-        "dataType": "list"
+        "dataType": "list<string>"
       },
       {
         "name": "separator",
@@ -1055,4 +1055,3 @@
     "hidden": true
   }
 ]
-

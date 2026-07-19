@@ -8,7 +8,6 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,7 +32,7 @@ public class VariableScopeHandler implements NodeHandler {
             boolean persistent = Boolean.TRUE.equals(persist);
 
             if (!"list".equals(normalizedMode) && name.isEmpty()) {
-                return;
+                throw new IllegalArgumentException("Variable name is required for mode: " + normalizedMode);
             }
 
             Object valueOutput = null;
@@ -41,6 +40,8 @@ public class VariableScopeHandler implements NodeHandler {
             List<String> variablesOutput = List.of();
 
             switch (normalizedMode) {
+                case "get" -> {
+                }
                 case "set" -> {
                     setVariable(ctx, normalizedScope, name, value, player);
                     if (persistent) {
@@ -68,8 +69,7 @@ public class VariableScopeHandler implements NodeHandler {
                         updateNumericVariable(ctx, normalizedMode, normalizedScope, name, delta, player);
                     }
                 }
-                default -> {
-                }
+                default -> throw new IllegalArgumentException("Unknown variable mode: " + mode);
             }
 
             if (!"list".equals(normalizedMode)) {
@@ -89,7 +89,7 @@ public class VariableScopeHandler implements NodeHandler {
         operations.put("variable_set_global", (ctx, node) -> {
             String name = ctx.getInputValue(node, "name", String.class, "");
             Object value = ctx.getInputValue(node, "value", Object.class, null);
-            ctx.getGlobalVariables().put(GLOBAL_PREFIX + name, value);
+            putOrRemove(ctx.getGlobalVariables(), GLOBAL_PREFIX + name, value);
         });
 
         operations.put("variable_set_local", (ctx, node) -> {
@@ -192,9 +192,10 @@ public class VariableScopeHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown variable scope operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 
@@ -211,11 +212,11 @@ public class VariableScopeHandler implements NodeHandler {
 
     private static void setVariable(FlowContext ctx, String scope, String name, Object value, Player player) {
         switch (scope) {
-            case "global" -> ctx.getGlobalVariables().put(GLOBAL_PREFIX + name, value);
+            case "global" -> putOrRemove(ctx.getGlobalVariables(), GLOBAL_PREFIX + name, value);
             case "player" -> {
                 Map<String, Object> vars = getPlayerVars(ctx, player, true);
                 if (vars != null) {
-                    vars.put(name, value);
+                    putOrRemove(vars, name, value);
                 }
             }
             default -> ctx.setVariable(name, value);
@@ -281,15 +282,16 @@ public class VariableScopeHandler implements NodeHandler {
         if (target == null) {
             return;
         }
-        Object current = target.get(key);
-        double base = current instanceof Number ? ((Number) current).doubleValue() : 0.0;
-        double result = switch (mode) {
-            case "decrement" -> base - amount;
-            case "multiply" -> base * amount;
-            case "divide" -> amount == 0 ? base : base / amount;
-            default -> base + amount;
-        };
-        target.put(key, result);
+        String variableKey = key;
+        target.compute(variableKey, (ignored, current) -> {
+            double base = current instanceof Number ? ((Number) current).doubleValue() : 0.0;
+            return switch (mode) {
+                case "decrement" -> base - amount;
+                case "multiply" -> base * amount;
+                case "divide" -> amount == 0 ? base : base / amount;
+                default -> base + amount;
+            };
+        });
     }
 
     private static Object resolvePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
@@ -397,8 +399,16 @@ public class VariableScopeHandler implements NodeHandler {
         }
         String varKey = "player_vars_" + player.getUniqueId();
         if (create) {
-            return (Map<String, Object>) ctx.getGlobalVariables().computeIfAbsent(varKey, k -> new HashMap<>());
+            return (Map<String, Object>) ctx.getGlobalVariables().computeIfAbsent(varKey, key -> new ConcurrentHashMap<>());
         }
         return (Map<String, Object>) ctx.getGlobalVariables().get(varKey);
+    }
+
+    private static void putOrRemove(Map<String, Object> variables, String name, Object value) {
+        if (value == null) {
+            variables.remove(name);
+        } else {
+            variables.put(name, value);
+        }
     }
 }

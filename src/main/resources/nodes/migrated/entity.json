@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "name",
           "custom_name",
@@ -295,7 +295,7 @@
       },
       {
         "name": "passengers",
-        "dataType": "list",
+        "dataType": "list<entity>",
         "visibleWhen": {
           "action": "get",
           "property": "passengers"
@@ -375,7 +375,7 @@
       },
       {
         "name": "scoreboard_tags",
-        "dataType": "list",
+        "dataType": "list<string>",
         "visibleWhen": {
           "action": "get",
           "property": "scoreboard_tags"
@@ -467,7 +467,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "name",
           "custom_name",
@@ -2314,7 +2314,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -2782,6 +2782,8 @@
     "id": "entity.entity_set_wet",
     "displayName": "Entity Set Wet",
     "category": "ENTITY",
+    "hidden": true,
+    "hiddenReason": "migration-only-unsupported-runtime-state",
     "handler": "EntityActionHandler",
     "handlerConfig": {
       "operation": "entity_set_wet"
@@ -3229,7 +3231,7 @@
       {
         "name": "property",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "name",
           "name_visible",
@@ -3454,6 +3456,356 @@
     ]
   },
   {
+    "id": "entity.entity_data",
+    "displayName": "Entity Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_data"
+    },
+    "hidden": true,
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:entity_data_property",
+        "defaultValue": "custom_name"
+      },
+      {
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": ["get", "set"],
+        "defaultValue": "get"
+      },
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "optional": true,
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any"
+      },
+      {
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_text_data",
+    "displayName": "Entity Text Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "text"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_text_property", "defaultValue": "custom_name"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_boolean_data",
+    "displayName": "Entity Boolean Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "boolean"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_boolean_property", "defaultValue": "glowing"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_number_data",
+    "displayName": "Entity Number Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "number"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_number_property", "defaultValue": "health"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_vector_data",
+    "displayName": "Entity Vector Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "vector"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_vector_property", "defaultValue": "velocity"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "vector", "dataType": "vector", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "vector", "dataType": "vector", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_location_data",
+    "displayName": "Entity Location Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "location"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_location_property", "defaultValue": "location"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "location", "dataType": "location", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "location", "dataType": "location", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_reference_data",
+    "displayName": "Entity Reference Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "reference"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_reference_property", "defaultValue": "target"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "reference", "dataType": "living_entity", "optional": true, "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "reference", "dataType": "living_entity", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_attribute_data",
+    "displayName": "Entity Attribute Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "number", "propertyPrefix": "attribute:"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:max_health"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_text_data_entry",
+    "displayName": "Entity Text Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "text"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_text_property", "defaultValue": "custom_name"},
+      {"name": "text", "dataType": "string"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_boolean_data_entry",
+    "displayName": "Entity Boolean Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "boolean"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_boolean_property", "defaultValue": "glowing"},
+      {"name": "boolean", "dataType": "boolean"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_number_data_entry",
+    "displayName": "Entity Number Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_number_property", "defaultValue": "fuse_ticks"},
+      {"name": "number", "dataType": "number"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_vector_data_entry",
+    "displayName": "Entity Vector Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "vector"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_vector_property", "defaultValue": "velocity"},
+      {"name": "vector", "dataType": "vector"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_location_data_entry",
+    "displayName": "Entity Location Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "location"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_location_property", "defaultValue": "location"},
+      {"name": "location", "dataType": "location"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_reference_data_entry",
+    "displayName": "Entity Reference Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "reference"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_reference_property", "defaultValue": "target"},
+      {"name": "reference", "dataType": "living_entity", "optional": true}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_attribute_data_entry",
+    "displayName": "Entity Attribute Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number", "propertyPrefix": "attribute:"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:max_health"},
+      {"name": "number", "dataType": "number"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_apply_data",
+    "displayName": "Entity Apply Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_apply_data"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "entity_data"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
     "id": "entity.entity_spawn",
     "displayName": "Entity Spawn",
     "category": "ENTITY",
@@ -3476,6 +3828,12 @@
         "name": "location",
         "dataType": "location",
         "pinType": "DATA"
+      },
+      {
+        "name": "data",
+        "dataType": "entity_data",
+        "pinType": "DATA",
+        "optional": true
       }
     ],
     "outputs": [
@@ -3557,7 +3915,7 @@
       },
       {
         "name": "entities",
-        "dataType": "list",
+        "dataType": "list<entity>",
         "pinType": "DATA"
       }
     ]
@@ -3595,7 +3953,7 @@
       },
       {
         "name": "entities",
-        "dataType": "list",
+        "dataType": "list<entity>",
         "pinType": "DATA"
       }
     ]
@@ -3694,7 +4052,7 @@
       },
       {
         "name": "players",
-        "dataType": "list",
+        "dataType": "list<player>",
         "pinType": "DATA"
       }
     ]
@@ -3737,7 +4095,7 @@
       },
       {
         "name": "mobs",
-        "dataType": "list",
+        "dataType": "list<living_entity>",
         "pinType": "DATA"
       }
     ]
@@ -4264,7 +4622,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"

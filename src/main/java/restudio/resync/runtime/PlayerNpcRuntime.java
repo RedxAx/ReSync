@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
+import java.util.List;
+
 public interface PlayerNpcRuntime {
     boolean available();
 
@@ -18,6 +20,10 @@ public interface PlayerNpcRuntime {
     boolean isActive(String id);
 
     Location location(String id);
+
+    List<String> activeIds();
+
+    boolean teleport(String id, String world, double x, double y, double z, float yaw, float pitch);
 
     void shutdown();
 
@@ -74,6 +80,16 @@ public interface PlayerNpcRuntime {
         @Override
         public Location location(String id) {
             return null;
+        }
+
+        @Override
+        public List<String> activeIds() {
+            return List.of();
+        }
+
+        @Override
+        public boolean teleport(String id, String world, double x, double y, double z, float yaw, float pitch) {
+            return false;
         }
 
         @Override

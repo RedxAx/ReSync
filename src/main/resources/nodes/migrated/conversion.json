@@ -158,7 +158,7 @@
     "outputs": [
       {
         "name": "list",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ]
   }

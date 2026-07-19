@@ -24,7 +24,7 @@
     "category": "DATA",
     "handler": "player_get_all_items",
     "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
-    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list"}]
+    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list<item>"}]
   },
   {
     "id": "player_get_hotbar_items",
@@ -32,7 +32,7 @@
     "category": "DATA",
     "handler": "player_get_hotbar_items",
     "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
-    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list"}]
+    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list<item>"}]
   },
   {
     "id": "player_get_armor_items",
@@ -131,7 +131,7 @@
       {"name": "player", "pinType": "DATA", "dataType": "player"},
       {"name": "hand", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["main", "off"], "defaultValue": "main"}
     ],
-    "outputs": [{"name": "lore_lines_list", "pinType": "DATA", "dataType": "list"}]
+    "outputs": [{"name": "lore_lines_list", "pinType": "DATA", "dataType": "list<string>"}]
   },
   {
     "id": "player_get_display_name",

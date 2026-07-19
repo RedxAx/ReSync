@@ -3,6 +3,8 @@ package restudio.resync.modules;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
+import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Keyed;
@@ -53,13 +55,15 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.view.StonecutterView;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.Log;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customization.ResourceJson;
 import restudio.resync.customcontent.CustomContentProvider;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
@@ -75,6 +79,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RecipeModule implements Module, Listener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("recipes", "Recipes").withDependencies("flow");
@@ -83,9 +88,20 @@ public class RecipeModule implements Module, Listener {
     private CustomContentService customContentService;
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
-    private ModuleContext context;
+    private JavaPlugin plugin;
     private final Set<NamespacedKey> registered = new HashSet<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
+    private final BoundedDiagnosticDeduplicator reportedRegistrationFailures = new BoundedDiagnosticDeduplicator(512);
+    private final AtomicBoolean recipeReloadScheduled = new AtomicBoolean();
+    private ReSyncJsonResourceStorage.ResourceListener recipeResourceListener;
+
+    public RecipeModule() {
+    }
+
+    RecipeModule(JavaPlugin plugin, ReSyncJsonResourceStorage storage) {
+        this.plugin = plugin;
+        this.storage = storage;
+    }
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -94,7 +110,7 @@ public class RecipeModule implements Module, Listener {
 
     @Override
     public void initialize(ModuleContext context) {
-        this.context = context;
+        plugin = context.getPlugin();
         storage = context.getRequiredService(ReSyncJsonResourceStorage.class);
         text = context.getRequiredService(ReTextService.class);
         customContentService = context.getService(CustomContentService.class);
@@ -105,17 +121,49 @@ public class RecipeModule implements Module, Listener {
 
     @Override
     public void start(ModuleContext context) {
-        Bukkit.getPluginManager().registerEvents(this, context.getPlugin());
-        reloadRecipes();
+        plugin = context.getPlugin();
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        startRecipeLifecycle();
     }
 
     @Override
     public void stop(ModuleContext context) {
+        if (storage != null && recipeResourceListener != null) {
+            storage.removeListener(recipeResourceListener);
+            recipeResourceListener = null;
+        }
+        recipeReloadScheduled.set(false);
         HandlerList.unregisterAll(this);
         for (NamespacedKey key : registered) {
             Bukkit.removeRecipe(key);
         }
         registered.clear();
+    }
+
+    void startRecipeLifecycle() {
+        if (recipeResourceListener == null) {
+            recipeResourceListener = (type, id, value, deleted) -> {
+                if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                    requestRecipeReload();
+                }
+            };
+            storage.addListener(recipeResourceListener);
+        }
+        reloadRecipes();
+    }
+
+    private void requestRecipeReload() {
+        if (Bukkit.isPrimaryThread()) {
+            reloadRecipes();
+            return;
+        }
+        if (!recipeReloadScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            recipeReloadScheduled.set(false);
+            reloadRecipes();
+        });
     }
 
     public void reloadRecipes() {
@@ -124,18 +172,49 @@ public class RecipeModule implements Module, Listener {
         }
         registered.clear();
         for (String id : storage.listIds(ReSyncResourceCatalog.RECIPE_DEFINITION)) {
-            JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
-            if (!ResourceJson.bool(definition, "enabled", true)) {
-                continue;
-            }
-            if (manualCraftingRecipe(definition)) {
-                continue;
-            }
-            Recipe recipe = createRecipe(definition);
-            if (recipe != null && Bukkit.addRecipe(recipe)) {
-                registered.add(key(definition));
+            try {
+                JsonObject definition = storage.get(ReSyncResourceCatalog.RECIPE_DEFINITION, id);
+                if (definition == null) {
+                    reportRegistrationFailure(id, "Persisted recipe could not be loaded", null);
+                    continue;
+                }
+                if (!ResourceJson.bool(definition, "enabled", true) || manualCraftingRecipe(definition)) {
+                    continue;
+                }
+                Recipe recipe = createRecipe(definition);
+                if (recipe == null) {
+                    reportRegistrationFailure(id, "Recipe output could not be resolved", null);
+                    continue;
+                }
+                if (Bukkit.addRecipe(recipe)) {
+                    registered.add(key(definition));
+                } else {
+                    reportRegistrationFailure(id, "Paper rejected or collided with the recipe key " + key(definition), null);
+                }
+            } catch (RuntimeException failure) {
+                String detail = failure.getMessage() != null && !failure.getMessage().isBlank() ? failure.getMessage() : failure.getClass().getSimpleName();
+                reportRegistrationFailure(id, "Recipe construction failed: " + detail, failure);
             }
         }
+    }
+
+    private void reportRegistrationFailure(String id, String message, Throwable failure) {
+        String resolvedId = id == null || id.isBlank() ? "unknown" : id;
+        String resolvedMessage = message == null || message.isBlank() ? "Unknown recipe registration failure" : message;
+        if (!reportedRegistrationFailures.add(resolvedId + '\u0000' + resolvedMessage)) {
+            return;
+        }
+        String logMessage = "Recipe registration failed for " + resolvedId + ": " + resolvedMessage;
+        if (failure != null) {
+            Log.warn(logMessage, failure);
+        } else {
+            Log.warn(logMessage);
+        }
+    }
+
+    @EventHandler
+    public void onResourcesReloaded(ServerResourcesReloadedEvent event) {
+        reloadRecipes();
     }
 
     @EventHandler
@@ -266,7 +345,7 @@ public class RecipeModule implements Module, Listener {
             event.setCancelled(true);
             return;
         }
-        Bukkit.getScheduler().runTask(context.getPlugin(), () -> consumeExtraSmithingIngredients(definition, event.getInventory()));
+        Bukkit.getScheduler().runTask(plugin, () -> consumeExtraSmithingIngredients(definition, event.getInventory()));
     }
 
     @EventHandler
@@ -279,7 +358,7 @@ public class RecipeModule implements Module, Listener {
             event.setTotalCookTime(Integer.MAX_VALUE);
             return;
         }
-        Bukkit.getScheduler().runTask(context.getPlugin(), () -> consumeExtraFurnaceInput(definition, event.getBlock().getState()));
+        Bukkit.getScheduler().runTask(plugin, () -> consumeExtraFurnaceInput(definition, event.getBlock().getState()));
     }
 
     @EventHandler
@@ -323,7 +402,7 @@ public class RecipeModule implements Module, Listener {
         }
         EquipmentSlot hand = event.getHand();
         Location location = event.getClickedBlock().getLocation();
-        Bukkit.getScheduler().runTask(context.getPlugin(), () -> consumeCampfireExtra(player, hand, location, before, amount));
+        Bukkit.getScheduler().runTask(plugin, () -> consumeCampfireExtra(player, hand, location, before, amount));
     }
 
     @EventHandler
@@ -1757,7 +1836,7 @@ public class RecipeModule implements Module, Listener {
 
     private NamespacedKey key(JsonObject definition) {
         String id = ResourceJson.string(definition, "id", "recipe");
-        return new NamespacedKey(context.getPlugin(), id.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_"));
+        return new NamespacedKey(plugin, id.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_./-]", "_"));
     }
 
     private record IngredientUse(int slot, int amount) {

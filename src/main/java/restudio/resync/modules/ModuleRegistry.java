@@ -166,6 +166,10 @@ public class ModuleRegistry {
         return List.copyOf(startOrder);
     }
 
+    public List<String> getInitializationOrder() {
+        return resolveOrder().stream().filter(Module::isEnabledByDefault).map(Module::getModuleId).toList();
+    }
+
     public void addListener(ModuleChangeListener listener) {
         if (listener != null) {
             listeners.add(listener);

@@ -17,6 +17,7 @@ import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
 import restudio.resync.server.ReSyncConfig;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
@@ -27,6 +28,7 @@ public class ReSync extends JavaPlugin {
     private ReSyncPluginMessageBridge pluginMessageBridge;
     private ReSyncNetworkAgent networkAgent;
     private NetworkPlayerStateCoordinator networkPlayerStateCoordinator;
+    private boolean networkStateReloadScheduled;
     private Object placeholderExpansion;
     private InteractiveSelectionManager interactiveSelectionManager;
 
@@ -90,20 +92,20 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onError(WebSocket conn, Exception ex) {
-                Log.error("[ReSync] WebSocket error: " + ex.getMessage(), ex);
+                Log.error("WebSocket error: " + ex.getMessage(), ex);
             }
 
             @Override
             public void onStart() {
-                Log.info("Server started on " + config.getBindHost() + ":" + getPort());
+                Log.info("WebSocket server ready on " + config.getBindHost() + ":" + getPort());
             }
         };
 
         try {
             wsServer.start();
-            Log.info("[ReSync] Server enabled on " + config.getBindHost() + ":" + config.getPort());
+            Log.info("WebSocket server starting on " + config.getBindHost() + ":" + config.getPort());
         } catch (Exception e) {
-            Log.error("[ReSync] Failed to start WebSocket server: " + e.getMessage(), e);
+            Log.error("Failed to start WebSocket server: " + e.getMessage(), e);
         }
 
         if (getCommand("resync") != null) {
@@ -171,6 +173,33 @@ public class ReSync extends JavaPlugin {
 
     public ReSyncNetworkAgent getNetworkAgent() {
         return networkAgent;
+    }
+
+    public synchronized NetworkPlayerStateConfig reloadNetworkState() throws IOException {
+        if (networkAgent == null) throw new IllegalStateException("ReSync Network Agent Is Not Running");
+        NetworkPlayerStateConfig config = NetworkPlayerStateConfig.load(getDataFolder().toPath());
+        if (networkAgent.hasActiveTransfers()) {
+            if (!networkStateReloadScheduled) {
+                networkStateReloadScheduled = true;
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    synchronized (this) {
+                        networkStateReloadScheduled = false;
+                    }
+                    try {
+                        reloadNetworkState();
+                    } catch (IOException | RuntimeException exception) {
+                        Log.error("ReSync network state reload failed: " + exception.getMessage(), exception);
+                    }
+                }, 1);
+            }
+            return config;
+        }
+        networkAgent.setTransferHandler(null);
+        if (networkPlayerStateCoordinator != null) networkPlayerStateCoordinator.shutdown();
+        networkPlayerStateCoordinator = config.enabled() ? new NetworkPlayerStateCoordinator(this, config) : null;
+        if (networkPlayerStateCoordinator != null) networkAgent.setTransferHandler(networkPlayerStateCoordinator);
+        networkAgent.reconnect();
+        return config;
     }
 
     public InteractiveSelectionManager getInteractiveSelectionManager() {

@@ -1,538 +1,191 @@
 package restudio.resync.flow.handler.generic;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.SkullMeta;
 import restudio.flow.data.FlowNode;
-import restudio.resync.ReSync;
+import restudio.flow.data.GuiDefinition;
+import restudio.flow.data.GuiElement;
+import restudio.flow.data.Visual;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.FlowRuntimeAccess;
+import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
-import restudio.resync.flow.util.TextFormatter;
-import restudio.resync.server.ReSyncServer;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class MenuHandler implements NodeHandler {
-    private static final Map<String, MenuData> menus = new HashMap<>();
-    private static final Map<Player, String> openMenus = new HashMap<>();
-
-    private static class MenuData {
-        String title;
-        int rows;
-        Map<Integer, MenuItemData> items = new HashMap<>();
-        Sound clickSound = Sound.UI_BUTTON_CLICK;
-        String closeAction;
-        String openAction;
-        int updateInterval;
-        int updateTaskId = -1;
-    }
-
-    private static class MenuItemData {
-        ItemStack item;
-        String flowId;
-        boolean enchanted;
-        List<ItemFlag> flags;
-        int customModelData = -1;
-        String skullTexture;
-    }
-
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public MenuHandler() {
-        operations.put("menu_create", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String title = ctx.getInputValue(node, "title", String.class, "Menu");
-            Integer rows = ctx.getInputValue(node, "rows", Integer.class, 1);
-
-            if (!menuId.isEmpty() && rows >= 1 && rows <= 6) {
-                MenuData menu = new MenuData();
-                menu.title = title;
-                menu.rows = rows;
-                menus.put(menuId, menu);
-            }
+        operations.put("menu_create", (context, node) -> {
+            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            String title = context.getInputValue(node, "title", String.class, "Menu");
+            int rows = context.getInputValue(node, "rows", Integer.class, 1);
+            if (title == null || title.isBlank()) throw new IllegalArgumentException("Menu title is required");
+            if (rows < 1 || rows > 6) throw new IllegalArgumentException("Menu rows must be between 1 and 6");
+            FlowStorage storage = requireStorage();
+            if (storage.getGui(menuId) != null) throw new IllegalStateException("Menu already exists: " + menuId);
+            GuiDefinition definition = new GuiDefinition(menuId, title, rows);
+            storage.saveGui(definition);
+            refresh(definition);
         });
 
-        operations.put("menu_set_item", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            String materialName = ctx.getInputValue(node, "material", String.class, "STONE");
-            String name = ctx.getInputValue(node, "name", String.class, "");
-            String lore = ctx.getInputValue(node, "lore", String.class, "");
-            String flowId = ctx.getInputValue(node, "flow_to_execute", String.class, "");
+        operations.put("menu_set_item", (context, node) -> mutate(context, node, definition -> {
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            replaceSlot(definition, slot, element(context, node, slot, "flow_to_execute"));
+        }));
 
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                Material material = Material.getMaterial(materialName.toUpperCase());
-                if (material != null && slot >= 0 && slot < menu.rows * 9) {
-                    ItemStack item = new ItemStack(material);
-                    ItemMeta meta = item.getItemMeta();
-                    if (meta != null) {
-                        if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parseItemName(name));
-                        }
-                        if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseItemLoreLines(lore));
-                        }
-                        item.setItemMeta(meta);
-                    }
-                    MenuItemData menuItem = new MenuItemData();
-                    menuItem.item = item;
-                    menuItem.flowId = flowId;
-                    menu.items.put(slot, menuItem);
-                }
-            }
+        operations.put("menu_add_item", (context, node) -> mutate(context, node, definition -> {
+            int slot = firstFreeSlot(definition);
+            if (slot < 0) throw new IllegalStateException("Menu has no empty slot");
+            replaceSlot(definition, slot, element(context, node, slot, "flow_to_execute"));
+        }));
+
+        operations.put("menu_clear", (context, node) -> mutate(context, node, definition -> definition.getElements().clear()));
+
+        operations.put("menu_open", (context, node) -> {
+            GuiManager manager = requireManager();
+            Player player = requirePlayer(context, node);
+            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            if (requireStorage().getGui(menuId) == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
+            manager.openGui(player, menuId);
         });
 
-        operations.put("menu_add_item", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String materialName = ctx.getInputValue(node, "material", String.class, "STONE");
-            String name = ctx.getInputValue(node, "name", String.class, "");
-            String lore = ctx.getInputValue(node, "lore", String.class, "");
-            String flowId = ctx.getInputValue(node, "flow_to_execute", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                Material material = Material.getMaterial(materialName.toUpperCase());
-                if (material != null) {
-                    ItemStack item = new ItemStack(material);
-                    ItemMeta meta = item.getItemMeta();
-                    if (meta != null) {
-                        if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parseItemName(name));
-                        }
-                        if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseItemLoreLines(lore));
-                        }
-                        item.setItemMeta(meta);
-                    }
-                    int slot = -1;
-                    for (int i = 0; i < menu.rows * 9; i++) {
-                        if (!menu.items.containsKey(i)) {
-                            slot = i;
-                            break;
-                        }
-                    }
-                    if (slot >= 0) {
-                        MenuItemData menuItem = new MenuItemData();
-                        menuItem.item = item;
-                        menuItem.flowId = flowId;
-                        menu.items.put(slot, menuItem);
-                    }
-                }
-            }
+        operations.put("menu_update", (context, node) -> {
+            GuiManager manager = requireManager();
+            Player player = requirePlayer(context, node);
+            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            if (requireStorage().getGui(menuId) == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
+            manager.refreshPlayerGui(player, menuId);
         });
 
-        operations.put("menu_clear", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                menu.items.clear();
-            }
+        operations.put("menu_close", (context, node) -> {
+            requireManager().closeGui(requirePlayer(context, node));
         });
 
-        operations.put("menu_open", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-
-            if (player != null && !menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (Bukkit.isPrimaryThread()) {
-                    Inventory inv = Bukkit.createInventory(null, menu.rows * 9, TextFormatter.parse(menu.title));
-                    for (Map.Entry<Integer, MenuItemData> entry : menu.items.entrySet()) {
-                        inv.setItem(entry.getKey(), entry.getValue().item);
-                    }
-                    player.openInventory(inv);
-                    openMenus.put(player, menuId);
-                } else {
-                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                        Inventory inv = Bukkit.createInventory(null, menu.rows * 9, TextFormatter.parse(menu.title));
-                        for (Map.Entry<Integer, MenuItemData> entry : menu.items.entrySet()) {
-                            inv.setItem(entry.getKey(), entry.getValue().item);
-                        }
-                        player.openInventory(inv);
-                        openMenus.put(player, menuId);
-                    });
-                }
-            } else if (player != null && !menuId.isEmpty()) {
-                ReSyncServer server = ReSync.getInstance() != null ? ReSync.getInstance().getReSyncServer() : null;
-                GuiManager guiManager = server != null ? server.getGuiManager() : null;
-                if (guiManager != null) {
-                    if (Bukkit.isPrimaryThread()) {
-                        guiManager.openGui(player, menuId);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> guiManager.openGui(player, menuId));
-                    }
-                }
+        operations.put("menu_set_click_sound", (context, node) -> mutate(context, node, definition -> {
+            String sound = requireText(context.getInputValue(node, "sound", String.class, "UI_BUTTON_CLICK"), "Menu click sound");
+            try {
+                Sound.valueOf(sound.toUpperCase(Locale.ROOT).replace('.', '_'));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown menu click sound: " + sound, exception);
             }
+            definition.setClickSound(sound);
+        }));
+
+        operations.put("menu_set_title", (context, node) -> mutate(context, node,
+            definition -> definition.setTitle(requireText(context.getInputValue(node, "title", String.class, "Menu"), "Menu title"))));
+
+        operations.put("menu_set_click_action", (context, node) -> mutate(context, node, definition -> {
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            GuiElement element = elementAt(definition, slot, true);
+            element.setFlowId(requireText(context.getInputValue(node, "flow_id", String.class, ""), "Click Flow ID"));
+        }));
+
+        operations.put("menu_set_item_with_action", (context, node) -> mutate(context, node, definition -> {
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            replaceSlot(definition, slot, element(context, node, slot, "flow_id"));
+        }));
+
+        operations.put("menu_set_enchant", (context, node) -> mutateVisual(context, node,
+            visual -> visual.setEnchanted(context.getInputValue(node, "enchanted", Boolean.class, false))));
+
+        operations.put("menu_set_flags", (context, node) -> mutateVisual(context, node,
+            visual -> visual.setItemFlags(stringList(context.getInputValue(node, "flags_list")))));
+
+        operations.put("menu_set_custom_model", (context, node) -> mutateVisual(context, node, visual -> {
+            int modelData = context.getInputValue(node, "model_data", Integer.class, 0);
+            if (modelData < 0) throw new IllegalArgumentException("Custom model data cannot be negative");
+            visual.setModelData(modelData);
+        }));
+
+        operations.put("menu_set_head_texture", (context, node) -> mutateVisual(context, node, visual -> {
+            visual.setMaterial(Material.PLAYER_HEAD.name());
+            visual.setHeadTexture(requireText(context.getInputValue(node, "player_name_or_uuid", String.class, ""), "Player name or UUID"));
+        }));
+
+        operations.put("menu_fill_pattern", (context, node) -> mutate(context, node, definition -> {
+            int start = context.getInputValue(node, "start_slot", Integer.class, 0);
+            int end = context.getInputValue(node, "end_slot", Integer.class, start);
+            requireSlot(definition, start);
+            requireSlot(definition, end);
+            if (end < start) throw new IllegalArgumentException("Pattern end slot cannot be before its start slot");
+            for (int slot = start; slot <= end; slot++) {
+                replaceSlot(definition, slot, element(context, node, slot, null));
+            }
+        }));
+
+        operations.put("menu_clear_slot", (context, node) -> mutate(context, node, definition -> {
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            if (elementAt(definition, slot, false) == null) throw new IllegalStateException("Menu slot is already empty: " + slot);
+            removeSlot(definition, slot);
+        }));
+
+        operations.put("menu_get_item", (context, node) -> {
+            GuiDefinition definition = requireGui(context.getInputValue(node, "menu_id", String.class, ""));
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            GuiElement element = elementAt(definition, slot, false);
+            ItemStack item = element != null ? GuiManager.createItemStack(element.getVisual()) : null;
+            context.setOutput(node, "item", item);
         });
 
-        operations.put("menu_update", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-
-            if (player != null && !menuId.isEmpty() && menus.containsKey(menuId) && openMenus.containsKey(player)) {
-                MenuData menu = menus.get(menuId);
-                if (openMenus.get(player).equals(menuId)) {
-                    if (Bukkit.isPrimaryThread()) {
-                        if (player.getOpenInventory() != null && player.getOpenInventory().getTopInventory() != null) {
-                            Inventory inv = player.getOpenInventory().getTopInventory();
-                            inv.clear();
-                            for (Map.Entry<Integer, MenuItemData> entry : menu.items.entrySet()) {
-                                inv.setItem(entry.getKey(), entry.getValue().item);
-                            }
-                        }
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> {
-                            if (player.getOpenInventory() != null && player.getOpenInventory().getTopInventory() != null) {
-                                Inventory inv = player.getOpenInventory().getTopInventory();
-                                inv.clear();
-                                for (Map.Entry<Integer, MenuItemData> entry : menu.items.entrySet()) {
-                                    inv.setItem(entry.getKey(), entry.getValue().item);
-                                }
-                            }
-                        });
-                    }
-                }
-            }
+        operations.put("menu_get_all_items", (context, node) -> {
+            GuiDefinition definition = requireGui(context.getInputValue(node, "menu_id", String.class, ""));
+            List<ItemStack> items = new ArrayList<>();
+            definition.getElements().stream()
+                .filter(element -> element != null && element.getSlots() != null && !element.getSlots().isEmpty())
+                .sorted(Comparator.comparingInt(element -> element.getSlots().getFirst()))
+                .forEach(element -> {
+                    ItemStack item = GuiManager.createItemStack(element.getVisual());
+                    if (item != null) items.add(item);
+                });
+            context.setOutput(node, "items_list", items);
         });
 
-        operations.put("menu_close", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-
-            if (player != null && !menuId.isEmpty()) {
-                if (Bukkit.isPrimaryThread()) {
-                    player.closeInventory();
-                } else {
-                    Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.closeInventory());
-                }
-            }
+        operations.put("menu_duplicate", (context, node) -> {
+            String sourceId = requireText(context.getInputValue(node, "source_menu_id", String.class, ""), "Source menu ID");
+            String newId = requireText(context.getInputValue(node, "new_menu_id", String.class, ""), "New menu ID");
+            FlowStorage storage = requireStorage();
+            GuiDefinition source = storage.getGui(sourceId);
+            if (source == null) throw new IllegalArgumentException("Unknown source menu: " + sourceId);
+            if (storage.getGui(newId) != null) throw new IllegalStateException("Menu already exists: " + newId);
+            GuiDefinition copy = source.copy();
+            copy.setId(newId);
+            storage.saveGui(copy);
+            refresh(copy);
         });
 
-        operations.put("menu_set_click_sound", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String soundName = ctx.getInputValue(node, "sound", String.class, "UI_BUTTON_CLICK");
+        operations.put("menu_set_close_action", (context, node) -> mutate(context, node,
+            definition -> definition.setCloseFlowId(context.getInputValue(node, "flow_id", String.class, ""))));
 
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                try {
-                    MenuData menu = menus.get(menuId);
-                    Sound sound = Sound.valueOf(soundName.toUpperCase());
-                    menu.clickSound = sound;
-                } catch (IllegalArgumentException e) {
-                }
-            }
-        });
+        operations.put("menu_set_open_action", (context, node) -> mutate(context, node,
+            definition -> definition.setOpenFlowId(context.getInputValue(node, "flow_id", String.class, ""))));
 
-        operations.put("menu_set_title", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String title = ctx.getInputValue(node, "title", String.class, "Menu");
+        operations.put("menu_set_update_interval", (context, node) -> mutate(context, node, definition -> {
+            definition.setUpdateIntervalTicks(Math.max(0, context.getInputValue(node, "interval_ticks", Integer.class, 20)));
+            definition.setUpdateFlowId(context.getInputValue(node, "flow_id", String.class, ""));
+        }));
 
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                menu.title = title;
-            }
-        });
-
-        operations.put("menu_set_click_action", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            String flowId = ctx.getInputValue(node, "flow_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    if (menuItem == null) {
-                        menuItem = new MenuItemData();
-                        menuItem.item = new ItemStack(Material.AIR);
-                        menu.items.put(slot, menuItem);
-                    }
-                    menuItem.flowId = flowId;
-                }
-            }
-        });
-
-        operations.put("menu_set_item_with_action", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            String materialName = ctx.getInputValue(node, "material", String.class, "STONE");
-            String name = ctx.getInputValue(node, "name", String.class, "");
-            String lore = ctx.getInputValue(node, "lore", String.class, "");
-            String flowId = ctx.getInputValue(node, "flow_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                Material material = Material.getMaterial(materialName.toUpperCase());
-                if (material != null && slot >= 0 && slot < menu.rows * 9) {
-                    ItemStack item = new ItemStack(material);
-                    ItemMeta meta = item.getItemMeta();
-                    if (meta != null) {
-                        if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parseItemName(name));
-                        }
-                        if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseItemLoreLines(lore));
-                        }
-                        item.setItemMeta(meta);
-                    }
-                    MenuItemData menuItem = new MenuItemData();
-                    menuItem.item = item;
-                    menuItem.flowId = flowId;
-                    menu.items.put(slot, menuItem);
-                }
-            }
-        });
-
-        operations.put("menu_set_enchant", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            Boolean enchanted = ctx.getInputValue(node, "enchanted", Boolean.class, false);
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9 && menu.items.containsKey(slot)) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    menuItem.enchanted = enchanted;
-                    if (enchanted) {
-                        ItemMeta meta = menuItem.item.getItemMeta();
-                        if (meta != null) {
-                            meta.addEnchant(Enchantment.MENDING, 1, true);
-                            menuItem.item.setItemMeta(meta);
-                        }
-                    }
-                }
-            }
-        });
-
-        operations.put("menu_set_flags", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            String flagsList = ctx.getInputValue(node, "flags_list", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9 && menu.items.containsKey(slot)) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    List<ItemFlag> flags = new ArrayList<>();
-                    if (!flagsList.isEmpty()) {
-                        String[] flagNames = flagsList.split(",");
-                        for (String flagName : flagNames) {
-                            try {
-                                flags.add(ItemFlag.valueOf(flagName.trim().toUpperCase()));
-                            } catch (IllegalArgumentException e) {
-                            }
-                        }
-                    }
-                    menuItem.flags = flags;
-                    ItemMeta meta = menuItem.item.getItemMeta();
-                    if (meta != null) {
-                        meta.addItemFlags(flags.toArray(new ItemFlag[0]));
-                        menuItem.item.setItemMeta(meta);
-                    }
-                }
-            }
-        });
-
-        operations.put("menu_set_custom_model", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            Integer modelData = ctx.getInputValue(node, "model_data", Integer.class, 0);
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9 && menu.items.containsKey(slot)) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    menuItem.customModelData = modelData;
-                    ItemMeta meta = menuItem.item.getItemMeta();
-                    if (meta != null) {
-                        meta.setCustomModelData(modelData);
-                        menuItem.item.setItemMeta(meta);
-                    }
-                }
-            }
-        });
-
-        operations.put("menu_set_head_texture", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-            String playerNameOrUuid = ctx.getInputValue(node, "player_name_or_uuid", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9 && menu.items.containsKey(slot)) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    menuItem.skullTexture = playerNameOrUuid;
-                    ItemStack item = new ItemStack(Material.PLAYER_HEAD);
-                    SkullMeta meta = (SkullMeta) item.getItemMeta();
-                    if (meta != null) {
-                        try {
-                            UUID uuid = UUID.fromString(playerNameOrUuid);
-                            meta.setOwnerProfile(Bukkit.createProfile(uuid));
-                        } catch (IllegalArgumentException e) {
-                            meta.setOwnerProfile(Bukkit.createProfile(playerNameOrUuid));
-                        }
-                        item.setItemMeta(meta);
-                    }
-                    menuItem.item = item;
-                }
-            }
-        });
-
-        operations.put("menu_fill_pattern", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer startSlot = ctx.getInputValue(node, "start_slot", Integer.class, 0);
-            Integer endSlot = ctx.getInputValue(node, "end_slot", Integer.class, 0);
-            String materialName = ctx.getInputValue(node, "material", String.class, "STONE");
-            String name = ctx.getInputValue(node, "name", String.class, "");
-            String lore = ctx.getInputValue(node, "lore", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                Material material = Material.getMaterial(materialName.toUpperCase());
-                if (material != null && startSlot >= 0 && endSlot >= startSlot && endSlot < menu.rows * 9) {
-                    ItemStack item = new ItemStack(material);
-                    ItemMeta meta = item.getItemMeta();
-                    if (meta != null) {
-                        if (!name.isEmpty()) {
-                            meta.displayName(TextFormatter.parseItemName(name));
-                        }
-                        if (!lore.isEmpty()) {
-                            meta.lore(TextFormatter.parseItemLoreLines(lore));
-                        }
-                        item.setItemMeta(meta);
-                    }
-                    for (int i = startSlot; i <= endSlot; i++) {
-                        MenuItemData menuItem = new MenuItemData();
-                        menuItem.item = item.clone();
-                        menu.items.put(i, menuItem);
-                    }
-                }
-            }
-        });
-
-        operations.put("menu_clear_slot", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9) {
-                    menu.items.remove(slot);
-                }
-            }
-        });
-
-        operations.put("menu_get_item", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer slot = ctx.getInputValue(node, "slot", Integer.class, 0);
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (slot >= 0 && slot < menu.rows * 9 && menu.items.containsKey(slot)) {
-                    MenuItemData menuItem = menu.items.get(slot);
-                    ctx.setOutput(node, "item", menuItem.item.clone());
-                }
-            }
-        });
-
-        operations.put("menu_get_all_items", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                List<ItemStack> items = new ArrayList<>();
-                for (MenuItemData menuItem : menu.items.values()) {
-                    items.add(menuItem.item.clone());
-                }
-                ctx.setOutput(node, "items_list", items);
-            }
-        });
-
-        operations.put("menu_duplicate", (ctx, node) -> {
-            String sourceMenuId = ctx.getInputValue(node, "source_menu_id", String.class, "");
-            String newMenuId = ctx.getInputValue(node, "new_menu_id", String.class, "");
-
-            if (!sourceMenuId.isEmpty() && !newMenuId.isEmpty() && menus.containsKey(sourceMenuId) && !menus.containsKey(newMenuId)) {
-                MenuData sourceMenu = menus.get(sourceMenuId);
-                MenuData newMenu = new MenuData();
-                newMenu.title = sourceMenu.title;
-                newMenu.rows = sourceMenu.rows;
-                newMenu.clickSound = sourceMenu.clickSound;
-                newMenu.closeAction = sourceMenu.closeAction;
-                newMenu.openAction = sourceMenu.openAction;
-                newMenu.updateInterval = sourceMenu.updateInterval;
-                for (Map.Entry<Integer, MenuItemData> entry : sourceMenu.items.entrySet()) {
-                    MenuItemData sourceItem = entry.getValue();
-                    MenuItemData newItem = new MenuItemData();
-                    newItem.item = sourceItem.item.clone();
-                    newItem.flowId = sourceItem.flowId;
-                    newItem.enchanted = sourceItem.enchanted;
-                    newItem.flags = sourceItem.flags != null ? new ArrayList<>(sourceItem.flags) : null;
-                    newItem.customModelData = sourceItem.customModelData;
-                    newItem.skullTexture = sourceItem.skullTexture;
-                    newMenu.items.put(entry.getKey(), newItem);
-                }
-                menus.put(newMenuId, newMenu);
-            }
-        });
-
-        operations.put("menu_set_close_action", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String flowId = ctx.getInputValue(node, "flow_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                menu.closeAction = flowId;
-            }
-        });
-
-        operations.put("menu_set_open_action", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            String flowId = ctx.getInputValue(node, "flow_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                menu.openAction = flowId;
-            }
-        });
-
-        operations.put("menu_set_update_interval", (ctx, node) -> {
-            String menuId = ctx.getInputValue(node, "menu_id", String.class, "");
-            Integer intervalTicks = ctx.getInputValue(node, "interval_ticks", Integer.class, 20);
-            String flowId = ctx.getInputValue(node, "flow_id", String.class, "");
-
-            if (!menuId.isEmpty() && menus.containsKey(menuId)) {
-                MenuData menu = menus.get(menuId);
-                if (menu.updateTaskId != -1) {
-                    Bukkit.getScheduler().cancelTask(menu.updateTaskId);
-                }
-                menu.updateInterval = intervalTicks;
-                menu.openAction = flowId;
-            }
-        });
-
-        operations.put("menu_get_open_menu_id", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-
-            if (player != null && openMenus.containsKey(player)) {
-                ctx.setOutput(node, "menu_id", openMenus.get(player));
-            }
+        operations.put("menu_get_open_menu_id", (context, node) -> {
+            String menuId = requireManager().getOpenGuiId(requirePlayer(context, node));
+            context.setOutput(node, "menu_id", menuId != null ? menuId : "");
         });
     }
 
@@ -541,20 +194,159 @@ public class MenuHandler implements NodeHandler {
     }
 
     @Override
-    public void execute(FlowContext ctx, FlowNode node) {
+    public void execute(FlowContext context, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
-        BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        BiConsumer<FlowContext, FlowNode> handler = operation != null ? operations.get(operation) : null;
+        if (handler == null) {
+            throw new IllegalArgumentException("Unknown menu operation: " + operation);
         }
-        ctx.triggerOutput("flow");
+        handler.accept(context, node);
+        context.triggerOutput("flow");
     }
 
-    public static Map<String, MenuData> getMenus() {
-        return menus;
+    private void mutate(FlowContext context, FlowNode node, Consumer<GuiDefinition> mutation) {
+        String menuId = context.getInputValue(node, "menu_id", String.class, "");
+        FlowStorage storage = requireStorage();
+        GuiDefinition definition = storage.getGui(requireText(menuId, "Menu ID"));
+        if (definition == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
+        ensureElements(definition);
+        mutation.accept(definition);
+        storage.saveGui(definition);
+        refresh(definition);
     }
 
-    public static Map<Player, String> getOpenMenus() {
-        return openMenus;
+    private void mutateVisual(FlowContext context, FlowNode node, Consumer<Visual> mutation) {
+        mutate(context, node, definition -> {
+            int slot = context.getInputValue(node, "slot", Integer.class, 0);
+            requireSlot(definition, slot);
+            GuiElement element = elementAt(definition, slot, true);
+            if (element.getVisual() == null) {
+                element.setVisual(new Visual(Material.AIR.name()));
+            }
+            mutation.accept(element.getVisual());
+        });
+    }
+
+    private GuiElement element(FlowContext context, FlowNode node, int slot, String flowPin) {
+        Visual visual = new Visual(materialId(context.getInputValue(node, "material")));
+        visual.setName(context.getInputValue(node, "name", String.class, ""));
+        visual.setLore(stringList(context.getInputValue(node, "lore")));
+        GuiElement element = new GuiElement(List.of(slot), visual, null);
+        if (flowPin != null) {
+            element.setFlowId(context.getInputValue(node, flowPin, String.class, ""));
+        }
+        return element;
+    }
+
+    private GuiElement elementAt(GuiDefinition definition, int slot, boolean create) {
+        for (GuiElement element : definition.getElements()) {
+            if (element != null && element.getSlots() != null && element.getSlots().contains(slot)) {
+                return element;
+            }
+        }
+        if (!create) {
+            return null;
+        }
+        GuiElement element = new GuiElement(List.of(slot), new Visual(Material.AIR.name()), null);
+        definition.getElements().add(element);
+        return element;
+    }
+
+    private void replaceSlot(GuiDefinition definition, int slot, GuiElement replacement) {
+        removeSlot(definition, slot);
+        definition.getElements().add(replacement);
+    }
+
+    private void removeSlot(GuiDefinition definition, int slot) {
+        List<GuiElement> empty = new ArrayList<>();
+        for (GuiElement element : definition.getElements()) {
+            if (element == null || element.getSlots() == null) {
+                empty.add(element);
+                continue;
+            }
+            element.getSlots().removeIf(candidate -> candidate != null && candidate == slot);
+            if (element.getSlots().isEmpty()) {
+                empty.add(element);
+            }
+        }
+        definition.getElements().removeAll(empty);
+    }
+
+    private int firstFreeSlot(GuiDefinition definition) {
+        for (int slot = 0; slot < definition.getRows() * 9; slot++) {
+            if (elementAt(definition, slot, false) == null) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private boolean validSlot(GuiDefinition definition, int slot) {
+        return slot >= 0 && slot < Math.clamp(definition.getRows(), 1, 6) * 9;
+    }
+
+    private String materialId(Object value) {
+        if (value instanceof Material material) {
+            return material.name();
+        }
+        Material material = value != null ? Material.matchMaterial(String.valueOf(value)) : null;
+        if (material == null || material.isAir()) throw new IllegalArgumentException("Menu item material is invalid: " + value);
+        return material.name();
+    }
+
+    private List<String> stringList(Object value) {
+        if (value instanceof Collection<?> collection) {
+            return collection.stream().filter(item -> item != null).map(String::valueOf).toList();
+        }
+        if (value == null || String.valueOf(value).isBlank()) {
+            return new ArrayList<>();
+        }
+        return List.of(String.valueOf(value).split("\\R|,"));
+    }
+
+    private GuiDefinition requireGui(String id) {
+        String menuId = requireText(id, "Menu ID");
+        GuiDefinition definition = requireStorage().getGui(menuId);
+        if (definition == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
+        ensureElements(definition);
+        return definition;
+    }
+
+    private FlowStorage requireStorage() {
+        FlowStorage storage = FlowRuntimeAccess.getStorage();
+        if (storage == null) throw new IllegalStateException("Flow storage is unavailable");
+        return storage;
+    }
+
+    private void refresh(GuiDefinition definition) {
+        GuiManager.refreshOpenGuis(definition);
+    }
+
+    private void ensureElements(GuiDefinition definition) {
+        if (definition.getElements() == null) {
+            definition.setElements(new ArrayList<>());
+        }
+    }
+
+    private GuiManager requireManager() {
+        GuiManager manager = GuiManager.activeManager();
+        if (manager == null) throw new IllegalStateException("GUI runtime is unavailable");
+        return manager;
+    }
+
+    private Player requirePlayer(FlowContext context, FlowNode node) {
+        Player player = context.getPlayerInput(node, "player");
+        if (player == null) throw new IllegalArgumentException("Player is required");
+        return player;
+    }
+
+    private int requireSlot(GuiDefinition definition, int slot) {
+        if (!validSlot(definition, slot)) throw new IllegalArgumentException("Menu slot must be between 0 and " + (Math.clamp(definition.getRows(), 1, 6) * 9 - 1));
+        return slot;
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
+        return value;
     }
 }

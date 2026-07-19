@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledFuture;
 public class FlowDebugSession {
     private final String sessionId;
     private final String graphId;
+    private final String executionId;
     private volatile String currentGraphId;
     private volatile String currentNodeId;
     private volatile String currentNodeType;
@@ -19,9 +20,10 @@ public class FlowDebugSession {
     private volatile ScheduledFuture<?> autoResumeTask;
     private volatile long updatedAt = System.currentTimeMillis();
 
-    public FlowDebugSession(String sessionId, String graphId) {
+    public FlowDebugSession(String sessionId, String graphId, String executionId) {
         this.sessionId = sessionId;
         this.graphId = graphId;
+        this.executionId = executionId;
         this.currentGraphId = graphId;
     }
 
@@ -31,6 +33,10 @@ public class FlowDebugSession {
 
     public String getGraphId() {
         return graphId;
+    }
+
+    public String getExecutionId() {
+        return executionId;
     }
 
     public String getCurrentGraphId() {

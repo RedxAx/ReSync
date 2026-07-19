@@ -8,6 +8,7 @@ import restudio.resync.modules.Module;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 import restudio.resync.security.ClientIdentity;
 
+import java.util.Collection;
 import java.util.UUID;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -167,7 +168,7 @@ public class SessionManager {
         }
     }
 
-    public java.util.Collection<Session> getSessions() {
+    public Collection<Session> getSessions() {
         return sessionsById.values();
     }
 

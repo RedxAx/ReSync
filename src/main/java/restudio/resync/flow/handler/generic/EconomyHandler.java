@@ -22,343 +22,169 @@ public class EconomyHandler implements NodeHandler {
 
     public EconomyHandler() {
         operations.put("eco_get_balance", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "balance", 0.0);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "balance", 0.0);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "balance", 0.0);
-                return;
-            }
-            double balance = eco.getBalance(player);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "balance", balance);
+            Economy economy = requireEconomy();
+            Player player = requirePlayer(ctx, node, "player");
+            succeed(ctx, node);
+            ctx.setOutput(node, "balance", economy.getBalance(player));
         });
 
         operations.put("eco_set_balance", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double balance = ctx.getInputValue(node, "balance", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                return;
-            }
-            eco.withdrawPlayer(player, eco.getBalance(player));
-            eco.depositPlayer(player, balance);
-            ctx.setOutput(node, "success", true);
+            Economy economy = requireEconomy();
+            Player player = requirePlayer(ctx, node, "player");
+            double requestedBalance = requireAmount(ctx.getInputValue(node, "balance", Double.class, 0.0), "Balance");
+            double currentBalance = economy.getBalance(player);
+            EconomyResponse response = requestedBalance >= currentBalance
+                ? economy.depositPlayer(player, requestedBalance - currentBalance)
+                : economy.withdrawPlayer(player, currentBalance - requestedBalance);
+            publishTransaction(ctx, node, economy, player, response);
         });
 
-        operations.put("eco_add_balance", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            eco.depositPlayer(player, amount);
-            double newBalance = eco.getBalance(player);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "new_balance", newBalance);
-        });
-
-        operations.put("eco_subtract_balance", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            eco.withdrawPlayer(player, amount);
-            double newBalance = eco.getBalance(player);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "new_balance", newBalance);
-        });
+        operations.put("eco_add_balance", (ctx, node) -> deposit(ctx, node));
+        operations.put("deposit", (ctx, node) -> deposit(ctx, node));
+        operations.put("eco_subtract_balance", (ctx, node) -> withdraw(ctx, node));
+        operations.put("withdraw", (ctx, node) -> withdraw(ctx, node));
 
         operations.put("eco_has_enough", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "has", false);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "has", false);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "has", false);
-                return;
-            }
-            boolean has = eco.has(player, amount);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "has", has);
+            Economy economy = requireEconomy();
+            Player player = requirePlayer(ctx, node, "player");
+            double amount = requireAmount(ctx.getInputValue(node, "amount", Double.class, 0.0), "Amount");
+            succeed(ctx, node);
+            ctx.setOutput(node, "has", economy.has(player, amount));
         });
 
         operations.put("eco_transfer", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
+            Economy economy = requireEconomy();
+            Player fromPlayer = requirePlayer(ctx, node, "from_player");
+            Player toPlayer = requirePlayer(ctx, node, "to_player");
+            if (fromPlayer.getUniqueId().equals(toPlayer.getUniqueId())) throw new IllegalArgumentException("Transfer players must be different");
+            double amount = requireAmount(ctx.getInputValue(node, "amount", Double.class, 0.0), "Transfer amount");
+            EconomyResponse withdrawal = economy.withdrawPlayer(fromPlayer, amount);
+            if (!withdrawal.transactionSuccess()) {
+                fail(ctx, node, transactionError(withdrawal, "Transfer withdrawal failed"));
                 return;
             }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
+            EconomyResponse deposit = economy.depositPlayer(toPlayer, amount);
+            if (deposit.transactionSuccess()) {
+                succeed(ctx, node);
+                ctx.setOutput(node, "from_balance", economy.getBalance(fromPlayer));
+                ctx.setOutput(node, "to_balance", economy.getBalance(toPlayer));
                 return;
             }
-            Player fromPlayer = ctx.getInputValue(node, "from_player", Player.class, null);
-            Player toPlayer = ctx.getInputValue(node, "to_player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (fromPlayer == null || toPlayer == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                return;
+            EconomyResponse rollback = economy.depositPlayer(fromPlayer, amount);
+            if (!rollback.transactionSuccess()) {
+                throw new IllegalStateException("Economy transfer failed and rollback failed: " + transactionError(deposit, "deposit failed") + "; " + transactionError(rollback, "rollback failed"));
             }
-            EconomyResponse response = eco.withdrawPlayer(fromPlayer, amount);
-            if (response.transactionSuccess()) {
-                eco.depositPlayer(toPlayer, amount);
-                ctx.setOutput(node, "success", true);
-            } else {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", response.errorMessage);
-            }
+            fail(ctx, node, transactionError(deposit, "Transfer deposit failed"));
         });
 
         operations.put("eco_get_top", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "top", new ArrayList<>());
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "top", new ArrayList<>());
-                return;
-            }
-            Integer limit = ctx.getInputValue(node, "limit", Integer.class, 10);
+            Economy economy = requireEconomy();
+            int limit = ctx.getInputValue(node, "limit", Integer.class, 10);
+            if (limit < 1 || limit > 100) throw new IllegalArgumentException("Economy leaderboard limit must be between 1 and 100");
             List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
-            online.sort(Comparator.comparingDouble((Player p) -> eco.getBalance(p)).reversed());
+            online.sort(Comparator.comparingDouble((Player player) -> economy.getBalance(player)).reversed());
             List<String> top = new ArrayList<>();
-            for (int i = 0; i < Math.min(limit, online.size()); i++) {
-                Player p = online.get(i);
-                top.add(p.getName() + ": " + eco.format(eco.getBalance(p)));
+            for (int index = 0; index < Math.min(limit, online.size()); index++) {
+                Player player = online.get(index);
+                top.add(player.getName() + ": " + economy.format(economy.getBalance(player)));
             }
-            ctx.setOutput(node, "success", true);
+            succeed(ctx, node);
             ctx.setOutput(node, "top", top);
         });
 
-        operations.put("deposit", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            eco.depositPlayer(player, amount);
-            double newBalance = eco.getBalance(player);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "new_balance", newBalance);
-        });
-
-        operations.put("withdraw", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                ctx.setOutput(node, "new_balance", 0.0);
-                return;
-            }
-            eco.withdrawPlayer(player, amount);
-            double newBalance = eco.getBalance(player);
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "new_balance", newBalance);
-        });
-
         operations.put("format", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "formatted", "$" + ctx.getInputValue(node, "amount", Double.class, 0.0));
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "formatted", "$" + ctx.getInputValue(node, "amount", Double.class, 0.0));
-                return;
-            }
-            Double amount = ctx.getInputValue(node, "amount", Double.class, 0.0);
-            ctx.setOutput(node, "formatted", eco.format(amount));
+            Economy economy = requireEconomy();
+            double amount = requireFinite(ctx.getInputValue(node, "amount", Double.class, 0.0), "Amount");
+            ctx.setOutput(node, "formatted", economy.format(amount));
         });
 
         operations.put("eco_get_currency", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                ctx.setOutput(node, "singular", "dollar");
-                ctx.setOutput(node, "plural", "dollars");
-                ctx.setOutput(node, "currency", "$");
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                ctx.setOutput(node, "singular", "dollar");
-                ctx.setOutput(node, "plural", "dollars");
-                ctx.setOutput(node, "currency", "$");
-                return;
-            }
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "singular", eco.currencyNameSingular());
-            ctx.setOutput(node, "plural", eco.currencyNamePlural());
-            ctx.setOutput(node, "currency", eco.currencyNamePlural());
+            Economy economy = requireEconomy();
+            succeed(ctx, node);
+            ctx.setOutput(node, "singular", economy.currencyNameSingular());
+            ctx.setOutput(node, "plural", economy.currencyNamePlural());
+            ctx.setOutput(node, "currency", economy.currencyNamePlural());
         });
 
         operations.put("eco_has_bank", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "has_bank", false);
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "has_bank", false);
-                return;
-            }
-            ctx.setOutput(node, "success", true);
-            ctx.setOutput(node, "has_bank", eco.hasBankSupport());
-            ctx.setOutput(node, "has", eco.hasBankSupport());
+            Economy economy = requireEconomy();
+            boolean supported = economy.hasBankSupport();
+            succeed(ctx, node);
+            ctx.setOutput(node, "has_bank", supported);
+            ctx.setOutput(node, "has", supported);
         });
 
         operations.put("eco_create_bank", (ctx, node) -> {
-            if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Vault not available");
-                return;
-            }
-            Economy eco = getEconomy();
-            if (eco == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Economy not available");
-                return;
-            }
-            if (!eco.hasBankSupport()) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Bank support unavailable");
-                return;
-            }
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (player == null) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Player is null");
-                return;
-            }
-            String bankName = ctx.getInputValue(node, "bank_name", String.class, "");
-            if (bankName.isEmpty()) {
-                bankName = player.getName();
-            }
-            EconomyResponse response = eco.createBank(bankName, player);
-            ctx.setOutput(node, "success", response.transactionSuccess());
-            if (!response.transactionSuccess()) {
-                ctx.setOutput(node, "error", response.errorMessage);
-            }
+            Economy economy = requireEconomy();
+            if (!economy.hasBankSupport()) throw new IllegalStateException("The active economy provider does not support banks");
+            Player player = requirePlayer(ctx, node, "player");
+            String bankName = ctx.getInputValue(node, "bank_name", String.class, player.getName());
+            if (bankName == null || bankName.isBlank()) throw new IllegalArgumentException("Bank name is required");
+            EconomyResponse response = economy.createBank(bankName, player);
+            if (response.transactionSuccess()) succeed(ctx, node);
+            else fail(ctx, node, transactionError(response, "Bank creation failed"));
         });
     }
 
-    private Economy getEconomy() {
+    private static void deposit(FlowContext context, FlowNode node) {
+        Economy economy = requireEconomy();
+        Player player = requirePlayer(context, node, "player");
+        double amount = requireAmount(context.getInputValue(node, "amount", Double.class, 0.0), "Deposit amount");
+        publishTransaction(context, node, economy, player, economy.depositPlayer(player, amount));
+    }
+
+    private static void withdraw(FlowContext context, FlowNode node) {
+        Economy economy = requireEconomy();
+        Player player = requirePlayer(context, node, "player");
+        double amount = requireAmount(context.getInputValue(node, "amount", Double.class, 0.0), "Withdrawal amount");
+        publishTransaction(context, node, economy, player, economy.withdrawPlayer(player, amount));
+    }
+
+    private static void publishTransaction(FlowContext context, FlowNode node, Economy economy, Player player, EconomyResponse response) {
+        if (response == null) throw new IllegalStateException("Economy provider returned no transaction response");
+        double balance = economy.getBalance(player);
+        context.setOutput(node, "new_balance", balance);
+        context.setOutput(node, "balance", balance);
+        if (response.transactionSuccess()) succeed(context, node);
+        else fail(context, node, transactionError(response, "Economy transaction failed"));
+    }
+
+    private static Economy requireEconomy() {
         RegisteredServiceProvider<Economy> registration = Bukkit.getServicesManager().getRegistration(Economy.class);
-        return registration != null ? registration.getProvider() : null;
+        if (registration == null || registration.getProvider() == null) throw new IllegalStateException("No Vault economy provider is available");
+        return registration.getProvider();
+    }
+
+    private static Player requirePlayer(FlowContext context, FlowNode node, String inputName) {
+        Player player = context.getInputValue(node, inputName, Player.class, null);
+        if (player == null) throw new IllegalArgumentException("Player input is required: " + inputName);
+        return player;
+    }
+
+    private static double requireAmount(double value, String field) {
+        double finite = requireFinite(value, field);
+        if (finite < 0) throw new IllegalArgumentException(field + " cannot be negative");
+        return finite;
+    }
+
+    private static double requireFinite(double value, String field) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException(field + " must be finite");
+        return value;
+    }
+
+    private static String transactionError(EconomyResponse response, String fallback) {
+        if (response == null) return fallback;
+        return response.errorMessage != null && !response.errorMessage.isBlank() ? response.errorMessage : fallback;
+    }
+
+    private static void succeed(FlowContext context, FlowNode node) {
+        context.setOutput(node, "success", true);
+        context.setOutput(node, "error", "");
+    }
+
+    private static void fail(FlowContext context, FlowNode node, String error) {
+        context.setOutput(node, "success", false);
+        context.setOutput(node, "error", error);
     }
 
     public void registerTo(HandlerRegistry registry) {
@@ -369,9 +195,8 @@ public class EconomyHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
-        }
+        if (op == null) throw new IllegalArgumentException("Unknown economy operation: " + operation);
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

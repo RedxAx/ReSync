@@ -17,6 +17,7 @@ import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.Test;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.handler.property.PropertyRegistry;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -137,7 +138,7 @@ class JsonFamilyHandlerTest {
 
     private NodeHandler family(String id) {
         HandlerRegistry registry = new HandlerRegistry();
-        JsonFamilyHandler.registerFamilies(registry);
+        JsonFamilyHandler.registerFamilies(registry, new PropertyRegistry());
         return registry.getHandler(id);
     }
 

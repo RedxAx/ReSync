@@ -58,6 +58,29 @@ class JsonAssetStoreTest {
     }
 
     @Test
+    void rejectedReloadRestoresLastValidatedCachedValue() throws Exception {
+        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
+            tempDir.resolve("assets"),
+            tempDir.resolve("legacy"),
+            "gui",
+            "GUIs",
+            TestResource::fromJson,
+            TestResource::toJson,
+            TestResource::id
+        );
+        store.save(new TestResource("main", "Main"));
+        Path file = tempDir.resolve("assets").resolve("GUIs").resolve("main.json");
+        Files.writeString(file, "{\"id\":\"main\",\"name\":\"Invalid\",\"resourceType\":\"gui\"}");
+
+        assertThrows(IllegalArgumentException.class, () -> store.reload("main", value -> {
+            if ("Invalid".equals(value.name())) {
+                throw new IllegalArgumentException("Rejected");
+            }
+        }));
+        assertEquals("Main", store.get("main").name());
+    }
+
+    @Test
     void migratesLegacyFilesToAssetFolder() throws Exception {
         Path legacy = tempDir.resolve("legacy");
         Files.createDirectories(legacy);
@@ -77,7 +100,31 @@ class JsonAssetStoreTest {
         Path file = tempDir.resolve("assets").resolve("Customization").resolve("Scoreboards").resolve("main.json");
         assertTrue(Files.exists(file));
         assertTrue(Files.readString(file).contains("\"resourceType\":\"scoreboard\""));
+        assertTrue(Files.exists(tempDir.resolve("assets").resolve("migration-backups").resolve("scoreboard").resolve("legacy").resolve("main.json")));
         assertFalse(Files.exists(legacy));
+    }
+
+    @Test
+    void retainsLegacyDirectoryWhenAnyAssetFailsValidation() throws Exception {
+        Path legacy = tempDir.resolve("legacy");
+        Files.createDirectories(legacy);
+        Files.writeString(legacy.resolve("valid.json"), GSON.toJson(new TestResource("valid", "Valid")));
+        Files.writeString(legacy.resolve("broken.json"), "{\"name\":\"Missing Id\"}");
+        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
+            tempDir.resolve("assets"),
+            legacy,
+            "gui",
+            "GUIs",
+            TestResource::fromJson,
+            TestResource::toJson,
+            TestResource::id
+        );
+
+        store.migrateLegacyAssets();
+
+        assertTrue(Files.exists(legacy.resolve("valid.json")));
+        assertTrue(Files.exists(legacy.resolve("broken.json")));
+        assertTrue(Files.exists(tempDir.resolve("assets").resolve("GUIs").resolve("valid.json")));
     }
 
     @Test

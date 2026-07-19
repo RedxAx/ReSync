@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "size",
           "type",
@@ -70,7 +70,7 @@
       },
       {
         "name": "items",
-        "dataType": "list",
+        "dataType": "list<itemstack>",
         "visibleWhen": {
           "action": "get",
           "property": "items"
@@ -110,7 +110,7 @@
       },
       {
         "name": "contents",
-        "dataType": "list",
+        "dataType": "list<item>",
         "visibleWhen": {
           "action": "get",
           "property": "contents"
@@ -118,7 +118,7 @@
       },
       {
         "name": "storage_contents",
-        "dataType": "list",
+        "dataType": "list<item>",
         "visibleWhen": {
           "action": "get",
           "property": "storage_contents"
@@ -126,7 +126,7 @@
       },
       {
         "name": "armor",
-        "dataType": "list",
+        "dataType": "list<item>",
         "visibleWhen": {
           "action": "get",
           "property": "armor"
@@ -170,7 +170,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "size",
           "type",
@@ -352,7 +352,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -859,7 +859,7 @@
       },
       {
         "name": "contents",
-        "dataType": "list",
+        "dataType": "list<item>",
         "pinType": "DATA"
       }
     ],
@@ -1391,7 +1391,7 @@
       },
       {
         "name": "items_list",
-        "dataType": "list",
+        "dataType": "list<item>",
         "pinType": "DATA"
       }
     ],
@@ -1448,7 +1448,7 @@
       },
       {
         "name": "items_list",
-        "dataType": "list",
+        "dataType": "list<item>",
         "pinType": "DATA"
       }
     ],
@@ -1545,7 +1545,7 @@
       },
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ],
     "outputs": [
@@ -1759,6 +1759,16 @@
         "name": "item",
         "dataType": "itemstack",
         "pinType": "DATA"
+      },
+      {
+        "name": "max_damage",
+        "dataType": "number",
+        "pinType": "DATA",
+        "defaultValue": "100",
+        "constraints": {
+          "min": 1,
+          "max": 2147483647
+        }
       }
     ],
     "outputs": [

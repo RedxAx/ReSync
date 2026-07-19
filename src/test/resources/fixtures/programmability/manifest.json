@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "file": "legacy-command-flow.json",
+      "resourceType": "flow",
+      "disposition": "migration-only",
+      "requirements": ["MIG-001", "MIG-002", "MIG-004", "FLOW-015"]
+    },
+    {
+      "file": "starter-loot-table.json",
+      "resourceType": "loot_table",
+      "disposition": "supported",
+      "requirements": ["RES-001", "RES-002", "RES-003", "RES-011"]
+    },
+    {
+      "file": "librarian-trade-profile.json",
+      "resourceType": "trade_profile",
+      "disposition": "supported",
+      "requirements": ["RES-001", "RES-002", "RES-003", "RES-011"]
+    },
+    {
+      "file": "guide-npc-definition.json",
+      "resourceType": "npc_definition",
+      "disposition": "supported",
+      "requirements": ["RES-001", "RES-002", "RES-003", "RES-011"]
+    }
+  ]
+}

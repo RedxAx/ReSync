@@ -3,6 +3,7 @@ package restudio.resync.core;
 import org.java_websocket.WebSocket;
 import restudio.resync.protocol.FrameSender;
 
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,6 +65,16 @@ public class ConnectionManager {
 
     public int getConnectionCount() {
         return connections.size();
+    }
+
+    public int reconnectWebSocketClients(String reason) {
+        String closeReason = reason != null && !reason.isBlank() ? reason : "Server reconnect requested";
+        ArrayList<ConnectionInfo> activeConnections = new ArrayList<>(connections.values());
+        for (ConnectionInfo info : activeConnections) {
+            info.setState(ConnectionState.CLOSING);
+            info.getFrameSender().close(1012, closeReason);
+        }
+        return activeConnections.size();
     }
 
     public void updateHeartbeat(WebSocket conn) {

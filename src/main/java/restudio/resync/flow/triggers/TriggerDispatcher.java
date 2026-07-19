@@ -5,6 +5,7 @@ import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.EventExecutor;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
@@ -74,28 +75,16 @@ public class TriggerDispatcher implements Listener {
         }
 
         ConcurrentHashMap<String, String> triggerMap = new ConcurrentHashMap<>();
-        Method getPlayer = null;
-        Method getEntity = null;
-        Method getWhoClicked = null;
-        try {
-            getPlayer = eventClass.getMethod("getPlayer");
-        } catch (NoSuchMethodException ignored) {
-        }
-        try {
-            getEntity = eventClass.getMethod("getEntity");
-        } catch (NoSuchMethodException ignored) {
-        }
-        try {
-            getWhoClicked = eventClass.getMethod("getWhoClicked");
-        } catch (NoSuchMethodException ignored) {
-        }
+        Method getPlayer = findMethod(eventClass, "getPlayer");
+        Method getEntity = findMethod(eventClass, "getEntity");
+        Method getWhoClicked = findMethod(eventClass, "getWhoClicked");
         TriggerEntry entry = new TriggerEntry(eventType, nodeType, eventClass, priority,
                 ignoreCancelled, variableExtractor, playerExtractor, triggerMap,
                 getPlayer, getEntity, getWhoClicked);
         entries.add(entry);
         indexEntryLookups(entry, eventType, nodeType, aliases);
 
-        org.bukkit.plugin.EventExecutor bukkitExecutor = (listener, event) -> {
+        EventExecutor bukkitExecutor = (listener, event) -> {
             if (!eventClass.isInstance(event)) return;
             dispatch(entry, event);
         };
@@ -112,7 +101,7 @@ public class TriggerDispatcher implements Listener {
             FlowGraph graph = storage.getGraph(trigger.getKey());
             if (graph == null) continue;
 
-            Map<String, Object> eventVars = new java.util.HashMap<>();
+            Map<String, Object> eventVars = new HashMap<>();
             if (player != null) {
                 eventVars.put("event.player", player);
             }
@@ -330,55 +319,45 @@ public class TriggerDispatcher implements Listener {
                 try {
                     return (Player) extractorMethod.invoke(cont, event);
                 } catch (Exception e) {
-                    return null;
+                    throw new IllegalStateException("Player extractor failed: " + extractorName, e);
                 }
             };
         }
 
         Class<?> eventClass = annotation.eventClass();
-        Method getPlayer = null;
-        Method getEntity = null;
-        Method getWhoClicked = null;
-        try {
-            getPlayer = eventClass.getMethod("getPlayer");
-        } catch (NoSuchMethodException ignored) {
-        }
-        try {
-            getEntity = eventClass.getMethod("getEntity");
-        } catch (NoSuchMethodException ignored) {
-        }
-        try {
-            getWhoClicked = eventClass.getMethod("getWhoClicked");
-        } catch (NoSuchMethodException ignored) {
-        }
+        Method getPlayer = findMethod(eventClass, "getPlayer");
+        Method getEntity = findMethod(eventClass, "getEntity");
+        Method getWhoClicked = findMethod(eventClass, "getWhoClicked");
         final Method cachedGetPlayer = getPlayer;
         final Method cachedGetEntity = getEntity;
         final Method cachedGetWhoClicked = getWhoClicked;
         return event -> {
-            try {
-                if (cachedGetPlayer != null) {
-                    Object result = cachedGetPlayer.invoke(event);
-                    if (result instanceof Player p) return p;
-                }
-            } catch (Exception e) {
-                return null;
-            }
-            try {
-                if (cachedGetEntity != null) {
-                    Object entity = cachedGetEntity.invoke(event);
-                    if (entity instanceof Player p) return p;
-                }
-            } catch (Exception ignored) {
-            }
-            try {
-                if (cachedGetWhoClicked != null) {
-                    Object who = cachedGetWhoClicked.invoke(event);
-                    if (who instanceof Player p) return p;
-                }
-            } catch (Exception ignored) {
-            }
+            Player player = invokePlayerMethod(cachedGetPlayer, event);
+            if (player != null) return player;
+            player = invokePlayerMethod(cachedGetEntity, event);
+            if (player != null) return player;
+            player = invokePlayerMethod(cachedGetWhoClicked, event);
+            if (player != null) return player;
             return null;
         };
+    }
+
+    private static Method findMethod(Class<?> type, String name) {
+        try {
+            return type.getMethod(name);
+        } catch (NoSuchMethodException exception) {
+            return null;
+        }
+    }
+
+    private static Player invokePlayerMethod(Method method, Event event) {
+        if (method == null) return null;
+        try {
+            Object value = method.invoke(event);
+            return value instanceof Player player ? player : null;
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to resolve a player from " + event.getEventName() + " using " + method.getName(), exception);
+        }
     }
 
     private static class TriggerEntry {

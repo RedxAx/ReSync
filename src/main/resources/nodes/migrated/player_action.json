@@ -500,7 +500,7 @@
       {
         "name": "property",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "sprint",
           "sneak",
@@ -893,6 +893,12 @@
       {
         "name": "strength",
         "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": -100,
+          "max": 100
+        },
         "visibleWhen": {
           "mode": "push"
         }
@@ -1219,11 +1225,23 @@
       },
       {
         "name": "volume",
-        "dataType": "number"
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 16
+        }
       },
       {
         "name": "pitch",
-        "dataType": "number"
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 2
+        }
       }
     ],
     "outputs": [
@@ -1781,7 +1799,15 @@
       },
       {
         "name": "slot",
-        "dataType": "any"
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "defaultValue": "CHEST",
+        "options": [
+          "HEAD",
+          "CHEST",
+          "LEGS",
+          "FEET"
+        ]
       },
       {
         "name": "red",

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowControlHandlerTest {
     @Test
@@ -29,6 +30,25 @@ class FlowControlHandlerTest {
         assertEquals(false, context.outputs.get("matched"));
         assertEquals(-1, context.outputs.get("index"));
         assertEquals("flow", context.triggeredOutput);
+    }
+
+    @Test
+    void switchCaseMatchesEquivalentNumericRepresentations() {
+        TestFlowContext context = executeSwitchCase(2.0D, List.of(1, 2L, 3.0F));
+
+        assertEquals(true, context.outputs.get("matched"));
+        assertEquals(1, context.outputs.get("index"));
+        assertEquals("flow", context.triggeredOutput);
+    }
+
+    @Test
+    void executorManagedLoopOperationsAreAdvertisedToValidation() {
+        HandlerRegistry registry = new HandlerRegistry();
+        new FlowControlHandler().registerTo(registry);
+
+        for (String operation : List.of("loop", "loop_count", "loop_for_each", "loop_for_each_player", "loop_for_each_entity", "loop_interval", "loop_while")) {
+            assertTrue(registry.hasOperation("FlowControlHandler", operation), operation);
+        }
     }
 
     private TestFlowContext executeSwitchCase(Object value, List<?> cases) {

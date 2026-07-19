@@ -93,7 +93,7 @@
       },
       {
         "name": "event.args_list",
-        "dataType": "list"
+        "dataType": "list<string>"
       },
       {
         "name": "event.args_count",
@@ -179,10 +179,6 @@
       {
         "source": "event.result",
         "target": "event.result"
-      },
-      {
-        "source": "event.player",
-        "target": "event.player"
       }
     ],
     "inputs": []
@@ -211,7 +207,7 @@
       },
       {
         "name": "event.lines",
-        "dataType": "list"
+        "dataType": "list<string>"
       }
     ],
     "trigger": true,
@@ -248,7 +244,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.result",
@@ -259,11 +256,11 @@
     "eventType": "org.bukkit.event.inventory.CraftItemEvent",
     "outputMappings": [
       {
-        "source": "event.player",
+        "source": "event.whoClicked",
         "target": "event.player"
       },
       {
-        "source": "event.result",
+        "source": "event.recipe.result",
         "target": "event.result"
       }
     ],
@@ -300,7 +297,7 @@
         "target": "event.player"
       },
       {
-        "source": "event.previousGameMode",
+        "source": "event.player.gameMode",
         "target": "event.old_gamemode"
       },
       {
@@ -322,7 +319,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.command",
@@ -330,18 +328,18 @@
       },
       {
         "name": "event.completions",
-        "dataType": "string"
+        "dataType": "list<string>"
       }
     ],
     "trigger": true,
     "eventType": "org.bukkit.event.server.TabCompleteEvent",
     "outputMappings": [
       {
-        "source": "event.player",
+        "source": "event.sender",
         "target": "event.player"
       },
       {
-        "source": "event.command",
+        "source": "event.buffer",
         "target": "event.command"
       },
       {
@@ -373,10 +371,6 @@
     "trigger": true,
     "eventType": "org.bukkit.event.inventory.FurnaceSmeltEvent",
     "outputMappings": [
-      {
-        "source": "event.player",
-        "target": "event.player"
-      },
       {
         "source": "event.result",
         "target": "event.result"
@@ -437,7 +431,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.projectile",
@@ -527,7 +522,7 @@
       },
       {
         "name": "event.placed_against",
-        "dataType": "item"
+        "dataType": "block"
       },
       {
         "name": "event.location",
@@ -727,7 +722,7 @@
       },
       {
         "name": "event.new_state",
-        "dataType": "item"
+        "dataType": "material"
       },
       {
         "name": "event.location",
@@ -742,7 +737,7 @@
         "target": "event.block"
       },
       {
-        "source": "event.newState",
+        "source": "event.newState.type",
         "target": "event.new_state"
       },
       {
@@ -768,7 +763,7 @@
       },
       {
         "name": "event.new_state",
-        "dataType": "item"
+        "dataType": "material"
       },
       {
         "name": "event.location",
@@ -783,7 +778,7 @@
         "target": "event.block"
       },
       {
-        "source": "event.newState",
+        "source": "event.newState.type",
         "target": "event.new_state"
       },
       {
@@ -950,6 +945,10 @@
       {
         "name": "event.is_vanished",
         "dataType": "boolean"
+      },
+      {
+        "name": "event.hidden_entity",
+        "dataType": "entity"
       }
     ],
     "trigger": true,
@@ -960,8 +959,8 @@
         "target": "event.player"
       },
       {
-        "source": "event.is_vanished",
-        "target": "event.is_vanished"
+        "source": "event.entity",
+        "target": "event.hidden_entity"
       }
     ],
     "inputs": []
@@ -997,7 +996,7 @@
         "target": "event.location"
       },
       {
-        "source": "event.hitEntity",
+        "source": "event.lightning",
         "target": "event.struck_entity"
       },
       {
@@ -1038,11 +1037,11 @@
     "eventType": "org.bukkit.event.entity.ItemMergeEvent",
     "outputMappings": [
       {
-        "source": "event.entity",
+        "source": "event.entity.itemStack",
         "target": "event.item1"
       },
       {
-        "source": "event.target",
+        "source": "event.target.itemStack",
         "target": "event.item2"
       },
       {
@@ -1050,7 +1049,7 @@
         "target": "event.location"
       },
       {
-        "source": "event.target",
+        "source": "event.target.itemStack",
         "target": "event.result"
       }
     ],
@@ -1150,7 +1149,7 @@
       },
       {
         "name": "event.new_state",
-        "dataType": "item"
+        "dataType": "material"
       }
     ],
     "trigger": true,
@@ -1165,7 +1164,7 @@
         "target": "event.location"
       },
       {
-        "source": "event.newState",
+        "source": "event.newState.type",
         "target": "event.new_state"
       }
     ],
@@ -1224,7 +1223,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.slot",
@@ -1255,7 +1255,7 @@
     "eventType": "org.bukkit.event.inventory.InventoryClickEvent",
     "outputMappings": [
       {
-        "source": "event.player",
+        "source": "event.whoClicked",
         "target": "event.player"
       },
       {
@@ -1263,11 +1263,11 @@
         "target": "event.slot"
       },
       {
-        "source": "event.raw_slot",
+        "source": "event.rawSlot",
         "target": "event.raw_slot"
       },
       {
-        "source": "event.button",
+        "source": "event.hotbarButton",
         "target": "event.button"
       },
       {
@@ -1275,11 +1275,11 @@
         "target": "event.action"
       },
       {
-        "source": "event.item",
+        "source": "event.currentItem",
         "target": "event.item"
       },
       {
-        "source": "event.cursor_item",
+        "source": "event.cursor",
         "target": "event.cursor_item"
       }
     ],
@@ -1345,7 +1345,7 @@
         "target": "event.player"
       },
       {
-        "source": "event.itemDrop",
+        "source": "event.itemDrop.itemStack",
         "target": "event.item"
       }
     ],
@@ -1807,7 +1807,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.inventory_title",
@@ -1856,7 +1857,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.inventory_title",
@@ -2165,7 +2167,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.item",
@@ -2180,7 +2183,7 @@
         "target": "event.player"
       },
       {
-        "source": "event.item",
+        "source": "event.item.itemStack",
         "target": "event.item"
       }
     ],
@@ -2247,7 +2250,7 @@
       },
       {
         "name": "event.new_state",
-        "dataType": "item"
+        "dataType": "list<block>"
       }
     ],
     "trigger": true,
@@ -2337,7 +2340,7 @@
       },
       {
         "name": "event.break_blocks",
-        "dataType": "boolean"
+        "dataType": "list<block>"
       },
       {
         "name": "event.fire",
@@ -2366,10 +2369,6 @@
       {
         "source": "event.blockList",
         "target": "event.break_blocks"
-      },
-      {
-        "source": "event.fire",
-        "target": "event.fire"
       },
       {
         "source": "event.entity",
@@ -2545,7 +2544,7 @@
     "eventType": "org.bukkit.event.enchantment.EnchantItemEvent",
     "outputMappings": [
       {
-        "source": "event.player",
+        "source": "event.enchanter",
         "target": "event.player"
       },
       {
@@ -2553,11 +2552,11 @@
         "target": "event.item"
       },
       {
-        "source": "event.enchantment",
+        "source": "event.enchantmentHint.key.asString",
         "target": "event.enchantment"
       },
       {
-        "source": "event.level",
+        "source": "event.levelHint",
         "target": "event.level"
       }
     ],
@@ -2649,7 +2648,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.projectile",
@@ -2817,7 +2817,8 @@
       },
       {
         "name": "event.tamer",
-        "dataType": "entity"
+        "dataType": "entity",
+        "optional": true
       },
       {
         "name": "event.entity_type",
@@ -2910,7 +2911,7 @@
         "target": "event.entity"
       },
       {
-        "source": "event.killer",
+        "source": "event.entity.killer",
         "target": "event.killer"
       }
     ],
@@ -3045,10 +3046,6 @@
         "target": "event.amount"
       },
       {
-        "source": "event.entity.health",
-        "target": "event.new_health"
-      },
-      {
         "source": "event.regainReason",
         "target": "event.reason"
       }
@@ -3094,10 +3091,6 @@
         "target": "event.amount"
       },
       {
-        "source": "event.entity.health",
-        "target": "event.new_health"
-      },
-      {
         "source": "event.regainReason",
         "target": "event.reason"
       }
@@ -3135,7 +3128,7 @@
         "target": "event.entity"
       },
       {
-        "source": "event.item",
+        "source": "event.item.itemStack",
         "target": "event.item"
       },
       {
@@ -3213,7 +3206,7 @@
         "target": "event.location"
       },
       {
-        "source": "event.portal_type",
+        "source": "event.portalType",
         "target": "event.portal_type"
       }
     ],
@@ -3250,11 +3243,11 @@
         "target": "event.entity"
       },
       {
-        "source": "event.location",
+        "source": "event.to",
         "target": "event.location"
       },
       {
-        "source": "event.portal_type",
+        "source": "event.from.block.type",
         "target": "event.portal_type"
       }
     ],
@@ -3305,7 +3298,8 @@
       },
       {
         "name": "event.player",
-        "dataType": "player"
+        "dataType": "player",
+        "optional": true
       },
       {
         "name": "event.damager",

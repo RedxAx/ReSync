@@ -4,11 +4,14 @@ public class FlowTraceRecord {
     private long sequence;
     private long timestamp;
     private String graphId;
+    private String executionId;
     private String nodeId;
     private String nodeType;
     private String status;
     private long durationNanos;
     private String errorText;
+    private String errorCode;
+    private String remediation;
     private int executionDepth;
     private String inputSummary;
     private String outputSummary;
@@ -42,6 +45,14 @@ public class FlowTraceRecord {
 
     public void setGraphId(String graphId) {
         this.graphId = graphId;
+    }
+
+    public String getExecutionId() {
+        return executionId;
+    }
+
+    public void setExecutionId(String executionId) {
+        this.executionId = executionId;
     }
 
     public String getNodeId() {
@@ -82,6 +93,22 @@ public class FlowTraceRecord {
 
     public void setErrorText(String errorText) {
         this.errorText = errorText;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
+    }
+
+    public String getRemediation() {
+        return remediation;
+    }
+
+    public void setRemediation(String remediation) {
+        this.remediation = remediation;
     }
 
     public int getExecutionDepth() {

@@ -7,11 +7,15 @@ import restudio.flow.data.CustomAbilityBinding;
 import restudio.flow.data.CustomArmorDefinition;
 import restudio.flow.data.CustomBlockDefinition;
 import restudio.flow.data.CustomContentDefinition;
+import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.CustomItemDefinition;
 import restudio.flow.data.FlowDataObject;
 import restudio.flow.data.FlowDataObjectAdapter;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowDataTypeAdapter;
+import restudio.flow.data.FlowConnection;
+import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -22,12 +26,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomContentStorage {
+    private final JavaPlugin plugin;
     private final File contentDir;
     private final Path contentPath;
     private final File assetsDir;
@@ -39,13 +45,27 @@ public class CustomContentStorage {
             .registerTypeAdapter(FlowDataObject.class, new FlowDataObjectAdapter())
             .create();
     private final CustomContentValidator validator = new CustomContentValidator();
-    private final ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
+    private final ItemAttributeSchemaService attributeSchemaService;
 
     public CustomContentStorage(JavaPlugin plugin) {
-        this(plugin.getDataFolder());
+        this(plugin, new ItemAttributeSchemaService());
+    }
+
+    public CustomContentStorage(JavaPlugin plugin, ItemAttributeSchemaService attributeSchemaService) {
+        this(plugin, plugin.getDataFolder(), attributeSchemaService);
     }
 
     CustomContentStorage(File dataFolder) {
+        this(null, dataFolder, new ItemAttributeSchemaService());
+    }
+
+    CustomContentStorage(File dataFolder, ItemAttributeSchemaService attributeSchemaService) {
+        this(null, dataFolder, attributeSchemaService);
+    }
+
+    private CustomContentStorage(JavaPlugin plugin, File dataFolder, ItemAttributeSchemaService attributeSchemaService) {
+        this.plugin = plugin;
+        this.attributeSchemaService = attributeSchemaService != null ? attributeSchemaService : new ItemAttributeSchemaService();
         this.contentDir = new File(dataFolder, "custom-content");
         this.contentPath = contentDir.toPath();
         this.assetsDir = new File(dataFolder, "assets");
@@ -63,6 +83,11 @@ public class CustomContentStorage {
             assetsDir.mkdirs();
         }
         migrateLegacyAssets();
+        repairMalformedFlowAliases();
+    }
+
+    JavaPlugin getPlugin() {
+        return plugin;
     }
 
     public void preloadAll() {
@@ -107,6 +132,7 @@ public class CustomContentStorage {
         try {
             assetStore.save(definition);
             cache.put(safeId, definition);
+            removeMalformedFlowAliases(definition);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to save custom content: " + safeId, e);
         }
@@ -148,6 +174,73 @@ public class CustomContentStorage {
             return List.of();
         }
         return getAll().stream().filter(definition -> flowId.equals(definition.getFlowId())).toList();
+    }
+
+    public CustomContentDefinition repairMalformedFlowIdentity(CustomContentDefinition definition) {
+        if (definition == null || definition.getGraph() == null || definition.getId() == null || definition.getFlowId() == null
+            || !definition.getId().equalsIgnoreCase(definition.getFlowId())) {
+            return definition;
+        }
+        List<CustomContentDefinition> canonical = getByFlow(definition.getFlowId()).stream()
+            .filter(existing -> existing.getId() != null && !existing.getId().equalsIgnoreCase(definition.getFlowId()))
+            .toList();
+        if (canonical.size() != 1) {
+            return definition;
+        }
+        CustomContentDefinition original = canonical.getFirst();
+        FlowGraph repairedGraph = repairGraph(definition, original);
+        FlowNode start = CustomContentGraphAdapter.findStartNode(repairedGraph);
+        if (start == null || start.getInputValues() == null) {
+            return definition;
+        }
+        start.setType(CustomContentGraphAdapter.nodeType(original.getType()));
+        Map<String, Object> inputs = start.getInputValues();
+        inputs.put("content_id", original.getId());
+        inputs.put("name", original.getDisplayName());
+        inputs.put("provider", original.getProvider());
+        inputs.put("external_id", original.getExternalId());
+        inputs.put("material", original.getMaterial());
+        inputs.put("custom_model_data", original.getCustomModelData() != null ? original.getCustomModelData() : "");
+        inputs.put("components", new LinkedHashMap<>(original.getComponents() != null ? original.getComponents() : Map.of()));
+        inputs.put("lore", String.join("\n", original.getLore() != null ? original.getLore() : List.of()));
+        inputs.put("tags", String.join("\n", original.getTags() != null ? original.getTags() : List.of()));
+        inputs.remove("armor_slot");
+        if ("armor".equalsIgnoreCase(original.getType())) {
+            CustomContentGraphAdapter.setContentConfiguration(repairedGraph, "armor_slot", original.getArmorSlot());
+        } else {
+            CustomContentGraphAdapter.removeContentConfiguration(repairedGraph, "armor_slot");
+        }
+        CustomContentDefinition repaired = CustomContentGraphAdapter.toDefinition(repairedGraph);
+        if (repaired == null) {
+            return definition;
+        }
+        repaired.setVersion(original.getVersion());
+        Log.warn("Repaired malformed custom content identity " + definition.getId() + " to " + original.getId());
+        return repaired;
+    }
+
+    private FlowGraph repairGraph(CustomContentDefinition malformed, CustomContentDefinition original) {
+        FlowGraph malformedGraph = malformed.getGraph();
+        FlowGraph originalGraph = original.getGraph();
+        if (originalGraph == null || original.getType() == null || malformed.getType() == null || original.getType().equalsIgnoreCase(malformed.getType())) {
+            return malformedGraph;
+        }
+        FlowNode malformedStart = CustomContentGraphAdapter.findStartNode(malformedGraph);
+        String malformedStartId = malformedGraph.findNodeId(malformedStart);
+        Set<String> transferred = new HashSet<>();
+        for (Map.Entry<String, FlowNode> entry : malformedGraph.getNodes().entrySet()) {
+            if (!entry.getKey().equals(malformedStartId) && !originalGraph.getNodes().containsKey(entry.getKey())) {
+                originalGraph.getNodes().put(entry.getKey(), entry.getValue());
+                transferred.add(entry.getKey());
+            }
+        }
+        for (FlowConnection connection : malformedGraph.getConnections()) {
+            if (transferred.contains(connection.getSourceNodeId()) && transferred.contains(connection.getTargetNodeId())
+                && !originalGraph.getConnections().contains(connection)) {
+                originalGraph.getConnections().add(connection);
+            }
+        }
+        return originalGraph;
     }
 
     public List<CustomContentDefinition> getByType(String type) {
@@ -209,6 +302,38 @@ public class CustomContentStorage {
             case "block" -> "Content/Blocks";
             default -> "Content/Items";
         };
+    }
+
+    private void removeMalformedFlowAliases(CustomContentDefinition definition) {
+        String id = definition != null ? definition.getId() : null;
+        String flowId = definition != null ? definition.getFlowId() : null;
+        if (id == null || flowId == null || id.equalsIgnoreCase(flowId)) {
+            return;
+        }
+        for (CustomContentDefinition candidate : getByFlow(flowId)) {
+            if (candidate.getId() != null && candidate.getId().equalsIgnoreCase(flowId)) {
+                assetStore.delete(candidate.getId());
+                cache.remove(candidate.getId());
+                Log.warn("Removed malformed custom content alias " + candidate.getId() + " for " + id);
+            }
+        }
+    }
+
+    private void repairMalformedFlowAliases() {
+        List<CustomContentDefinition> malformed = getAll().stream()
+            .filter(definition -> definition.getId() != null && definition.getFlowId() != null && definition.getId().equalsIgnoreCase(definition.getFlowId()))
+            .toList();
+        for (CustomContentDefinition definition : malformed) {
+            CustomContentDefinition repaired = repairMalformedFlowIdentity(definition);
+            if (repaired == definition) {
+                continue;
+            }
+            try {
+                save(repaired);
+            } catch (RuntimeException exception) {
+                Log.warn("Failed to repair malformed custom content alias " + definition.getId() + ": " + exception.getMessage());
+            }
+        }
     }
 
     private void migrateLegacyAssets() {

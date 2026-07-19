@@ -1,125 +1,183 @@
 [
   {
     "id": "time.format",
-    "displayName": "Time Format",
+    "displayName": "Format Time",
+    "description": "Format an epoch-millisecond timestamp with an explicit pattern, zone, and locale.",
     "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "format", "date"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_format"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {"name": "time", "dataType": "instant", "widget": "NUMBER", "description": "Epoch milliseconds"},
+      {"name": "format", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern"},
+      {"name": "time_zone", "dataType": "string", "defaultValue": "UTC", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:time_zone", "description": "IANA time zone; UTC by default"},
+      {"name": "locale", "dataType": "string", "defaultValue": "", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:locale", "description": "BCP 47 language tag or blank for neutral formatting"}
+    ],
+    "outputs": [
+      {"name": "string", "dataType": "string"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
+    ]
   },
   {
     "id": "time.parse",
-    "displayName": "Time Parse",
+    "displayName": "Parse Time",
+    "description": "Parse text into epoch milliseconds with an explicit pattern, zone, and locale.",
     "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "parse", "date"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_parse"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {"name": "string", "dataType": "string"},
+      {"name": "format", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern containing a complete date and time"},
+      {"name": "time_zone", "dataType": "string", "defaultValue": "UTC", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:time_zone", "description": "IANA time zone; UTC by default"},
+      {"name": "locale", "dataType": "string", "defaultValue": "", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:locale", "description": "BCP 47 language tag or blank for neutral parsing"}
+    ],
+    "outputs": [
+      {"name": "time", "dataType": "instant"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
+    ]
   },
   {
     "id": "time.add",
-    "displayName": "Time Add",
+    "displayName": "Add Time",
+    "description": "Add a supported unit to an epoch-millisecond timestamp.",
     "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "add", "duration"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_add"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {"name": "time", "dataType": "instant", "widget": "NUMBER", "description": "Epoch milliseconds"},
+      {"name": "amount", "dataType": "number", "defaultValue": 0},
+      {"name": "unit", "dataType": "string", "defaultValue": "seconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks", "months", "years"]},
+      {"name": "time_zone", "dataType": "string", "defaultValue": "UTC", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:time_zone", "description": "IANA zone used for calendar months and years; UTC by default"}
+    ],
+    "outputs": [
+      {"name": "time", "dataType": "instant"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
+    ]
   },
   {
     "id": "time.diff",
-    "displayName": "Time Diff",
+    "displayName": "Time Difference",
+    "description": "Measure the absolute and signed millisecond difference between two timestamps.",
     "category": "DATA",
+    "schemaVersion": 4,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "difference", "duration"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_diff"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {"name": "time1", "dataType": "instant", "widget": "NUMBER", "description": "Starting epoch milliseconds"},
+      {"name": "time2", "dataType": "instant", "widget": "NUMBER", "description": "Ending epoch milliseconds"},
+      {"name": "unit", "dataType": "string", "defaultValue": "milliseconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks"]}
+    ],
+    "outputs": [
+      {"name": "diff", "dataType": "duration", "description": "Absolute milliseconds"},
+      {"name": "signed_diff", "dataType": "duration", "description": "Ending time minus starting time"},
+      {"name": "unit_diff", "dataType": "number", "description": "Signed difference converted to the selected unit"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
+    ]
   },
   {
     "id": "time.time_current",
-    "displayName": "Time Current",
-    "category": "UTILITY",
+    "displayName": "Current Time",
+    "description": "Get the current Unix timestamp in milliseconds.",
+    "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "QUERY",
+    "clockDomain": "wall_time",
+    "tags": ["time", "current", "timestamp"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_current"
     },
+    "inputs": [],
     "outputs": [
-      {
-        "name": "time",
-        "dataType": "number"
-      }
-    ],
-    "inputs": []
+      {"name": "time", "dataType": "instant"}
+    ]
   },
   {
     "id": "time.time_to_ticks",
-    "displayName": "Time To Ticks",
-    "category": "UTILITY",
+    "displayName": "Seconds To Ticks",
+    "description": "Convert real seconds to nominal Minecraft ticks at 20 ticks per second.",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time,server_ticks",
+    "tags": ["time", "ticks", "convert"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_to_ticks"
     },
     "inputs": [
-      {
-        "name": "seconds",
-        "dataType": "number"
-      }
+      {"name": "seconds", "dataType": "number"}
     ],
     "outputs": [
-      {
-        "name": "ticks",
-        "dataType": "number"
-      }
+      {"name": "ticks", "dataType": "number"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
     ]
   },
   {
     "id": "get.current.time",
-    "displayName": "Get Current Time",
-    "category": "UTILITY",
+    "displayName": "Current World Time",
+    "description": "Get the selected world's current day time in ticks.",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "clockDomain": "world_day_time",
+    "tags": ["world", "time", "ticks"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_get_current_time"
     },
     "inputs": [
-      {
-        "name": "world",
-        "dataType": "world"
-      }
+      {"name": "world", "dataType": "world"}
     ],
     "outputs": [
-      {
-        "name": "time",
-        "dataType": "number"
-      }
+      {"name": "time", "dataType": "number"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "error", "dataType": "string"}
     ]
   },
   {
     "id": "get.current.ticks",
-    "displayName": "Get Current Ticks",
-    "category": "UTILITY",
+    "displayName": "Current Server Tick",
+    "description": "Get the server's current tick counter.",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "clockDomain": "server_ticks",
+    "tags": ["server", "time", "ticks"],
     "handler": "TimeHandler",
     "handlerConfig": {
       "operation": "time_get_current_ticks"
     },
+    "inputs": [],
     "outputs": [
-      {
-        "name": "ticks",
-        "dataType": "number"
-      }
-    ],
-    "inputs": []
+      {"name": "ticks", "dataType": "number"}
+    ]
   }
 ]
-

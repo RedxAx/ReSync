@@ -5,13 +5,13 @@ import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 import restudio.flow.data.FlowNode;
-import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -24,33 +24,17 @@ public class SoundHandler implements NodeHandler {
             String soundName = ctx.getInputValue(node, "sound_type", String.class, "BLOCK_AMETHYST_BLOCK_CHIME");
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
-            if (location != null && location.getWorld() != null) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    if (Bukkit.isPrimaryThread()) {
-                        location.getWorld().playSound(location, sound, volume, pitch);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> location.getWorld().playSound(location, sound, volume, pitch));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requireWorldLocation(location);
+            Sound sound = sound(soundName);
+            location.getWorld().playSound(location, sound, volume, pitch);
         });
 
         operations.put("sound_stop", (ctx, node) -> {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String soundName = ctx.getInputValue(node, "sound", String.class, "");
-            if (player != null && !soundName.isEmpty()) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    if (Bukkit.isPrimaryThread()) {
-                        player.stopSound(sound);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.stopSound(sound));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requirePlayer(player);
+            Sound sound = sound(soundName);
+            player.stopSound(sound);
         });
 
         operations.put("sound_play_ambient", (ctx, node) -> {
@@ -58,17 +42,9 @@ public class SoundHandler implements NodeHandler {
             String soundName = ctx.getInputValue(node, "sound_type", String.class, "BLOCK_AMETHYST_BLOCK_CHIME");
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
-            if (location != null && location.getWorld() != null) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    if (Bukkit.isPrimaryThread()) {
-                        location.getWorld().playSound(location, sound, SoundCategory.AMBIENT, volume, pitch);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> location.getWorld().playSound(location, sound, SoundCategory.AMBIENT, volume, pitch));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requireWorldLocation(location);
+            Sound sound = sound(soundName);
+            location.getWorld().playSound(location, sound, SoundCategory.AMBIENT, volume, pitch);
         });
 
         operations.put("fade", (ctx, node) -> {
@@ -77,24 +53,20 @@ public class SoundHandler implements NodeHandler {
             Float fromVolume = ctx.getInputValue(node, "from_volume", Float.class, 1.0f);
             Float toVolume = ctx.getInputValue(node, "to_volume", Float.class, 0.0f);
             Integer durationTicks = ctx.getInputValue(node, "duration_ticks", Integer.class, 20);
-            if (player != null && !sound.isEmpty() && durationTicks > 0) {
-                float step = (toVolume - fromVolume) / durationTicks;
-                new BukkitRunnable() {
-                    int tick = 0;
-
-                    @Override
-                    public void run() {
-                        if (tick >= durationTicks) {
-                            player.stopSound(sound);
-                            cancel();
-                            return;
-                        }
-                        float volume = fromVolume + step * tick;
-                        player.playSound(player.getLocation(), sound, volume, 1.0f);
-                        tick++;
-                    }
-                }.runTaskTimer(ReSync.getInstance(), 0L, 1L);
+            requirePlayer(player);
+            sound(sound);
+            if (durationTicks == null || durationTicks <= 0) {
+                throw new IllegalArgumentException("Sound fade duration must be greater than zero");
             }
+            if (durationTicks > 200) {
+                throw new IllegalArgumentException("Sound fade duration cannot exceed 200 ticks");
+            }
+            float step = (toVolume - fromVolume) / durationTicks;
+            for (int tick = 0; tick < durationTicks; tick++) {
+                float volume = fromVolume + step * tick;
+                ctx.runLaterBeforeContinuation(() -> player.playSound(player.getLocation(), sound, volume, 1.0f), tick);
+            }
+            ctx.runLaterBeforeContinuation(() -> player.stopSound(sound), durationTicks);
         });
 
         operations.put("sound_play_for_player", (ctx, node) -> {
@@ -102,61 +74,33 @@ public class SoundHandler implements NodeHandler {
             String soundName = ctx.getInputValue(node, "sound_type", String.class, "BLOCK_AMETHYST_BLOCK_CHIME");
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
-            if (player != null) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    if (Bukkit.isPrimaryThread()) {
-                        player.playSound(player.getLocation(), sound, volume, pitch);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.playSound(player.getLocation(), sound, volume, pitch));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requirePlayer(player);
+            Sound sound = sound(soundName);
+            player.playSound(player.getLocation(), sound, volume, pitch);
         });
 
         operations.put("sound_play_for_all", (ctx, node) -> {
             String soundName = ctx.getInputValue(node, "sound_type", String.class, "BLOCK_AMETHYST_BLOCK_CHIME");
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
-            try {
-                Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    if (Bukkit.isPrimaryThread()) {
-                        player.playSound(player.getLocation(), sound, volume, pitch);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.playSound(player.getLocation(), sound, volume, pitch));
-                    }
-                }
-            } catch (IllegalArgumentException ignored) {
+            Sound sound = sound(soundName);
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                player.playSound(player.getLocation(), sound, volume, pitch);
             }
         });
 
         operations.put("sound_stop_for_player", (ctx, node) -> {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String soundName = ctx.getInputValue(node, "sound", String.class, "");
-            if (player != null && !soundName.isEmpty()) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    if (Bukkit.isPrimaryThread()) {
-                        player.stopSound(sound);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.stopSound(sound));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requirePlayer(player);
+            Sound sound = sound(soundName);
+            player.stopSound(sound);
         });
 
         operations.put("sound_stop_all", (ctx, node) -> {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (player != null) {
-                if (Bukkit.isPrimaryThread()) {
-                    player.stopAllSounds();
-                } else {
-                    Bukkit.getScheduler().runTask(ReSync.getInstance(), player::stopAllSounds);
-                }
-            }
+            requirePlayer(player);
+            player.stopAllSounds();
         });
 
         operations.put("sound_play_category", (ctx, node) -> {
@@ -165,34 +109,18 @@ public class SoundHandler implements NodeHandler {
             String categoryName = ctx.getInputValue(node, "category", String.class, "MASTER");
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
-            if (player != null) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    SoundCategory category = SoundCategory.valueOf(categoryName.toUpperCase());
-                    if (Bukkit.isPrimaryThread()) {
-                        player.playSound(player.getLocation(), sound, category, volume, pitch);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.playSound(player.getLocation(), sound, category, volume, pitch));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requirePlayer(player);
+            Sound sound = sound(soundName);
+            SoundCategory category = soundCategory(categoryName);
+            player.playSound(player.getLocation(), sound, category, volume, pitch);
         });
 
         operations.put("sound_stop_category", (ctx, node) -> {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             String categoryName = ctx.getInputValue(node, "category", String.class, "MASTER");
-            if (player != null) {
-                try {
-                    SoundCategory category = SoundCategory.valueOf(categoryName.toUpperCase());
-                    if (Bukkit.isPrimaryThread()) {
-                        player.stopSound(category);
-                    } else {
-                        Bukkit.getScheduler().runTask(ReSync.getInstance(), () -> player.stopSound(category));
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
-            }
+            requirePlayer(player);
+            SoundCategory category = soundCategory(categoryName);
+            player.stopSound(category);
         });
 
         operations.put("sound_loop_for_player", (ctx, node) -> {
@@ -201,16 +129,26 @@ public class SoundHandler implements NodeHandler {
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
             Integer interval = ctx.getInputValue(node, "interval_ticks", Integer.class, 20);
-            if (player != null && interval > 0) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    Bukkit.getScheduler().runTaskTimer(ReSync.getInstance(), () -> {
-                        if (player.isOnline()) {
-                            player.playSound(player.getLocation(), sound, volume, pitch);
-                        }
-                    }, 0L, interval.longValue());
-                } catch (IllegalArgumentException ignored) {
-                }
+            Integer repeatCount = ctx.getInputValue(node, "repeat_count", Integer.class, 10);
+            requirePlayer(player);
+            if (interval == null || interval <= 0) {
+                throw new IllegalArgumentException("Sound loop interval must be greater than zero");
+            }
+            if (repeatCount == null || repeatCount <= 0 || repeatCount > 256) {
+                throw new IllegalArgumentException("Sound loop repeat count must be between 1 and 256");
+            }
+            long lastDelay = Math.multiplyExact(repeatCount - 1L, interval.longValue());
+            if (lastDelay > 72_000L) {
+                throw new IllegalArgumentException("Sound loop duration cannot exceed 72000 ticks");
+            }
+            Sound sound = sound(soundName);
+            for (int index = 0; index < repeatCount; index++) {
+                long delay = Math.multiplyExact(index, interval.longValue());
+                ctx.runLaterBeforeContinuation(() -> {
+                    if (player.isOnline()) {
+                        player.playSound(player.getLocation(), sound, volume, pitch);
+                    }
+                }, delay);
             }
         });
 
@@ -218,24 +156,29 @@ public class SoundHandler implements NodeHandler {
             Player player = ctx.getInputValue(node, "player", Player.class, null);
             Object soundsObj = ctx.getInputValue(node, "sounds", Object.class, null);
             Integer interval = ctx.getInputValue(node, "interval_ticks", Integer.class, 20);
-            if (player != null && soundsObj instanceof java.util.List<?> soundList && !soundList.isEmpty() && interval > 0) {
-                new BukkitRunnable() {
-                    int index = 0;
-                    @Override
-                    public void run() {
-                        if (index >= soundList.size() || !player.isOnline()) {
-                            cancel();
-                            return;
-                        }
-                        String soundName = String.valueOf(soundList.get(index));
-                        try {
-                            Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                            player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
-                        } catch (IllegalArgumentException ignored) {
-                        }
-                        index++;
+            requirePlayer(player);
+            if (!(soundsObj instanceof List<?> soundList) || soundList.isEmpty()) {
+                throw new IllegalArgumentException("Sound sequence requires at least one sound");
+            }
+            if (interval == null || interval <= 0) {
+                throw new IllegalArgumentException("Sound sequence interval must be greater than zero");
+            }
+            if (soundList.size() > 100) {
+                throw new IllegalArgumentException("Sound sequence cannot contain more than 100 sounds");
+            }
+            long lastDelay = Math.multiplyExact(soundList.size() - 1L, interval.longValue());
+            if (lastDelay > 72_000L) {
+                throw new IllegalArgumentException("Sound sequence duration cannot exceed 72000 ticks");
+            }
+            List<Sound> sounds = soundList.stream().map(value -> sound(String.valueOf(value))).toList();
+            for (int index = 0; index < sounds.size(); index++) {
+                Sound scheduledSound = sounds.get(index);
+                long delay = Math.multiplyExact(index, interval.longValue());
+                ctx.runLaterBeforeContinuation(() -> {
+                    if (player.isOnline()) {
+                        player.playSound(player.getLocation(), scheduledSound, 1.0f, 1.0f);
                     }
-                }.runTaskTimer(ReSync.getInstance(), 0L, interval.longValue());
+                }, delay);
             }
         });
 
@@ -245,15 +188,14 @@ public class SoundHandler implements NodeHandler {
             Float volume = ctx.getInputValue(node, "volume", Float.class, 1.0f);
             Float pitch = ctx.getInputValue(node, "pitch", Float.class, 1.0f);
             Double maxDistance = ctx.getInputValue(node, "max_distance", Double.class, 16.0);
-            if (location != null && location.getWorld() != null) {
-                try {
-                    Sound sound = Sound.valueOf(soundName.toUpperCase().replace('.', '_'));
-                    for (Player player : location.getWorld().getPlayers()) {
-                        if (player.getLocation().distance(location) <= maxDistance) {
-                            player.playSound(location, sound, volume, pitch);
-                        }
-                    }
-                } catch (IllegalArgumentException ignored) {
+            requireWorldLocation(location);
+            if (maxDistance == null || !Double.isFinite(maxDistance) || maxDistance < 0.0 || maxDistance > 1024.0) {
+                throw new IllegalArgumentException("Sound distance must be between 0 and 1024");
+            }
+            Sound sound = sound(soundName);
+            for (Player player : location.getWorld().getPlayers()) {
+                if (player.getLocation().distance(location) <= maxDistance) {
+                    player.playSound(location, sound, volume, pitch);
                 }
             }
         });
@@ -268,9 +210,58 @@ public class SoundHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown sound operation: " + operation);
         }
+        validateLevel(ctx, node, "volume", 0.0f, 16.0f);
+        validateLevel(ctx, node, "from_volume", 0.0f, 16.0f);
+        validateLevel(ctx, node, "to_volume", 0.0f, 16.0f);
+        validateLevel(ctx, node, "pitch", 0.0f, 2.0f);
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private static Sound sound(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Sound is required");
+        }
+        try {
+            return Sound.valueOf(value.toUpperCase(Locale.ROOT).replace('.', '_'));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown sound: " + value, exception);
+        }
+    }
+
+    private static SoundCategory soundCategory(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Sound category is required");
+        }
+        try {
+            return SoundCategory.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Unknown sound category: " + value, exception);
+        }
+    }
+
+    private static void requirePlayer(Player player) {
+        if (player == null) {
+            throw new IllegalArgumentException("Player is required");
+        }
+    }
+
+    private static void requireWorldLocation(Location location) {
+        if (location == null || location.getWorld() == null) {
+            throw new IllegalArgumentException("World location is required");
+        }
+    }
+
+    private static void validateLevel(FlowContext ctx, FlowNode node, String pin, float minimum, float maximum) {
+        Object raw = ctx.getInputValue(node, pin);
+        if (raw == null) return;
+        if (!(raw instanceof Number number)) throw new IllegalArgumentException("Sound " + pin + " must be a number");
+        float value = number.floatValue();
+        if (!Float.isFinite(value) || value < minimum || value > maximum) {
+            throw new IllegalArgumentException("Sound " + pin + " must be between " + minimum + " and " + maximum);
+        }
     }
 }

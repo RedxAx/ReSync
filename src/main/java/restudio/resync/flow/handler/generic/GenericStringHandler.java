@@ -9,6 +9,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -78,11 +79,7 @@ public class GenericStringHandler implements NodeHandler {
             String pattern = ctx.getInputValue(node, "pattern", String.class, "");
             String replacement = ctx.getInputValue(node, "replacement", String.class, "");
             if (value != null && pattern != null) {
-                try {
-                    ctx.setOutput(node, "result", value.replaceAll(pattern, replacement));
-                } catch (Exception e) {
-                    ctx.setOutput(node, "result", value);
-                }
+                ctx.setOutput(node, "result", value.replaceAll(pattern, replacement));
             } else {
                 ctx.setOutput(node, "result", "");
             }
@@ -150,11 +147,7 @@ public class GenericStringHandler implements NodeHandler {
             String value = ctx.getInputValue(node, "value", String.class, "");
             String pattern = ctx.getInputValue(node, "pattern", String.class, "");
             if (value != null && pattern != null) {
-                try {
-                    ctx.setOutput(node, "result", Pattern.matches(pattern, value));
-                } catch (Exception e) {
-                    ctx.setOutput(node, "result", false);
-                }
+                ctx.setOutput(node, "result", Pattern.matches(pattern, value));
             } else {
                 ctx.setOutput(node, "result", false);
             }
@@ -212,36 +205,18 @@ public class GenericStringHandler implements NodeHandler {
             String encoded = ctx.getInputValue(node, "encoded", String.class, "");
             String decoded = "";
             if (encoded != null && !encoded.isEmpty()) {
-                try {
-                    decoded = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-                } catch (Exception e) {
-                    decoded = "";
-                }
+                decoded = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
             }
             ctx.setOutput(node, "decoded", decoded);
         });
         operations.put("url_encode", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
-            String encoded = "";
-            if (text != null) {
-                try {
-                    encoded = URLEncoder.encode(text, StandardCharsets.UTF_8.name());
-                } catch (Exception e) {
-                    encoded = "";
-                }
-            }
+            String encoded = text != null ? URLEncoder.encode(text, StandardCharsets.UTF_8) : "";
             ctx.setOutput(node, "encoded", encoded);
         });
         operations.put("url_decode", (ctx, node) -> {
             String encoded = ctx.getInputValue(node, "encoded", String.class, "");
-            String decoded = "";
-            if (encoded != null) {
-                try {
-                    decoded = URLDecoder.decode(encoded, StandardCharsets.UTF_8.name());
-                } catch (Exception e) {
-                    decoded = "";
-                }
-            }
+            String decoded = encoded != null ? URLDecoder.decode(encoded, StandardCharsets.UTF_8) : "";
             ctx.setOutput(node, "decoded", decoded);
         });
         operations.put("md5", (ctx, node) -> {
@@ -463,8 +438,8 @@ public class GenericStringHandler implements NodeHandler {
             StringBuilder sb = new StringBuilder();
             for (byte b : digest) sb.append(String.format("%02x", b));
             return sb.toString();
-        } catch (Exception e) {
-            return "";
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Hash algorithm is unavailable: " + algorithm, exception);
         }
     }
 
@@ -672,9 +647,10 @@ public class GenericStringHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown string operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

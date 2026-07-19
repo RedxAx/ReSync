@@ -4,8 +4,10 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 @Deprecated
@@ -43,7 +45,7 @@ public class FlowRegistry {
         return executors.get(type);
     }
 
-    public java.util.Set<String> getRegisteredTypes() {
-        return java.util.Collections.unmodifiableSet(executors.keySet());
+    public Set<String> getRegisteredTypes() {
+        return Collections.unmodifiableSet(executors.keySet());
     }
 }

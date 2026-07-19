@@ -1,5 +1,6 @@
 package restudio.resync.core;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,7 +50,7 @@ public class ChannelMuxer {
     public Map<String, Integer> getNumericChannels() {
         Map<String, Integer> output = new LinkedHashMap<>();
         channels.values().stream()
-            .sorted(java.util.Comparator.comparingInt(Channel::getNumericId))
+            .sorted(Comparator.comparingInt(Channel::getNumericId))
             .forEach(channel -> output.put(channel.getId(), channel.getNumericId()));
         return output;
     }

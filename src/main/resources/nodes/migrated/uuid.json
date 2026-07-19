@@ -2,26 +2,50 @@
   {
     "id": "uuid.from.string",
     "displayName": "UUID From String",
+    "description": "Parse a UUID string into a typed UUID value.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "DATA",
     "handler": "UuidHandler",
     "handlerConfig": {
       "operation": "uuid_from_string"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {
+        "name": "uuid_string",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "uuid_object",
+        "dataType": "uuid"
+      }
+    ]
   },
   {
     "id": "uuid.to.string",
     "displayName": "UUID To String",
+    "description": "Convert a typed UUID value into its canonical string form.",
     "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "DATA",
     "handler": "UuidHandler",
     "handlerConfig": {
       "operation": "uuid_to_string"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
+    "inputs": [
+      {
+        "name": "uuid_object",
+        "dataType": "uuid"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "uuid_string",
+        "dataType": "string"
+      }
+    ]
   },
   {
     "id": "utility.uuid_generate",

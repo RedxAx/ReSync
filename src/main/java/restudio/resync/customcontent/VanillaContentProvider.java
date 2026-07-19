@@ -8,6 +8,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
@@ -18,22 +19,38 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 public class VanillaContentProvider implements CustomContentProvider {
-    private final NamespacedKey contentTypeKey = new NamespacedKey(ReSync.getInstance(), "content_type");
-    private final NamespacedKey contentIdKey = new NamespacedKey(ReSync.getInstance(), "content_id");
-    private final NamespacedKey contentVersionKey = new NamespacedKey(ReSync.getInstance(), "content_version");
-    private final NamespacedKey instanceIdKey = new NamespacedKey(ReSync.getInstance(), "instance_id");
-    private final File blockFile = new File(ReSync.getInstance().getDataFolder(), "custom-blocks.json");
+    private final NamespacedKey contentTypeKey;
+    private final NamespacedKey contentIdKey;
+    private final NamespacedKey contentVersionKey;
+    private final NamespacedKey instanceIdKey;
+    private final File blockFile;
     private final Gson gson = new Gson();
     private final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
     private final Map<String, String> blocks = new HashMap<>();
-    private final ItemAttributeSchemaService attributeSchemaService = new ItemAttributeSchemaService();
+    private final ItemAttributeSchemaService attributeSchemaService;
 
     public VanillaContentProvider() {
+        this(ReSync.getInstance(), new ItemAttributeSchemaService());
+    }
+
+    public VanillaContentProvider(ItemAttributeSchemaService attributeSchemaService) {
+        this(ReSync.getInstance(), attributeSchemaService);
+    }
+
+    public VanillaContentProvider(JavaPlugin plugin, ItemAttributeSchemaService attributeSchemaService) {
+        if (plugin == null) {
+            throw new IllegalArgumentException("Plugin cannot be null");
+        }
+        this.contentTypeKey = new NamespacedKey(plugin, "content_type");
+        this.contentIdKey = new NamespacedKey(plugin, "content_id");
+        this.contentVersionKey = new NamespacedKey(plugin, "content_version");
+        this.instanceIdKey = new NamespacedKey(plugin, "instance_id");
+        this.blockFile = new File(plugin.getDataFolder(), "custom-blocks.json");
+        this.attributeSchemaService = attributeSchemaService != null ? attributeSchemaService : new ItemAttributeSchemaService();
         loadBlocks();
     }
 

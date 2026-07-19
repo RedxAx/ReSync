@@ -19,7 +19,7 @@
       },
       {
         "name": "data_payload",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       }
     ],
     "outputs": [
@@ -173,7 +173,7 @@
       },
       {
         "name": "data",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       }
     ]
   }

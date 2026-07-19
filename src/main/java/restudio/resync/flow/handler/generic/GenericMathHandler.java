@@ -59,39 +59,39 @@ public class GenericMathHandler implements NodeHandler {
         });
         operations.put("sqrt", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.sqrt(value));
+            ctx.setOutput(node, "sqrt", Math.sqrt(value));
         });
         operations.put("abs", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.abs(value));
+            ctx.setOutput(node, "absolute", Math.abs(value));
         });
         operations.put("floor", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.floor(value));
+            ctx.setOutput(node, "floored", Math.floor(value));
         });
         operations.put("ceil", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.ceil(value));
+            ctx.setOutput(node, "ceiling", Math.ceil(value));
         });
         operations.put("round", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", (double) Math.round(value));
+            Integer decimalPlaces = ctx.getInputValue(node, "decimal_places", Integer.class, 0);
+            double factor = Math.pow(10.0, Math.clamp(decimalPlaces, -15, 15));
+            ctx.setOutput(node, "rounded", Math.round(value * factor) / factor);
         });
         operations.put("min", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.min(a, b));
+            List<?> values = ctx.getInputValue(node, "values_list", List.class, List.of());
+            ctx.setOutput(node, "min", values.stream().filter(Number.class::isInstance).map(Number.class::cast).mapToDouble(Number::doubleValue).min().orElse(0.0));
         });
         operations.put("max", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.max(a, b));
+            List<?> values = ctx.getInputValue(node, "values_list", List.class, List.of());
+            ctx.setOutput(node, "max", values.stream().filter(Number.class::isInstance).map(Number.class::cast).mapToDouble(Number::doubleValue).max().orElse(0.0));
         });
         operations.put("clamp", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
             Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
             Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
-            ctx.setOutput(node, "result", Math.max(min, Math.min(max, value)));
+            ctx.setOutput(node, "clamped", Math.max(min, Math.min(max, value)));
         });
         operations.put("random", (ctx, node) -> {
             Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
@@ -384,24 +384,24 @@ public class GenericMathHandler implements NodeHandler {
 
     private void registerTrigOperations() {
         operations.put("sin", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.sin(value));
+            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            ctx.setOutput(node, "sin", Math.sin(Math.toRadians(angle)));
         });
         operations.put("cos", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.cos(value));
+            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            ctx.setOutput(node, "cos", Math.cos(Math.toRadians(angle)));
         });
         operations.put("tan", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.tan(value));
+            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            ctx.setOutput(node, "tan", Math.tan(Math.toRadians(angle)));
         });
         operations.put("to_radians", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.toRadians(value));
+            Double degrees = ctx.getInputValue(node, "degrees", Double.class, 0.0);
+            ctx.setOutput(node, "radians", Math.toRadians(degrees));
         });
         operations.put("to_degrees", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.toDegrees(value));
+            Double radians = ctx.getInputValue(node, "radians", Double.class, 0.0);
+            ctx.setOutput(node, "degrees", Math.toDegrees(radians));
         });
         operations.put("asin", (ctx, node) -> {
             Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
@@ -432,6 +432,8 @@ public class GenericMathHandler implements NodeHandler {
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op != null) {
             op.accept(ctx, node);
+        } else {
+            throw new IllegalArgumentException("Unknown math operation: " + operation);
         }
         ctx.triggerOutput("flow");
     }

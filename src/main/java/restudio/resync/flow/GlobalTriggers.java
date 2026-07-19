@@ -9,9 +9,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
-import org.bukkit.plugin.SimplePluginManager;
+import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowGraph;
-import restudio.resync.ReSync;
 import restudio.resync.Log;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerDefinitions;
@@ -20,15 +19,16 @@ import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.lang.reflect.Field;
 
 public class GlobalTriggers implements Listener {
+    private final JavaPlugin plugin;
     private final FlowStorage storage;
     private final FlowExecutor executor;
     private final TriggerRegistry triggerRegistry;
@@ -117,10 +117,11 @@ public class GlobalTriggers implements Listener {
     }
 
     public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry) {
+        this.plugin = triggerRegistry.getPlugin();
         this.storage = storage;
         this.executor = executor;
         this.triggerRegistry = triggerRegistry;
-        this.triggerDispatcher = new TriggerDispatcher(storage, executor, ReSync.getInstance());
+        this.triggerDispatcher = new TriggerDispatcher(storage, executor, triggerRegistry.getPlugin());
         this.triggerDispatcher.registerFromContainer(new TriggerDefinitions());
         this.systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         refreshBindings();
@@ -208,7 +209,9 @@ public class GlobalTriggers implements Listener {
                     }
                     structured = payload.structured != null && payload.structured;
                 }
-            } catch (Exception ignored) {
+            } catch (RuntimeException exception) {
+                Log.warn("Rejected invalid command trigger context for " + binding.getFlowId() + ": " + exception.getMessage());
+                return;
             }
         } else {
             command = trimmed;
@@ -385,7 +388,7 @@ public class GlobalTriggers implements Listener {
         if (graph == null) {
             return false;
         }
-        Map<String, Object> eventVars = new java.util.HashMap<>();
+        Map<String, Object> eventVars = new HashMap<>();
         setEventVariables(player, eventVars);
         eventVars.put("event.command_label", commandLabel);
         eventVars.put("event.args", args);
@@ -402,32 +405,20 @@ public class GlobalTriggers implements Listener {
 
     private CommandMap resolveCommandMap() {
         try {
-            if (!(Bukkit.getPluginManager() instanceof SimplePluginManager pluginManager)) {
-                return null;
-            }
-            Field commandMapField = SimplePluginManager.class.getDeclaredField("commandMap");
-            commandMapField.setAccessible(true);
-            Object value = commandMapField.get(pluginManager);
-            if (value instanceof CommandMap commandMap) {
-                return commandMap;
-            }
-        } catch (Exception ignored) {
+            return Bukkit.getServer().getCommandMap();
+        } catch (RuntimeException exception) {
+            Log.warn("Unable to access the server command map: " + exception.getMessage());
+            return null;
         }
-        return null;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Command> resolveKnownCommands(CommandMap commandMap) {
         try {
-            Field knownCommandsField = commandMap.getClass().getDeclaredField("knownCommands");
-            knownCommandsField.setAccessible(true);
-            Object value = knownCommandsField.get(commandMap);
-            if (value instanceof Map<?, ?> map) {
-                return (Map<String, Command>) map;
-            }
-        } catch (Exception ignored) {
+            return commandMap.getKnownCommands();
+        } catch (RuntimeException exception) {
+            Log.warn("Unable to access registered server commands: " + exception.getMessage());
+            return null;
         }
-        return null;
     }
 
     public void shutdownRuntimeCommands() {
@@ -438,7 +429,7 @@ public class GlobalTriggers implements Listener {
             return;
         }
         Map<String, Command> knownCommands = resolveKnownCommands(commandMap);
-        String pluginPrefix = ReSync.getInstance().getName().toLowerCase(Locale.ROOT) + ":";
+        String pluginPrefix = plugin.getName().toLowerCase(Locale.ROOT) + ":";
         for (Map.Entry<String, RuntimeFlowCommand> entry : new ArrayList<>(runtimeCommands.entrySet())) {
             RuntimeFlowCommand command = entry.getValue();
             command.unregister(commandMap);
@@ -461,7 +452,7 @@ public class GlobalTriggers implements Listener {
         for (CommandTrigger trigger : commandTriggers.values()) {
             desired.add(trigger.command);
         }
-        String pluginPrefix = ReSync.getInstance().getName().toLowerCase(Locale.ROOT) + ":";
+        String pluginPrefix = plugin.getName().toLowerCase(Locale.ROOT) + ":";
 
         for (Map.Entry<String, RuntimeFlowCommand> entry : new ArrayList<>(runtimeCommands.entrySet())) {
             if (desired.contains(entry.getKey())) {
@@ -488,7 +479,7 @@ public class GlobalTriggers implements Listener {
             removeKnownRuntimeCommand(commandMap, knownCommands, commandLabel);
             removeKnownRuntimeCommand(commandMap, knownCommands, pluginPrefix + commandLabel);
             RuntimeFlowCommand command = new RuntimeFlowCommand(commandLabel);
-            commandMap.register(ReSync.getInstance().getName().toLowerCase(Locale.ROOT), command);
+            commandMap.register(plugin.getName().toLowerCase(Locale.ROOT), command);
             runtimeCommands.put(commandLabel, command);
         }
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {

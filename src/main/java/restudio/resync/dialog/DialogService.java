@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public class DialogService {
     private final JavaPlugin plugin;
@@ -111,7 +112,7 @@ public class DialogService {
             inputs(resource)
         );
         Object type = dialogType(player, dialogId, resource);
-        return api.dialogCreate.invoke(null, (java.util.function.Consumer<Object>) builderFactory -> {
+        return api.dialogCreate.invoke(null, (Consumer<Object>) builderFactory -> {
             try {
                 Object builder = invoke(builderFactory, "empty");
                 invoke(builder, "base", base);
@@ -579,7 +580,7 @@ public class DialogService {
                 return new DialogApi(
                     callback,
                     after,
-                    dialog.getMethod("create", java.util.function.Consumer.class),
+                    dialog.getMethod("create", Consumer.class),
                     base.getMethod("create", Component.class, Component.class, boolean.class, boolean.class, after, List.class, List.class),
                     body.getMethod("plainMessage", Component.class, int.class),
                     body.getMethod("item", ItemStack.class, plainBody, boolean.class, boolean.class, int.class, int.class),

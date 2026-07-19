@@ -15,7 +15,11 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   },
   {
@@ -27,11 +31,15 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "webhook_url", "dataType": "string" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   },
   {
@@ -43,11 +51,15 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "webhook_url", "dataType": "string" },
-      { "name": "messages", "dataType": "list" }
+      { "name": "messages", "dataType": "list<any>" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   },
   {
@@ -73,7 +85,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -84,14 +96,14 @@
     "handlerConfig": { "operation": "discord_add_field" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "name", "dataType": "string" },
       { "name": "value", "dataType": "string", "widget": "MULTILINE" },
       { "name": "inline", "dataType": "boolean" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -102,12 +114,12 @@
     "handlerConfig": { "operation": "discord_add_embed" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "webhook_data", "dataType": "map" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "webhook_data", "dataType": "map<any,any>" },
+      { "name": "embed", "dataType": "map<any,any>" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "webhook_data", "dataType": "map" }
+      { "name": "webhook_data", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -118,12 +130,12 @@
     "handlerConfig": { "operation": "discord_set_color" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "color", "dataType": "number" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -169,11 +181,15 @@
       { "name": "webhook_url", "dataType": "string" },
       { "name": "message_id", "dataType": "string" },
       { "name": "content", "dataType": "string", "widget": "MULTILINE" },
-      { "name": "embeds", "dataType": "list" }
+      { "name": "embeds", "dataType": "list<any>" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   },
   {
@@ -189,7 +205,11 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   },
   {
@@ -200,12 +220,12 @@
     "handlerConfig": { "operation": "discord_set_thumbnail" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "url", "dataType": "string" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -216,12 +236,12 @@
     "handlerConfig": { "operation": "discord_set_image" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "url", "dataType": "string" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -232,14 +252,14 @@
     "handlerConfig": { "operation": "discord_set_author" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "name", "dataType": "string" },
       { "name": "url", "dataType": "string" },
       { "name": "icon_url", "dataType": "string" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -250,13 +270,13 @@
     "handlerConfig": { "operation": "discord_set_footer" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "text", "dataType": "string" },
       { "name": "icon_url", "dataType": "string" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -267,12 +287,12 @@
     "handlerConfig": { "operation": "discord_set_timestamp" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" },
+      { "name": "embed", "dataType": "map<any,any>" },
       { "name": "timestamp", "dataType": "string" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "embed", "dataType": "map" }
+      { "name": "embed", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -290,7 +310,7 @@
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "webhook_data", "dataType": "map" }
+      { "name": "webhook_data", "dataType": "map<any,any>" }
     ]
   },
   {
@@ -302,11 +322,15 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "webhook_url", "dataType": "string" },
-      { "name": "webhook_data", "dataType": "map" }
+      { "name": "webhook_data", "dataType": "map<any,any>" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "success", "dataType": "boolean" }
+      { "name": "success", "dataType": "boolean" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "operation_result", "dataType": "result<boolean>" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
     ]
   }
 ]

@@ -7,11 +7,17 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.Log;
+import restudio.resync.flow.handler.FlowHandlerException;
 
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class FunctionCallSupport {
     private static final Gson GSON = new Gson();
@@ -24,33 +30,69 @@ public final class FunctionCallSupport {
             return true;
         }
         if (executor == null) {
-            return false;
+            throw new FlowHandlerException("FUNCTION_EXECUTOR_UNAVAILABLE", "Function executor is unavailable",
+                "Restore the Flow runtime before evaluating this function");
         }
-        FlowGraph function = function(storage, call);
-        if (function == null) {
-            return false;
-        }
+        FlowGraph function = requireFunction(storage, call);
         try {
             Map<String, Object> outputs = executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars).get(5, TimeUnit.SECONDS);
             Object result = first(outputs, "condition", "result", "return", "success");
             return result instanceof Boolean value ? value : Boolean.parseBoolean(String.valueOf(result));
-        } catch (Exception ignored) {
-            return false;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new FlowHandlerException("FUNCTION_EVALUATION_INTERRUPTED", "Function evaluation was interrupted: " + function.getId(),
+                "Retry the operation when the Flow runtime is available", Map.of("functionId", function.getId()));
+        } catch (TimeoutException exception) {
+            throw new FlowHandlerException("FUNCTION_EVALUATION_TIMEOUT", "Function evaluation timed out: " + function.getId(),
+                "Reduce the function work or use an asynchronous action", Map.of("functionId", function.getId(), "timeoutSeconds", 5));
+        } catch (ExecutionException exception) {
+            Throwable cause = unwrapFailure(exception);
+            if (cause instanceof FlowHandlerException handlerFailure) {
+                throw handlerFailure;
+            }
+            if (cause instanceof FlowExecutor.FlowExecutionException executionFailure) {
+                throw new FlowHandlerException(executionFailure.getCode(), executionFailure.getMessage(), executionFailure.getRemediation(),
+                    executionFailure.getDetails());
+            }
+            throw new IllegalStateException("Function evaluation failed: " + function.getId(), cause);
         }
     }
 
-    public static void execute(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event, Map<String, Object> vars) {
+    public static CompletableFuture<Map<String, Object>> execute(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event,
+                                                                  Map<String, Object> vars) {
         if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
-            return;
+            return CompletableFuture.completedFuture(Map.of());
         }
         if (executor == null) {
-            return;
+            throw new FlowHandlerException("FUNCTION_EXECUTOR_UNAVAILABLE", "Function executor is unavailable",
+                "Restore the Flow runtime before executing this function");
         }
+        FlowGraph function = requireFunction(storage, call);
+        return executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars).whenComplete((result, error) -> {
+            if (error != null) Log.warn("Function execution failed for " + function.getId() + ": " + error.getMessage());
+        });
+    }
+
+    private static FlowGraph requireFunction(FlowStorage storage, JsonObject call) {
         FlowGraph function = function(storage, call);
+        String functionId = requestedFunctionId(call);
         if (function == null) {
-            return;
+            throw new FlowHandlerException("FUNCTION_NOT_FOUND", "Function not found: " + functionId,
+                "Select an existing function or restore the missing function", Map.of("functionId", functionId));
         }
-        executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars);
+        if (!function.isFunction()) {
+            throw new FlowHandlerException("FUNCTION_INVALID", "Flow is not callable as a function: " + functionId,
+                "Select a callable function", Map.of("functionId", functionId));
+        }
+        return function;
+    }
+
+    private static Throwable unwrapFailure(Throwable failure) {
+        Throwable cause = failure;
+        while ((cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 
     private static FlowGraph function(FlowStorage storage, JsonObject call) {
@@ -62,11 +104,13 @@ public final class FunctionCallSupport {
             }
             return graph;
         }
-        String functionId = text(call, "functionId");
-        if (functionId.isBlank()) {
-            functionId = text(call, "id");
-        }
+        String functionId = requestedFunctionId(call);
         return storage != null && !functionId.isBlank() && !"none".equalsIgnoreCase(functionId) ? storage.getGraph(functionId) : null;
+    }
+
+    private static String requestedFunctionId(JsonObject call) {
+        String functionId = text(call, "functionId");
+        return functionId.isBlank() ? text(call, "id") : functionId;
     }
 
     private static boolean hasCallableFunction(JsonObject call) {
@@ -263,8 +307,8 @@ public final class FunctionCallSupport {
             }
             try {
                 return Integer.parseInt(String.valueOf(value));
-            } catch (NumberFormatException ignored) {
-                return 0;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Function input is not a valid integer: " + value, exception);
             }
         }
         if ("float".equals(id)) {
@@ -273,8 +317,8 @@ public final class FunctionCallSupport {
             }
             try {
                 return Float.parseFloat(String.valueOf(value));
-            } catch (NumberFormatException ignored) {
-                return 0F;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Function input is not a valid float: " + value, exception);
             }
         }
         if ("number".equals(id)) {
@@ -283,8 +327,8 @@ public final class FunctionCallSupport {
             }
             try {
                 return Double.parseDouble(String.valueOf(value));
-            } catch (NumberFormatException ignored) {
-                return 0;
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Function input is not a valid number: " + value, exception);
             }
         }
         if ("string".equals(id) || "component".equals(id) || "color".equals(id) || "uuid".equals(id) || "region".equals(id)) {

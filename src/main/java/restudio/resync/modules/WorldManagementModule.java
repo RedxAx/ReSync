@@ -3,6 +3,7 @@ package restudio.resync.modules;
 import com.google.gson.Gson;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
+import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.jobs.JobManager;
 import restudio.resync.jobs.JobRecord;
 import restudio.resync.player.PlayerTrackingService;
@@ -23,6 +24,7 @@ import restudio.resync.world.WorldMapService;
 import restudio.resync.world.WorldOperationResult;
 import restudio.resync.world.WorldOperationSafetyService;
 import restudio.resync.world.WorldProfileSettings;
+import restudio.resync.worldgen.WorldGenProjectStorage;
 
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -35,7 +37,7 @@ import java.util.function.Supplier;
 
 public class WorldManagementModule implements Module, WorldManagementListener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("worldManagement", "WorldManagement", "world_management")
-        .withDependencies("playerTracking");
+        .withDependencies("flowJobs", "playerTracking", "worldGen");
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final Gson gson = new Gson();
     private Codec codec;
@@ -56,9 +58,10 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         this.channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         this.scheduler = context.getScheduler();
         PlayerTrackingService trackingService = context.getRequiredService(PlayerTrackingService.class);
+        WorldGenProjectStorage worldGenProjectStorage = context.getRequiredService(WorldGenProjectStorage.class);
         this.safetyService = new WorldOperationSafetyService(context.getPlugin());
-        this.jobManager = new JobManager(job -> broadcast(WorldChannelMessage.job("jobStatus", job.snapshot())));
-        this.worldManagementService = new WorldManagementManager(context.getPlugin(), trackingService);
+        this.jobManager = new JobManager(context.getRequiredService(FlowJobRegistry.class), job -> broadcast(WorldChannelMessage.job("jobStatus", job.snapshot())));
+        this.worldManagementService = new WorldManagementManager(context.getPlugin(), trackingService, worldGenProjectStorage);
         this.worldManagementService.addListener(this);
         context.registerService(WorldManagementService.class, worldManagementService);
         context.registerService(WorldMapService.class, worldManagementService.getMapService());

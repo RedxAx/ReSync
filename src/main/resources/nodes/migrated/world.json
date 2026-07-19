@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "time",
           "full_time",
@@ -146,7 +146,7 @@
       },
       {
         "name": "players",
-        "dataType": "list",
+        "dataType": "list<player>",
         "visibleWhen": {
           "action": "get",
           "property": "players"
@@ -154,7 +154,7 @@
       },
       {
         "name": "entities",
-        "dataType": "list",
+        "dataType": "list<entity>",
         "visibleWhen": {
           "action": "get",
           "property": "entities"
@@ -279,7 +279,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "time",
           "full_time",
@@ -992,7 +992,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -1048,7 +1048,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"

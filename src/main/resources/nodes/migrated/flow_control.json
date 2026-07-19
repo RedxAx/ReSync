@@ -2,7 +2,15 @@
   {
     "id": "if",
     "displayName": "If",
+    "description": "Continue through True or False based on a condition.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "if",
+      "condition",
+      "branch"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "if"
@@ -34,7 +42,15 @@
   {
     "id": "branch.random",
     "displayName": "Random Branch",
+    "description": "Choose one active branch at random and publish its index.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "random",
+      "branch",
+      "choice"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "branch_random"
@@ -47,7 +63,13 @@
       },
       {
         "name": "branches",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 2,
+        "description": "Number of active branches from 1 to 4",
+        "constraints": {
+          "min": 1,
+          "max": 4
+        }
       }
     ],
     "outputs": [
@@ -80,7 +102,15 @@
   {
     "id": "branch.all",
     "displayName": "Branch All",
+    "description": "Run every connected branch in stable pin order.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "branch",
+      "sequence",
+      "all"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "branch_all"
@@ -118,7 +148,15 @@
   {
     "id": "loop_while",
     "displayName": "While",
+    "description": "Repeat while the condition is true, with optional pacing and a safety limit.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "while",
+      "repeat"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "loop_while"
@@ -137,12 +175,18 @@
       {
         "name": "interval_ticks",
         "dataType": "number",
-        "defaultValue": 1
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        }
       },
       {
         "name": "max_iterations",
         "dataType": "number",
-        "defaultValue": 0
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
       }
     ],
     "outputs": [
@@ -152,16 +196,32 @@
         "dataType": "execution"
       },
       {
-        "name": "completed",
+        "name": "done",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {
+        "name": "completed",
+        "dataType": "boolean"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
       }
     ]
   },
   {
     "id": "break.loop",
     "displayName": "Break",
+    "description": "End the nearest active loop and continue through its Done path.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "break",
+      "stop"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "break_loop"
@@ -173,18 +233,20 @@
         "dataType": "execution"
       }
     ],
-    "outputs": [
-      {
-        "name": "flow",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      }
-    ]
+    "outputs": []
   },
   {
     "id": "continue.loop",
     "displayName": "Continue",
+    "description": "Skip the rest of the nearest active loop iteration.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "continue",
+      "skip"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "continue_loop"
@@ -196,18 +258,20 @@
         "dataType": "execution"
       }
     ],
-    "outputs": [
-      {
-        "name": "flow",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      }
-    ]
+    "outputs": []
   },
   {
     "id": "flow.switch_case",
     "displayName": "Switch Case",
+    "description": "Find a value in the case list and publish its match state and index.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "switch",
+      "case",
+      "match"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "switch_case"
@@ -220,11 +284,11 @@
       },
       {
         "name": "value",
-        "dataType": "any"
+        "dataType": "type:t"
       },
       {
         "name": "cases",
-        "dataType": "list"
+        "dataType": "list<type:t>"
       }
     ],
     "outputs": [
@@ -251,6 +315,7 @@
     "handlerConfig": {
       "operation": "loop_count"
     },
+    "canonicalId": "loop.count",
     "inputs": [
       {
         "name": "flow",
@@ -259,7 +324,11 @@
       },
       {
         "name": "count",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0
+        }
       }
     ],
     "outputs": [
@@ -277,7 +346,8 @@
         "dataType": "execution"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "hiddenReason": "migration_only"
   },
   {
     "id": "flow.loop_for_each",
@@ -287,6 +357,7 @@
     "handlerConfig": {
       "operation": "loop_for_each"
     },
+    "canonicalId": "loop.for.each",
     "inputs": [
       {
         "name": "flow",
@@ -295,7 +366,7 @@
       },
       {
         "name": "list",
-        "dataType": "list"
+        "dataType": "list<type:t>"
       }
     ],
     "outputs": [
@@ -309,7 +380,7 @@
       },
       {
         "name": "element",
-        "dataType": "any"
+        "dataType": "type:t"
       },
       {
         "name": "flow",
@@ -317,7 +388,8 @@
         "dataType": "execution"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "hiddenReason": "migration_only"
   },
   {
     "id": "flow.loop_for_each_player",
@@ -327,6 +399,7 @@
     "handlerConfig": {
       "operation": "loop_for_each_player"
     },
+    "canonicalId": "loop.for.each.player",
     "outputs": [
       {
         "name": "completed",
@@ -353,7 +426,8 @@
         "dataType": "execution"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "hiddenReason": "migration_only"
   },
   {
     "id": "flow.loop_for_each_entity",
@@ -363,6 +437,7 @@
     "handlerConfig": {
       "operation": "loop_for_each_entity"
     },
+    "canonicalId": "loop.for.each.entity",
     "inputs": [
       {
         "name": "flow",
@@ -371,7 +446,12 @@
       },
       {
         "name": "radius",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 10,
+        "constraints": {
+          "min": 0,
+          "max": 128
+        }
       },
       {
         "name": "center",
@@ -397,12 +477,21 @@
         "dataType": "execution"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "hiddenReason": "migration_only"
   },
   {
     "id": "loop.count",
     "displayName": "Loop Count",
+    "description": "Run the loop body a fixed number of times.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "count",
+      "repeat"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "loop_count"
@@ -415,12 +504,16 @@
       },
       {
         "name": "count",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0
+        }
       }
     ],
     "outputs": [
       {
-        "name": "flow",
+        "name": "loop",
         "pinType": "FLOW",
         "dataType": "execution"
       },
@@ -431,13 +524,26 @@
       {
         "name": "completed",
         "dataType": "boolean"
+      },
+      {
+        "name": "done",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
   {
     "id": "loop.for.each",
     "displayName": "Loop For Each",
+    "description": "Run the loop body once for every value in a list.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "list",
+      "collection"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "loop_for_each"
@@ -450,12 +556,12 @@
       },
       {
         "name": "list",
-        "dataType": "list"
+        "dataType": "list<type:t>"
       }
     ],
     "outputs": [
       {
-        "name": "flow",
+        "name": "loop",
         "pinType": "FLOW",
         "dataType": "execution"
       },
@@ -469,21 +575,34 @@
       },
       {
         "name": "element",
-        "dataType": "any"
+        "dataType": "type:t"
+      },
+      {
+        "name": "done",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
   {
     "id": "loop.for.each.player",
     "displayName": "Loop For Each Player",
+    "description": "Run the loop body once for every player online when the loop starts.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "player",
+      "online"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "loop_for_each_player"
     },
     "outputs": [
       {
-        "name": "flow",
+        "name": "loop",
         "pinType": "FLOW",
         "dataType": "execution"
       },
@@ -498,6 +617,11 @@
       {
         "name": "player",
         "dataType": "player"
+      },
+      {
+        "name": "done",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ],
     "inputs": [
@@ -511,7 +635,15 @@
   {
     "id": "loop.for.each.entity",
     "displayName": "Loop For Each Entity",
+    "description": "Run the loop body once for every nearby entity captured when the loop starts.",
     "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "loop",
+      "entity",
+      "nearby"
+    ],
     "handler": "FlowControlHandler",
     "handlerConfig": {
       "operation": "loop_for_each_entity"
@@ -524,7 +656,12 @@
       },
       {
         "name": "radius",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 10,
+        "constraints": {
+          "min": 0,
+          "max": 128
+        }
       },
       {
         "name": "center",
@@ -533,7 +670,7 @@
     ],
     "outputs": [
       {
-        "name": "flow",
+        "name": "loop",
         "pinType": "FLOW",
         "dataType": "execution"
       },
@@ -548,6 +685,11 @@
       {
         "name": "entity",
         "dataType": "entity"
+      },
+      {
+        "name": "done",
+        "pinType": "FLOW",
+        "dataType": "execution"
       }
     ]
   },
@@ -559,6 +701,7 @@
     "handlerConfig": {
       "operation": "switch_case"
     },
+    "canonicalId": "flow.switch_case",
     "inputs": [
       {
         "name": "flow",
@@ -567,11 +710,11 @@
       },
       {
         "name": "value",
-        "dataType": "any"
+        "dataType": "type:t"
       },
       {
         "name": "cases",
-        "dataType": "list"
+        "dataType": "list<type:t>"
       }
     ],
     "outputs": [
@@ -589,7 +732,7 @@
         "dataType": "execution"
       }
     ],
-    "hidden": true
+    "hidden": true,
+    "hiddenReason": "migration_only"
   }
 ]
-

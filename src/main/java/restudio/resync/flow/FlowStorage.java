@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
@@ -14,6 +15,9 @@ import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.resources.AssetFileFormat;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
+import restudio.resync.flow.validation.FlowGraphValidationException;
+import restudio.resync.flow.validation.FlowGraphValidationResult;
+import restudio.resync.flow.validation.FlowGraphValidator;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,6 +35,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import java.util.function.Consumer;
 
 public class FlowStorage {
     private final File flowDir;
@@ -58,6 +63,8 @@ public class FlowStorage {
     private volatile String defaultTabId;
     private volatile boolean defaultTabUsePapi = true;
     private volatile int tabRefreshIntervalTicks = 20;
+    private FlowGraphValidator graphValidator;
+    private Consumer<String> graphChangeListener;
 
     public FlowStorage(JavaPlugin plugin) {
         this(plugin.getDataFolder());
@@ -106,7 +113,30 @@ public class FlowStorage {
         return null;
     }
 
+    public FlowGraph reloadGraph(String id) {
+        String safeId = safeId(id, "reload flow");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid flow id");
+        }
+        invalidateAssetFileIndex();
+        Path file = resourceFile(flowDir, "flow", safeId, "reload flow");
+        if (file == null || !Files.exists(file)) {
+            graphCache.remove(safeId);
+            return null;
+        }
+        try {
+            FlowGraph graph = FlowSerializer.deserialize(StorageSafety.readUtf8(file));
+            requireValidGraph(graph);
+            graphCache.put(safeId, graph);
+            notifyGraphChanged(safeId);
+            return graph;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to reload flow: " + safeId, exception);
+        }
+    }
+
     public void saveGraph(FlowGraph graph) {
+        requireValidGraph(graph);
         String safeId = graph != null ? safeId(graph.getId(), "save flow") : null;
         if (safeId == null) {
             throw new IllegalArgumentException("Invalid flow id");
@@ -116,15 +146,44 @@ public class FlowStorage {
             throw new IllegalStateException("Failed to resolve flow file");
         }
         try {
-            String type = graphResourceTypeForWrite(graph, safeId, file);
+            String type = graphResourceTypeForWrite(graph);
+            String existingType = Files.exists(file) ? AssetFileFormat.readResourceType(file) : "";
+            if (Set.of("flow", "function", "command").contains(existingType) && !type.equals(existingType)) {
+                String folder = defaultFolderForType(type);
+                file = safeAssetFolder(folder).resolve(AssetFileFormat.idOnlyFileName(safeId));
+            }
             file = collisionSafeWriteFile(type, safeId, file);
             String json = FlowSerializer.serialize(graph);
             StorageSafety.writeUtf8Atomic(file, AssetFileFormat.withResourceType(json, type));
-            deleteAssetDuplicates("flow", safeId, file);
-            assetFileIndex.put(assetIndexKey(type, safeId), file);
+            updateMetadataResourcePath(type, safeId, assetFolderPath(assetsDir.toPath(), file));
+            deleteGraphAssetDuplicates(safeId, file);
+            invalidateAssetFileIndex();
             graphCache.put(safeId, graph);
+            notifyGraphChanged(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save flow: " + safeId, e);
+        }
+    }
+
+    public void setGraphValidator(FlowGraphValidator graphValidator) {
+        this.graphValidator = graphValidator;
+    }
+
+    public void setGraphChangeListener(Consumer<String> graphChangeListener) {
+        this.graphChangeListener = graphChangeListener;
+    }
+
+    public FlowGraphValidationResult validateGraph(FlowGraph graph) {
+        if (graphValidator == null) {
+            return new FlowGraphValidationResult(List.of());
+        }
+        return graphValidator.validate(graph);
+    }
+
+    public void requireValidGraph(FlowGraph graph) {
+        FlowGraphValidationResult result = validateGraph(graph);
+        if (!result.valid()) {
+            throw new FlowGraphValidationException(result);
         }
     }
 
@@ -133,12 +192,62 @@ public class FlowStorage {
         if (safeId == null) {
             throw new IllegalArgumentException("Invalid flow id");
         }
+        FlowGraph graph = getGraph(safeId);
+        if (graph != null && graph.isFunction()) {
+            List<FlowFunctionReference> references = findFunctionReferences(safeId).stream()
+                .filter(reference -> !safeId.equals(reference.callerGraphId()))
+                .toList();
+            if (!references.isEmpty()) {
+                throw new FlowFunctionInUseException(safeId, references);
+            }
+        }
+        deleteGraphFiles(safeId);
+    }
+
+    public void forceDeleteGraph(String id) {
+        String safeId = safeId(id, "delete flow");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid flow id");
+        }
+        deleteGraphFiles(safeId);
+    }
+
+    public List<FlowFunctionReference> findFunctionReferences(String functionId) {
+        String safeFunctionId = safeId(functionId, "analyze function references");
+        if (safeFunctionId == null) {
+            return List.of();
+        }
+        String expectedType = CustomFunctionNodeDefinitions.NODE_PREFIX + safeFunctionId;
+        List<FlowFunctionReference> references = new ArrayList<>();
+        for (String graphId : listFlowIds()) {
+            FlowGraph graph = getGraph(graphId);
+            if (graph == null || graph.getNodes() == null) {
+                continue;
+            }
+            for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
+                if (entry.getValue() != null && expectedType.equals(entry.getValue().getType())) {
+                    references.add(new FlowFunctionReference(graphId, entry.getKey()));
+                }
+            }
+        }
+        references.sort(Comparator.comparing(FlowFunctionReference::callerGraphId).thenComparing(FlowFunctionReference::nodeId));
+        return List.copyOf(references);
+    }
+
+    private void deleteGraphFiles(String safeId) {
         try {
             deleteResourceFiles(flowDir, "flow", safeId);
             invalidateAssetFileIndex();
             graphCache.remove(safeId);
+            notifyGraphChanged(safeId);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to delete flow: " + safeId, e);
+        }
+    }
+
+    private void notifyGraphChanged(String graphId) {
+        if (graphChangeListener != null && graphId != null && !graphId.isBlank()) {
+            graphChangeListener.accept(graphId);
         }
     }
 
@@ -334,10 +443,6 @@ public class FlowStorage {
 
     public String getProjectMetadata(String id) {
         String safeId = projectMetadataId(id);
-        String cached = projectMetadataCache.get(safeId);
-        if (cached != null) {
-            return cached;
-        }
         Path file = projectMetadataFile(safeId, "load project metadata");
         if (file != null && Files.exists(file)) {
             try {
@@ -348,7 +453,7 @@ public class FlowStorage {
                 Log.warn("Failed to load project metadata: " + safeId + " - " + e.getMessage());
             }
         }
-        return null;
+        return projectMetadataCache.get(safeId);
     }
 
     public void saveProjectMetadata(String json) {
@@ -395,6 +500,43 @@ public class FlowStorage {
         return listResourceIds(flowDir, "flow");
     }
 
+    public List<String> listGraphIds(String resourceType) {
+        if (!Set.of("flow", "function", "command").contains(resourceType)) {
+            throw new IllegalArgumentException("Unknown graph resource type: " + resourceType);
+        }
+        return listFlowIds().stream().filter(id -> resourceType.equals(getGraphResourceType(id))).toList();
+    }
+
+    public String getGraphResourceType(String id) {
+        String safeId = safeId(id, "resolve graph resource type");
+        if (safeId == null) {
+            return "";
+        }
+        Map<String, Path> index = assetFiles();
+        for (String type : List.of("flow", "function", "command")) {
+            if (index.containsKey(assetIndexKey(type, safeId))) {
+                return type;
+            }
+        }
+        ProjectMetadataSnapshot metadata = parseProjectMetadata(getProjectMetadata("project"));
+        ResourceEntrySnapshot resource = metadata != null ? metadata.findGraphResource(safeId) : null;
+        if (resource != null && resource.type != null && Set.of("flow", "function", "command").contains(resource.type)) {
+            return resource.type;
+        }
+        FlowGraph graph = getGraph(safeId);
+        return graph != null ? graphResourceType(graph) : "";
+    }
+
+    public String graphResourceType(FlowGraph graph) {
+        if (graph == null) {
+            return "";
+        }
+        if (graphHasCommandStartNode(graph)) {
+            return "command";
+        }
+        return graph.isFunction() ? "function" : "flow";
+    }
+
     public boolean hasStoredGraphVersion(String id) {
         String safeId = safeId(id, "inspect flow version");
         if (safeId == null) {
@@ -410,6 +552,25 @@ public class FlowStorage {
         } catch (IOException e) {
             Log.warn("Failed to inspect flow version: " + safeId + " - " + e.getMessage());
             return false;
+        }
+    }
+
+    public Path backupGraphForMigration(String id, String migrationId) {
+        String safeId = safeId(id, "backup flow migration");
+        String safeMigrationId = safeId(migrationId, "backup flow migration");
+        if (safeId == null || safeMigrationId == null) {
+            throw new IllegalArgumentException("Invalid migration backup identity");
+        }
+        Path source = resourceFile(flowDir, "flow", safeId, "backup flow migration");
+        if (source == null || Files.notExists(source)) {
+            throw new IllegalStateException("Flow source is unavailable for migration backup: " + safeId);
+        }
+        Path backup = assetsDir.toPath().resolve("migration-backups").resolve(safeMigrationId).resolve(safeId + ".json");
+        try {
+            StorageSafety.writeUtf8Atomic(backup, StorageSafety.readUtf8(source));
+            return backup;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to back up flow migration: " + safeId, exception);
         }
     }
 
@@ -621,7 +782,8 @@ public class FlowStorage {
             try {
                 tabRefreshIntervalTicks = Math.max(1, Integer.parseInt(configuredInterval));
                 return;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException exception) {
+                Log.warn("Invalid tab refresh interval in config: " + configuredInterval);
             }
         }
         File legacyFile = new File(configFile.getParentFile(), "tab-refresh.cfg");
@@ -726,7 +888,7 @@ public class FlowStorage {
         if (resource != null) {
             return assetResourceFile(resource);
         }
-        String type = graph != null && graph.isFunction() ? "function" : "flow";
+        String type = graphResourceType(graph);
         return assetResourceFile(newResource(type, id, id, defaultFolderForType(type)));
     }
 
@@ -829,21 +991,15 @@ public class FlowStorage {
         return assetFile.getParent().resolve(AssetFileFormat.idOnlyFileName(id));
     }
 
-    private String graphResourceTypeForWrite(FlowGraph graph, String id, Path file) {
-        String declaredType = AssetFileFormat.readResourceType(file);
-        if ("flow".equals(declaredType) || "function".equals(declaredType) || "command".equals(declaredType)) {
-            return declaredType;
-        }
-        String json = getProjectMetadata("project");
-        ProjectMetadataSnapshot metadata = parseProjectMetadata(json);
-        ResourceEntrySnapshot resource = metadata != null ? metadata.findGraphResource(id) : null;
-        if (resource != null && ("flow".equals(resource.type) || "function".equals(resource.type) || "command".equals(resource.type))) {
-            return resource.type;
-        }
-        return graph != null && graph.isFunction() ? "function" : "flow";
+    private String graphResourceTypeForWrite(FlowGraph graph) {
+        return graphResourceType(graph);
     }
 
     private void deleteAssetDuplicates(String type, String id, Path keep) throws IOException {
+        deleteAssetDuplicates(Set.of(type), id, keep);
+    }
+
+    private void deleteAssetDuplicates(Set<String> types, String id, Path keep) throws IOException {
         Path root = assetsDir.toPath();
         if (!Files.exists(root)) {
             return;
@@ -855,11 +1011,15 @@ public class FlowStorage {
                     continue;
                 }
                 AssetResourceName asset = parseAssetResourceName(path);
-                if (assetFileMatches(type, id, asset)) {
+                if (types.stream().anyMatch(type -> assetFileMatches(type, id, asset))) {
                     Files.deleteIfExists(path);
                 }
             }
         }
+    }
+
+    private void deleteGraphAssetDuplicates(String id, Path keep) throws IOException {
+        deleteAssetDuplicates(Set.of("flow", "function", "command"), id, keep);
     }
 
     private Path collisionSafeWriteFile(String type, String id, Path file) throws IOException {
@@ -871,7 +1031,6 @@ public class FlowStorage {
             return file;
         }
         String folder = conflictFolderForType(type, id, 1);
-        updateMetadataResourcePath(type, id, folder);
         Path target = safeAssetFolder(folder).resolve(AssetFileFormat.idOnlyFileName(id));
         Files.createDirectories(target.getParent());
         return target;
@@ -882,11 +1041,11 @@ public class FlowStorage {
         if (metadata == null) {
             return;
         }
-        ResourceEntrySnapshot resource = ("flow".equals(type) || "function".equals(type) || "command".equals(type)) ? metadata.findGraphResource(id) : metadata.findExactResource(type, id);
-        if (resource == null) {
+        boolean changed = ensureFolderPath(metadata, folder);
+        changed |= ensureAssetResource(metadata, type, id, id, folder);
+        if (!changed) {
             return;
         }
-        resource.path = normalizeAssetPath(folder);
         try {
             String json = gson.toJson(metadata);
             StorageSafety.writeUtf8Atomic(assetsDir.toPath().resolve("project.json"), json);
@@ -1023,6 +1182,11 @@ public class FlowStorage {
                 projectMetadataCache.put("project", json);
             }
             syncAssetsFromProjectMetadata(gson.toJson(metadata));
+            if (pruneMissingAssetResources(metadata)) {
+                String json = gson.toJson(metadata);
+                StorageSafety.writeUtf8Atomic(assetsDir.toPath().resolve("project.json"), json);
+                projectMetadataCache.put("project", json);
+            }
             cleanupLegacyAssetDirectories();
             invalidateAssetFileIndex();
         } catch (IOException | IllegalArgumentException e) {
@@ -1079,6 +1243,23 @@ public class FlowStorage {
             }
         }
         return changed;
+    }
+
+    private boolean pruneMissingAssetResources(ProjectMetadataSnapshot metadata) throws IOException {
+        Set<String> existing = new HashSet<>();
+        Path root = assetsDir.toPath();
+        if (Files.exists(root)) {
+            try (Stream<Path> paths = Files.walk(root)) {
+                for (Path file : paths.filter(Files::isRegularFile).toList()) {
+                    AssetResourceName asset = parseAssetResourceName(file);
+                    if (asset != null) {
+                        existing.add(assetIndexKey(asset.type(), asset.id()));
+                    }
+                }
+            }
+        }
+        return metadata.mutableResources().removeIf(resource -> resource != null && knownAssetType(resource.type)
+            && !existing.contains(assetIndexKey(resource.type, resource.id)));
     }
 
     private FlowGraph readAssetFlow(Path file) {

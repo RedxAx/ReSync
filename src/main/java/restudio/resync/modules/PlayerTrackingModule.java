@@ -61,7 +61,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PlayerTrackingModule implements Module, Listener, PlayerTrackingListener, FlowExecutionListener {
-    private static final ModuleMetadata METADATA = ModuleMetadata.of("playerTracking", "PlayerTracking", "player_tracking").withDependencies("flow");
+    private static final ModuleMetadata METADATA = ModuleMetadata.of("playerTracking", "PlayerTracking", "player_tracking");
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final Set<Session> legacyBroadSessions = ConcurrentHashMap.newKeySet();
     private final Map<Session, Set<UUID>> watchedPlayers = new ConcurrentHashMap<>();
@@ -72,6 +72,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private int channelId;
     private PlayerTrackingService trackingService;
     private PlayerSessionLinkService sessionLinkService;
+    private FlowExecutor flowExecutor;
     private final PlayerTrackingPrivacyPolicy privacyPolicy = new PlayerTrackingPrivacyPolicy();
     private final Map<UUID, Integer> pendingLiveBroadcastTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastLiveBroadcastAt = new ConcurrentHashMap<>();
@@ -100,10 +101,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     public void start(ModuleContext context) {
         trackingService.addListener(this);
         Bukkit.getPluginManager().registerEvents(this, context.getPlugin());
-        FlowExecutor flowExecutor = context.getService(FlowExecutor.class);
-        if (flowExecutor != null) {
-            flowExecutor.addExecutionListener(this);
-        }
+        attachFlowExecutor(context.getService(FlowExecutor.class));
         for (Player player : Bukkit.getOnlinePlayers()) {
             trackingService.markOnline(player, "bootstrap");
         }
@@ -117,9 +115,9 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             sessionLinkService.unlinkPlayer(player.getUniqueId());
         }
         trackingService.removeListener(this);
-        FlowExecutor flowExecutor = context.getService(FlowExecutor.class);
         if (flowExecutor != null) {
             flowExecutor.removeExecutionListener(this);
+            flowExecutor = null;
         }
         HandlerList.unregisterAll(this);
         subscribedSessions.clear();
@@ -139,6 +137,24 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         lastInventorySignatures.clear();
         lastScopedStateSignatures.clear();
         pendingInventoryRevisionPlayers.clear();
+    }
+
+    @Override
+    public void onTick() {
+        if (flowExecutor == null && context != null) {
+            attachFlowExecutor(context.getService(FlowExecutor.class));
+        }
+    }
+
+    private void attachFlowExecutor(FlowExecutor executor) {
+        if (executor == null || flowExecutor == executor) {
+            return;
+        }
+        if (flowExecutor != null) {
+            flowExecutor.removeExecutionListener(this);
+        }
+        flowExecutor = executor;
+        flowExecutor.addExecutionListener(this);
     }
 
     @Override

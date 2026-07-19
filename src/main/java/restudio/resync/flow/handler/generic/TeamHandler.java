@@ -14,6 +14,7 @@ import restudio.resync.flow.util.TextFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -23,231 +24,96 @@ public class TeamHandler implements NodeHandler {
 
     public TeamHandler() {
         operations.put("team_create", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
+            String teamId = requireTeamId(ctx, node);
             String name = ctx.getInputValue(node, "name", String.class, "Team");
-            if (teamId.isEmpty()) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team == null) {
-                team = scoreboard.registerNewTeam(teamId);
-                team.setDisplayName(TextFormatter.formatLegacy(name));
-            }
+            if (name == null || name.isBlank()) throw new IllegalArgumentException("Team display name is required");
+            Scoreboard scoreboard = requireScoreboard();
+            if (scoreboard.getTeam(teamId) != null) throw new IllegalStateException("Team already exists: " + teamId);
+            Team team = scoreboard.registerNewTeam(teamId);
+            team.setDisplayName(TextFormatter.formatLegacy(name));
         });
 
         operations.put("team_remove", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
-            if (teamId.isEmpty()) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.unregister();
-            }
+            requireTeam(ctx, node).unregister();
         });
 
         operations.put("team_add_player", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (teamId.isEmpty() || player == null) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.addEntry(player.getName());
-                player.setScoreboard(scoreboard);
-            }
+            Player player = requirePlayer(ctx, node);
+            Team team = requireTeam(ctx, node);
+            team.addEntry(player.getName());
+            player.setScoreboard(requireScoreboard());
         });
 
         operations.put("team_remove_player", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (teamId.isEmpty() || player == null) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.removeEntry(player.getName());
-            }
+            Player player = requirePlayer(ctx, node);
+            Team team = requireTeam(ctx, node);
+            if (!team.removeEntry(player.getName())) throw new IllegalStateException("Player is not in team: " + team.getName());
         });
 
         operations.put("team_set_prefix", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             String prefix = ctx.getInputValue(node, "prefix", String.class, "");
-            if (teamId.isEmpty()) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.setPrefix(TextFormatter.formatLegacy(prefix));
-            }
+            requireTeam(ctx, node).setPrefix(TextFormatter.formatLegacy(prefix));
         });
 
         operations.put("team_set_suffix", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             String suffix = ctx.getInputValue(node, "suffix", String.class, "");
-            if (teamId.isEmpty()) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.setSuffix(TextFormatter.formatLegacy(suffix));
-            }
+            requireTeam(ctx, node).setSuffix(TextFormatter.formatLegacy(suffix));
         });
 
         operations.put("team_set_color", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             String colorName = ctx.getInputValue(node, "color", String.class, "WHITE");
-            if (teamId.isEmpty()) {
-                return;
+            ChatColor color;
+            try {
+                color = ChatColor.valueOf(colorName.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Unknown team color: " + colorName, exception);
             }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                try {
-                    ChatColor color = ChatColor.valueOf(colorName.toUpperCase());
-                    team.setColor(color);
-                } catch (IllegalArgumentException e) {
-                    team.setColor(ChatColor.WHITE);
-                }
-            }
+            if (!color.isColor()) throw new IllegalArgumentException("Team color must be a color: " + colorName);
+            requireTeam(ctx, node).setColor(color);
         });
 
         operations.put("team_set_friendly_fire", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             Boolean allow = ctx.getInputValue(node, "allow", Boolean.class, true);
-            if (teamId.isEmpty()) {
-                return;
-            }
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager == null) {
-                return;
-            }
-            Scoreboard scoreboard = manager.getMainScoreboard();
-            Team team = scoreboard.getTeam(teamId);
-            if (team != null) {
-                team.setAllowFriendlyFire(allow);
-            }
+            requireTeam(ctx, node).setAllowFriendlyFire(allow);
         });
 
         operations.put("team_get_players", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
-            if (!teamId.isEmpty()) {
-                ScoreboardManager manager = Bukkit.getScoreboardManager();
-                if (manager != null) {
-                    Team team = manager.getMainScoreboard().getTeam(teamId);
-                    if (team != null) {
-                        ctx.setOutput(node, "players", new ArrayList<>(team.getEntries()));
-                    } else {
-                        ctx.setOutput(node, "players", new ArrayList<>());
-                    }
-                }
-            } else {
-                ctx.setOutput(node, "players", new ArrayList<>());
-            }
+            ctx.setOutput(node, "players", new ArrayList<>(requireTeam(ctx, node).getEntries()));
         });
 
         operations.put("team_get_team", (ctx, node) -> {
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            if (player != null) {
-                ScoreboardManager manager = Bukkit.getScoreboardManager();
-                if (manager != null) {
-                    for (Team team : manager.getMainScoreboard().getTeams()) {
-                        if (team.hasEntry(player.getName())) {
-                            ctx.setOutput(node, "team_id", team.getName());
-                            return;
-                        }
-                    }
+            Player player = requirePlayer(ctx, node);
+            for (Team team : requireScoreboard().getTeams()) {
+                if (team.hasEntry(player.getName())) {
+                    ctx.setOutput(node, "team_id", team.getName());
+                    return;
                 }
             }
             ctx.setOutput(node, "team_id", "");
         });
 
         operations.put("team_get_teams", (ctx, node) -> {
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
             List<String> teams = new ArrayList<>();
-            if (manager != null) {
-                for (Team team : manager.getMainScoreboard().getTeams()) {
-                    teams.add(team.getName());
-                }
+            for (Team team : requireScoreboard().getTeams()) {
+                teams.add(team.getName());
             }
             ctx.setOutput(node, "teams", teams);
         });
 
         operations.put("team_has_player", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
-            Player player = ctx.getInputValue(node, "player", Player.class, null);
-            boolean has = false;
-            if (!teamId.isEmpty() && player != null) {
-                ScoreboardManager manager = Bukkit.getScoreboardManager();
-                if (manager != null) {
-                    Team team = manager.getMainScoreboard().getTeam(teamId);
-                    has = team != null && team.hasEntry(player.getName());
-                }
-            }
-            ctx.setOutput(node, "has", has);
+            Player player = requirePlayer(ctx, node);
+            ctx.setOutput(node, "has", requireTeam(ctx, node).hasEntry(player.getName()));
         });
 
         operations.put("team_see_friendly_invisibles", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             Boolean see = ctx.getInputValue(node, "see", Boolean.class, true);
-            if (!teamId.isEmpty()) {
-                ScoreboardManager manager = Bukkit.getScoreboardManager();
-                if (manager != null) {
-                    Team team = manager.getMainScoreboard().getTeam(teamId);
-                    if (team != null) {
-                        team.setCanSeeFriendlyInvisibles(see);
-                    }
-                }
-            }
+            requireTeam(ctx, node).setCanSeeFriendlyInvisibles(see);
         });
 
         operations.put("team_set_display_name", (ctx, node) -> {
-            String teamId = ctx.getInputValue(node, "team_id", String.class, "");
             String displayName = ctx.getInputValue(node, "display_name", String.class, "");
-            if (!teamId.isEmpty()) {
-                ScoreboardManager manager = Bukkit.getScoreboardManager();
-                if (manager != null) {
-                    Team team = manager.getMainScoreboard().getTeam(teamId);
-                    if (team != null) {
-                        team.setDisplayName(TextFormatter.formatLegacy(displayName));
-                    }
-                }
-            }
+            if (displayName == null || displayName.isBlank()) throw new IllegalArgumentException("Team display name is required");
+            requireTeam(ctx, node).setDisplayName(TextFormatter.formatLegacy(displayName));
         });
 
     }
@@ -260,9 +126,36 @@ public class TeamHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown team operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
+    }
+
+    private static Scoreboard requireScoreboard() {
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager == null) throw new IllegalStateException("Scoreboard manager is unavailable");
+        return manager.getMainScoreboard();
+    }
+
+    private static String requireTeamId(FlowContext context, FlowNode node) {
+        String teamId = context.getInputValue(node, "team_id", String.class, "");
+        if (teamId == null || teamId.isBlank()) throw new IllegalArgumentException("Team ID is required");
+        if (teamId.length() > 128) throw new IllegalArgumentException("Team ID cannot exceed 128 characters");
+        return teamId;
+    }
+
+    private static Team requireTeam(FlowContext context, FlowNode node) {
+        String teamId = requireTeamId(context, node);
+        Team team = requireScoreboard().getTeam(teamId);
+        if (team == null) throw new IllegalArgumentException("Unknown team: " + teamId);
+        return team;
+    }
+
+    private static Player requirePlayer(FlowContext context, FlowNode node) {
+        Player player = context.getInputValue(node, "player", Player.class, context.getPlayer());
+        if (player == null) throw new IllegalArgumentException("Player is required");
+        return player;
     }
 }

@@ -1,0 +1,9 @@
+{
+  "id": "guide",
+  "enabled": true,
+  "displayName": "Guide",
+  "entityType": "villager",
+  "hooks": {
+    "interactFlow": "npc-interact"
+  }
+}

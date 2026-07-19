@@ -1,0 +1,15 @@
+{
+  "id": "restartcommand",
+  "version": 1,
+  "resourceType": "flow",
+  "nodes": {
+    "start": {
+      "type": "event.resync.command",
+      "version": 1,
+      "x": 0,
+      "y": 0,
+      "inputValues": {}
+    }
+  },
+  "connections": []
+}

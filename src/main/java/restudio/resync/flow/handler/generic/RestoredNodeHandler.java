@@ -13,7 +13,6 @@ import org.bukkit.potion.PotionEffectType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import restudio.flow.data.FlowNode;
-import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -117,246 +116,222 @@ public class RestoredNodeHandler implements NodeHandler {
             case "player_get_player_list_name" -> playerGetPlayerListName(ctx, node);
             case "player_is_op" -> playerIsOp(ctx, node);
             case "player_get_allowed_flight" -> playerGetAllowedFlight(ctx, node);
-            default -> ctx.triggerOutput("flow");
+            default -> throw new IllegalArgumentException("Unknown restored node operation: " + node.getType());
         }
     }
 
     private void entityMount(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Entity mount = ctx.getInputValue(node, "mount_entity", Entity.class, null);
-        if (entity != null && mount != null) {
-            entity.teleport(mount.getLocation());
-            mount.addPassenger(entity);
-        }
+        Entity entity = requireEntity(ctx, node, "entity");
+        Entity mount = requireEntity(ctx, node, "mount_entity");
+        if (entity.equals(mount)) throw new IllegalArgumentException("Entity cannot mount itself");
+        if (!entity.teleport(mount.getLocation())) throw new IllegalStateException("Entity could not be moved to the mount");
+        if (!mount.addPassenger(entity)) throw new IllegalStateException("Entity could not be mounted");
         ctx.triggerOutput("flow");
     }
 
     private void entityDismount(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity != null && entity.isInsideVehicle()) {
-            entity.leaveVehicle();
-        }
+        Entity entity = requireEntity(ctx, node, "entity");
+        if (!entity.isInsideVehicle()) throw new IllegalStateException("Entity is not mounted");
+        if (!entity.leaveVehicle()) throw new IllegalStateException("Entity could not dismount");
         ctx.triggerOutput("flow");
     }
 
     private void entityAi(FlowContext ctx, FlowNode node, boolean enabled) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity instanceof Mob mob) {
-            mob.setAI(enabled);
-        }
+        Entity entity = requireEntity(ctx, node, "entity");
+        if (!(entity instanceof Mob mob)) throw new IllegalArgumentException("Entity does not support AI");
+        mob.setAI(enabled);
         ctx.triggerOutput("flow");
     }
 
     private void entitySetInvulnerable(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         Boolean noDamage = ctx.getInputValue(node, "no_damage", Boolean.class, false);
-        if (entity != null) {
-            entity.setInvulnerable(noDamage);
-        }
+        entity.setInvulnerable(noDamage);
         ctx.triggerOutput("flow");
     }
 
     private void entitySetSilent(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         Boolean silent = ctx.getInputValue(node, "silent", Boolean.class, false);
-        if (entity != null) {
-            entity.setSilent(silent);
-        }
+        entity.setSilent(silent);
         ctx.triggerOutput("flow");
     }
 
     private void entityAddPotion(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        LivingEntity living = requireLivingEntity(ctx, node, "entity");
         String effectName = ctx.getInputValue(node, "effect_type", String.class, "SPEED");
         Integer duration = ctx.getInputValue(node, "duration", Integer.class, 200);
         Integer amplifier = ctx.getInputValue(node, "amplifier", Integer.class, 0);
-        if (entity instanceof LivingEntity living && effectName != null) {
-            PotionEffectType effectType = PotionEffectType.getByName(effectName.toUpperCase());
-            if (effectType != null) {
-                living.addPotionEffect(new PotionEffect(effectType, duration, amplifier));
-            } else {
-                Log.warn("[Flow] Invalid potion effect type: " + effectName);
-            }
-        }
+        if (effectName == null || effectName.isBlank()) throw new IllegalArgumentException("Potion effect type is required");
+        PotionEffectType effectType = PotionEffectType.getByName(effectName.toUpperCase());
+        if (effectType == null) throw new IllegalArgumentException("Unknown potion effect type: " + effectName);
+        if (duration < 1 || duration > 72_000) throw new IllegalArgumentException("Potion duration must be between 1 and 72000 ticks");
+        if (amplifier < 0 || amplifier > 255) throw new IllegalArgumentException("Potion amplifier must be between 0 and 255");
+        living.addPotionEffect(new PotionEffect(effectType, duration, amplifier));
         ctx.triggerOutput("flow");
     }
 
     private void entityClearPotions(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity instanceof LivingEntity living) {
-            List<PotionEffectType> effects = living.getActivePotionEffects().stream().map(PotionEffect::getType).toList();
-            for (PotionEffectType effect : effects) {
-                living.removePotionEffect(effect);
-            }
+        LivingEntity living = requireLivingEntity(ctx, node, "entity");
+        List<PotionEffectType> effects = living.getActivePotionEffects().stream().map(PotionEffect::getType).toList();
+        for (PotionEffectType effect : effects) {
+            living.removePotionEffect(effect);
         }
         ctx.triggerOutput("flow");
     }
 
     private void entityLeash(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        Entity holder = ctx.getInputValue(node, "holder_entity", Entity.class, null);
-        if (entity instanceof LivingEntity living && holder instanceof LivingEntity leashHolder) {
-            living.setLeashHolder(leashHolder);
-        }
+        LivingEntity living = requireLivingEntity(ctx, node, "entity");
+        Entity holder = requireEntity(ctx, node, "holder_entity");
+        if (!living.setLeashHolder(holder)) throw new IllegalStateException("Entity could not be leashed to the holder");
         ctx.triggerOutput("flow");
     }
 
     private void entityUnleash(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity instanceof LivingEntity living) {
-            living.setLeashHolder(null);
-        }
+        LivingEntity living = requireLivingEntity(ctx, node, "entity");
+        if (!living.isLeashed()) throw new IllegalStateException("Entity is not leashed");
+        if (!living.setLeashHolder(null)) throw new IllegalStateException("Entity could not be unleashed");
         ctx.triggerOutput("flow");
     }
 
     private void entitySetCustomName(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         String name = ctx.getInputValue(node, "name", String.class, "");
-        if (entity != null) {
-            entity.setCustomName(name);
-            entity.setCustomNameVisible(true);
-        }
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Entity custom name is required");
+        entity.setCustomName(name);
+        entity.setCustomNameVisible(true);
         ctx.triggerOutput("flow");
     }
 
     private void entityGetPassengers(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        ctx.setOutput(node, "passengers_list", entity != null ? entity.getPassengers() : List.of());
+        Entity entity = requireEntity(ctx, node, "entity");
+        ctx.setOutput(node, "passengers_list", entity.getPassengers());
         ctx.triggerOutput("flow");
     }
 
     private void entityGetVehicle(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        ctx.setOutput(node, "vehicle", entity != null ? entity.getVehicle() : null);
+        Entity entity = requireEntity(ctx, node, "entity");
+        ctx.setOutput(node, "vehicle", entity.getVehicle());
         ctx.triggerOutput("flow");
     }
 
     private void entitySetFireTicks(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (entity != null) {
-            entity.setFireTicks(ticks);
-        }
+        if (ticks < 0 || ticks > 72_000) throw new IllegalArgumentException("Fire ticks must be between 0 and 72000");
+        entity.setFireTicks(ticks);
         ctx.triggerOutput("flow");
     }
 
     private void entitySetFrozen(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
-        if (entity != null) {
-            entity.setFreezeTicks(ticks);
-        }
+        if (ticks < 0 || ticks > entity.getMaxFreezeTicks()) throw new IllegalArgumentException("Freeze ticks must be between 0 and " + entity.getMaxFreezeTicks());
+        entity.setFreezeTicks(ticks);
         ctx.triggerOutput("flow");
     }
 
     private void entityAddTag(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         String tag = ctx.getInputValue(node, "tag", String.class, "");
-        if (entity != null && !tag.isEmpty()) {
-            entity.addScoreboardTag(tag);
-        }
+        if (tag == null || tag.isBlank()) throw new IllegalArgumentException("Entity tag is required");
+        if (!entity.addScoreboardTag(tag)) throw new IllegalStateException("Entity tag could not be added");
         ctx.triggerOutput("flow");
     }
 
     private void entityRemoveTag(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         String tag = ctx.getInputValue(node, "tag", String.class, "");
-        if (entity != null && !tag.isEmpty()) {
-            entity.removeScoreboardTag(tag);
-        }
+        if (tag == null || tag.isBlank()) throw new IllegalArgumentException("Entity tag is required");
+        if (!entity.removeScoreboardTag(tag)) throw new IllegalStateException("Entity does not contain tag: " + tag);
         ctx.triggerOutput("flow");
     }
 
     private void entityClearTags(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        if (entity != null) {
-            for (String tag : new ArrayList<>(entity.getScoreboardTags())) {
-                entity.removeScoreboardTag(tag);
-            }
+        Entity entity = requireEntity(ctx, node, "entity");
+        for (String tag : new ArrayList<>(entity.getScoreboardTags())) {
+            if (!entity.removeScoreboardTag(tag)) throw new IllegalStateException("Entity tag could not be removed: " + tag);
         }
         ctx.triggerOutput("flow");
     }
 
     private void entityHasTag(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         String tag = ctx.getInputValue(node, "tag", String.class, "");
-        ctx.setOutput(node, "has_tag", entity != null && !tag.isEmpty() && entity.getScoreboardTags().contains(tag));
+        if (tag == null || tag.isBlank()) throw new IllegalArgumentException("Entity tag is required");
+        ctx.setOutput(node, "has_tag", entity.getScoreboardTags().contains(tag));
     }
 
     private void entityHasAnyTag(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         List<?> tags = ctx.getInputValue(node, "tags", List.class, List.of());
+        if (tags == null || tags.isEmpty()) throw new IllegalArgumentException("Entity tags are required");
         boolean hasAny = false;
-        if (entity != null && tags != null) {
-            for (Object tag : tags) {
-                if (tag instanceof String value && entity.getScoreboardTags().contains(value)) {
-                    hasAny = true;
-                    break;
-                }
+        for (Object tag : tags) {
+            if (!(tag instanceof String value) || value.isBlank()) throw new IllegalArgumentException("Entity tags must contain non-empty strings");
+            if (entity.getScoreboardTags().contains(value)) {
+                hasAny = true;
+                break;
             }
         }
         ctx.setOutput(node, "has_any", hasAny);
     }
 
     private void entityHasAllTags(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        Entity entity = requireEntity(ctx, node, "entity");
         List<?> tags = ctx.getInputValue(node, "tags", List.class, List.of());
-        boolean hasAll = entity != null && tags != null && !tags.isEmpty() && tags.stream().allMatch(tag -> tag instanceof String value && entity.getScoreboardTags().contains(value));
+        if (tags == null || tags.isEmpty()) throw new IllegalArgumentException("Entity tags are required");
+        if (tags.stream().anyMatch(tag -> !(tag instanceof String value) || value.isBlank())) throw new IllegalArgumentException("Entity tags must contain non-empty strings");
+        boolean hasAll = tags.stream().allMatch(tag -> entity.getScoreboardTags().contains((String) tag));
         ctx.setOutput(node, "has_all", hasAll);
     }
 
     private void entityGetTags(FlowContext ctx, FlowNode node) {
-        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
-        ctx.setOutput(node, "tags", entity != null ? new ArrayList<>(entity.getScoreboardTags()) : List.of());
+        Entity entity = requireEntity(ctx, node, "entity");
+        ctx.setOutput(node, "tags", new ArrayList<>(entity.getScoreboardTags()));
     }
 
     private void playerCountItem(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ItemStack target = getMaterialOrItem(ctx, node);
+        Player player = requirePlayer(ctx, node);
+        ItemStack target = requireMaterialOrItem(ctx, node);
         int count = 0;
-        if (player != null && target != null) {
-            for (ItemStack item : player.getInventory().getStorageContents()) {
-                if (item != null && item.isSimilar(target)) {
-                    count += item.getAmount();
-                }
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.isSimilar(target)) {
+                count += item.getAmount();
             }
         }
         ctx.setOutput(node, "count", count);
     }
 
     private void playerGetFirstEmptySlot(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "slot_index", player != null ? player.getInventory().firstEmpty() : -1);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "slot_index", player.getInventory().firstEmpty());
     }
 
     private void playerGetAllItems(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
+        Player player = requirePlayer(ctx, node);
         List<ItemStack> items = new ArrayList<>();
-        if (player != null) {
-            for (ItemStack item : player.getInventory().getStorageContents()) {
-                if (item != null && item.getType() != Material.AIR) {
-                    items.add(item);
-                }
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.getType() != Material.AIR) {
+                items.add(item.clone());
             }
         }
         ctx.setOutput(node, "items_list", items);
     }
 
     private void playerGetHotbarItems(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
+        Player player = requirePlayer(ctx, node);
         List<ItemStack> items = new ArrayList<>();
-        if (player != null) {
-            for (int i = 0; i < 9; i++) {
-                ItemStack item = player.getInventory().getItem(i);
-                items.add(item != null ? item : new ItemStack(Material.AIR));
-            }
+        for (int i = 0; i < 9; i++) {
+            ItemStack item = player.getInventory().getItem(i);
+            items.add(item != null ? item.clone() : new ItemStack(Material.AIR));
         }
         ctx.setOutput(node, "items_list", items);
     }
 
     private void playerGetArmorItems(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ItemStack[] armor = player != null ? player.getInventory().getArmorContents() : new ItemStack[4];
+        Player player = requirePlayer(ctx, node);
+        ItemStack[] armor = player.getInventory().getArmorContents();
         ctx.setOutput(node, "helmet", armor[3]);
         ctx.setOutput(node, "chestplate", armor[2]);
         ctx.setOutput(node, "leggings", armor[1]);
@@ -364,66 +339,65 @@ public class RestoredNodeHandler implements NodeHandler {
     }
 
     private void playerGetInventorySize(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "size", player != null ? player.getInventory().getSize() : 0);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "size", player.getInventory().getSize());
     }
 
     private void playerGetMainhandItem(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "item", player != null ? player.getInventory().getItemInMainHand() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "item", player.getInventory().getItemInMainHand());
     }
 
     private void playerGetOffhandItem(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "item", player != null ? player.getInventory().getItemInOffHand() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "item", player.getInventory().getItemInOffHand());
     }
 
     private void playerIsOnGround(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "on_ground", player != null && player.isOnGround());
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "on_ground", player.isOnGround());
     }
 
     private void playerIsSleeping(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "is_sleeping", player != null && player.isSleeping());
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "is_sleeping", player.isSleeping());
     }
 
     private void playerGetBedLocation(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "bed_location", player != null ? player.getBedSpawnLocation() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "bed_location", player.getBedSpawnLocation());
     }
 
     private void playerGetLastDamage(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        EntityDamageEvent lastDamage = player != null ? player.getLastDamageCause() : null;
+        Player player = requirePlayer(ctx, node);
+        EntityDamageEvent lastDamage = player.getLastDamageCause();
         ctx.setOutput(node, "damage_cause", lastDamage != null ? lastDamage.getCause().name() : null);
         ctx.setOutput(node, "damage_source", lastDamage != null ? lastDamage.getEntity() : null);
     }
 
     private void playerGetKiller(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "killer", player != null ? player.getKiller() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "killer", player.getKiller());
     }
 
     private void playerGetPing(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "ping_ms", player != null ? player.getPing() : 0);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "ping_ms", player.getPing());
     }
 
     private void playerGetLore(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
+        Player player = requirePlayer(ctx, node);
         String hand = ctx.getInputValue(node, "hand", String.class, "main");
+        if (!"main".equalsIgnoreCase(hand) && !"off".equalsIgnoreCase(hand)) throw new IllegalArgumentException("Hand must be main or off");
         List<String> loreLines = new ArrayList<>();
-        if (player != null) {
-            ItemStack item = "off".equalsIgnoreCase(hand) ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
-            if (item != null && item.hasItemMeta()) {
-                ItemMeta meta = item.getItemMeta();
-                List<Component> lore = meta.lore();
-                if (lore != null) {
-                    PlainTextComponentSerializer serializer = PlainTextComponentSerializer.plainText();
-                    for (Component line : lore) {
-                        loreLines.add(serializer.serialize(line));
-                    }
+        ItemStack item = "off".equalsIgnoreCase(hand) ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+        if (item != null && item.hasItemMeta()) {
+            ItemMeta meta = item.getItemMeta();
+            List<Component> lore = meta.lore();
+            if (lore != null) {
+                PlainTextComponentSerializer serializer = PlainTextComponentSerializer.plainText();
+                for (Component line : lore) {
+                    loreLines.add(serializer.serialize(line));
                 }
             }
         }
@@ -431,32 +405,53 @@ public class RestoredNodeHandler implements NodeHandler {
     }
 
     private void playerGetDisplayName(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "display_name", player != null ? player.getDisplayName() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "display_name", player.getDisplayName());
     }
 
     private void playerGetPlayerListName(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "list_name", player != null ? player.getPlayerListName() : null);
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "list_name", player.getPlayerListName());
     }
 
     private void playerIsOp(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "is_op", player != null && player.isOp());
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "is_op", player.isOp());
     }
 
     private void playerGetAllowedFlight(FlowContext ctx, FlowNode node) {
-        Player player = ctx.getInputValue(node, "player", Player.class, null);
-        ctx.setOutput(node, "can_fly", player != null && player.getAllowFlight());
+        Player player = requirePlayer(ctx, node);
+        ctx.setOutput(node, "can_fly", player.getAllowFlight());
     }
 
-    private ItemStack getMaterialOrItem(FlowContext ctx, FlowNode node) {
+    private ItemStack requireMaterialOrItem(FlowContext ctx, FlowNode node) {
         ItemStack item = ctx.getInputValue(node, "material_or_item", ItemStack.class, null);
-        if (item != null) {
+        if (item != null && !item.getType().isAir()) {
             return item;
         }
         String materialName = ctx.getInputValue(node, "material", String.class, "");
         Material material = Material.matchMaterial(materialName);
-        return material != null ? new ItemStack(material) : null;
+        if (material == null || material.isAir()) throw new IllegalArgumentException("Material or item is required");
+        return new ItemStack(material);
+    }
+
+    private Entity requireEntity(FlowContext context, FlowNode node, String inputName) {
+        Entity entity = context.getInputValue(node, inputName, Entity.class, null);
+        if (entity == null) throw new IllegalArgumentException("Entity input is required: " + inputName);
+        if (!entity.isValid()) throw new IllegalArgumentException("Entity is no longer valid: " + inputName);
+        return entity;
+    }
+
+    private LivingEntity requireLivingEntity(FlowContext context, FlowNode node, String inputName) {
+        Entity entity = requireEntity(context, node, inputName);
+        if (!(entity instanceof LivingEntity living)) throw new IllegalArgumentException("Entity must be living: " + inputName);
+        return living;
+    }
+
+    private Player requirePlayer(FlowContext context, FlowNode node) {
+        Player player = context.getInputValue(node, "player", Player.class, context.getPlayer());
+        if (player == null) throw new IllegalArgumentException("Player is required");
+        if (!player.isOnline()) throw new IllegalArgumentException("Player is offline");
+        return player;
     }
 }

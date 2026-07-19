@@ -16,7 +16,10 @@ import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.api.ReSyncExtensionData;
+import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
@@ -27,24 +30,29 @@ import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
 import restudio.resync.flow.handler.property.PropertyRegistry;
+import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
 import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.flow.testing.FlowFunctionTestHarness;
 import restudio.resync.messages.MessageLogService;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
+import restudio.resync.modules.flow.BuiltinOptionCatalogService;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
 import restudio.resync.modules.flow.FlowOptionCatalogPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
 import restudio.resync.modules.flow.FlowResourcePacketRouter;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
@@ -52,6 +60,10 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +71,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 public class FlowModule implements Module {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("flowLegacyHandler", "FlowLegacyHandler", "flow");
@@ -80,7 +93,7 @@ public class FlowModule implements Module {
     private FlowTraceSink traceSink;
     private FlowExecutor executor;
     private final Gson gson = new Gson();
-    private final ItemAttributeSchemaService quickEditAttributeService = new ItemAttributeSchemaService();
+    private final ItemAttributeSchemaService quickEditAttributeService;
     private final Map<String, QuickEditSession> quickEditSessions = new ConcurrentHashMap<>();
     private long lastCustomContentCatalogPollAt;
 
@@ -123,16 +136,61 @@ public class FlowModule implements Module {
                       PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
                       ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService,
                       PlayerSessionLinkService sessionLinkService) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService, extensionData,
+            optionCatalogRegistry, jsonResourceStorage, messageLogService, sessionLinkService,
+            new BuiltinOptionCatalogService(() -> customContentService, new ItemAttributeSchemaService()));
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService,
+                      PlayerSessionLinkService sessionLinkService, BuiltinOptionCatalogService builtinOptionCatalogs) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService,
+            extensionData, optionCatalogRegistry, jsonResourceStorage, messageLogService, sessionLinkService, builtinOptionCatalogs, new FlowResourceRegistry());
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService,
+                      PlayerSessionLinkService sessionLinkService, BuiltinOptionCatalogService builtinOptionCatalogs, FlowResourceRegistry resourceRegistry) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService,
+            extensionData, optionCatalogRegistry, jsonResourceStorage, messageLogService, sessionLinkService, builtinOptionCatalogs, resourceRegistry, new FlowValueCodecRegistry());
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService,
+                      PlayerSessionLinkService sessionLinkService, BuiltinOptionCatalogService builtinOptionCatalogs, FlowResourceRegistry resourceRegistry,
+                      FlowValueCodecRegistry valueCodecs) {
+        this(storage, codec, channelId, triggerRegistry, globalTriggers, flowRegistry, definitionRegistry, propertyRegistry, customContentStorage, customContentService,
+            extensionData, optionCatalogRegistry, jsonResourceStorage, messageLogService, sessionLinkService, builtinOptionCatalogs, resourceRegistry, valueCodecs, null);
+    }
+
+    public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                      FlowRegistry flowRegistry, NodeDefinitionRegistry definitionRegistry,
+                      PropertyRegistry propertyRegistry, CustomContentStorage customContentStorage, CustomContentService customContentService,
+                      ReSyncExtensionData extensionData, OptionCatalogRegistry optionCatalogRegistry, ReSyncJsonResourceStorage jsonResourceStorage, MessageLogService messageLogService,
+                      PlayerSessionLinkService sessionLinkService, BuiltinOptionCatalogService builtinOptionCatalogs, FlowResourceRegistry resourceRegistry,
+                      FlowValueCodecRegistry valueCodecs, FlowJobRegistry flowJobs) {
+        BuiltinOptionCatalogService catalogs = builtinOptionCatalogs != null ? builtinOptionCatalogs : new BuiltinOptionCatalogService(() -> customContentService, new ItemAttributeSchemaService());
+        catalogs.registerProviders(optionCatalogRegistry);
+        this.quickEditAttributeService = catalogs.itemAttributeSchemaService();
         this.storage = storage;
         this.definitionRegistry = definitionRegistry;
         this.customContentStorage = customContentStorage;
         this.sessionLinkService = sessionLinkService;
-        this.sender = new FlowPacketSender(codec, channelId, subscribedSessions);
+        this.sender = new FlowPacketSender(codec, channelId, subscribedSessions, flowJobs);
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
-        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, customContentService, optionCatalogRegistry);
-        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService, optionCatalogHandler::broadcastCustomContentCatalogs);
-        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData);
+        this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, optionCatalogRegistry, catalogs);
+        FlowResourceRegistry resources = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
+        resources.setChangeListener(optionCatalogHandler::broadcastCatalog);
+        this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService,
+            optionCatalogHandler::broadcastCustomContentCatalogs, resources, optionCatalogHandler::broadcastCatalog, quickEditAttributeService);
+        this.nodeRegistryHandler = new FlowNodeRegistryPacketHandler(definitionRegistry, sender, propertyRegistry, customContentService, extensionData, optionCatalogRegistry, resources, valueCodecs);
     }
 
     @Override
@@ -192,23 +250,27 @@ public class FlowModule implements Module {
         try {
             if (!resourceRouter.handle(session, packetId, buffer)) {
                 switch (packetId) {
-                    case 0x01 -> blueprintHandler.handleRequest(session, buffer);
-                    case 0x02 -> {
+                    case ReSyncProtocolContract.FLOW_PACKET_REQUEST -> blueprintHandler.handleRequest(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_DATA -> {
                     }
-                    case 0x03 -> blueprintHandler.handleSave(session, buffer);
-                    case 0x04 -> {
+                    case ReSyncProtocolContract.FLOW_PACKET_SAVE -> blueprintHandler.handleSave(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_GUI_STATE -> {
                     }
-                    case 0x06 -> blueprintHandler.handleTriggerUpdate(session, buffer);
-                    case 0x08 -> blueprintHandler.handleDelete(session, buffer);
-                    case 0x09 -> blueprintHandler.handleListRequest(session);
-                    case 0x0C -> nodeRegistryHandler.handleRequest(session, buffer);
-                    case 0x27 -> placeholderPreviewHandler.handle(session, buffer);
-                    case 0x37 -> optionCatalogHandler.handle(session, buffer);
-                    case 0x40 -> handleTraceToggle(session, buffer);
-                    case 0x43 -> handleTraceClear(session);
-                    case 0x45 -> sender.sendJobSnapshot(session, session.getClientId());
-                    case 0x46 -> handleDebugCommand(session, buffer);
-                    case 0x61 -> handleQuickEditApply(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_TRIGGER_UPDATE -> blueprintHandler.handleTriggerUpdate(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_DELETE -> blueprintHandler.handleDelete(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_LIST_REQUEST -> blueprintHandler.handleListRequest(session);
+                    case ReSyncProtocolContract.FLOW_PACKET_NODE_REGISTRY_REQUEST -> nodeRegistryHandler.handleRequest(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_PLACEHOLDER_PREVIEW_REQUEST -> placeholderPreviewHandler.handle(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_OPTION_CATALOG_REQUEST -> optionCatalogHandler.handle(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_TRACE_TOGGLE -> handleTraceToggle(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_TRACE_CLEAR -> handleTraceClear(session);
+                    case ReSyncProtocolContract.FLOW_PACKET_JOB_SNAPSHOT_REQUEST -> {
+                        sender.sendJobSnapshot(session, session.getClientId());
+                        sender.sendScheduledTaskSnapshot(session, executor != null ? executor.getScheduledTaskSnapshots() : List.of());
+                    }
+                    case ReSyncProtocolContract.FLOW_PACKET_DEBUG_COMMAND -> handleDebugCommand(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_FUNCTION_TEST_REQUEST -> handleFunctionTest(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_QUICK_EDIT_APPLY -> handleQuickEditApply(session, buffer);
                     default -> {
                         Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
                         sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
@@ -220,7 +282,7 @@ public class FlowModule implements Module {
             sender.sendError(session, "PROCESSING_ERROR", e.getMessage());
         }
 
-        if (packetId == 0x03 || packetId == 0x08) {
+        if (packetId == ReSyncProtocolContract.FLOW_PACKET_SAVE || packetId == ReSyncProtocolContract.FLOW_PACKET_DELETE) {
             refreshCustomFunctionDefinitions();
         }
     }
@@ -231,23 +293,21 @@ public class FlowModule implements Module {
     }
 
     private NodeRegistrySnapshot buildFullNodeRegistrySnapshot() {
-        NodeRegistrySnapshot snapshot = new NodeRegistrySnapshot();
-        snapshot.setFullSync(true);
-
-        List<String> nodeIds = new ArrayList<>(definitionRegistry.getAllDefinitions().keySet());
-        nodeIds.sort(String.CASE_INSENSITIVE_ORDER);
-        snapshot.setNodeIds(nodeIds);
-        snapshot.setGeneratedAt(System.currentTimeMillis());
-        snapshot.setRegistryChecksum(nodeRegistryHandler.computeRegistryChecksum());
-
-        snapshot.setPlugins(nodeRegistryHandler.buildPluginPayloads());
-        snapshot.setRemovedPlugins(List.of());
-        nodeRegistryHandler.populateServerMetadata(snapshot);
-        return snapshot;
+        return nodeRegistryHandler.buildFullSnapshot();
     }
 
     public String getNodeRegistryChecksum() {
         return nodeRegistryHandler.computeRegistryChecksum();
+    }
+
+    public void setNodeRegistryDiagnosticsSupplier(Supplier<Map<String, Object>> diagnosticsSupplier) {
+        nodeRegistryHandler.setDiagnosticsSupplier(diagnosticsSupplier);
+    }
+
+    public void broadcastOptionCatalog(String sourceId) {
+        if (sourceId != null && !sourceId.isBlank()) {
+            optionCatalogHandler.broadcastCatalog(sourceId);
+        }
     }
 
     public int getSubscribedSessionCount() {
@@ -284,7 +344,7 @@ public class FlowModule implements Module {
         payload.put("definition", definition);
         String json = gson.toJson(payload);
         for (Session target : targets) {
-            sender.sendJsonPayload(target, (byte) 0x60, json, "QUICK_EDIT_TOO_LARGE", "Quick edit data exceeds maximum size");
+            sender.sendJsonPayload(target, ReSyncProtocolContract.FLOW_PACKET_QUICK_EDIT_OPEN, json, "QUICK_EDIT_TOO_LARGE", "Quick edit data exceeds maximum size");
         }
         return QuickEditResult.success("Quick Edit Opened");
     }
@@ -325,7 +385,7 @@ public class FlowModule implements Module {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", definition.getId());
         payload.put("content", definition);
-        sender.sendJsonPayload(session, (byte) 0x63, gson.toJson(payload), "CONTENT_OPEN_TOO_LARGE", "Content open data exceeds maximum size");
+        sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_OPEN_CUSTOM_CONTENT, gson.toJson(payload), "CONTENT_OPEN_TOO_LARGE", "Content open data exceeds maximum size");
     }
 
     private boolean isOpenFlowSession(Session session) {
@@ -458,7 +518,7 @@ public class FlowModule implements Module {
         }
         player.getInventory().setItemInMainHand(edited);
         quickEditSessions.put(editSession.sessionId(), new QuickEditSession(editSession.sessionId(), editSession.playerId(), normalizedSnapshot(edited), System.currentTimeMillis()));
-        sender.sendJsonPayload(session, (byte) 0x62, gson.toJson(Map.of("sessionId", editSession.sessionId(), "status", "applied")), "QUICK_EDIT_RESULT_TOO_LARGE", "Quick edit result exceeds maximum size");
+        sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_QUICK_EDIT_RESULT, gson.toJson(Map.of("sessionId", editSession.sessionId(), "status", "applied")), "QUICK_EDIT_RESULT_TOO_LARGE", "Quick edit result exceeds maximum size");
         player.sendMessage("§8[ReSync] §aQuick Edit Applied");
     }
 
@@ -493,7 +553,7 @@ public class FlowModule implements Module {
         payload.put("sessionId", sessionId != null ? sessionId : "");
         payload.put("status", "failed");
         payload.put("message", message != null && !message.isBlank() ? message : "Apply Failed");
-        sender.sendJsonPayload(session, (byte) 0x62, gson.toJson(payload), "QUICK_EDIT_RESULT_TOO_LARGE", "Quick edit result exceeds maximum size");
+        sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_QUICK_EDIT_RESULT, gson.toJson(payload), "QUICK_EDIT_RESULT_TOO_LARGE", "Quick edit result exceeds maximum size");
     }
 
     private String quickEditError(List<Map<String, Object>> errors) {
@@ -611,6 +671,89 @@ public class FlowModule implements Module {
         sender.sendDebugSnapshot(session, debugService.snapshot());
     }
 
+    private void handleFunctionTest(Session session, ByteBuffer buffer) {
+        JsonObject request;
+        try {
+            String json = readRemaining(buffer);
+            request = json == null || json.isBlank() ? new JsonObject() : gson.fromJson(json, JsonObject.class);
+        } catch (RuntimeException exception) {
+            sendFunctionTestFailure(session, "", "", "INVALID_FIXTURE", "Function fixture is invalid");
+            return;
+        }
+        String requestId = string(request, "requestId");
+        String graphId = string(request, "graphId");
+        FlowGraph graph;
+        try {
+            graph = request.has("graph") && request.get("graph").isJsonObject()
+                ? FlowSerializer.deserialize(request.get("graph").toString())
+                : graphId != null && !graphId.isBlank() ? storage.getGraph(graphId) : null;
+        } catch (RuntimeException exception) {
+            sendFunctionTestFailure(session, requestId, graphId, "INVALID_FUNCTION_GRAPH", "Function graph is invalid");
+            return;
+        }
+        if (executor == null) {
+            sendFunctionTestFailure(session, requestId, graphId, "EXECUTOR_UNAVAILABLE", "Flow executor is unavailable");
+            return;
+        }
+        if (graph == null || !graph.isFunction()) {
+            sendFunctionTestFailure(session, requestId, graphId, "FUNCTION_NOT_FOUND", "Function not found: " + graphId);
+            return;
+        }
+        Map<String, Object> inputs = objectMap(request.get("inputs"));
+        Map<String, Object> expectedOutputs = objectMap(request.get("expectedOutputs"));
+        Map<String, Object> serverContext = objectMap(request.get("serverContext"));
+        long timeoutMillis = Math.clamp(longValue(request, "timeoutMillis", 5000L), 1L, 30000L);
+        Clock fixtureClock;
+        try {
+            ZoneId zone = ZoneId.of(defaultText(string(request, "zoneId"), "UTC"));
+            String instant = string(request, "clockInstant");
+            fixtureClock = instant == null || instant.isBlank() ? Clock.system(zone) : Clock.fixed(Instant.parse(instant), zone);
+        } catch (RuntimeException exception) {
+            sendFunctionTestFailure(session, requestId, graphId, "INVALID_FIXTURE_CLOCK", "Fixture clock or time zone is invalid");
+            return;
+        }
+        FlowFunctionTestHarness harness = new FlowFunctionTestHarness(executor, fixtureClock);
+        FlowFunctionTestHarness.Fixture fixture = new FlowFunctionTestHarness.Fixture(defaultText(string(request, "name"), "Fixture"), inputs,
+            expectedOutputs, serverContext, null, null, Duration.ofMillis(timeoutMillis));
+        harness.run(graph, fixture).whenComplete((result, failure) -> {
+            if (failure != null) {
+                sendFunctionTestFailure(session, requestId, graphId, "FUNCTION_TEST_FAILED", failure.getMessage());
+                return;
+            }
+            sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_FUNCTION_TEST_RESULT,
+                gson.toJson(Map.of("requestId", requestId, "graphId", graphId, "result", result)), "FUNCTION_TEST_RESULT_TOO_LARGE",
+                "Function test result exceeds maximum size");
+        });
+    }
+
+    private void sendFunctionTestFailure(Session session, String requestId, String graphId, String code, String message) {
+        sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_FUNCTION_TEST_RESULT,
+            gson.toJson(Map.of("requestId", defaultText(requestId, ""), "graphId", defaultText(graphId, ""), "error",
+                Map.of("code", code, "message", defaultText(message, code)))), "FUNCTION_TEST_RESULT_TOO_LARGE", "Function test result exceeds maximum size");
+    }
+
+    private Map<String, Object> objectMap(JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            return Map.of();
+        }
+        Map<?, ?> values = gson.fromJson(element, Map.class);
+        Map<String, Object> result = new LinkedHashMap<>();
+        values.forEach((key, value) -> result.put(String.valueOf(key), value));
+        return result;
+    }
+
+    private long longValue(JsonObject root, String key, long fallback) {
+        try {
+            return root != null && root.has(key) && !root.get(key).isJsonNull() ? root.get(key).getAsLong() : fallback;
+        } catch (RuntimeException exception) {
+            return fallback;
+        }
+    }
+
+    private String defaultText(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
+    }
+
     private void ensureTraceSink() {
         if (traceService != null && traceSink == null) {
             traceSink = record -> {
@@ -644,7 +787,7 @@ public class FlowModule implements Module {
         if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
             return null;
         }
-        for (Map.Entry<String, restudio.flow.data.FlowNode> entry : graph.getNodes().entrySet()) {
+        for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
             if (entry.getValue() != null && entry.getValue().getType() != null
                 && (entry.getValue().getType().startsWith("event.") || entry.getValue().getType().startsWith("event:"))) {
                 return entry.getKey();
@@ -678,6 +821,6 @@ public class FlowModule implements Module {
         }
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
-        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

@@ -23,11 +23,12 @@ import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
+import restudio.resync.flow.diagnostics.ProgrammabilityAcceptanceSnapshot;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.runtime.LootTableService;
 import restudio.resync.runtime.NpcService;
-import restudio.resync.runtime.VillageProfileService;
+import restudio.resync.runtime.TradeProfileService;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.world.WorldGameRuleDescriptor;
@@ -42,6 +43,7 @@ import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSignPortal;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -72,6 +74,7 @@ public class ReSyncCommand implements TabExecutor {
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
             case "status" -> handleStatus(sender);
+            case "network" -> handleNetwork(sender, args);
             case "scoreboard" -> handleScoreboard(sender, args);
             case "tab" -> handleTab(sender, args);
             case "world" -> handleWorld(sender, args);
@@ -80,7 +83,7 @@ public class ReSyncCommand implements TabExecutor {
             case "quickedit" -> handleQuickEdit(sender);
             case "item" -> handleItem(sender, args);
             case "npc" -> handleNpc(sender, args);
-            case "village", "villager", "trade" -> handleVillage(sender, args);
+            case "trade" -> handleTrade(sender, args);
             case "resource" -> handleResource(sender, args);
             default -> {
                 sendUsage(sender);
@@ -92,7 +95,7 @@ public class ReSyncCommand implements TabExecutor {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(List.of("status", "scoreboard", "tab", "world", "portal", "flow", "quickedit", "item", "npc", "village", "resource"), args[0]);
+            return filter(List.of("status", "network", "scoreboard", "tab", "world", "portal", "flow", "quickedit", "item", "npc", "trade", "resource"), args[0]);
         }
         String group = args[0].toLowerCase(Locale.ROOT);
         return switch (group) {
@@ -104,10 +107,25 @@ public class ReSyncCommand implements TabExecutor {
             case "quickedit" -> List.of();
             case "item" -> tabCompleteItem(args);
             case "npc" -> tabCompleteNpc(args);
-            case "village", "villager", "trade" -> tabCompleteVillage(args);
+            case "trade" -> tabCompleteTrade(args);
             case "resource" -> tabCompleteResource(args);
+            case "network" -> args.length == 2 ? filter(List.of("reload"), args[1]) : List.of();
             default -> List.of();
         };
+    }
+
+    private boolean handleNetwork(CommandSender sender, String[] args) {
+        if (args.length != 2 || !"reload".equalsIgnoreCase(args[1])) {
+            sendError(sender, "Usage", "/resync network reload");
+            return true;
+        }
+        try {
+            plugin.reloadNetworkState();
+            sendSuccess(sender, "Network Sync Reloaded");
+        } catch (Exception exception) {
+            sendError(sender, "Network Sync Reload Failed", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
+        }
+        return true;
     }
 
     private boolean handleStatus(CommandSender sender) {
@@ -267,7 +285,7 @@ public class ReSyncCommand implements TabExecutor {
                 if (target != null && service.isActive(id)) {
                     sendSuccess(sender, "NPC Spawned", id);
                 } else if (target != null) {
-                    sendError(sender, "NPC Spawn Failed", service.playerNpcUnavailableReason());
+                    sendError(sender, "NPC Spawn Failed", service.spawnFailureReason(id));
                 }
                 yield true;
             }
@@ -293,8 +311,8 @@ public class ReSyncCommand implements TabExecutor {
                 if (profileId == null) {
                     yield true;
                 }
-                if (storage.get(ReSyncResourceCatalog.VILLAGE_PROFILE, profileId) == null) {
-                    sendError(sender, "Village Profile Not Found", profileId);
+                if (storage.get(ReSyncResourceCatalog.TRADE_PROFILE, profileId) == null) {
+                    sendError(sender, "Trade Profile Not Found", profileId);
                     yield true;
                 }
                 if (service.setProfile(id, profileId)) {
@@ -326,7 +344,7 @@ public class ReSyncCommand implements TabExecutor {
             return filter(onlinePlayers(), args[3]);
         }
         if (args.length == 4 && "trade".equalsIgnoreCase(args[1])) {
-            return filter(storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE), args[3]);
+            return filter(storage.listIds(ReSyncResourceCatalog.TRADE_PROFILE), args[3]);
         }
         return List.of();
     }
@@ -347,45 +365,45 @@ public class ReSyncCommand implements TabExecutor {
         return null;
     }
 
-    private boolean handleVillage(CommandSender sender, String[] args) {
+    private boolean handleTrade(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sendUsageLine(sender, "/resync village list");
-            sendUsageLine(sender, "/resync village apply <profileId>");
-            sendUsageLine(sender, "/resync village spawn <profileId> [player]");
-            sendUsageLine(sender, "/resync village open <profileId> [player]");
+            sendUsageLine(sender, "/resync trade list");
+            sendUsageLine(sender, "/resync trade apply <profileId>");
+            sendUsageLine(sender, "/resync trade spawn <profileId> [player]");
+            sendUsageLine(sender, "/resync trade open <profileId> [player]");
             return true;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
         ReSyncJsonResourceStorage storage = getJsonResourceStorage();
         if (storage == null) {
-            sendError(sender, "Village System Unavailable");
+            sendError(sender, "Trade System Unavailable");
             return true;
         }
         if ("list".equals(action)) {
-            List<String> ids = storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
-            sendInfo(sender, "Village Profiles", ids.isEmpty() ? "None" : String.join(", ", ids));
+            List<String> ids = storage.listIds(ReSyncResourceCatalog.TRADE_PROFILE).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            sendInfo(sender, "Trade Profiles", ids.isEmpty() ? "None" : String.join(", ", ids));
             return true;
         }
         if (!List.of("apply", "spawn", "open").contains(action)) {
-            sendUsageLine(sender, "/resync village <list|apply|spawn|open> ...");
+            sendUsageLine(sender, "/resync trade <list|apply|spawn|open> ...");
             return true;
         }
-        String id = requiredArg(sender, args, 2, "/resync village " + action + " <profileId>");
+        String id = requiredArg(sender, args, 2, "/resync trade " + action + " <profileId>");
         if (id == null) {
             return true;
         }
-        if (storage.get(ReSyncResourceCatalog.VILLAGE_PROFILE, id) == null) {
-            sendError(sender, "Village Profile Not Found", id);
+        if (storage.get(ReSyncResourceCatalog.TRADE_PROFILE, id) == null) {
+            sendError(sender, "Trade Profile Not Found", id);
             return true;
         }
         return switch (action) {
-            case "spawn" -> spawnVillageResource(sender, id, args);
-            case "open" -> openVillageResource(sender, id, args);
-            default -> applyVillageResource(sender, id);
+            case "spawn" -> spawnTradeResource(sender, id, args);
+            case "open" -> openTradeResource(sender, id, args);
+            default -> applyTradeResource(sender, id);
         };
     }
 
-    private List<String> tabCompleteVillage(String[] args) {
+    private List<String> tabCompleteTrade(String[] args) {
         if (args.length == 2) {
             return filter(List.of("list", "apply", "spawn", "open"), args[1]);
         }
@@ -394,7 +412,7 @@ public class ReSyncCommand implements TabExecutor {
             return List.of();
         }
         if (args.length == 3 && List.of("apply", "spawn", "open").contains(args[1].toLowerCase(Locale.ROOT))) {
-            return filter(storage.listIds(ReSyncResourceCatalog.VILLAGE_PROFILE), args[2]);
+            return filter(storage.listIds(ReSyncResourceCatalog.TRADE_PROFILE), args[2]);
         }
         if (args.length == 4 && List.of("spawn", "open").contains(args[1].toLowerCase(Locale.ROOT))) {
             return filter(onlinePlayers(), args[3]);
@@ -555,8 +573,8 @@ public class ReSyncCommand implements TabExecutor {
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
             return applyNpcResource(sender, id, args);
         }
-        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type)) {
-            return applyVillageResource(sender, id);
+        if (ReSyncResourceCatalog.TRADE_PROFILE.equals(type)) {
+            return applyTradeResource(sender, id);
         }
         sendError(sender, "Unsupported Resource Apply", prettyResourceType(type));
         return true;
@@ -591,14 +609,14 @@ public class ReSyncCommand implements TabExecutor {
         if (service.isActive(id)) {
             sendSuccess(sender, "NPC Spawned", id);
         } else {
-            sendError(sender, "NPC Spawn Failed", service.playerNpcUnavailableReason());
+            sendError(sender, "NPC Spawn Failed", service.spawnFailureReason(id));
         }
         return true;
     }
 
-    private boolean applyVillageResource(CommandSender sender, String id) {
+    private boolean applyTradeResource(CommandSender sender, String id) {
         if (!(sender instanceof Player player)) {
-            sendError(sender, "Villager Target Required", "/resync resource apply village " + id);
+            sendError(sender, "Villager Target Required", "/resync resource apply trade " + id);
             return true;
         }
         Villager villager = player.getNearbyEntities(8, 8, 8).stream()
@@ -607,52 +625,52 @@ public class ReSyncCommand implements TabExecutor {
             .min((first, second) -> Double.compare(first.getLocation().distanceSquared(player.getLocation()), second.getLocation().distanceSquared(player.getLocation())))
             .orElse(null);
         if (villager == null) {
-            sendError(sender, "Villager Target Required", "/resync resource apply village " + id);
+            sendError(sender, "Villager Target Required", "/resync resource apply trade " + id);
             return true;
         }
-        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        TradeProfileService service = plugin.getReSyncServer().getModuleContext().getService(TradeProfileService.class);
         if (service == null || !service.apply(villager, id)) {
-            sendError(sender, "Village Apply Failed", id);
+            sendError(sender, "Trade Apply Failed", id);
             return true;
         }
-        sendSuccess(sender, "Village Applied", id);
+        sendSuccess(sender, "Trade Applied", id);
         return true;
     }
 
-    private boolean spawnVillageResource(CommandSender sender, String id, String[] args) {
-        Player target = targetPlayerArg(sender, args, 3, "/resync village spawn " + id + " [player]");
+    private boolean spawnTradeResource(CommandSender sender, String id, String[] args) {
+        Player target = targetPlayerArg(sender, args, 3, "/resync trade spawn " + id + " [player]");
         if (target == null) {
             return true;
         }
-        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        TradeProfileService service = plugin.getReSyncServer().getModuleContext().getService(TradeProfileService.class);
         if (service == null) {
-            sendError(sender, "Village Service Unavailable", id);
+            sendError(sender, "Trade Service Unavailable", id);
             return true;
         }
         Villager villager = service.spawn(target.getLocation(), id);
         if (villager == null) {
-            sendError(sender, "Village Spawn Failed", id);
+            sendError(sender, "Trade Spawn Failed", id);
             return true;
         }
-        sendSuccess(sender, "Village Spawned", id);
+        sendSuccess(sender, "Trade Spawned", id);
         return true;
     }
 
-    private boolean openVillageResource(CommandSender sender, String id, String[] args) {
-        Player target = targetPlayerArg(sender, args, 3, "/resync village open " + id + " [player]");
+    private boolean openTradeResource(CommandSender sender, String id, String[] args) {
+        Player target = targetPlayerArg(sender, args, 3, "/resync trade open " + id + " [player]");
         if (target == null) {
             return true;
         }
-        VillageProfileService service = plugin.getReSyncServer().getModuleContext().getService(VillageProfileService.class);
+        TradeProfileService service = plugin.getReSyncServer().getModuleContext().getService(TradeProfileService.class);
         if (service == null) {
-            sendError(sender, "Village Service Unavailable", id);
+            sendError(sender, "Trade Service Unavailable", id);
             return true;
         }
         if (!service.openVirtualTrades(target, id)) {
-            sendError(sender, "Village Open Failed", id);
+            sendError(sender, "Trade Open Failed", id);
             return true;
         }
-        sendSuccess(sender, "Village Opened", id);
+        sendSuccess(sender, "Trade Opened", id);
         return true;
     }
 
@@ -754,7 +772,7 @@ public class ReSyncCommand implements TabExecutor {
             case "text", "template", "text_template" -> ReSyncResourceCatalog.TEXT_TEMPLATE;
             case "advancement", "advancements", "advancement_tree" -> ReSyncResourceCatalog.ADVANCEMENT_TREE;
             case "dialog", "dialogs" -> ReSyncResourceCatalog.DIALOG;
-            case "village", "trade", "village_profile" -> ReSyncResourceCatalog.VILLAGE_PROFILE;
+            case "trade", "trade_profile" -> ReSyncResourceCatalog.TRADE_PROFILE;
             case "npc", "npcs", "npc_definition" -> ReSyncResourceCatalog.NPC_DEFINITION;
             case "loot", "loot_table" -> ReSyncResourceCatalog.LOOT_TABLE;
             default -> type.toLowerCase(Locale.ROOT);
@@ -763,7 +781,7 @@ public class ReSyncCommand implements TabExecutor {
 
     private List<String> resourceTypeOptions(ReSyncJsonResourceStorage storage) {
         List<String> values = new ArrayList<>(storage.resourceTypes());
-        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement", "dialog", "village", "trade", "npc", "loot"));
+        values.addAll(List.of("motd", "message", "recipe", "text", "chat", "advancement", "dialog", "trade", "npc", "loot"));
         return values;
     }
 
@@ -780,8 +798,8 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
-            case ReSyncResourceCatalog.VILLAGE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
-            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "skin.username", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "tradeProfile", "lootTable", "equipment", "hooks.spawnAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.despawnAction");
+            case ReSyncResourceCatalog.TRADE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
+            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "spawnMode", "location.world", "location.x", "location.y", "location.z", "location.yaw", "location.pitch", "skin.username", "skin.uuid", "skin.texture", "skin.signature", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "dialog", "tradeProfile", "lootTable", "equipment.mainHand", "equipment.offHand", "equipment.helmet", "equipment.chestplate", "equipment.leggings", "equipment.boots", "hooks.spawnAction", "hooks.interactAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.damageAction", "hooks.deathAction", "hooks.despawnAction");
             case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool", "trigger.overrideDrops", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
@@ -815,14 +833,14 @@ public class ReSyncCommand implements TabExecutor {
         if (ReSyncResourceCatalog.DIALOG.equals(type) && ("pause".equalsIgnoreCase(field) || "can_close_with_escape".equalsIgnoreCase(field))) {
             return booleanOptions();
         }
-        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type) && "profession".equalsIgnoreCase(field)) {
+        if (ReSyncResourceCatalog.TRADE_PROFILE.equals(type) && "profession".equalsIgnoreCase(field)) {
             return List.of("none", "armorer", "butcher", "cartographer", "cleric", "farmer", "fisherman", "fletcher", "leatherworker", "librarian", "mason", "nitwit", "shepherd", "toolsmith", "weaponsmith");
         }
-        if (ReSyncResourceCatalog.VILLAGE_PROFILE.equals(type) && "villagerType".equalsIgnoreCase(field)) {
+        if (ReSyncResourceCatalog.TRADE_PROFILE.equals(type) && "villagerType".equalsIgnoreCase(field)) {
             return List.of("plains", "desert", "jungle", "savanna", "snow", "swamp", "taiga");
         }
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && "spawnMode".equalsIgnoreCase(field)) {
-            return List.of("manual");
+            return List.of("manual", "startup");
         }
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && ("ai".equalsIgnoreCase(field) || "gravity".equalsIgnoreCase(field) || "invulnerable".equalsIgnoreCase(field) || "followPlayer".equalsIgnoreCase(field))) {
             return booleanOptions();
@@ -935,7 +953,7 @@ public class ReSyncCommand implements TabExecutor {
                 actions.add(button);
                 resource.add("actions", actions);
             }
-            case ReSyncResourceCatalog.VILLAGE_PROFILE -> {
+            case ReSyncResourceCatalog.TRADE_PROFILE -> {
                 resource.addProperty("displayName", id);
                 resource.addProperty("profession", "librarian");
                 resource.addProperty("villagerType", "plains");
@@ -955,6 +973,7 @@ public class ReSyncCommand implements TabExecutor {
                 resource.addProperty("invulnerable", true);
                 resource.addProperty("followPlayer", false);
                 resource.addProperty("followRange", 12);
+                resource.addProperty("dialog", "");
                 resource.addProperty("tradeProfile", "");
                 resource.addProperty("lootTable", "");
                 JsonObject skin = new JsonObject();
@@ -1206,9 +1225,25 @@ public class ReSyncCommand implements TabExecutor {
         if (args.length < 2) {
             sendUsageLine(sender, "/resync flow reload nodes");
             sendUsageLine(sender, "/resync flow registry");
+            sendUsageLine(sender, "/resync flow registry export");
+            sendUsageLine(sender, "/resync flow clients reconnect");
             return true;
         }
         String sub = args[1].toLowerCase(Locale.ROOT);
+        if ("clients".equals(sub)) {
+            if (args.length != 3 || !"reconnect".equalsIgnoreCase(args[2])) {
+                sendUsageLine(sender, "/resync flow clients reconnect");
+                return true;
+            }
+            ReSyncServer server = plugin.getReSyncServer();
+            if (server == null) {
+                sendError(sender, "Server Not Initialized");
+                return true;
+            }
+            int clients = server.getConnectionManager().reconnectWebSocketClients("Server reconnect requested");
+            sendSuccess(sender, "Flow Clients Reconnecting", String.valueOf(clients));
+            return true;
+        }
         if ("registry".equals(sub)) {
             FlowRuntimeModule module = flowRuntimeModule();
             if (module == null) {
@@ -1216,6 +1251,22 @@ public class ReSyncCommand implements TabExecutor {
                 return true;
             }
             Map<String, Object> diagnostics = module.nodeRegistryDiagnostics();
+            if (args.length >= 3) {
+                if (!"export".equalsIgnoreCase(args[2])) {
+                    sendError(sender, "Unknown registry action: " + args[2]);
+                    return true;
+                }
+                try {
+                    ReSyncServer server = plugin.getReSyncServer();
+                    Map<String, Object> readiness = server != null ? server.readinessSnapshot() : Map.of();
+                    var output = ProgrammabilityAcceptanceSnapshot.write(plugin.getDataFolder().toPath().resolve("diagnostics"), diagnostics, readiness,
+                        Bukkit.getVersion(), plugin.getDescription().getVersion(), Instant.now());
+                    sendSuccess(sender, "Registry Snapshot Exported", output.toAbsolutePath().toString());
+                } catch (Exception exception) {
+                    sendError(sender, "Registry Snapshot Export Failed", exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName());
+                }
+                return true;
+            }
             String definitions = String.valueOf(diagnostics.getOrDefault("definitions", 0));
             String definitionSets = String.valueOf(diagnostics.getOrDefault("definitionSets", 0));
             String externalNodePlugins = String.valueOf(diagnostics.getOrDefault("externalNodePlugins", 0));
@@ -1228,6 +1279,18 @@ public class ReSyncCommand implements TabExecutor {
             sendInfo(sender, "External Node Plugin Ids", joinedDiagnosticList(diagnostics.get("externalNodePluginIds")));
             sendInfo(sender, "Flow Clients", flowClients);
             sendInfo(sender, "Registry Checksum", shortChecksum(String.valueOf(diagnostics.get("checksum"))));
+            sendInfo(sender, "Registry Parity", Boolean.TRUE.equals(diagnostics.get("parity")) ? "Ready" : "Mismatch");
+            sendInfo(sender, "Rejected Definitions", String.valueOf(diagnostics.getOrDefault("rejectedDefinitions", 0)));
+            sendInfo(sender, "Missing Handlers", joinedDiagnosticList(diagnostics.get("missingHandlers")));
+            sendInfo(sender, "Missing Operations", joinedDiagnosticList(diagnostics.get("missingOperations")));
+            sendInfo(sender, "Missing Catalogs", joinedDiagnosticList(diagnostics.get("missingCatalogs")));
+            if (diagnostics.get("inventoryCounts") instanceof Map<?, ?> counts) {
+                sendInfo(sender, "Platform Inventory", String.valueOf(counts.get("nodes")) + " nodes · " + counts.get("types") + " types · "
+                    + counts.get("catalogs") + " catalogs · " + counts.get("resources") + " resources");
+            }
+            sendInfo(sender, "Inventory Completion", Boolean.TRUE.equals(diagnostics.get("inventoryComplete")) ? "Ready" : "Incomplete");
+            sendInfo(sender, "Node Dispositions", diagnosticMap(diagnostics.get("nodeDispositions")));
+            sendInfo(sender, "Resource Dispositions", diagnosticMap(diagnostics.get("resourceDispositions")));
             return true;
         }
         if (!"reload".equals(sub)) {
@@ -1252,9 +1315,22 @@ public class ReSyncCommand implements TabExecutor {
         return true;
     }
 
+    private String diagnosticMap(Object value) {
+        if (!(value instanceof Map<?, ?> map) || map.isEmpty()) {
+            return "None";
+        }
+        return map.entrySet().stream().map(entry -> entry.getKey() + ": " + entry.getValue()).collect(Collectors.joining(" · "));
+    }
+
     private List<String> tabCompleteFlow(String[] args) {
         if (args.length == 2) {
-            return filter(List.of("reload", "registry"), args[1]);
+            return filter(List.of("reload", "registry", "clients"), args[1]);
+        }
+        if (args.length == 3 && "clients".equalsIgnoreCase(args[1])) {
+            return filter(List.of("reconnect"), args[2]);
+        }
+        if (args.length == 3 && "registry".equalsIgnoreCase(args[1])) {
+            return filter(List.of("export"), args[2]);
         }
         if (args.length == 3 && "reload".equalsIgnoreCase(args[1])) {
             return filter(List.of("nodes"), args[2]);
@@ -3500,6 +3576,7 @@ public class ReSyncCommand implements TabExecutor {
     private void sendUsage(CommandSender sender) {
         sendInfo(sender, "Commands");
         sendUsageLine(sender, "/resync status");
+        sendUsageLine(sender, "/resync network reload");
         sendUsageLine(sender, "/resync portal create <target> <name>");
         sendUsageLine(sender, "/resync portal cancel");
         sendUsageLine(sender, "/resync scoreboard list");
@@ -3576,6 +3653,8 @@ public class ReSyncCommand implements TabExecutor {
         sendUsageLine(sender, "/resync portal delete <portal>");
         sendUsageLine(sender, "/resync flow reload nodes");
         sendUsageLine(sender, "/resync flow registry");
+        sendUsageLine(sender, "/resync flow registry export");
+        sendUsageLine(sender, "/resync flow clients reconnect");
     }
 
     private void sendUsageLine(CommandSender sender, String usage) {

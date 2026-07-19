@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "type",
           "amount",
@@ -80,7 +80,7 @@
       },
       {
         "name": "lore",
-        "dataType": "list",
+        "dataType": "list<string>",
         "visibleWhen": {
           "action": "get",
           "property": "lore"
@@ -104,7 +104,7 @@
       },
       {
         "name": "enchantments",
-        "dataType": "map",
+        "dataType": "map<enchantment,integer>",
         "visibleWhen": {
           "action": "get",
           "property": "enchantments"
@@ -136,7 +136,7 @@
       },
       {
         "name": "item_flags",
-        "dataType": "list",
+        "dataType": "list<string>",
         "visibleWhen": {
           "action": "get",
           "property": "item_flags"
@@ -188,7 +188,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "type",
           "amount",
@@ -448,7 +448,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -626,7 +626,7 @@
     ],
     "outputs": [
       {
-        "dataType": "map",
+        "dataType": "map<any,any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -850,7 +850,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"
@@ -932,5 +932,442 @@
     ],
     "hidden": true,
     "canonicalId": "itemstack.properties"
+  },
+  {
+    "id": "itemstack.item_components",
+    "displayName": "Item Components",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_get_components"
+    },
+    "inputs": [
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "components",
+        "pinType": "DATA",
+        "dataType": "item_components"
+      }
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component",
+    "displayName": "Item Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_get_component"
+    },
+    "hidden": true,
+    "inputs": [
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "component",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:item_attribute_schema",
+        "defaultValue": "minecraft:attribute_modifiers"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any"
+      },
+      {
+        "name": "exists",
+        "pinType": "DATA",
+        "dataType": "boolean"
+      }
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_set_component",
+    "displayName": "Item Set Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_component"
+    },
+    "hidden": true,
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "component",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:item_attribute_schema",
+        "defaultValue": "minecraft:attribute_modifiers"
+      },
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.item_number_component",
+    "displayName": "Item Number Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "number", "valueKind": "number"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_number", "defaultValue": "minecraft:max_stack_size"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_boolean_component",
+    "displayName": "Item Boolean Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "boolean", "valueKind": "boolean"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_boolean", "defaultValue": "minecraft:enchantment_glint_override"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_text_component",
+    "displayName": "Item Text Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "text", "valueKind": "string"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_text", "defaultValue": "minecraft:item_model"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_object_component",
+    "displayName": "Item Object Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "component_value", "valueKind": "object"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_object", "defaultValue": "minecraft:custom_model_data"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "component_value", "dataType": "item_component", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component_value", "dataType": "item_component", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_list_component",
+    "displayName": "Item List Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "items", "valueKind": "array"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_list", "defaultValue": "minecraft:attribute_modifiers"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "items", "dataType": "item_component_list", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "items", "dataType": "item_component_list", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_presence_component",
+    "displayName": "Item Presence Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_typed_component", "valuePin": "enabled", "valueKind": "presence"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "component", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:item_component_presence", "defaultValue": "minecraft:unbreakable"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "enabled", "dataType": "boolean", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "enabled", "dataType": "boolean", "visibleWhen": {"action": "get"}},
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "itemstack.item_component_number_field",
+    "displayName": "Item Component Number Field",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_object_field", "valuePin": "number"},
+    "inputs": [{"name": "component_value", "dataType": "item_component", "optional": true}, {"name": "field", "dataType": "string"}, {"name": "number", "dataType": "number"}],
+    "outputs": [{"name": "component_value", "dataType": "item_component"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_boolean_field",
+    "displayName": "Item Component Boolean Field",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_object_field", "valuePin": "boolean"},
+    "inputs": [{"name": "component_value", "dataType": "item_component", "optional": true}, {"name": "field", "dataType": "string"}, {"name": "boolean", "dataType": "boolean"}],
+    "outputs": [{"name": "component_value", "dataType": "item_component"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_text_field",
+    "displayName": "Item Component Text Field",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_object_field", "valuePin": "text"},
+    "inputs": [{"name": "component_value", "dataType": "item_component", "optional": true}, {"name": "field", "dataType": "string"}, {"name": "text", "dataType": "string"}],
+    "outputs": [{"name": "component_value", "dataType": "item_component"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_object_field",
+    "displayName": "Item Component Object Field",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_object_field", "valuePin": "object"},
+    "inputs": [{"name": "component_value", "dataType": "item_component", "optional": true}, {"name": "field", "dataType": "string"}, {"name": "object", "dataType": "item_component"}],
+    "outputs": [{"name": "component_value", "dataType": "item_component"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_list_field",
+    "displayName": "Item Component List Field",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_object_field", "valuePin": "items"},
+    "inputs": [{"name": "component_value", "dataType": "item_component", "optional": true}, {"name": "field", "dataType": "string"}, {"name": "items", "dataType": "item_component_list"}],
+    "outputs": [{"name": "component_value", "dataType": "item_component"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_number_list_entry",
+    "displayName": "Item Component Number List Entry",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_list_entry", "valuePin": "number"},
+    "inputs": [{"name": "items", "dataType": "item_component_list", "optional": true}, {"name": "number", "dataType": "number"}],
+    "outputs": [{"name": "items", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_boolean_list_entry",
+    "displayName": "Item Component Boolean List Entry",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_list_entry", "valuePin": "boolean"},
+    "inputs": [{"name": "items", "dataType": "item_component_list", "optional": true}, {"name": "boolean", "dataType": "boolean"}],
+    "outputs": [{"name": "items", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_text_list_entry",
+    "displayName": "Item Component Text List Entry",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_list_entry", "valuePin": "text"},
+    "inputs": [{"name": "items", "dataType": "item_component_list", "optional": true}, {"name": "text", "dataType": "string"}],
+    "outputs": [{"name": "items", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_object_list_entry",
+    "displayName": "Item Component Object List Entry",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_list_entry", "valuePin": "object"},
+    "inputs": [{"name": "items", "dataType": "item_component_list", "optional": true}, {"name": "object", "dataType": "item_component"}],
+    "outputs": [{"name": "items", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_component_item_list_entry",
+    "displayName": "Item Component Item List Entry",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_component_list_entry", "valuePin": "item"},
+    "inputs": [{"name": "items", "dataType": "item_component_list", "optional": true}, {"name": "item", "dataType": "itemstack"}],
+    "outputs": [{"name": "items", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_attribute_modifier",
+    "displayName": "Item Attribute Modifier",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_attribute_modifier"},
+    "inputs": [
+      {"name": "attribute", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:attack_damage"},
+      {"name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "operation", "dataType": "string", "widget": "DROPDOWN", "options": ["add_value", "add_multiplied_base", "add_multiplied_total"], "defaultValue": "add_value"},
+      {"name": "slot", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "hand", "armor", "mainhand", "offhand", "head", "chest", "legs", "feet", "body"], "defaultValue": "any"},
+      {"name": "id", "dataType": "string", "optional": true}
+    ],
+    "outputs": [{"name": "modifier", "dataType": "item_attribute"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_attribute_modifier_list",
+    "displayName": "Item Attribute Modifier List",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {"operation": "item_attribute_modifier_list"},
+    "inputs": [
+      {"name": "modifiers", "dataType": "item_component_list", "optional": true},
+      {"name": "modifier", "dataType": "item_attribute"}
+    ],
+    "outputs": [{"name": "modifiers", "dataType": "item_component_list"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "itemstack.item_remove_component",
+    "displayName": "Item Remove Component",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_remove_component"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "component",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:item_attribute_schema",
+        "defaultValue": "minecraft:attribute_modifiers"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "itemstack.item_apply_components",
+    "displayName": "Item Apply Components",
+    "category": "ITEM",
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_apply_components"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "components",
+        "pinType": "DATA",
+        "dataType": "item_components"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack"
+      }
+    ]
   }
 ]

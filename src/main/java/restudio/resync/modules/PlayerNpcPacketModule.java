@@ -58,7 +58,7 @@ public class PlayerNpcPacketModule implements Module {
                     throw new IllegalStateException("PacketEvents is not initialized");
                 }
             }
-            runtime = new PlayerNpcPacketRuntime(context.getPlugin(), packetEvents, notifications, (id, player, location, leftClick, shifting) -> {
+            runtime = new PlayerNpcPacketRuntime(context.getPlugin(), packetEvents, (id, player, location, leftClick, shifting) -> {
                 PlayerNpcRuntime runtimeService = context.getService(PlayerNpcRuntime.class);
                 if (runtimeService == null || !runtimeService.isActive(id)) {
                     return;
@@ -95,7 +95,8 @@ public class PlayerNpcPacketModule implements Module {
         if (ownsPacketEvents && packetEvents != null) {
             try {
                 packetEvents.terminate();
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                Log.warn("Failed to stop the Player NPC packet runtime: " + clean(exception), exception);
             }
         }
         packetEvents = null;
@@ -111,7 +112,8 @@ public class PlayerNpcPacketModule implements Module {
         if (ownsPacketEvents && packetEvents != null) {
             try {
                 packetEvents.terminate();
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                Log.warn("Failed to clean up Player NPC packet initialization: " + clean(exception), exception);
             }
         }
         if (previous == null && PacketEvents.getAPI() == packetEvents) {

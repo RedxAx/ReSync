@@ -28,7 +28,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "location",
           "health",
@@ -513,7 +513,7 @@
       },
       {
         "name": "armor",
-        "dataType": "list",
+        "dataType": "list<item>",
         "visibleWhen": {
           "action": "get",
           "property": "armor"
@@ -557,7 +557,7 @@
         "description": "Property",
         "pinType": "DATA",
         "dataType": "string",
-        "widget": "DROPDOWN",
+        "widget": "SEARCHABLE_LIST",
         "options": [
           "location",
           "health",
@@ -3912,7 +3912,7 @@
     ],
     "outputs": [
       {
-        "dataType": "list",
+        "dataType": "list<any>",
         "description": "Property value",
         "name": "value",
         "pinType": "DATA"

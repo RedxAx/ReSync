@@ -7,9 +7,9 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
-import restudio.resync.ReSync;
 import restudio.resync.flow.util.TextFormatter;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,21 +22,17 @@ public class ServerHandler implements NodeHandler {
     public ServerHandler() {
         operations.put("system_broadcast", (ctx, node) -> {
             String message = ctx.getInputValue(node, "message", String.class, "");
-            int sentCount = 0;
-            if (!message.isEmpty()) {
-                Bukkit.broadcastMessage(TextFormatter.formatLegacy(message));
-                sentCount = Bukkit.getOnlinePlayers().size();
-            }
-            ctx.setOutput(node, "sent_count", sentCount);
+            if (message.isBlank()) throw new IllegalArgumentException("Broadcast message is required");
+            Bukkit.broadcastMessage(TextFormatter.formatLegacy(message));
+            ctx.setOutput(node, "sent_count", Bukkit.getOnlinePlayers().size());
         });
 
         operations.put("system_execute_command", (ctx, node) -> {
-            String command = ctx.getInputValue(node, "command", String.class, "");
-            boolean success = false;
-            if (!command.isEmpty()) {
-                ConsoleCommandSender console = Bukkit.getConsoleSender();
-                success = Bukkit.dispatchCommand(console, command);
-            }
+            String command = ctx.getInputValue(node, "command", String.class, "").trim();
+            if (command.startsWith("/")) command = command.substring(1).trim();
+            if (command.isBlank()) throw new IllegalArgumentException("Server command is required");
+            ConsoleCommandSender console = Bukkit.getConsoleSender();
+            boolean success = Bukkit.dispatchCommand(console, command);
             ctx.setOutput(node, "success", success);
         });
 
@@ -52,7 +48,8 @@ public class ServerHandler implements NodeHandler {
 
         operations.put("system_get_tps", (ctx, node) -> {
             double[] tps = Bukkit.getTPS();
-            ctx.setOutput(node, "tps", tps);
+            if (tps.length == 0) throw new IllegalStateException("Server TPS is unavailable");
+            ctx.setOutput(node, "tps", tps[0]);
         });
 
         operations.put("system_get_mspt", (ctx, node) -> {
@@ -63,13 +60,13 @@ public class ServerHandler implements NodeHandler {
         operations.put("system_restart", (ctx, node) -> {
             String reason = ctx.getInputValue(node, "reason", String.class, "Server restart");
             Bukkit.broadcastMessage(TextFormatter.formatLegacy("Server restarting: " + reason));
-            Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), () -> Bukkit.spigot().restart(), 20L);
+            ctx.runLater(() -> Bukkit.spigot().restart(), 20L);
         });
 
         operations.put("system_shutdown", (ctx, node) -> {
             String reason = ctx.getInputValue(node, "reason", String.class, "Server shutdown");
             Bukkit.broadcastMessage(TextFormatter.formatLegacy("Server shutting down: " + reason));
-            Bukkit.getScheduler().runTaskLater(ReSync.getInstance(), Bukkit::shutdown, 20L);
+            ctx.runLater(Bukkit::shutdown, 20L);
         });
 
         operations.put("system_get_motd", (ctx, node) -> {
@@ -87,15 +84,15 @@ public class ServerHandler implements NodeHandler {
         });
 
         operations.put("server_get_uptime", (ctx, node) -> {
-            long uptime = java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime();
-            ctx.setOutput(node, "uptime_seconds", (int) (uptime / 1000));
+            long uptime = ManagementFactory.getRuntimeMXBean().getUptime();
+            ctx.setOutput(node, "uptime_seconds", uptime / 1000L);
         });
 
         operations.put("server_get_info", (ctx, node) -> {
-            ctx.setOutput(node, "motd", org.bukkit.Bukkit.getMotd());
-            ctx.setOutput(node, "version", org.bukkit.Bukkit.getVersion());
-            ctx.setOutput(node, "online_players", org.bukkit.Bukkit.getOnlinePlayers().size());
-            ctx.setOutput(node, "max_players", org.bukkit.Bukkit.getMaxPlayers());
+            ctx.setOutput(node, "motd", Bukkit.getMotd());
+            ctx.setOutput(node, "version", Bukkit.getVersion());
+            ctx.setOutput(node, "online_players", Bukkit.getOnlinePlayers().size());
+            ctx.setOutput(node, "max_players", Bukkit.getMaxPlayers());
         });
 
     }
@@ -108,9 +105,10 @@ public class ServerHandler implements NodeHandler {
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
-        if (op != null) {
-            op.accept(ctx, node);
+        if (op == null) {
+            throw new IllegalArgumentException("Unknown server operation: " + operation);
         }
+        op.accept(ctx, node);
         ctx.triggerOutput("flow");
     }
 }

@@ -17,18 +17,25 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TriggerRegistry {
+    private final JavaPlugin plugin;
     private final File file;
     private final Map<String, TriggerBinding> bindings = new ConcurrentHashMap<>();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     public TriggerRegistry(JavaPlugin plugin) {
+        this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "triggers.json");
         load();
     }
 
     TriggerRegistry(File file) {
+        this.plugin = null;
         this.file = file;
         load();
+    }
+
+    public JavaPlugin getPlugin() {
+        return plugin;
     }
 
     public synchronized List<TriggerBinding> getBindings() {

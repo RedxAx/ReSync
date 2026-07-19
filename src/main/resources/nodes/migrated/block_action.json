@@ -306,7 +306,7 @@
       },
       {
         "name": "data",
-        "dataType": "map"
+        "dataType": "map<any,any>"
       }
     ],
     "outputs": [
@@ -337,7 +337,11 @@
       },
       {
         "name": "age",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
       }
     ],
     "outputs": [
@@ -368,7 +372,11 @@
       },
       {
         "name": "level",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
       }
     ],
     "outputs": [
@@ -507,6 +515,8 @@
     "id": "block.block_interact",
     "displayName": "Block Interact",
     "category": "BLOCK",
+    "hidden": true,
+    "hiddenReason": "migration-only-unsupported-runtime-state",
     "handler": "BlockActionHandler",
     "handlerConfig": {
       "operation": "block_interact"
@@ -587,11 +597,21 @@
       },
       {
         "name": "volume",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 16.0
+        }
       },
       {
         "name": "pitch",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 2.0
+        }
       }
     ],
     "outputs": [
@@ -649,7 +669,12 @@
       },
       {
         "name": "power",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 4.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 100.0
+        }
       },
       {
         "name": "fire",
@@ -692,7 +717,12 @@
       },
       {
         "name": "max_distance",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 50.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 1024.0
+        }
       }
     ],
     "outputs": [
@@ -828,7 +858,7 @@
       },
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ],
     "hidden": true,
@@ -854,7 +884,7 @@
       },
       {
         "name": "items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ],
     "outputs": [
@@ -962,7 +992,7 @@
       },
       {
         "name": "dropped_items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ]
   },
@@ -1024,7 +1054,7 @@
       },
       {
         "name": "dropped_items_list",
-        "dataType": "list"
+        "dataType": "list<item>"
       }
     ]
   },

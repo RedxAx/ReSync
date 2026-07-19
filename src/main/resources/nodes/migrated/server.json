@@ -72,7 +72,7 @@
     "outputs": [
       {
         "name": "players",
-        "dataType": "list"
+        "dataType": "list<player>"
       }
     ],
     "inputs": []

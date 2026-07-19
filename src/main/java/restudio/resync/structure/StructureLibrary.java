@@ -59,7 +59,8 @@ public class StructureLibrary {
                         .map(Optional::get)
                         .forEach(structure -> summaries.put(structure.getId(), summary(structure)));
             }
-        } catch (IOException ignored) {
+        } catch (IOException exception) {
+            throw new IllegalStateException("Structure library reload failed", exception);
         }
     }
 
@@ -68,11 +69,11 @@ public class StructureLibrary {
     }
 
     public boolean exists(String id) {
-        return summaries.containsKey(safeId(id));
+        return summaries.containsKey(requireId(id));
     }
 
     public Optional<ReSyncStructure> load(String id) {
-        return read(pathFor(id));
+        return read(pathFor(requireId(id)));
     }
 
     public void save(ReSyncStructure structure) {
@@ -102,12 +103,13 @@ public class StructureLibrary {
     }
 
     public boolean delete(String id) {
-        String safe = safeId(id);
-        summaries.remove(safe);
+        String safe = requireId(id);
         try {
-            return Files.deleteIfExists(pathFor(safe));
-        } catch (IOException ignored) {
-            return false;
+            boolean deleted = Files.deleteIfExists(pathFor(safe));
+            summaries.remove(safe);
+            return deleted;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Structure delete failed: " + safe, exception);
         }
     }
 
@@ -121,15 +123,15 @@ public class StructureLibrary {
             if (structure == null || structure.getId() == null || structure.getId().isBlank()) {
                 return Optional.empty();
             }
-            structure.setId(safeId(structure.getId()));
+            structure.setId(requireId(structure.getId()));
             return Optional.of(structure);
-        } catch (IOException ignored) {
-            return Optional.empty();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Structure load failed: " + path.getFileName(), exception);
         }
     }
 
     private Path pathFor(String id) {
-        Path path = structuresDir.resolve(safeId(id) + ".resync-structure").normalize();
+        Path path = structuresDir.resolve(requireId(id) + ".resync-structure").normalize();
         if (!path.startsWith(structuresDir)) {
             throw new IllegalArgumentException("Structure Id Invalid");
         }
@@ -151,5 +153,11 @@ public class StructureLibrary {
             }
         }
         return builder.toString();
+    }
+
+    private String requireId(String value) {
+        String id = safeId(value);
+        if (id.isBlank()) throw new IllegalArgumentException("Structure ID is required");
+        return id;
     }
 }

@@ -134,7 +134,7 @@
     "category": "DATA",
     "handler": "entity_get_passengers",
     "inputs": [{"name": "entity", "pinType": "DATA", "dataType": "entity"}],
-    "outputs": [{"name": "passengers_list", "pinType": "DATA", "dataType": "list"}]
+    "outputs": [{"name": "passengers_list", "pinType": "DATA", "dataType": "list<entity>"}]
   },
   {
     "id": "entity_get_vehicle",
@@ -221,7 +221,7 @@
     "handler": "entity_has_any_tag",
     "inputs": [
       {"name": "entity", "pinType": "DATA", "dataType": "entity"},
-      {"name": "tags", "pinType": "DATA", "dataType": "list"}
+      {"name": "tags", "pinType": "DATA", "dataType": "list<string>"}
     ],
     "outputs": [{"name": "has_any", "pinType": "DATA", "dataType": "boolean"}]
   },
@@ -232,7 +232,7 @@
     "handler": "entity_has_all_tags",
     "inputs": [
       {"name": "entity", "pinType": "DATA", "dataType": "entity"},
-      {"name": "tags", "pinType": "DATA", "dataType": "list"}
+      {"name": "tags", "pinType": "DATA", "dataType": "list<string>"}
     ],
     "outputs": [{"name": "has_all", "pinType": "DATA", "dataType": "boolean"}]
   },
@@ -242,7 +242,7 @@
     "category": "DATA",
     "handler": "entity_get_tags",
     "inputs": [{"name": "entity", "pinType": "DATA", "dataType": "entity"}],
-    "outputs": [{"name": "tags", "pinType": "DATA", "dataType": "list"}]
+    "outputs": [{"name": "tags", "pinType": "DATA", "dataType": "list<string>"}]
   }
 ]
 

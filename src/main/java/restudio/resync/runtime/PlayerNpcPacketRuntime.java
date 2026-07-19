@@ -16,7 +16,6 @@ import com.github.retrooper.packetevents.protocol.player.GameMode;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.UserProfile;
-import com.github.retrooper.packetevents.protocol.world.Location;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
@@ -38,6 +37,7 @@ import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -45,9 +45,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+import restudio.resync.Log;
+import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.customcontent.CustomContentAccess;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.util.TextFormatter;
@@ -57,34 +61,40 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     private final JavaPlugin plugin;
     private final PacketEventsAPI<Plugin> packetEvents;
-    private final RuntimeNotificationService notifications;
     private final InteractionDispatcher dispatcher;
     private final Map<String, PacketNpc> npcs = new ConcurrentHashMap<>();
     private final Map<Integer, String> idsByEntity = new ConcurrentHashMap<>();
     private final Map<String, SkinTextures> skinCache = new ConcurrentHashMap<>();
-    private final Map<String, Long> interactionDebounce = new ConcurrentHashMap<>();
+    private final Map<InteractionKey, Long> interactionDebounce = new ConcurrentHashMap<>();
+    private final Map<InfoRemovalKey, BukkitTask> infoRemovalTasks = new ConcurrentHashMap<>();
+    private final Set<CompletableFuture<?>> skinRequests = ConcurrentHashMap.newKeySet();
+    private final BoundedDiagnosticDeduplicator reportedPacketFailures = new BoundedDiagnosticDeduplicator(512);
     private final AtomicInteger nextEntityId = new AtomicInteger(2_000_000);
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final PacketListenerCommon packetListener;
     private final int followTaskId;
 
-    public PlayerNpcPacketRuntime(JavaPlugin plugin, PacketEventsAPI<Plugin> packetEvents, RuntimeNotificationService notifications, InteractionDispatcher dispatcher) {
+    public PlayerNpcPacketRuntime(JavaPlugin plugin, PacketEventsAPI<Plugin> packetEvents, InteractionDispatcher dispatcher) {
         this.plugin = plugin;
         this.packetEvents = packetEvents;
-        this.notifications = notifications;
         this.dispatcher = dispatcher;
         this.packetListener = createPacketListener();
         packetEvents.getEventManager().registerListener(packetListener);
@@ -103,7 +113,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     }
 
     @Override
-    public boolean spawn(String id, JsonObject definition, org.bukkit.Location location) {
+    public boolean spawn(String id, JsonObject definition, Location location) {
         if (id == null || id.isBlank() || definition == null || location == null || location.getWorld() == null) {
             return false;
         }
@@ -111,7 +121,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         if (existing != null) {
             return true;
         }
-        PacketNpc npc = new PacketNpc(id, nextEntityId.incrementAndGet(), profile(id, definition), location.clone(), copy(definition));
+        UserProfile profile = profile(id, definition);
+        PacketNpc npc = new PacketNpc(id, nextEntityId.incrementAndGet(), profile, location.clone(), copy(definition));
         npcs.put(id, npc);
         idsByEntity.put(npc.entityId(), id);
         if (!showToVisiblePlayers(npc)) {
@@ -119,18 +130,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             idsByEntity.remove(npc.entityId());
             return false;
         }
-        resolveSkin(definition).thenAccept(textures -> {
-            if (textures == null) {
-                return;
-            }
-            PacketNpc active = npcs.get(id);
-            if (active == null) {
-                return;
-            }
-            active.profile().getTextureProperties().clear();
-            active.profile().getTextureProperties().add(new TextureProperty("textures", textures.value(), textures.signature()));
-            Bukkit.getScheduler().runTask(plugin, () -> reshow(active));
-        });
+        resolveAndApplySkin(id, definition, profile);
         return true;
     }
 
@@ -142,12 +142,13 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         }
         idsByEntity.remove(npc.entityId());
         clearInteractionDebounce(id);
+        cancelInfoRemovalTasks(key -> key.npcId().equals(id));
         hideFromAll(npc);
         return true;
     }
 
     @Override
-    public boolean reload(String id, JsonObject definition, boolean deleted, org.bukkit.Location fallbackLocation) {
+    public boolean reload(String id, JsonObject definition, boolean deleted, Location fallbackLocation) {
         if (deleted || definition == null) {
             return despawn(id);
         }
@@ -155,23 +156,13 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         if (npc == null) {
             return false;
         }
-        org.bukkit.Location location = fallbackLocation != null ? fallbackLocation : npc.location();
+        Location location = fallbackLocation != null ? fallbackLocation : npc.location();
         npc.definition(copy(definition));
         npc.location(location.clone());
-        npc.profile(profile(id, definition));
+        UserProfile profile = profile(id, definition);
+        npc.profile(profile);
         reshow(npc);
-        resolveSkin(definition).thenAccept(textures -> {
-            if (textures == null) {
-                return;
-            }
-            PacketNpc active = npcs.get(id);
-            if (active == null) {
-                return;
-            }
-            active.profile().getTextureProperties().clear();
-            active.profile().getTextureProperties().add(new TextureProperty("textures", textures.value(), textures.signature()));
-            Bukkit.getScheduler().runTask(plugin, () -> reshow(active));
-        });
+        resolveAndApplySkin(id, definition, profile);
         return true;
     }
 
@@ -181,9 +172,34 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     }
 
     @Override
-    public org.bukkit.Location location(String id) {
+    public Location location(String id) {
         PacketNpc npc = npcs.get(id);
         return npc != null ? npc.location().clone() : null;
+    }
+
+    @Override
+    public List<String> activeIds() {
+        return List.copyOf(npcs.keySet());
+    }
+
+    @Override
+    public boolean teleport(String id, String world, double x, double y, double z, float yaw, float pitch) {
+        PacketNpc npc = npcs.get(id);
+        World targetWorld = world != null && !world.isBlank() ? Bukkit.getWorld(world) : null;
+        if (npc == null || targetWorld == null) {
+            return false;
+        }
+        var location = npc.location().clone();
+        location.setWorld(targetWorld);
+        location.setX(x);
+        location.setY(y);
+        location.setZ(z);
+        location.setYaw(yaw);
+        location.setPitch(pitch);
+        npc.location(location);
+        npc.verticalVelocity(0);
+        reshow(npc);
+        return true;
     }
 
     @Override
@@ -194,18 +210,42 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         npcs.clear();
         idsByEntity.clear();
         interactionDebounce.clear();
+        for (CompletableFuture<?> request : List.copyOf(skinRequests)) {
+            request.cancel(true);
+        }
+        skinRequests.clear();
+        skinCache.clear();
+        for (BukkitTask task : List.copyOf(infoRemovalTasks.values())) {
+            task.cancel();
+        }
+        infoRemovalTasks.clear();
         Bukkit.getScheduler().cancelTask(followTaskId);
         packetEvents.getEventManager().unregisterListener(packetListener);
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> showVisibleTo(event.getPlayer()), 20L);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (event.getPlayer().isOnline()) {
+                showVisibleTo(event.getPlayer());
+            }
+        }, 20L);
     }
 
     @EventHandler
     public void onWorldChanged(PlayerChangedWorldEvent event) {
-        Bukkit.getScheduler().runTask(plugin, () -> showVisibleTo(event.getPlayer()));
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (event.getPlayer().isOnline()) {
+                showVisibleTo(event.getPlayer());
+            }
+        });
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        interactionDebounce.keySet().removeIf(key -> key.playerId().equals(playerId));
+        cancelInfoRemovalTasks(key -> key.playerId().equals(playerId));
     }
 
     private PacketListenerCommon createPacketListener() {
@@ -231,12 +271,11 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                 boolean leftClick = packet.getAction() == WrapperPlayClientInteractEntity.InteractAction.ATTACK;
                 boolean shifting = packet.isSneaking().orElse(false);
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!shouldDispatchInteraction(player, id)) {
+                    PacketNpc npc = npcs.get(id);
+                    if (!player.isOnline() || npc == null || !shouldDispatchInteraction(player, id, leftClick)) {
                         return;
                     }
-                    PacketNpc npc = npcs.get(id);
-                    org.bukkit.Location location = npc != null ? npc.location() : player.getLocation();
-                    dispatcher.interact(id, player, location, leftClick, shifting);
+                    dispatcher.interact(id, player, npc.location(), leftClick, shifting);
                 });
             }
         };
@@ -247,29 +286,37 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             if (npc == null) {
                 continue;
             }
-            boolean moved = tickGravity(npc);
-            if (!bool(npc.definition(), "followPlayer", false)) {
-                if (moved) {
-                    sendTeleportToVisiblePlayers(npc);
-                }
-                continue;
+            try {
+                tickFollowPlayer(npc);
+            } catch (RuntimeException exception) {
+                reportPacketRuntimeFailure("update", npc, exception);
             }
-            Player target = nearestPlayer(npc.location(), decimal(npc.definition(), "followRange", 12.0));
-            if (target == null) {
-                if (moved) {
-                    sendTeleportToVisiblePlayers(npc);
-                }
-                continue;
-            }
-            org.bukkit.Location location = npc.location();
-            LookAngles angles = lookAt(location, target.getEyeLocation());
-            location.setYaw(smoothAngle(location.getYaw(), angles.yaw(), 0.35F));
-            location.setPitch(smoothAngle(location.getPitch(), angles.pitch(), 0.35F));
+        }
+    }
+
+    private void tickFollowPlayer(PacketNpc npc) {
+        boolean moved = tickGravity(npc);
+        if (!bool(npc.definition(), "followPlayer", false)) {
             if (moved) {
                 sendTeleportToVisiblePlayers(npc);
-            } else {
-                sendLookToVisiblePlayers(npc);
             }
+            return;
+        }
+        Player target = nearestPlayer(npc.location(), decimal(npc.definition(), "followRange", 12.0));
+        if (target == null) {
+            if (moved) {
+                sendTeleportToVisiblePlayers(npc);
+            }
+            return;
+        }
+        Location location = npc.location();
+        LookAngles angles = lookAt(location, target.getEyeLocation());
+        location.setYaw(smoothAngle(location.getYaw(), angles.yaw(), 0.35F));
+        location.setPitch(smoothAngle(location.getPitch(), angles.pitch(), 0.35F));
+        if (moved) {
+            sendTeleportToVisiblePlayers(npc);
+        } else {
+            sendLookToVisiblePlayers(npc);
         }
     }
 
@@ -278,7 +325,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             npc.verticalVelocity(0);
             return false;
         }
-        org.bukkit.Location location = npc.location();
+        Location location = npc.location();
         if (location == null || location.getWorld() == null) {
             return false;
         }
@@ -300,7 +347,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         return true;
     }
 
-    private boolean onGround(org.bukkit.Location location, double velocity) {
+    private boolean onGround(Location location, double velocity) {
         if (location == null || location.getWorld() == null || velocity > 0) {
             return false;
         }
@@ -312,7 +359,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         return type.isSolid();
     }
 
-    private Player nearestPlayer(org.bukkit.Location origin, double range) {
+    private Player nearestPlayer(Location origin, double range) {
         if (origin == null || origin.getWorld() == null || range <= 0) {
             return null;
         }
@@ -339,7 +386,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             try {
                 send(viewer, new WrapperPlayServerEntityHeadLook(npc.entityId(), npc.location().getYaw()));
                 send(viewer, new WrapperPlayServerEntityRotation(npc.entityId(), npc.location().getYaw(), npc.location().getPitch(), bool(npc.definition(), "gravity", true)));
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                reportPacketFailure("send look packets for", viewer, npc, exception);
             }
         }
     }
@@ -350,14 +398,15 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                 continue;
             }
             try {
-                send(viewer, new WrapperPlayServerEntityTeleport(npc.entityId(), packetLocation(npc.location()), onGround(npc.location(), npc.verticalVelocity())));
+                send(viewer, new WrapperPlayServerEntityTeleport(npc.entityId(), PlayerNpcPacketLocation.create(npc.location().getX(), npc.location().getY(), npc.location().getZ(), npc.location().getYaw(), npc.location().getPitch()), onGround(npc.location(), npc.verticalVelocity())));
                 send(viewer, new WrapperPlayServerEntityHeadLook(npc.entityId(), npc.location().getYaw()));
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException exception) {
+                reportPacketFailure("send teleport packets for", viewer, npc, exception);
             }
         }
     }
 
-    private LookAngles lookAt(org.bukkit.Location origin, org.bukkit.Location target) {
+    private LookAngles lookAt(Location origin, Location target) {
         double dx = target.getX() - origin.getX();
         double dy = target.getY() - (origin.getY() + 1.62);
         double dz = target.getZ() - origin.getZ();
@@ -410,15 +459,11 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             send(player, new WrapperPlayServerEntityRotation(npc.entityId(), npc.location().getYaw(), npc.location().getPitch(), bool(npc.definition(), "gravity", true)));
             send(player, new WrapperPlayServerEntityMetadata(npc.entityId(), metadata(npc)));
             sendEquipment(player, npc);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                try {
-                    send(player, new WrapperPlayServerPlayerInfoRemove(List.of(npc.profile().getUUID())));
-                } catch (RuntimeException ignored) {
-                }
-            }, 40L);
+            schedulePlayerInfoRemoval(player, npc);
             return true;
         } catch (RuntimeException exception) {
-            notifications.broadcastError("ReSync Player NPCs do not support this server version: " + exception.getMessage());
+            reportPacketFailure("show", player, npc, exception);
+            hide(player, npc);
             return false;
         }
     }
@@ -434,7 +479,53 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             send(player, new WrapperPlayServerDestroyEntities(npc.entityId()));
             send(player, teamRemovePacket(npc));
             send(player, new WrapperPlayServerPlayerInfoRemove(List.of(npc.profile().getUUID())));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException exception) {
+            reportPacketFailure("hide", player, npc, exception);
+        }
+    }
+
+    private void reportPacketFailure(String action, Player player, PacketNpc npc, RuntimeException exception) {
+        String detail = exception.getMessage() == null || exception.getMessage().isBlank() ? exception.getClass().getSimpleName() : exception.getMessage();
+        String signature = action + '|' + exception.getClass().getName() + '|' + detail;
+        if (reportedPacketFailures.add(signature)) {
+            Log.warn("Failed to " + action + " Player NPC " + npc.id() + " for " + player.getName() + ": " + detail, exception);
+        }
+    }
+
+    private void reportPacketRuntimeFailure(String action, PacketNpc npc, RuntimeException exception) {
+        String detail = exception.getMessage() == null || exception.getMessage().isBlank() ? exception.getClass().getSimpleName() : exception.getMessage();
+        String signature = action + '|' + npc.id() + '|' + exception.getClass().getName() + '|' + detail;
+        if (reportedPacketFailures.add(signature)) {
+            Log.warn("Failed to " + action + " Player NPC " + npc.id() + ": " + detail, exception);
+        }
+    }
+
+    private void schedulePlayerInfoRemoval(Player player, PacketNpc npc) {
+        InfoRemovalKey key = new InfoRemovalKey(player.getUniqueId(), npc.id());
+        AtomicReference<BukkitTask> reference = new AtomicReference<>();
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            try {
+                if (player.isOnline()) {
+                    send(player, new WrapperPlayServerPlayerInfoRemove(List.of(npc.profile().getUUID())));
+                }
+            } catch (RuntimeException exception) {
+                reportPacketFailure("remove the player-info entry for", player, npc, exception);
+            } finally {
+                infoRemovalTasks.remove(key, reference.get());
+            }
+        }, 40L);
+        reference.set(task);
+        BukkitTask previous = infoRemovalTasks.put(key, task);
+        if (previous != null) {
+            previous.cancel();
+        }
+    }
+
+    private void cancelInfoRemovalTasks(Predicate<InfoRemovalKey> predicate) {
+        for (Map.Entry<InfoRemovalKey, BukkitTask> entry : List.copyOf(infoRemovalTasks.entrySet())) {
+            if (predicate.test(entry.getKey()) && infoRemovalTasks.remove(entry.getKey(), entry.getValue())) {
+                entry.getValue().cancel();
+            }
         }
     }
 
@@ -443,7 +534,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     }
 
     private PacketWrapper<?> spawnPacket(PacketNpc npc) {
-        Location location = packetLocation(npc.location());
+        var location = PlayerNpcPacketLocation.create(npc.location().getX(), npc.location().getY(), npc.location().getZ(), npc.location().getYaw(), npc.location().getPitch());
         if (packetEvents.getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_20_2)) {
             return new WrapperPlayServerSpawnEntity(npc.entityId(), npc.profile().getUUID(), EntityTypes.PLAYER, location, location.getYaw(), 0, null);
         }
@@ -539,24 +630,78 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         return actions;
     }
 
-    private Location packetLocation(org.bukkit.Location location) {
-        return new Location(location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
-    }
-
-    private boolean shouldDispatchInteraction(Player player, String id) {
+    private boolean shouldDispatchInteraction(Player player, String id, boolean leftClick) {
         long now = System.currentTimeMillis();
-        String key = player.getUniqueId() + ":" + id;
+        InteractionKey key = new InteractionKey(player.getUniqueId(), id, leftClick);
         Long previous = interactionDebounce.put(key, now);
         return previous == null || now - previous > 300L;
     }
 
     private void clearInteractionDebounce(String id) {
-        String marker = ":" + id;
-        interactionDebounce.keySet().removeIf(key -> key.endsWith(marker));
+        interactionDebounce.keySet().removeIf(key -> key.npcId().equals(id));
+    }
+
+    private void resolveAndApplySkin(String id, JsonObject definition, UserProfile requestedProfile) {
+        CompletableFuture<SkinTextures> resolution;
+        try {
+            resolution = resolveSkin(definition);
+        } catch (RuntimeException exception) {
+            reportSkinFailure(id, exception);
+            return;
+        }
+        skinRequests.add(resolution);
+        resolution.whenComplete((textures, failure) -> {
+            skinRequests.remove(resolution);
+            if (failure != null) {
+                Throwable cause = failure.getCause() != null ? failure.getCause() : failure;
+                if (cause instanceof CancellationException) {
+                    return;
+                }
+                reportSkinFailure(id, failure);
+                return;
+            }
+            if (textures == null) {
+                if (hasConfiguredSkin(definition)) {
+                    reportSkinFailure(id, new IllegalStateException("Configured skin could not be resolved"));
+                }
+                return;
+            }
+            PacketNpc pending = npcs.get(id);
+            if (!plugin.isEnabled() || pending == null || pending.profile() != requestedProfile) {
+                return;
+            }
+            try {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    PacketNpc active = npcs.get(id);
+                    if (active == null || active.profile() != requestedProfile) {
+                        return;
+                    }
+                    requestedProfile.getTextureProperties().clear();
+                    requestedProfile.getTextureProperties().add(new TextureProperty("textures", textures.value(), textures.signature()));
+                    reshow(active);
+                });
+            } catch (RuntimeException exception) {
+                reportSkinFailure(id, exception);
+            }
+        });
+    }
+
+    private boolean hasConfiguredSkin(JsonObject definition) {
+        return rawSkin(definition) != null || !skinText(definition, "uuid", "skinUuid").isBlank()
+            || !skinText(definition, "username", "skinUsername").isBlank();
+    }
+
+    private void reportSkinFailure(String id, Throwable failure) {
+        Throwable cause = failure.getCause() != null ? failure.getCause() : failure;
+        String detail = cause.getMessage() == null || cause.getMessage().isBlank() ? cause.getClass().getSimpleName() : cause.getMessage();
+        String signature = "skin|" + id + '|' + cause.getClass().getName() + '|' + detail;
+        if (reportedPacketFailures.add(signature)) {
+            Log.warn("Failed to resolve Player NPC skin for " + id + ": " + detail, cause);
+        }
     }
 
     private UserProfile profile(String id, JsonObject definition) {
-        UserProfile profile = new UserProfile(uuid(id), profileName());
+        UserProfile profile = new UserProfile(uuid(id), profileName(id));
         SkinTextures textures = rawSkin(definition);
         if (textures != null) {
             profile.getTextureProperties().add(new TextureProperty("textures", textures.value(), textures.signature()));
@@ -586,7 +731,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
         }
-        HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.mojang.com/users/profiles/minecraft/" + username)).GET().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.mojang.com/users/profiles/minecraft/" + username)).timeout(Duration.ofSeconds(8)).GET().build();
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
             .thenCompose(response -> {
                 if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -601,8 +746,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                     skinCache.put(key, textures);
                 }
                 return textures;
-            })
-            .exceptionally(error -> null);
+            });
     }
 
     private CompletableFuture<SkinTextures> skinByUuid(String uuid) {
@@ -612,7 +756,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
         }
-        HttpRequest request = HttpRequest.newBuilder(URI.create("https://sessionserver.mojang.com/session/minecraft/profile/" + clean + "?unsigned=false")).GET().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create("https://sessionserver.mojang.com/session/minecraft/profile/" + clean + "?unsigned=false"))
+            .timeout(Duration.ofSeconds(8)).GET().build();
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
             .thenApply(response -> {
                 if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -629,8 +774,7 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
                     }
                 }
                 return null;
-            })
-            .exceptionally(error -> null);
+            });
     }
 
     private SkinTextures rawSkin(JsonObject definition) {
@@ -662,8 +806,8 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         return value.isBlank() ? id : value;
     }
 
-    private String profileName() {
-        return "";
+    private String profileName(String id) {
+        return "RS_" + uuid(id).toString().replace("-", "").substring(0, 13);
     }
 
     private String teamName(PacketNpc npc) {
@@ -708,6 +852,12 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     private record SkinTextures(String value, String signature) {
     }
 
+    private record InteractionKey(UUID playerId, String npcId, boolean leftClick) {
+    }
+
+    private record InfoRemovalKey(UUID playerId, String npcId) {
+    }
+
     private record LookAngles(float yaw, float pitch) {
     }
 
@@ -715,11 +865,11 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
         private final String id;
         private final int entityId;
         private UserProfile profile;
-        private org.bukkit.Location location;
+        private Location location;
         private JsonObject definition;
         private double verticalVelocity;
 
-        private PacketNpc(String id, int entityId, UserProfile profile, org.bukkit.Location location, JsonObject definition) {
+        private PacketNpc(String id, int entityId, UserProfile profile, Location location, JsonObject definition) {
             this.id = id;
             this.entityId = entityId;
             this.profile = profile;
@@ -743,11 +893,11 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
             this.profile = profile;
         }
 
-        private org.bukkit.Location location() {
+        private Location location() {
             return location;
         }
 
-        private void location(org.bukkit.Location location) {
+        private void location(Location location) {
             this.location = location;
         }
 

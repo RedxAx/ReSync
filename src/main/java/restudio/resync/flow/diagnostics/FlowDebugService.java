@@ -165,6 +165,7 @@ public class FlowDebugService {
         for (FlowDebugSession session : sessions.values()) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("sessionId", session.getSessionId());
+            item.put("executionId", session.getExecutionId());
             item.put("graphId", session.getGraphId());
             item.put("currentGraphId", session.getCurrentGraphId());
             item.put("currentNodeId", session.getCurrentNodeId());
@@ -176,6 +177,7 @@ public class FlowDebugService {
             sessionData.add(item);
         }
         snapshot.put("sessions", sessionData);
+        snapshot.put("metrics", traceService != null ? traceService.metricsSnapshot(50) : List.of());
         return snapshot;
     }
 
@@ -187,7 +189,7 @@ public class FlowDebugService {
         }
         String graphId = graph != null && graph.getId() != null ? graph.getId() : "";
         String id = sessionId;
-        return sessions.computeIfAbsent(id, ignored -> new FlowDebugSession(id, graphId));
+        return sessions.computeIfAbsent(id, ignored -> new FlowDebugSession(id, graphId, runtime.getExecutionId()));
     }
 
     private String pauseReason(FlowDebugSession session, FlowGraph graph, String nodeId, int depth) {
@@ -235,6 +237,7 @@ public class FlowDebugService {
     private void emitSession(FlowDebugSession session, String eventType, String reason) {
         FlowTraceRecord record = new FlowTraceRecord();
         record.setDebugSessionId(session.getSessionId());
+        record.setExecutionId(session.getExecutionId());
         record.setGraphId(session.getCurrentGraphId());
         record.setNodeId(session.getCurrentNodeId());
         record.setNodeType(session.getCurrentNodeType());
@@ -256,6 +259,7 @@ public class FlowDebugService {
     private FlowTraceRecord baseRecord(FlowDebugSession session, FlowGraph graph, FlowNode node, String nodeId, int depth, String eventType, String status, String reason) {
         FlowTraceRecord record = new FlowTraceRecord();
         record.setDebugSessionId(session.getSessionId());
+        record.setExecutionId(session.getExecutionId());
         record.setGraphId(graph != null ? graph.getId() : "");
         record.setNodeId(nodeId != null ? nodeId : "");
         record.setNodeType(node != null ? node.getType() : "");

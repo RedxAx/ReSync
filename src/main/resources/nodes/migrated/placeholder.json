@@ -35,12 +35,29 @@
       {
         "name": "result",
         "dataType": "string"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "operation_result",
+        "dataType": "result<string>"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
       }
     ]
   },
   {
     "id": "placeholder.placeholder_set",
-    "displayName": "Placeholder Set",
+    "displayName": "Parse Relational Placeholder",
     "category": "UTILITY",
     "handler": "PlaceholderHandler",
     "handlerConfig": {
@@ -72,18 +89,35 @@
       },
       {
         "name": "result",
-        "dataType": "any"
+        "dataType": "string"
       },
       {
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "operation_result",
+        "dataType": "result<string>"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
       }
     ]
   },
   {
     "id": "placeholder.placeholder_remove",
-    "displayName": "Placeholder Remove",
+    "displayName": "Parse Bracket Placeholder",
     "category": "UTILITY",
     "handler": "PlaceholderHandler",
     "handlerConfig": {
@@ -107,12 +141,29 @@
       },
       {
         "name": "result",
-        "dataType": "any"
+        "dataType": "string"
       },
       {
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "operation_result",
+        "dataType": "result<string>"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
       }
     ]
   },
@@ -156,8 +207,27 @@
       {
         "name": "result",
         "dataType": "string"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "operation_result",
+        "dataType": "result<string>"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
       }
-    ]
+    ],
+    "hidden": true,
+    "hiddenReason": "migration-only"
   },
   {
     "id": "placeholder.strip.brackets",
@@ -190,6 +260,23 @@
       },
       {
         "name": "result",
+        "dataType": "string"
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "operation_result",
+        "dataType": "result<string>"
+      },
+      {
+        "name": "error_code",
+        "dataType": "string"
+      },
+      {
+        "name": "message",
         "dataType": "string"
       }
     ]

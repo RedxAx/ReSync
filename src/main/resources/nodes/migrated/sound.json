@@ -353,6 +353,15 @@
       {
         "name": "interval_ticks",
         "dataType": "number"
+      },
+      {
+        "name": "repeat_count",
+        "dataType": "integer",
+        "defaultValue": 10,
+        "constraints": {
+          "min": 1,
+          "max": 256
+        }
       }
     ],
     "outputs": [
@@ -383,7 +392,7 @@
       },
       {
         "name": "sounds",
-        "dataType": "list"
+        "dataType": "list<sound>"
       },
       {
         "name": "interval_ticks",

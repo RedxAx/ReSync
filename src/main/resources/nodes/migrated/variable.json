@@ -193,7 +193,7 @@
     "outputs": [
       {
         "name": "keys",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ]
   },
@@ -280,7 +280,7 @@
       },
       {
         "name": "variables",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ]
   },
@@ -460,7 +460,7 @@
     "outputs": [
       {
         "name": "variables",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "inputs": []
@@ -477,7 +477,7 @@
     "outputs": [
       {
         "name": "variables",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "inputs": []
@@ -604,7 +604,7 @@
       },
       {
         "name": "variables",
-        "dataType": "list",
+        "dataType": "list<any>",
         "visibleWhen": {
           "mode": "list"
         }
@@ -796,7 +796,7 @@
     "outputs": [
       {
         "name": "variables",
-        "dataType": "list"
+        "dataType": "list<any>"
       }
     ],
     "inputs": []

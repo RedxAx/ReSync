@@ -1,91 +1,118 @@
 package restudio.resync.modules.flow;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Keyed;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Registry;
-import org.bukkit.World;
-import org.bukkit.advancement.Advancement;
-import org.bukkit.block.Biome;
-import org.bukkit.DyeColor;
-import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.EntityType;
-import org.bukkit.inventory.Recipe;
-import org.bukkit.potion.PotionEffectType;
+import com.google.gson.Gson;
 import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
+import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.core.Session;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class FlowOptionCatalogPacketHandler {
     private final FlowPacketSender sender;
-    private final CustomContentService customContentService;
     private final OptionCatalogRegistry optionCatalogRegistry;
-    private final ItemAttributeSchemaService itemAttributeSchemaService = new ItemAttributeSchemaService();
+    private final Gson gson = new Gson();
     private final Map<String, CatalogSnapshot> customContentCatalogSnapshots = new HashMap<>();
+    private final AtomicLong catalogSequence = new AtomicLong();
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
         this(sender, customContentService, null);
     }
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService, OptionCatalogRegistry optionCatalogRegistry) {
+        this(sender, optionCatalogRegistry, new BuiltinOptionCatalogService(() -> customContentService, new ItemAttributeSchemaService()));
+    }
+
+    public FlowOptionCatalogPacketHandler(FlowPacketSender sender, OptionCatalogRegistry optionCatalogRegistry, BuiltinOptionCatalogService builtinCatalogs) {
         this.sender = sender;
-        this.customContentService = customContentService;
         this.optionCatalogRegistry = optionCatalogRegistry;
+        if (optionCatalogRegistry != null && builtinCatalogs != null) {
+            builtinCatalogs.registerProviders(optionCatalogRegistry);
+        }
     }
 
     public void handle(Session session, ByteBuffer buffer) {
         if (buffer.remaining() < 4) {
+            sender.sendOptionCatalog(session, "", "", List.of(), List.of(), "invalid:source-length", catalogSequence.incrementAndGet(),
+                "invalid", "Catalog request is missing the source length");
             return;
         }
         int sourceLength = buffer.getInt();
         if (sourceLength < 0 || sourceLength > FlowPacketSender.MAX_STRING_LENGTH || sourceLength > buffer.remaining()) {
+            sender.sendOptionCatalog(session, "", "", List.of(), List.of(), "invalid:source", catalogSequence.incrementAndGet(),
+                "invalid", "Catalog request has an invalid source length");
             return;
         }
         byte[] sourceBytes = new byte[sourceLength];
         buffer.get(sourceBytes);
         String sourceId = new String(sourceBytes, StandardCharsets.UTF_8);
-        String normalized = normalize(sourceId);
-        if (normalized.equals("item_attribute_schema") || normalized.startsWith("item_attribute_schema:")) {
-            String material = normalized.equals("item_attribute_schema") ? "" : normalized.substring("item_attribute_schema:".length());
-            List<OptionCatalogItem> items = itemAttributeSchemaService.catalog(material);
-            sender.sendOptionCatalog(session, sourceId, items.stream().map(OptionCatalogItem::value).toList(), items, itemAttributeSchemaService.revision(material));
+        CatalogRequest request;
+        try {
+            request = readRequest(buffer);
+        } catch (IllegalArgumentException exception) {
+            sender.sendOptionCatalog(session, sourceId, "", List.of(), List.of(), "invalid:request", catalogSequence.incrementAndGet(),
+                "invalid", exception.getMessage());
+            return;
+        }
+        Map<String, Object> queryContext = new LinkedHashMap<>(request.context());
+        queryContext.put("$sessionId", session.getSessionId());
+        queryContext.put("$clientId", session.getClientId());
+        queryContext.put("$clientCapabilities", session.getConnection() != null ? session.getConnection().getClientCapabilities() : Set.of());
+        OptionCatalogQuery query = new OptionCatalogQuery(sourceId, queryContext);
+        long sequence = catalogSequence.incrementAndGet();
+        if (request.version() > 2) {
+            sender.sendOptionCatalog(session, sourceId, request.contextKey(), List.of(), List.of(), "incompatible:" + request.version(), sequence,
+                "incompatible", "Unsupported catalog request version");
             return;
         }
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
-            sender.sendOptionCatalog(session, sourceId, provider.values(), provider.items(), provider.revision());
+            sender.sendOptionCatalog(session, sourceId, request.contextKey(), optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), sequence,
+                provider.status(query), provider.diagnostic(query));
             return;
         }
-        if ("custom_content_recipe_item".equals(normalize(sourceId)) && customContentService != null) {
-            List<OptionCatalogItem> items = customContentService.recipeItemCatalog();
-            List<String> values = items.stream().map(OptionCatalogItem::value).toList();
-            sender.sendOptionCatalog(session, sourceId, values, items, "recipe_item:" + Bukkit.getVersion());
-            return;
+        sender.sendOptionCatalog(session, sourceId, request.contextKey(), List.of(), List.of(), "missing:" + sourceId, sequence, "missing", "Catalog provider is not registered");
+    }
+
+    private CatalogRequest readRequest(ByteBuffer buffer) {
+        if (buffer.remaining() < Integer.BYTES) {
+            throw new IllegalArgumentException("Catalog request is missing its context length");
         }
-        sender.sendOptionCatalog(session, sourceId, values(sourceId), revision(sourceId));
+        int length = buffer.getInt();
+        if (length < 0 || length > FlowPacketSender.MAX_STRING_LENGTH || length > buffer.remaining()) {
+            throw new IllegalArgumentException("Catalog request has an invalid context length");
+        }
+        if (length == 0) return CatalogRequest.EMPTY;
+        byte[] bytes = new byte[length];
+        buffer.get(bytes);
+        CatalogRequest request;
+        try {
+            request = gson.fromJson(new String(bytes, StandardCharsets.UTF_8), CatalogRequest.class);
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Catalog request context is invalid JSON", exception);
+        }
+        if (request == null) throw new IllegalArgumentException("Catalog request context is empty");
+        return request.normalized();
     }
 
     public void broadcastCustomContentCatalogs() {
         for (CatalogSnapshot snapshot : customContentCatalogSnapshots()) {
             customContentCatalogSnapshots.put(snapshot.sourceId(), snapshot);
-            snapshot.broadcast(sender);
+            snapshot.broadcast(sender, catalogSequence.incrementAndGet());
         }
     }
 
@@ -96,21 +123,30 @@ public class FlowOptionCatalogPacketHandler {
                 continue;
             }
             customContentCatalogSnapshots.put(snapshot.sourceId(), snapshot);
-            snapshot.broadcast(sender);
+            snapshot.broadcast(sender, catalogSequence.incrementAndGet());
+        }
+    }
+
+    public void broadcastCatalog(String sourceId) {
+        long sequence = catalogSequence.incrementAndGet();
+        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
+        if (provider != null) {
+            OptionCatalogQuery query = new OptionCatalogQuery(sourceId, Map.of());
+            sender.broadcastOptionCatalog(sourceId, optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), sequence, provider.status(query), provider.diagnostic(query));
+        } else {
+            sender.broadcastOptionCatalog(sourceId, List.of(), List.of(), "missing:" + sourceId, sequence, "missing", "Catalog provider is not registered");
         }
     }
 
     private List<CatalogSnapshot> customContentCatalogSnapshots() {
         List<CatalogSnapshot> snapshots = new ArrayList<>();
-        for (String sourceId : List.of(
-            "server:custom_content:recipe_item",
-            "server:custom_content:provider",
-            "server:custom_content:nexo_item",
-            "server:custom_content:nexo_block",
-            "server:custom_content:nexo_furniture",
-            "server:custom_content:nexo_armor"
-        )) {
-            snapshots.add(customContentCatalogSnapshot(sourceId));
+        if (optionCatalogRegistry == null) {
+            return snapshots;
+        }
+        for (OptionCatalogProvider provider : optionCatalogRegistry.providers()) {
+            if ("custom_content".equals(provider.providerId())) {
+                snapshots.add(customContentCatalogSnapshot(provider.sourceId()));
+            }
         }
         return snapshots;
     }
@@ -118,25 +154,32 @@ public class FlowOptionCatalogPacketHandler {
     private CatalogSnapshot customContentCatalogSnapshot(String sourceId) {
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
-            return new CatalogSnapshot(sourceId, provider.values(), provider.items(), provider.revision());
+            OptionCatalogQuery query = new OptionCatalogQuery(sourceId, Map.of());
+            return new CatalogSnapshot(sourceId, optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), provider.status(query), provider.diagnostic(query));
         }
-        if ("custom_content_recipe_item".equals(normalize(sourceId)) && customContentService != null) {
-            List<OptionCatalogItem> items = customContentService.recipeItemCatalog();
-            return new CatalogSnapshot(sourceId, items.stream().map(OptionCatalogItem::value).toList(), items, "recipe_item:" + Bukkit.getVersion());
-        }
-        return new CatalogSnapshot(sourceId, values(sourceId), List.of(), revision(sourceId));
+        return new CatalogSnapshot(sourceId, List.of(), List.of(), "missing:" + sourceId, "missing", "Catalog provider is not registered");
     }
 
-    private record CatalogSnapshot(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision) {
+    private record CatalogSnapshot(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision, String status, String diagnostic) {
         CatalogSnapshot {
             sourceId = sourceId != null ? sourceId : "";
             values = values != null ? List.copyOf(values) : List.of();
             items = items != null ? items.stream().map(FlowOptionCatalogPacketHandler::normalizeCatalogItem).toList() : List.of();
             revision = revision != null ? revision : "";
+            status = status != null && !status.isBlank() ? status : "available";
+            diagnostic = diagnostic != null ? diagnostic : "";
         }
 
-        private void broadcast(FlowPacketSender sender) {
-            sender.broadcastOptionCatalog(sourceId, values, items, revision);
+        private void broadcast(FlowPacketSender sender, long sequence) {
+            sender.broadcastOptionCatalog(sourceId, values, items, revision, sequence, status, diagnostic);
+        }
+    }
+
+    private record CatalogRequest(int version, String contextKey, Map<String, Object> context) {
+        private static final CatalogRequest EMPTY = new CatalogRequest(1, "", Map.of());
+
+        private CatalogRequest normalized() {
+            return new CatalogRequest(Math.max(1, version), contextKey != null ? contextKey : "", context != null ? Collections.unmodifiableMap(new LinkedHashMap<>(context)) : Map.of());
         }
     }
 
@@ -184,212 +227,11 @@ public class FlowOptionCatalogPacketHandler {
         if (value instanceof Number number) {
             try {
                 return new BigDecimal(number.toString()).stripTrailingZeros();
-            } catch (NumberFormatException ignored) {
-                return number.doubleValue();
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Catalog metadata contains an invalid number: " + number, exception);
             }
         }
         return value;
     }
 
-    private List<String> values(String sourceId) {
-        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
-        if (provider != null) {
-            return provider.values();
-        }
-        return switch (normalize(sourceId)) {
-            case "advancement" -> advancements();
-            case "biome" -> registryKeys(Registry.BIOME);
-            case "difficulty" -> List.of("peaceful", "easy", "normal", "hard");
-            case "attribute" -> registryKeysByField("ATTRIBUTE");
-            case "banner_pattern" -> registryKeysByField("BANNER_PATTERN");
-            case "damage_type" -> registryKeysByField("DAMAGE_TYPE");
-            case "dye_color" -> enumNames(DyeColor.values());
-            case "enchantment" -> registryKeys(Registry.ENCHANTMENT);
-            case "entity_type" -> enumNames(EntityType.values());
-            case "axolotl_variant" -> List.of("lucy", "wild", "gold", "cyan", "blue");
-            case "cat_variant" -> registryKeysByField("CAT_VARIANT");
-            case "cat_sound_variant" -> registryKeysByField("CAT_SOUND_VARIANT");
-            case "chicken_variant" -> registryKeysByField("CHICKEN_VARIANT");
-            case "chicken_sound_variant" -> registryKeysByField("CHICKEN_SOUND_VARIANT");
-            case "cow_variant" -> registryKeysByField("COW_VARIANT");
-            case "cow_sound_variant" -> registryKeysByField("COW_SOUND_VARIANT");
-            case "fox_variant" -> List.of("red", "snow");
-            case "frog_variant" -> registryKeysByField("FROG_VARIANT");
-            case "horse_variant" -> List.of("white", "creamy", "chestnut", "brown", "black", "gray", "dark_brown");
-            case "llama_variant" -> List.of("creamy", "white", "brown", "gray");
-            case "mooshroom_variant" -> List.of("red", "brown");
-            case "painting_variant" -> registryKeysByFields("PAINTING_VARIANT", "ART");
-            case "parrot_variant" -> List.of("red_blue", "blue", "green", "yellow_blue", "gray");
-            case "pig_variant" -> registryKeysByField("PIG_VARIANT");
-            case "pig_sound_variant" -> registryKeysByField("PIG_SOUND_VARIANT");
-            case "rabbit_variant" -> List.of("brown", "white", "black", "white_splotched", "gold", "salt", "evil");
-            case "salmon_size" -> List.of("small", "medium", "large");
-            case "tropical_fish_pattern" -> List.of("kob", "sunstreak", "snooper", "dasher", "brinely", "spotty", "flopper", "stripey", "glitter", "blockfish", "betty", "clayfish");
-            case "villager_type" -> registryKeysByField("VILLAGER_TYPE");
-            case "wolf_variant" -> registryKeysByField("WOLF_VARIANT");
-            case "wolf_sound_variant" -> registryKeysByField("WOLF_SOUND_VARIANT");
-            case "zombie_nautilus_variant" -> registryKeysByField("ZOMBIE_NAUTILUS_VARIANT");
-            case "gamemode" -> List.of("survival", "creative", "adventure", "spectator");
-            case "material" -> enumNames(Material.values());
-            case "block" -> blocks();
-            case "instrument" -> registryKeysByField("INSTRUMENT");
-            case "jukebox_song" -> registryKeysByField("JUKEBOX_SONG");
-            case "trim_material" -> registryKeysByField("TRIM_MATERIAL");
-            case "trim_pattern" -> registryKeysByField("TRIM_PATTERN");
-            case "loot_table" -> registryKeys(Registry.LOOT_TABLES);
-            case "recipe" -> recipes();
-            case "particle" -> registryKeys(Registry.PARTICLE_TYPE);
-            case "potion" -> potionTypes();
-            case "potion_effect" -> potionEffects();
-            case "sound" -> registryKeys(Registry.SOUNDS);
-            case "world" -> Bukkit.getWorlds().stream().map(World::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
-            case "custom_content_provider" -> customContentService != null ? customContentService.getAvailableProviderIds() : List.of("vanilla");
-            case "custom_content_nexo_item" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "item") : List.of();
-            case "custom_content_nexo_block" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "block") : List.of();
-            case "custom_content_nexo_furniture" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "furniture") : List.of();
-            case "custom_content_nexo_armor" -> customContentService != null ? customContentService.getProviderOptionIds("nexo", "armor") : List.of();
-            default -> List.of();
-        };
-    }
-
-    private String revision(String sourceId) {
-        OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
-        if (provider != null) {
-            return provider.revision();
-        }
-        return normalize(sourceId) + ":" + Bukkit.getVersion();
-    }
-
-    private String normalize(String sourceId) {
-        String value = sourceId != null ? sourceId.toLowerCase(Locale.ROOT) : "";
-        if (value.startsWith("server:minecraft:")) {
-            return value.substring("server:minecraft:".length());
-        }
-        if (value.startsWith("minecraft:")) {
-            return value.substring("minecraft:".length());
-        }
-        if (value.startsWith("client:minecraft:")) {
-            return value.substring("client:minecraft:".length());
-        }
-        if (value.startsWith("server:custom_content:")) {
-            return "custom_content_" + value.substring("server:custom_content:".length());
-        }
-        return value;
-    }
-
-    private List<String> advancements() {
-        List<String> values = new ArrayList<>();
-        Bukkit.advancementIterator().forEachRemaining(advancement -> values.add(key(advancement)));
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private String key(Advancement advancement) {
-        NamespacedKey key = advancement.getKey();
-        return key != null ? key.toString() : "";
-    }
-
-    private List<String> potionEffects() {
-        List<String> values = new ArrayList<>();
-        for (PotionEffectType type : PotionEffectType.values()) {
-            if (type != null) {
-                values.add(type.getKey().toString());
-            }
-        }
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private List<String> potionTypes() {
-        List<String> values = new ArrayList<>();
-        try {
-            Class<?> type = Class.forName("org.bukkit.potion.PotionType");
-            Object[] constants = type.isEnum() ? type.getEnumConstants() : new Object[0];
-            for (Object constant : constants) {
-                String key = keyedValue(constant);
-                values.add(key != null && !key.isBlank() ? key : "minecraft:" + constant.toString().toLowerCase(Locale.ROOT));
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-        }
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private String keyedValue(Object value) {
-        if (!(value instanceof Keyed keyed) || keyed.getKey() == null) {
-            return "";
-        }
-        return keyed.getKey().toString();
-    }
-
-    private List<String> blocks() {
-        List<String> values = new ArrayList<>();
-        for (Material material : Material.values()) {
-            if (material.isBlock()) {
-                values.add(material.name().toLowerCase(Locale.ROOT));
-            }
-        }
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private List<String> recipes() {
-        List<String> values = new ArrayList<>();
-        Bukkit.recipeIterator().forEachRemaining(recipe -> addRecipeKey(values, recipe));
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private void addRecipeKey(List<String> values, Recipe recipe) {
-        if (recipe instanceof Keyed keyed) {
-            values.add(keyed.getKey().toString());
-        }
-    }
-
-    private <T extends Keyed> List<String> registryKeys(Registry<T> registry) {
-        List<String> values = new ArrayList<>();
-        for (T value : registry) {
-            values.add(value.getKey().toString());
-        }
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private List<String> registryKeysByField(String fieldName) {
-        List<String> values = new ArrayList<>();
-        try {
-            Field field = Registry.class.getField(fieldName);
-            Object registry = field.get(null);
-            if (registry instanceof Iterable<?> iterable) {
-                for (Object value : iterable) {
-                    String key = keyedValue(value);
-                    if (!key.isBlank()) {
-                        values.add(key);
-                    }
-                }
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-        }
-        values.sort(String.CASE_INSENSITIVE_ORDER);
-        return values;
-    }
-
-    private List<String> registryKeysByFields(String... fieldNames) {
-        for (String fieldName : fieldNames) {
-            List<String> values = registryKeysByField(fieldName);
-            if (!values.isEmpty()) {
-                return values;
-            }
-        }
-        return List.of();
-    }
-
-    private <E extends Enum<E>> List<String> enumNames(E[] values) {
-        List<String> result = new ArrayList<>();
-        for (E value : values) {
-            result.add(value.name().toLowerCase(Locale.ROOT));
-        }
-        result.sort(Comparator.naturalOrder());
-        return result;
-    }
 }

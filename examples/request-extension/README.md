@@ -8,6 +8,7 @@ ReQuest adds a quests system to ReSync.
 - Quest option catalog: `request:quest_ids`
 - Event option catalog: `request:event_ids`
 - Flow type metadata: `request:quest`
+- Managed resource: `request:quest`
 - Nodes:
   - `Quest Info`
   - `Create Quest`
@@ -25,9 +26,9 @@ ReQuest adds a quests system to ReSync.
 
 ## Build
 
-Build ReSync first so `../../build/libs/ReSync-*.jar` exists, then run:
+Build ReSync first so `../../build/libs/ReSync-*.jar` exists, then run from the ReSync repository root:
 ```
-gradlew jar
+gradlew.bat -p examples/request-extension clean test jar
 ```
 
 Copy the jar into:
@@ -42,6 +43,8 @@ There are 4 premade quests (inactive by default): gather_logs, light_caves, map_
 Create a flow with `Player Join` -> `Start Quest` -> `Send Message`.
 
 Use `gather_logs` in the quest selector. The selector is backed by the extension option catalog.
+
+Quest definitions also participate in ReSync's managed-resource registry. Generic resource nodes can discover, read, validate, save, and delete global quests through the same `ReQuestService` authority, and extension unload removes the resource capability and its catalog cleanly.
 
 Then create another flow with `Player Block Break` -> `Add Quest Progress` -> `Send Message`. Use the same quest id and amount `1`.
 

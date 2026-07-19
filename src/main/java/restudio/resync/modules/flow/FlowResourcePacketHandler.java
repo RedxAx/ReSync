@@ -80,6 +80,7 @@ public class FlowResourcePacketHandler<T> {
                 sender.sendError(session, adapter.invalidValueCode(), adapter.missingIdMessage());
                 return;
             }
+            adapter.validate(value);
             adapter.save(value);
             adapter.afterSave(session, value);
             adapter.sendSaveAck(session, id, payload.requestId());

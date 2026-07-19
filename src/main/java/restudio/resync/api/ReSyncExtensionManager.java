@@ -1,10 +1,19 @@
 package restudio.resync.api;
 
+import org.bukkit.Bukkit;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.resync.Log;
 import restudio.resync.customcontent.CustomContentProvider;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.FlowRegistry;
+import restudio.resync.flow.FlowValueCodec;
+import restudio.resync.flow.FlowValueCodecRegistry;
+import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.flow.data.FlowDataType;
+import restudio.flow.data.FlowTypeRef;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -17,8 +26,12 @@ import restudio.resync.flow.sync.FlowCategoryMetadata;
 import restudio.resync.flow.sync.FlowConversionRule;
 import restudio.resync.flow.sync.FlowOptionSourceMetadata;
 import restudio.resync.flow.sync.FlowTypeMetadata;
+import restudio.resync.flow.validation.FlowGraphValidationRegistry;
+import restudio.resync.flow.validation.FlowGraphValidationRule;
 import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
+import restudio.resync.modules.flow.FlowResourceAdapter;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.world.WorldMapExtension;
 import restudio.resync.world.WorldMapService;
 
@@ -28,12 +41,16 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public class ReSyncExtensionManager {
     private static final long SCAN_INTERVAL_MS = 5000L;
@@ -85,6 +102,40 @@ public class ReSyncExtensionManager {
         return Set.copyOf(extensions.keySet());
     }
 
+    public List<Map<String, Object>> contributionInventory() {
+        return extensions.values().stream()
+            .sorted((first, second) -> String.CASE_INSENSITIVE_ORDER.compare(first.pluginId, second.pluginId))
+            .map(state -> {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("pluginId", state.pluginId);
+                item.put("version", nullToEmpty(state.extension.getVersion()));
+                item.put("description", nullToEmpty(state.extension.getDescription()));
+                item.put("owner", state.owner != null ? state.owner.getName() : moduleContext.getPlugin().getName());
+                item.put("source", state.jarPath != null ? state.jarPath.toString() : "bukkit");
+                item.put("nodes", sorted(state.nodeIds));
+                item.put("handlers", sorted(state.handlerIds));
+                item.put("modules", sorted(state.moduleIds));
+                item.put("properties", state.propertyIds.stream().map(value -> value.family() + "." + value.property()).sorted(String.CASE_INSENSITIVE_ORDER).toList());
+                item.put("catalogs", sorted(state.optionCatalogIds));
+                item.put("runtimeDataAdapters", sorted(state.runtimeDataAdapterIds));
+                item.put("types", sorted(state.typeIds));
+                item.put("conversions", state.conversions.stream().map(value -> value.source().getName() + " -> " + value.target().getName()).sorted(String.CASE_INSENSITIVE_ORDER).toList());
+                item.put("resources", sorted(state.resourceTypeIds));
+                item.put("validators", sorted(state.validatorIds));
+                item.put("customContentProviders", sorted(state.customContentProviderIds));
+                item.put("worldMapExtensions", sorted(state.worldMapExtensionIds));
+                item.put("listeners", state.listeners.size());
+                item.put("disposition", "supported");
+                item.put("requirements", List.of("EXT-001", "EXT-002", "EXT-006", "EXT-008"));
+                return Map.copyOf(item);
+            })
+            .toList();
+    }
+
+    private List<String> sorted(Set<String> values) {
+        return values.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
     public void reloadExtensions() {
         for (ExtensionState state : new ArrayList<>(extensions.values())) {
             try {
@@ -96,8 +147,7 @@ public class ReSyncExtensionManager {
             state.clearOwnedIds();
             try {
                 moduleContext.getRequiredService(ReSyncExtensionData.class).addPlugin(state.pluginId, state.extension.getVersion(), state.extension.getDescription());
-                state.extension.initialize(new ExtensionContext(state));
-                state.extension.start();
+                initializeExtension(state, new ExtensionContext(state));
             } catch (Exception exception) {
                 extensions.remove(state.pluginId);
                 cleanupState(state);
@@ -117,8 +167,7 @@ public class ReSyncExtensionManager {
         extensions.put(pluginId, state);
         try {
             moduleContext.getRequiredService(ReSyncExtensionData.class).addPlugin(pluginId, extension.getVersion(), extension.getDescription());
-            extension.initialize(context);
-            extension.start();
+            initializeExtension(state, context);
             refreshNodeRegistry();
             Log.info("[ReSync] Registered extension " + pluginId + " " + nullToEmpty(extension.getVersion()));
             return new ExtensionHandle(pluginId);
@@ -127,6 +176,28 @@ public class ReSyncExtensionManager {
             cleanupState(state);
             throw new IllegalStateException("Failed to register ReSync extension " + pluginId, exception);
         }
+    }
+
+    private void initializeExtension(ExtensionState state, ExtensionContext context) {
+        Set<Listener> listenersBefore = registeredListeners(context.owner());
+        try {
+            state.extension.initialize(context);
+            state.extension.start();
+        } finally {
+            for (Listener listener : registeredListeners(context.owner())) {
+                if (!listenersBefore.contains(listener)) {
+                    state.listeners.add(listener);
+                }
+            }
+        }
+    }
+
+    private Set<Listener> registeredListeners(JavaPlugin owner) {
+        Set<Listener> listeners = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (RegisteredListener registeredListener : HandlerList.getRegisteredListeners(owner)) {
+            listeners.add(registeredListener.getListener());
+        }
+        return listeners;
     }
 
     private void unregister(String pluginId) {
@@ -184,6 +255,35 @@ public class ReSyncExtensionManager {
                 optionCatalogs.unregister(sourceId);
             }
         }
+        RuntimeDataRegistry runtimeData = moduleContext.getService(RuntimeDataRegistry.class);
+        if (runtimeData != null) {
+            for (String adapterId : state.runtimeDataAdapterIds) {
+                runtimeData.unregister(adapterId);
+            }
+        }
+        FlowValueCodecRegistry valueCodecs = moduleContext.getService(FlowValueCodecRegistry.class);
+        for (String typeId : state.typeIds) {
+            FlowDataType.unregisterExtensionType(state.pluginId, typeId);
+            if (valueCodecs != null) {
+                valueCodecs.unregister(typeId);
+            }
+        }
+        TypeAdapterRegistry typeAdapters = moduleContext.getService(TypeAdapterRegistry.class);
+        if (typeAdapters != null) {
+            for (ConversionRegistration conversion : state.conversions) {
+                typeAdapters.unregister(conversion.source(), conversion.target());
+            }
+        }
+        FlowResourceRegistry resources = moduleContext.getService(FlowResourceRegistry.class);
+        if (resources != null) {
+            for (String resourceTypeId : state.resourceTypeIds) {
+                resources.unregister(state.pluginId, resourceTypeId);
+            }
+        }
+        FlowGraphValidationRegistry validators = moduleContext.getService(FlowGraphValidationRegistry.class);
+        if (validators != null) {
+            validators.unregisterOwner(state.pluginId);
+        }
         CustomContentService customContentService = moduleContext.getService(CustomContentService.class);
         if (customContentService != null) {
             for (String providerId : state.customContentProviderIds) {
@@ -195,6 +295,9 @@ public class ReSyncExtensionManager {
             for (String extensionId : state.worldMapExtensionIds) {
                 worldMapService.unregisterExtension(extensionId);
             }
+        }
+        for (Listener listener : state.listeners) {
+            HandlerList.unregisterAll(listener);
         }
         for (String moduleId : new ArrayList<>(state.moduleIds)) {
             moduleContext.getModuleRegistry().unregisterRuntimeModule(moduleId, moduleContext);
@@ -390,10 +493,39 @@ public class ReSyncExtensionManager {
                 if (registry.provider(provider.sourceId()) != null) {
                     throw new IllegalArgumentException("Duplicate option catalog id: " + provider.sourceId());
                 }
-                registry.register(provider);
+                if (!registry.register(provider)) {
+                    throw new IllegalArgumentException("Duplicate option catalog id: " + provider.sourceId());
+                }
                 state.optionCatalogIds.add(provider.sourceId());
                 moduleContext.getRequiredService(ReSyncExtensionData.class)
-                    .addOptionSource(state.pluginId, new FlowOptionSourceMetadata(provider.sourceId(), state.pluginId, "SEARCHABLE_LIST", true));
+                    .addOptionSource(state.pluginId, new FlowOptionSourceMetadata(provider.sourceId(), provider.providerId(), provider.widgetType(), provider.searchable(), "", "string",
+                        provider.contextKeys() != null ? provider.contextKeys().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList() : List.of()));
+            };
+        }
+
+        @Override
+        public RuntimeDataRegistration runtimeData() {
+            return adapter -> {
+                if (adapter == null) {
+                    return;
+                }
+                validateNamespaced(state.pluginId, adapter.id(), "Runtime data adapter");
+                RuntimeDataRegistry registry = moduleContext.getRequiredService(RuntimeDataRegistry.class);
+                if (!registry.register(adapter)) {
+                    throw new IllegalArgumentException("Duplicate runtime data adapter id: " + adapter.id());
+                }
+                state.runtimeDataAdapterIds.add(adapter.id());
+            };
+        }
+
+        @Override
+        public EventRegistration events() {
+            return listener -> {
+                if (listener == null) {
+                    return;
+                }
+                Bukkit.getPluginManager().registerEvents(listener, owner());
+                state.listeners.add(listener);
             };
         }
 
@@ -452,6 +584,7 @@ public class ReSyncExtensionManager {
                 return;
             }
             validateNamespaced(state.pluginId, definition.getId(), "Flow node");
+            definition.assignOwner(state.pluginId);
             nodeDefinitions().register(state.pluginId, definition);
             state.nodeIds.add(definition.getId());
         }
@@ -483,7 +616,51 @@ public class ReSyncExtensionManager {
         @Override
         public void registerType(FlowTypeMetadata metadata) {
             validateNamespaced(state.pluginId, metadata != null ? metadata.getId() : null, "Flow type");
+            metadata.setAvailable(false);
+            metadata.setUnavailableReason("No executable runtime type is registered");
             moduleContext.getRequiredService(ReSyncExtensionData.class).addType(state.pluginId, metadata);
+        }
+
+        @Override
+        public void registerType(FlowDataType type, FlowTypeMetadata metadata) {
+            registerType(type, null, metadata);
+        }
+
+        @Override
+        public void registerType(FlowDataType type, FlowValueCodec<?> codec, FlowTypeMetadata metadata) {
+            String typeId = type != null ? type.getId() : null;
+            validateNamespaced(state.pluginId, typeId, "Flow type");
+            if (metadata == null || metadata.getId() == null || !typeId.equalsIgnoreCase(metadata.getId())) {
+                throw new IllegalArgumentException("Flow type metadata must match runtime type " + typeId);
+            }
+            FlowDataType registered = FlowDataType.registerExtensionType(state.pluginId, type);
+            FlowValueCodecRegistry valueCodecs = moduleContext.getRequiredService(FlowValueCodecRegistry.class);
+            try {
+                boolean boundarySafe = false;
+                if (codec != null) {
+                    if (!typeId.equalsIgnoreCase(codec.id())) {
+                        throw new IllegalArgumentException("Flow codec id must match runtime type " + typeId);
+                    }
+                    valueCodecs.register(codec);
+                    boundarySafe = true;
+                } else if (registered.getParent() != null && valueCodecs.hasCodec(FlowTypeRef.simple(registered.getParent().getId()))) {
+                    valueCodecs.registerAlias(typeId, registered.getParent().getId());
+                    boundarySafe = true;
+                }
+                metadata.setOwner(state.pluginId);
+                metadata.setRuntimeType(registered.getJavaType() != null ? registered.getJavaType().getName() : null);
+                metadata.setAvailable(true);
+                metadata.setUnavailableReason(null);
+                metadata.setTransportable(boundarySafe);
+                metadata.setPersistable(boundarySafe);
+                metadata.setCodecId(boundarySafe ? "extension:" + state.pluginId + "/" + typeId : null);
+                moduleContext.getRequiredService(ReSyncExtensionData.class).addType(state.pluginId, metadata);
+                state.typeIds.add(typeId);
+            } catch (RuntimeException exception) {
+                valueCodecs.unregister(typeId);
+                FlowDataType.unregisterExtensionType(state.pluginId, typeId);
+                throw exception;
+            }
         }
 
         @Override
@@ -494,13 +671,92 @@ public class ReSyncExtensionManager {
 
         @Override
         public void registerConversion(FlowConversionRule rule) {
+            if (rule != null) {
+                rule.setAvailability("unavailable: No executable conversion adapter is registered");
+            }
             moduleContext.getRequiredService(ReSyncExtensionData.class).addConversion(state.pluginId, rule);
+        }
+
+        @Override
+        public <S, T> void registerConversion(Class<S> source, Class<T> target, Function<S, T> adapter, FlowConversionRule rule) {
+            if (source == null || target == null || adapter == null || rule == null) {
+                throw new IllegalArgumentException("Conversion classes, adapter, and rule are required");
+            }
+            FlowDataType sourceType = FlowDataType.fromString(rule.getSourceTypeId());
+            FlowDataType targetType = FlowDataType.fromString(rule.getTargetTypeId());
+            if (!sourceType.isResolved() || !targetType.isResolved()) {
+                throw new IllegalArgumentException("Conversion types must be executable before registering the adapter");
+            }
+            TypeAdapterRegistry adapters = moduleContext.getRequiredService(TypeAdapterRegistry.class);
+            adapters.register(source, target, adapter);
+            rule.setImplementationId(state.pluginId + ":adapter/" + rule.getSourceTypeId() + "-to-" + rule.getTargetTypeId());
+            rule.setAvailability("available");
+            moduleContext.getRequiredService(ReSyncExtensionData.class).addConversion(state.pluginId, rule);
+            state.conversions.add(new ConversionRegistration(source, target));
         }
 
         @Override
         public void registerOptionSource(FlowOptionSourceMetadata metadata) {
             validateNamespaced(state.pluginId, metadata != null ? metadata.getId() : null, "Option source");
             moduleContext.getRequiredService(ReSyncExtensionData.class).addOptionSource(state.pluginId, metadata);
+        }
+
+        @Override
+        public void registerResource(FlowResourceAdapter<?> adapter) {
+            String typeId = adapter != null && adapter.descriptor() != null ? adapter.descriptor().typeId() : null;
+            validateNamespaced(state.pluginId, typeId, "Flow resource");
+            FlowResourceRegistry resources = moduleContext.getRequiredService(FlowResourceRegistry.class);
+            OptionCatalogRegistry catalogs = moduleContext.getRequiredService(OptionCatalogRegistry.class);
+            String catalogSource = adapter.catalogSource();
+            resources.register(state.pluginId, adapter);
+            boolean catalogRegistered = false;
+            try {
+                OptionCatalogProvider existingCatalog = catalogs.provider(catalogSource);
+                if (existingCatalog != null) {
+                    if (!state.optionCatalogIds.contains(catalogSource)) {
+                        throw new IllegalStateException("Resource catalog source is owned by another contribution: " + catalogSource);
+                    }
+                } else {
+                    catalogRegistered = catalogs.register(new OptionCatalogProvider() {
+                        @Override
+                        public String sourceId() {
+                            return catalogSource;
+                        }
+
+                        @Override
+                        public String revision() {
+                            List<String> ids = new ArrayList<>(adapter.listIds());
+                            ids.sort(String.CASE_INSENSITIVE_ORDER);
+                            return typeId + ":" + ids.size() + ":" + String.join(",", ids);
+                        }
+
+                        @Override
+                        public List<String> values() {
+                            return adapter.listIds();
+                        }
+                    });
+                    if (!catalogRegistered) {
+                        throw new IllegalStateException("Resource catalog source is already registered: " + catalogSource);
+                    }
+                    state.optionCatalogIds.add(catalogSource);
+                }
+                state.resourceTypeIds.add(typeId);
+                moduleContext.getRequiredService(ReSyncExtensionData.class).addResource(state.pluginId, typeId);
+            } catch (RuntimeException exception) {
+                if (catalogRegistered) {
+                    catalogs.unregister(catalogSource);
+                }
+                resources.unregister(state.pluginId, typeId);
+                throw exception;
+            }
+        }
+
+        @Override
+        public void registerValidator(String validatorId, FlowGraphValidationRule validator) {
+            validateNamespaced(state.pluginId, validatorId, "Flow validator");
+            FlowGraphValidationRegistry validators = moduleContext.getRequiredService(FlowGraphValidationRegistry.class);
+            validators.register(state.pluginId, validatorId, validator);
+            state.validatorIds.add(validatorId);
         }
     }
 
@@ -570,8 +826,14 @@ public class ReSyncExtensionManager {
         private final Set<String> moduleIds = new HashSet<>();
         private final Set<PropertyRegistration> propertyIds = new HashSet<>();
         private final Set<String> optionCatalogIds = new HashSet<>();
+        private final Set<String> runtimeDataAdapterIds = new HashSet<>();
+        private final Set<String> typeIds = new HashSet<>();
+        private final Set<ConversionRegistration> conversions = new HashSet<>();
+        private final Set<String> resourceTypeIds = new HashSet<>();
+        private final Set<String> validatorIds = new HashSet<>();
         private final Set<String> customContentProviderIds = new HashSet<>();
         private final Set<String> worldMapExtensionIds = new HashSet<>();
+        private final Set<Listener> listeners = Collections.newSetFromMap(new IdentityHashMap<>());
 
         private ExtensionState(String pluginId, JavaPlugin owner, ReSyncExtension extension, URLClassLoader classLoader, Path jarPath) {
             this.pluginId = pluginId;
@@ -587,11 +849,20 @@ public class ReSyncExtensionManager {
             moduleIds.clear();
             propertyIds.clear();
             optionCatalogIds.clear();
+            runtimeDataAdapterIds.clear();
+            typeIds.clear();
+            conversions.clear();
+            resourceTypeIds.clear();
+            validatorIds.clear();
             customContentProviderIds.clear();
             worldMapExtensionIds.clear();
+            listeners.clear();
         }
     }
 
     private record PropertyRegistration(String family, String property) {
+    }
+
+    private record ConversionRegistration(Class<?> source, Class<?> target) {
     }
 }

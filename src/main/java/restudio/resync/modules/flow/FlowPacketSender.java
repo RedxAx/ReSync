@@ -14,10 +14,15 @@ import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.Log;
+import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.core.Session;
+import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.diagnostics.FlowTraceRecord;
+import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
+import restudio.resync.flow.sync.OptionCatalogSnapshot;
 import restudio.resync.jobs.JobManager;
 import restudio.resync.jobs.JobRecord;
 import restudio.resync.protocol.Codec;
@@ -27,6 +32,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -54,34 +60,38 @@ public class FlowPacketSender {
             .create();
 
     public FlowPacketSender(Codec codec, int channelId, Set<Session> subscribedSessions) {
+        this(codec, channelId, subscribedSessions, null);
+    }
+
+    public FlowPacketSender(Codec codec, int channelId, Set<Session> subscribedSessions, FlowJobRegistry flowJobs) {
         this.codec = codec;
         this.channelId = channelId;
         this.subscribedSessions = subscribedSessions;
-        this.jobManager = new JobManager(job -> broadcastJob("jobStatus", job.snapshot()));
+        this.jobManager = new JobManager(flowJobs, job -> broadcastJob("jobStatus", job.snapshot()));
     }
 
     public void sendFlowData(Session session, FlowGraph graph) {
-        sendJsonPacket(session, (byte) 0x02, FlowSerializer.serialize(graph), "FLOW_TOO_LARGE", "Flow data exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("flow").data(), FlowSerializer.serialize(graph), "FLOW_TOO_LARGE", "Flow data exceeds maximum size");
     }
 
     public void sendGuiData(Session session, GuiDefinition gui) {
-        sendJsonPacket(session, (byte) 0x12, FlowSerializer.serializeGui(gui), "GUI_TOO_LARGE", "GUI data exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("gui").data(), FlowSerializer.serializeGui(gui), "GUI_TOO_LARGE", "GUI data exceeds maximum size");
     }
 
     public void sendScoreboardData(Session session, ScoreboardDefinition scoreboard) {
-        sendJsonPacket(session, (byte) 0x1C, FlowSerializer.serializeScoreboard(scoreboard), "SCOREBOARD_TOO_LARGE", "Scoreboard data exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("scoreboard").data(), FlowSerializer.serializeScoreboard(scoreboard), "SCOREBOARD_TOO_LARGE", "Scoreboard data exceeds maximum size");
     }
 
     public void sendTabData(Session session, TabDefinition tab) {
-        sendJsonPacket(session, (byte) 0x24, FlowSerializer.serializeTab(tab), "TAB_TOO_LARGE", "Tab data exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("tab").data(), FlowSerializer.serializeTab(tab), "TAB_TOO_LARGE", "Tab data exceeds maximum size");
     }
 
     public void sendCustomContentData(Session session, CustomContentDefinition content) {
-        sendJsonPacket(session, (byte) 0x32, gson.toJson(content), "CONTENT_TOO_LARGE", "Custom content data exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("custom_content").data(), gson.toJson(content), "CONTENT_TOO_LARGE", "Custom content data exceeds maximum size");
     }
 
     public void sendProjectMetadataData(Session session, String json) {
-        sendJsonPacket(session, (byte) 0x52, json, "PROJECT_METADATA_TOO_LARGE", "Project metadata exceeds maximum size");
+        sendJsonPacket(session, resourcePackets("project_metadata").data(), json, "PROJECT_METADATA_TOO_LARGE", "Project metadata exceeds maximum size");
     }
 
     public void sendJsonResourceData(Session session, byte packetId, String json, String typeName) {
@@ -94,51 +104,51 @@ public class FlowPacketSender {
     }
 
     public void sendFlowSaveAck(Session session, String flowId) {
-        sendIdAck(session, (byte) 0x07, flowId);
+        sendIdAck(session, resourcePackets("flow").saveAck(), flowId);
     }
 
     public void sendFlowSaveAck(Session session, String flowId, String requestId) {
-        sendIdAck(session, (byte) 0x07, flowId, requestId);
+        sendIdAck(session, resourcePackets("flow").saveAck(), flowId, requestId);
     }
 
     public void sendGuiSaveAck(Session session, String guiId) {
-        sendIdAck(session, (byte) 0x17, guiId);
+        sendIdAck(session, resourcePackets("gui").saveAck(), guiId);
     }
 
     public void sendGuiSaveAck(Session session, String guiId, String requestId) {
-        sendIdAck(session, (byte) 0x17, guiId, requestId);
+        sendIdAck(session, resourcePackets("gui").saveAck(), guiId, requestId);
     }
 
     public void sendScoreboardSaveAck(Session session, String scoreboardId) {
-        sendIdAck(session, (byte) 0x1E, scoreboardId);
+        sendIdAck(session, resourcePackets("scoreboard").saveAck(), scoreboardId);
     }
 
     public void sendScoreboardSaveAck(Session session, String scoreboardId, String requestId) {
-        sendIdAck(session, (byte) 0x1E, scoreboardId, requestId);
+        sendIdAck(session, resourcePackets("scoreboard").saveAck(), scoreboardId, requestId);
     }
 
     public void sendTabSaveAck(Session session, String tabId) {
-        sendIdAck(session, (byte) 0x26, tabId);
+        sendIdAck(session, resourcePackets("tab").saveAck(), tabId);
     }
 
     public void sendTabSaveAck(Session session, String tabId, String requestId) {
-        sendIdAck(session, (byte) 0x26, tabId, requestId);
+        sendIdAck(session, resourcePackets("tab").saveAck(), tabId, requestId);
     }
 
     public void sendCustomContentSaveAck(Session session, String contentId) {
-        sendIdAck(session, (byte) 0x35, contentId);
+        sendIdAck(session, resourcePackets("custom_content").saveAck(), contentId);
     }
 
     public void sendCustomContentSaveAck(Session session, String contentId, String requestId) {
-        sendIdAck(session, (byte) 0x35, contentId, requestId);
+        sendIdAck(session, resourcePackets("custom_content").saveAck(), contentId, requestId);
     }
 
     public void sendProjectMetadataSaveAck(Session session, String metadataId) {
-        sendIdAck(session, (byte) 0x56, metadataId);
+        sendIdAck(session, resourcePackets("project_metadata").saveAck(), metadataId);
     }
 
     public void sendProjectMetadataSaveAck(Session session, String metadataId, String requestId) {
-        sendIdAck(session, (byte) 0x56, metadataId, requestId);
+        sendIdAck(session, resourcePackets("project_metadata").saveAck(), metadataId, requestId);
     }
 
     public void sendJsonResourceSaveAck(Session session, byte packetId, String id) {
@@ -179,28 +189,43 @@ public class FlowPacketSender {
         sendJob(session, "jobSnapshot", jobManager.activeOrRecentSnapshot(actorClientId, 300000));
     }
 
+    public void sendScheduledTaskSnapshot(Session session, List<FlowExecutor.ScheduledTaskSnapshot> snapshots) {
+        List<Map<String, Object>> tasks = snapshots != null ? snapshots.stream().map(snapshot -> Map.<String, Object>of(
+            "taskId", snapshot.taskId(),
+            "kind", "scheduled_flow",
+            "runtimeOwner", snapshot.runtimeOwner(),
+            "graphId", snapshot.graphId(),
+            "createdAt", snapshot.createdAt(),
+            "nextFireAt", snapshot.nextFireAt(),
+            "recurring", snapshot.recurring(),
+            "status", snapshot.state().name().toLowerCase(Locale.ROOT),
+            "lastFailure", snapshot.lastFailure()
+        )).toList() : List.of();
+        sendJob(session, "scheduledTaskSnapshot", tasks);
+    }
+
     public void sendFlowList(Session session, List<String> flowIds) {
-        sendStringList(session, (byte) 0x0A, flowIds);
+        sendStringList(session, resourcePackets("flow").list(), flowIds);
     }
 
     public void sendGuiList(Session session, List<String> guiIds) {
-        sendStringList(session, (byte) 0x15, guiIds);
+        sendStringList(session, resourcePackets("gui").list(), guiIds);
     }
 
     public void sendScoreboardList(Session session, List<String> scoreboardIds) {
-        sendStringList(session, (byte) 0x1D, scoreboardIds);
+        sendStringList(session, resourcePackets("scoreboard").list(), scoreboardIds);
     }
 
     public void sendTabList(Session session, List<String> tabIds) {
-        sendStringList(session, (byte) 0x25, tabIds);
+        sendStringList(session, resourcePackets("tab").list(), tabIds);
     }
 
     public void sendCustomContentList(Session session, List<String> contentIds) {
-        sendStringList(session, (byte) 0x31, contentIds);
+        sendStringList(session, resourcePackets("custom_content").list(), contentIds);
     }
 
     public void sendProjectMetadataList(Session session, List<String> metadataIds) {
-        sendStringList(session, (byte) 0x53, metadataIds);
+        sendStringList(session, resourcePackets("project_metadata").list(), metadataIds);
     }
 
     public void sendJsonResourceList(Session session, byte packetId, List<String> ids) {
@@ -220,7 +245,7 @@ public class FlowPacketSender {
         byte[] guiBytes = guiId != null ? guiId.getBytes(StandardCharsets.UTF_8) : new byte[0];
         byte[] flowBytes = flowId != null ? flowId.getBytes(StandardCharsets.UTF_8) : new byte[0];
         ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 4 + guiBytes.length + 4 + flowBytes.length);
-        buffer.put((byte) 0x04);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_GUI_STATE);
         buffer.put((byte) (editable ? 1 : 0));
         buffer.putInt(guiBytes.length);
         buffer.put(guiBytes);
@@ -247,7 +272,7 @@ public class FlowPacketSender {
         byte[] idBytes = resourceId != null ? resourceId.getBytes(StandardCharsets.UTF_8) : new byte[0];
         byte[] flowBytes = flowId != null ? flowId.getBytes(StandardCharsets.UTF_8) : new byte[0];
         ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 4 + typeBytes.length + 4 + idBytes.length + 4 + flowBytes.length);
-        buffer.put((byte) 0x5A);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_EDIT_TARGET_STATE);
         buffer.put((byte) (editable ? 1 : 0));
         buffer.putInt(typeBytes.length);
         buffer.put(typeBytes);
@@ -261,7 +286,7 @@ public class FlowPacketSender {
     public void sendPlaceholderPreview(Session session, int requestId, String rendered) {
         byte[] renderedBytes = rendered.getBytes(StandardCharsets.UTF_8);
         ByteBuffer out = ByteBuffer.allocate(1 + 4 + 4 + renderedBytes.length);
-        out.put((byte) 0x28);
+        out.put(ReSyncProtocolContract.FLOW_PACKET_PLACEHOLDER_PREVIEW);
         out.putInt(requestId);
         out.putInt(renderedBytes.length);
         out.put(renderedBytes);
@@ -274,7 +299,7 @@ public class FlowPacketSender {
         }
         String json = gson.toJson(snapshot);
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
-        byte packetId = snapshot.isFullSync() ? (byte) 0x0B : (byte) 0x0D;
+        byte packetId = snapshot.isFullSync() ? ReSyncProtocolContract.FLOW_PACKET_NODE_REGISTRY : ReSyncProtocolContract.FLOW_PACKET_NODE_REGISTRY_DELTA;
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
         buffer.put(packetId);
         buffer.put(jsonBytes);
@@ -285,36 +310,52 @@ public class FlowPacketSender {
         sendOptionCatalog(session, sourceId, values, List.of(), revision);
     }
 
-    public void sendOptionCatalog(Session session, String sourceId, List<String> values, List<?> items, String revision) {
-        String json = gson.toJson(Map.of(
-            "sourceId", sourceId != null ? sourceId : "",
-            "revision", revision != null ? revision : "",
-            "values", values != null ? values : List.of(),
-            "items", items != null ? items : List.of()
-        ));
+    public void sendOptionCatalog(Session session, String sourceId, List<String> values, List<OptionCatalogItem> items, String revision) {
+        sendOptionCatalog(session, sourceId, values, items, revision, 0L);
+    }
+
+    public void sendOptionCatalog(Session session, String sourceId, List<String> values, List<OptionCatalogItem> items, String revision, long sequence) {
+        sendOptionCatalog(session, sourceId, "", values, items, revision, sequence);
+    }
+
+    public void sendOptionCatalog(Session session, String sourceId, String contextKey, List<String> values, List<OptionCatalogItem> items, String revision, long sequence) {
+        sendOptionCatalog(session, sourceId, contextKey, values, items, revision, sequence, "available", "");
+    }
+
+    public void sendOptionCatalog(Session session, String sourceId, String contextKey, List<String> values, List<OptionCatalogItem> items, String revision, long sequence,
+                                  String status, String diagnostic) {
+        String json = gson.toJson(new OptionCatalogSnapshot(sourceId, contextKey, revision, sequence, values, items, status, diagnostic));
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
-        buffer.put((byte) 0x38);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_OPTION_CATALOG);
         buffer.put(jsonBytes);
         sendRaw(session, buffer.array(), true);
     }
 
-    public void broadcastOptionCatalog(String sourceId, List<String> values, List<?> items, String revision) {
+    public void broadcastOptionCatalog(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision) {
+        broadcastOptionCatalog(sourceId, values, items, revision, 0L);
+    }
+
+    public void broadcastOptionCatalog(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision, long sequence) {
+        broadcastOptionCatalog(sourceId, values, items, revision, sequence, "available", "");
+    }
+
+    public void broadcastOptionCatalog(String sourceId, List<String> values, List<OptionCatalogItem> items, String revision, long sequence, String status, String diagnostic) {
         for (Session session : subscribedSessions) {
-            sendOptionCatalog(session, sourceId, values, items, revision);
+            sendOptionCatalog(session, sourceId, "", values, items, revision, sequence, status, diagnostic);
         }
     }
 
     public void sendTraceSnapshot(Session session, List<FlowTraceRecord> records) {
-        sendTracePacket(session, (byte) 0x41, records == null ? List.of() : records);
+        sendTracePacket(session, ReSyncProtocolContract.FLOW_PACKET_TRACE_SNAPSHOT, records == null ? List.of() : records);
     }
 
     public void sendTraceEvent(Session session, FlowTraceRecord record) {
-        sendTracePacket(session, (byte) 0x42, record);
+        sendTracePacket(session, ReSyncProtocolContract.FLOW_PACKET_TRACE_EVENT, record);
     }
 
     public void sendDebugSnapshot(Session session, Object payload) {
-        sendTracePacket(session, (byte) 0x47, payload);
+        sendTracePacket(session, ReSyncProtocolContract.FLOW_PACKET_DEBUG_EVENT, payload);
     }
 
     private void sendTracePacket(Session session, byte packetId, Object payload) {
@@ -350,7 +391,7 @@ public class FlowPacketSender {
         ));
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + jsonBytes.length);
-        buffer.put((byte) 0x44);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_JOB);
         buffer.put(jsonBytes);
         sendRaw(session, buffer.array(), false);
     }
@@ -358,7 +399,7 @@ public class FlowPacketSender {
     public void sendError(Session session, String errorCode, String message) {
         byte[] errorBytes = message.getBytes(StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + errorBytes.length);
-        buffer.put((byte) 0x05);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_ERROR);
         buffer.putInt(errorBytes.length);
         buffer.put(errorBytes);
         sendRaw(session, buffer.array(), false);
@@ -387,6 +428,14 @@ public class FlowPacketSender {
         buffer.putInt(idBytes.length);
         buffer.put(idBytes);
         sendRaw(session, buffer.array(), false);
+    }
+
+    private ReSyncProtocolContract.ResourceFlowPackets resourcePackets(String typeId) {
+        ReSyncProtocolContract.ResourceContract resource = ReSyncProtocolContract.resource(typeId);
+        if (resource == null || resource.flowPackets() == null) {
+            throw new IllegalStateException("Missing Flow resource packet contract: " + typeId);
+        }
+        return resource.flowPackets();
     }
 
     private void sendIdAck(Session session, byte packetId, String id, String requestId) {

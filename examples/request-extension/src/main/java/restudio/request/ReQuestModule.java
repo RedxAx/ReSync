@@ -2,8 +2,12 @@ package restudio.request;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
 import restudio.resync.core.ChannelMuxer;
 import restudio.resync.core.Session;
+import restudio.resync.flow.validation.FlowGraphDiagnostic;
+import restudio.resync.flow.validation.FlowGraphValidationRegistry;
 import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleMetadata;
@@ -12,6 +16,7 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +33,7 @@ public class ReQuestModule implements Module {
     private final ReQuestService service;
     private final Set<Session> sessions = ConcurrentHashMap.newKeySet();
     private ModuleContext context;
+    private FlowGraphValidationRegistry validationRegistry;
 
     public ReQuestModule(ReQuestService service) {
         this.service = service;
@@ -41,11 +47,39 @@ public class ReQuestModule implements Module {
     @Override
     public void initialize(ModuleContext context) {
         this.context = context;
+        validationRegistry = context.getRequiredService(FlowGraphValidationRegistry.class);
+        validationRegistry.register(ReQuestExtension.PLUGIN_ID, "request:quest_references", this::validateGraph);
     }
 
     @Override
     public void stop(ModuleContext context) {
+        if (validationRegistry != null) {
+            validationRegistry.unregister(ReQuestExtension.PLUGIN_ID, "request:quest_references");
+            validationRegistry = null;
+        }
         sessions.clear();
+    }
+
+    List<FlowGraphDiagnostic> validateGraph(FlowGraph graph) {
+        if (graph == null) {
+            return List.of();
+        }
+        List<FlowGraphDiagnostic> diagnostics = new ArrayList<>();
+        for (var entry : graph.getNodes().entrySet()) {
+            FlowNode node = entry.getValue();
+            if (node == null || node.getType() == null || !node.getType().startsWith(ReQuestExtension.PLUGIN_ID + ":") || node.getInputValues() == null) {
+                continue;
+            }
+            Object value = node.getInputValues().get("quest");
+            if (!(value instanceof String questId) || questId.isBlank() || graph.getConnectionsToTarget(entry.getKey()).stream().anyMatch(connection -> "quest".equals(connection.getTargetPin()))) {
+                continue;
+            }
+            if (service.quest(questId) == null) {
+                diagnostics.add(new FlowGraphDiagnostic(FlowGraphDiagnostic.Severity.ERROR, "REQUEST_QUEST_UNRESOLVED", graph.getId(), entry.getKey(), "quest",
+                    "Quest does not exist: " + questId, "Create the quest or select an existing quest ID"));
+            }
+        }
+        return List.copyOf(diagnostics);
     }
 
     @Override

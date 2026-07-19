@@ -2,32 +2,22 @@ package restudio.resync.worldgen.datapack;
 
 import io.papermc.paper.datapack.Datapack;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
 
 public class WorldGenDatapackInstaller {
-    private final Plugin plugin;
-
-    public WorldGenDatapackInstaller(Plugin plugin) {
-        this.plugin = plugin;
-    }
-
     public InstallResult install(WorldGenDatapackBuild build, String worldName) {
         if (build == null || build.getFolder() == null) {
             return new InstallResult(false, false, "Datapack Build Missing");
         }
         try {
-            cleanupInstalledPacks();
             Path serverPack = serverDatapackFolder(build.getPackName());
             copyDirectory(build.getFolder(), serverPack);
             if (worldName != null && !worldName.isBlank()) {
-                Path worldPack = Bukkit.getWorldContainer().toPath().resolve(worldName).resolve("datapacks").resolve(build.getPackName()).toAbsolutePath().normalize();
+                Path worldPack = worldDatapackFolder(worldName, build.getPackName());
                 copyDirectory(build.getFolder(), worldPack);
             }
             boolean enabled = enableKnownPack(build.getPackName());
@@ -37,36 +27,23 @@ public class WorldGenDatapackInstaller {
         }
     }
 
-    public void cleanupInstalledPacks() {
-        Path root = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        List<Path> datapackFolders = new ArrayList<>();
-        try (var stream = Files.list(root)) {
-            stream
-                .filter(Files::isDirectory)
-                .map(path -> path.resolve("datapacks").toAbsolutePath().normalize())
-                .filter(Files::isDirectory)
-                .forEach(datapackFolders::add);
-        } catch (IOException ignored) {
-        }
-        for (Path datapackFolder : datapackFolders) {
-            try (var stream = Files.list(datapackFolder)) {
-                stream
-                    .filter(Files::isDirectory)
-                    .filter(path -> path.getFileName().toString().startsWith("resync_worldgen_"))
-                    .forEach(path -> {
-                        try {
-                            deleteDirectory(path);
-                        } catch (IOException ignored) {
-                        }
-                    });
-            } catch (IOException ignored) {
-            }
-        }
+    private Path serverDatapackFolder(String packName) {
+        return worldDatapackFolder(Bukkit.getUnsafe().getMainLevelName(), packName);
     }
 
-    private Path serverDatapackFolder(String packName) {
-        String mainWorld = Bukkit.getUnsafe().getMainLevelName();
-        return Bukkit.getWorldContainer().toPath().resolve(mainWorld).resolve("datapacks").resolve(packName).toAbsolutePath().normalize();
+    private Path worldDatapackFolder(String worldName, String packName) {
+        if (worldName == null || worldName.isBlank() || worldName.contains("/") || worldName.contains("\\") || worldName.contains("..")
+            || packName == null || packName.isBlank() || packName.contains("/") || packName.contains("\\") || packName.contains("..")) {
+            throw new IllegalArgumentException("Invalid WorldGen datapack destination");
+        }
+        Path root = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path world = root.resolve(worldName).normalize();
+        Path datapacks = world.resolve("datapacks").normalize();
+        Path pack = datapacks.resolve(packName).normalize();
+        if (world.equals(root) || !world.startsWith(root) || pack.equals(datapacks) || !pack.startsWith(datapacks)) {
+            throw new IllegalArgumentException("Invalid WorldGen datapack destination");
+        }
+        return pack;
     }
 
     private boolean enableKnownPack(String packName) {

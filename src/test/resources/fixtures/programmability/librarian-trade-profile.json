@@ -1,0 +1,13 @@
+{
+  "id": "librarian",
+  "enabled": true,
+  "displayName": "Librarian",
+  "offers": [
+    {
+      "cost": "minecraft:emerald",
+      "costAmount": 4,
+      "result": "minecraft:book",
+      "resultAmount": 2
+    }
+  ]
+}

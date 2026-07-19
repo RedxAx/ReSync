@@ -5,10 +5,12 @@ import org.bukkit.block.Biome;
 import org.bukkit.entity.EntityType;
 import restudio.resync.ReSync;
 import restudio.resync.structure.StructureLibrary;
+import restudio.resync.structure.StructureSummary;
 import restudio.flow.data.FlowDataType;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 public final class WorldGenNodeDefinitions {
     private WorldGenNodeDefinitions() {
@@ -108,12 +110,12 @@ public final class WorldGenNodeDefinitions {
     }
 
     private static List<String> structureOptions() {
-        List<String> custom = ReSync.getInstance() == null ? List.of() : StructureLibrary.get(ReSync.getInstance()).list().stream().map(restudio.resync.structure.StructureSummary::id).toList();
+        List<String> custom = ReSync.getInstance() == null ? List.of() : StructureLibrary.get(ReSync.getInstance()).list().stream().map(StructureSummary::id).toList();
         try {
             Class<?> type = Class.forName("org.bukkit.StructureType");
             Object[] values = type.getEnumConstants();
             if (values == null) return custom;
-            return java.util.stream.Stream.concat(custom.stream(), Arrays.stream(values).map(value -> "minecraft:" + ((Enum<?>) value).name().toLowerCase())).sorted().toList();
+            return Stream.concat(custom.stream(), Arrays.stream(values).map(value -> "minecraft:" + ((Enum<?>) value).name().toLowerCase())).sorted().toList();
         } catch (Exception ignored) {
             return custom;
         }

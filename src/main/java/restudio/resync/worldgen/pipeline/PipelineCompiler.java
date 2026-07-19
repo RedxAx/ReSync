@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -58,10 +59,10 @@ public class PipelineCompiler {
         if (message == null) {
             return "project";
         }
-        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        String lower = message.toLowerCase(Locale.ROOT);
         for (WorldGenStage stage : WorldGenStage.values()) {
-            if (lower.startsWith(stage.name().toLowerCase(java.util.Locale.ROOT))) {
-                return stage.name().toLowerCase(java.util.Locale.ROOT);
+            if (lower.startsWith(stage.name().toLowerCase(Locale.ROOT))) {
+                return stage.name().toLowerCase(Locale.ROOT);
             }
         }
         return "project";

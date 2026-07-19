@@ -10,6 +10,7 @@ import restudio.resync.worldgen.registry.WorldGenNodeRegistry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,7 +93,7 @@ final class PipelineValidator {
     }
 
     private static void validateSingleInputConnections(WorldGenGraph graph) {
-        Set<String> targets = new java.util.HashSet<>();
+        Set<String> targets = new HashSet<>();
         for (WorldGenConnection connection : graph.getConnections()) {
             String target = connection.getTargetNodeId() + ":" + connection.getTargetPin();
             if (!targets.add(target)) throw new CompilationException("Duplicate Input Connection " + target);

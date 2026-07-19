@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public class WorldGenProjectStorage {
     private final File projectDir;
@@ -22,11 +23,17 @@ public class WorldGenProjectStorage {
     private final File assetsDir;
     private final JsonAssetStore<WorldGenProject> assetStore;
     private final Map<String, WorldGenProject> cache = new ConcurrentHashMap<>();
+    private Runnable changeListener = () -> {
+    };
 
     public WorldGenProjectStorage(JavaPlugin plugin) {
-        this.projectDir = new File(plugin.getDataFolder(), "worldgen-projects");
+        this(plugin.getDataFolder());
+    }
+
+    public WorldGenProjectStorage(File dataFolder) {
+        this.projectDir = new File(dataFolder, "worldgen-projects");
         this.projectPath = projectDir.toPath();
-        this.assetsDir = new File(plugin.getDataFolder(), "assets");
+        this.assetsDir = new File(dataFolder, "assets");
         this.assetStore = new JsonAssetStore<>(
             assetsDir.toPath(),
             projectPath,
@@ -73,6 +80,7 @@ public class WorldGenProjectStorage {
         try {
             assetStore.save(project);
             cache.put(safeId, project);
+            notifyChange();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to save WorldGen project: " + safeId, e);
         }
@@ -86,6 +94,7 @@ public class WorldGenProjectStorage {
         try {
             assetStore.delete(safeId);
             cache.remove(safeId);
+            notifyChange();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to delete WorldGen project: " + safeId, e);
         }
@@ -94,6 +103,34 @@ public class WorldGenProjectStorage {
     public List<String> listProjectIds() {
         Set<String> ids = new HashSet<>(assetStore.listIds());
         return ids.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    public WorldGenProject reloadProject(String id, Consumer<WorldGenProject> validator) {
+        String safeId = safeId(id, "reload");
+        if (safeId == null) {
+            throw new IllegalArgumentException("Invalid WorldGen project id");
+        }
+        WorldGenProject project = assetStore.reload(safeId, validator);
+        if (project != null) {
+            cache.put(safeId, project);
+        } else {
+            cache.remove(safeId);
+        }
+        notifyChange();
+        return project;
+    }
+
+    public void setChangeListener(Runnable changeListener) {
+        this.changeListener = changeListener != null ? changeListener : () -> {
+        };
+    }
+
+    private void notifyChange() {
+        try {
+            changeListener.run();
+        } catch (RuntimeException exception) {
+            Log.warn("Failed to publish WorldGen project catalog change: " + exception.getMessage());
+        }
     }
 
     private String safeId(String id, String action) {

@@ -11,7 +11,6 @@ import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
 import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
-import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
@@ -25,6 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,12 +37,10 @@ public class WorldGenPreviewManager {
     private final Map<String, Long> activeRequests = new ConcurrentHashMap<>();
     private final AtomicLong previewRevision = new AtomicLong();
     private final WorldGenDatapackCompiler datapackCompiler;
-    private final WorldGenDatapackInstaller datapackInstaller;
 
     public WorldGenPreviewManager(Plugin plugin) {
         this.plugin = plugin;
         this.datapackCompiler = new WorldGenDatapackCompiler(plugin);
-        this.datapackInstaller = new WorldGenDatapackInstaller(plugin);
     }
 
     public void createPreview(String previewId, String playerUuid, WorldGenGraph graph, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
@@ -126,7 +124,6 @@ public class WorldGenPreviewManager {
     }
 
     public void cleanupOrphanedPreviews() {
-        datapackInstaller.cleanupInstalledPacks();
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (World world : new ArrayList<>(Bukkit.getWorlds())) {
                 if (isPreviewWorldName(world.getName())) {
@@ -150,7 +147,12 @@ public class WorldGenPreviewManager {
         activeRequests.clear();
         List<PreviewWorld> previews = new ArrayList<>(activePreviews.values());
         activePreviews.clear();
-        Bukkit.getScheduler().runTask(plugin, () -> previews.forEach(preview -> deletePreviewWorld(preview.worldName())));
+        Runnable cleanup = () -> previews.forEach(preview -> deletePreviewWorld(preview.worldName()));
+        if (Bukkit.isPrimaryThread() || !plugin.isEnabled()) {
+            cleanup.run();
+        } else {
+            Bukkit.getScheduler().runTask(plugin, cleanup);
+        }
     }
 
     private PreviewWorld createWorldSync(String playerUuid, TerrainPipeline pipeline, WorldGenDatapackBuild datapackBuild, String worldName, World.Environment environment, long seed, Map<String, Location> previousLocations) {
@@ -182,7 +184,7 @@ public class WorldGenPreviewManager {
     }
 
     private String normalizePreviewId(String previewId) {
-        String value = previewId == null || previewId.isBlank() ? "worldgen" : previewId.trim().toLowerCase(java.util.Locale.ROOT);
+        String value = previewId == null || previewId.isBlank() ? "worldgen" : previewId.trim().toLowerCase(Locale.ROOT);
         value = value.replaceAll("[^a-z0-9_\\-]+", "_");
         return value.isBlank() ? "worldgen" : value;
     }

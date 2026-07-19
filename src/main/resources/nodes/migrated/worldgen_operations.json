@@ -1,0 +1,136 @@
+[
+  {
+    "id": "worldgen.validate_project",
+    "displayName": "Validate WorldGen Project",
+    "description": "Validate a WorldGen project through the authoritative compiler pipeline.",
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["worldgen", "project", "validate", "diagnostics"],
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_validate"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<map<any,any>>"},
+      {"name": "diagnostics", "dataType": "map<any,any>"},
+      {"name": "valid", "dataType": "boolean"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "worldgen.compile_project",
+    "displayName": "Compile WorldGen Project",
+    "description": "Validate and compile a WorldGen project into a versioned datapack job.",
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["worldgen", "project", "compile", "datapack", "job"],
+    "examples": ["Connect the returned job to Get Job Status or handle Job Completed to inspect the compiled pack."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_operation",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_compile"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "worldgen_job"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "worldgen.install_project",
+    "displayName": "Install WorldGen Project",
+    "description": "Compile and install a WorldGen datapack for the server and an optional world.",
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["worldgen", "project", "install", "datapack", "job"],
+    "examples": ["Leave World Name empty to install for the main server world, or select a world for an additional world-owned copy."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_install"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen"},
+      {"name": "world_name", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:world", "optional": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "worldgen_job"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "worldgen.preview_project",
+    "displayName": "Preview WorldGen Project",
+    "description": "Create or replace an isolated preview world and return a cancellable job.",
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["worldgen", "project", "preview", "world", "job"],
+    "examples": ["Reuse the same Preview ID to replace an earlier preview without leaving an orphaned world."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_preview",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_preview"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen"},
+      {"name": "preview_id", "dataType": "string", "optional": true},
+      {"name": "player", "dataType": "player", "optional": true},
+      {"name": "environment", "dataType": "string", "widget": "DROPDOWN", "options": ["NORMAL", "NETHER", "THE_END"], "defaultValue": "NORMAL"},
+      {"name": "seed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "worldgen_job"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "worldgen.stop_preview",
+    "displayName": "Stop WorldGen Preview",
+    "description": "Unload and remove an isolated WorldGen preview world.",
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["worldgen", "preview", "stop", "cleanup", "job"],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_preview",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_preview_stop"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "preview_id", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "worldgen_job"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  }
+]

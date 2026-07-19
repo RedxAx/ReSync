@@ -7,8 +7,24 @@
     "handlerConfig": {
       "operation": "call_function"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "function",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
     "hidden": true
   },
   {
@@ -19,7 +35,18 @@
     "handlerConfig": {
       "operation": "return_value"
     },
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "value",
+        "dataType": "any",
+        "optional": true
+      }
+    ],
     "outputs": [],
     "hidden": true
   },

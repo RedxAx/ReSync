@@ -3,18 +3,117 @@
     "id": "delay",
     "displayName": "Delay",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.delay",
     "handler": "ScheduleHandler",
     "handlerConfig": {
       "operation": "delay"
     },
-    "inputs": [],
-    "outputs": [],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "seconds", "dataType": "number", "defaultValue": 1, "constraints": { "min": 0 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "completed", "dataType": "boolean" },
+      { "name": "success", "dataType": "boolean" }
+    ],
     "hidden": true
   },
   {
-    "id": "schedule.schedule",
-    "displayName": "Schedule",
+    "id": "schedule.delay",
+    "displayName": "Delay",
+    "description": "Continue after a real-time delay measured in seconds.",
     "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "monotonic_elapsed",
+    "tags": ["wait", "timer", "seconds"],
+    "recommended": true,
+    "handler": "ScheduleHandler",
+    "handlerConfig": {
+      "operation": "delay"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "seconds",
+        "dataType": "number",
+        "defaultValue": 1,
+        "description": "Non-negative delay in real seconds",
+        "constraints": {"min": 0}
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "completed", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "schedule.wait_ticks",
+    "displayName": "Wait Ticks",
+    "description": "Continue after a server-tick delay.",
+    "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "server_ticks",
+    "tags": ["wait", "delay", "ticks"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {
+      "operation": "wait_ticks"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "ticks",
+        "dataType": "number",
+        "defaultValue": 20,
+        "description": "Non-negative server ticks to wait",
+        "constraints": {"min": 0}
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "completed", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "schedule.schedule",
+    "displayName": "Schedule Daily Flow",
+    "description": "Run a stored Flow every day at a local time.",
+    "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "wall_time",
+    "tags": ["schedule", "daily", "time"],
     "handler": "ScheduleHandler",
     "handlerConfig": {
       "operation": "schedule"
@@ -27,11 +126,24 @@
       },
       {
         "name": "time_string",
-        "dataType": "string"
+        "dataType": "string",
+        "defaultValue": "12:00",
+        "description": "Daily time using HH:mm or HH:mm:ss"
+      },
+      {
+        "name": "time_zone",
+        "dataType": "string",
+        "defaultValue": "UTC",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:time_zone",
+        "description": "IANA time zone; UTC by default"
       },
       {
         "name": "flow_id",
-        "dataType": "string"
+        "dataType": "resource_reference<flow>",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Stored Flow to execute"
       }
     ],
     "outputs": [
@@ -40,16 +152,31 @@
         "dataType": "string"
       },
       {
+        "name": "scheduled",
+        "dataType": "boolean"
+      },
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
-      }
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"}
     ]
   },
   {
     "id": "schedule.schedule_repeating",
-    "displayName": "Schedule Repeating",
+    "displayName": "Schedule Repeating Flow",
+    "description": "Run a stored Flow on a fixed server-tick interval without overlapping executions.",
     "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "server_ticks",
+    "tags": ["schedule", "repeat", "interval"],
     "handler": "ScheduleHandler",
     "handlerConfig": {
       "operation": "schedule_repeating"
@@ -62,11 +189,17 @@
       },
       {
         "name": "interval_ticks",
-        "dataType": "number"
+        "dataType": "number",
+        "defaultValue": 1200,
+        "description": "Positive interval in server ticks",
+        "constraints": {"min": 1}
       },
       {
         "name": "flow_id",
-        "dataType": "string"
+        "dataType": "resource_reference<flow>",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Stored Flow to execute"
       }
     ],
     "outputs": [
@@ -75,16 +208,158 @@
         "dataType": "string"
       },
       {
+        "name": "scheduled",
+        "dataType": "boolean"
+      },
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"}
+    ]
+  },
+  {
+    "id": "schedule.cron",
+    "displayName": "Schedule Cron Flow",
+    "description": "Run a stored Flow on a five-field cron pattern in a selected time zone.",
+    "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "wall_time",
+    "tags": ["schedule", "cron", "calendar"],
+    "examples": ["0 12 * * MON-FRI", "*/15 * * * *"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {
+      "operation": "cron"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "expression",
+        "dataType": "string",
+        "defaultValue": "0 12 * * *",
+        "description": "Minute hour day month weekday"
+      },
+      {
+        "name": "time_zone",
+        "dataType": "string",
+        "defaultValue": "UTC",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:time_zone",
+        "description": "IANA time zone; UTC by default"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "resource_reference<flow>",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Stored Flow to execute"
       }
+    ],
+    "outputs": [
+      {
+        "name": "task_id",
+        "dataType": "string"
+      },
+      {
+        "name": "scheduled",
+        "dataType": "boolean"
+      },
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"}
+    ]
+  },
+  {
+    "id": "schedule.at.time",
+    "displayName": "Schedule Flow At Time",
+    "description": "Run a stored Flow once at an ISO-8601 date and time.",
+    "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "wall_time",
+    "tags": ["schedule", "once", "timestamp"],
+    "examples": ["2026-08-01T18:30:00+03:00", "2026-08-01T18:30:00"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {
+      "operation": "schedule_at_time"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "time",
+        "dataType": "string",
+        "description": "ISO-8601 date and time"
+      },
+      {
+        "name": "time_zone",
+        "dataType": "string",
+        "defaultValue": "UTC",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:time_zone",
+        "description": "IANA zone for local times without an offset; UTC by default"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "resource_reference<flow>",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Stored Flow to execute"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "task_id",
+        "dataType": "string"
+      },
+      {
+        "name": "scheduled",
+        "dataType": "boolean"
+      },
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"}
     ]
   },
   {
     "id": "schedule.cancel_task",
-    "displayName": "Cancel Task",
+    "displayName": "Cancel Scheduled Flow",
+    "description": "Cancel a scheduled Flow owned by the active runtime.",
     "category": "UTILITY",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "clockDomain": "wall_time,server_ticks",
+    "tags": ["schedule", "cancel", "task"],
     "handler": "ScheduleHandler",
     "handlerConfig": {
       "operation": "cancel_task"
@@ -102,81 +377,99 @@
     ],
     "outputs": [
       {
-        "name": "flow",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      }
-    ]
-  },
-  {
-    "id": "schedule.wait_ticks",
-    "displayName": "Wait Ticks",
-    "category": "UTILITY",
-    "handler": "ScheduleHandler",
-    "handlerConfig": {
-      "operation": "wait_ticks"
-    },
-    "inputs": [
+        "name": "cancelled",
+        "dataType": "boolean"
+      },
+      {
+        "name": "status",
+        "dataType": "string"
+      },
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
       {
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
       },
-      {
-        "name": "ticks",
-        "dataType": "number"
-      }
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"}
+    ]
+  },
+  {
+    "id": "schedule.get_task",
+    "displayName": "Get Scheduled Task",
+    "description": "Inspect a scheduled Flow task, including ownership, timing, state, and its last failure.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "clockDomain": "wall_time,server_ticks",
+    "tags": ["schedule", "task", "status", "inspect"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {"operation": "get_task"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "task_id", "dataType": "string"}
     ],
     "outputs": [
-      {
-        "name": "flow",
-        "pinType": "FLOW",
-        "dataType": "execution"
-      }
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "result", "dataType": "result<scheduled_task>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "schedule.list_tasks",
+    "displayName": "List Scheduled Tasks",
+    "description": "List active and recently completed scheduled Flow tasks owned by the runtime.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "clockDomain": "wall_time,server_ticks",
+    "tags": ["schedule", "tasks", "status", "list"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {"operation": "list_tasks"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "tasks", "dataType": "list<scheduled_task>"},
+      {"name": "result", "dataType": "result<list<scheduled_task>>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
     ]
   },
   {
     "id": "schedule.interval",
     "displayName": "Schedule Interval",
     "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.schedule_repeating",
     "handler": "ScheduleHandler",
     "handlerConfig": {
       "operation": "interval"
     },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
-  },
-  {
-    "id": "schedule.cron",
-    "displayName": "Schedule Cron",
-    "category": "UTILITY",
-    "handler": "ScheduleHandler",
-    "handlerConfig": {
-      "operation": "cron"
-    },
-    "inputs": [],
-    "outputs": [],
-    "hidden": true
-  },
-  {
-    "id": "schedule.at.time",
-    "displayName": "Schedule at Time",
-    "category": "UTILITY",
-    "handler": "ScheduleHandler",
-    "handlerConfig": {
-      "operation": "schedule_at_time"
-    },
     "inputs": [
-      {
-        "name": "time",
-        "dataType": "string"
-      },
-      {
-        "name": "flow",
-        "dataType": "execution"
-      }
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "seconds", "dataType": "number", "defaultValue": 60, "constraints": { "min": 1 } },
+      { "name": "flow_id", "dataType": "string" }
     ],
-    "outputs": []
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "task_id", "dataType": "string" },
+      { "name": "scheduled", "dataType": "boolean" },
+      { "name": "task", "dataType": "scheduled_task" },
+      { "name": "success", "dataType": "boolean" }
+    ],
+    "hidden": true
   }
 ]

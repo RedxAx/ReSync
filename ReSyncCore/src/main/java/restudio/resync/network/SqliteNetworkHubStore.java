@@ -1,10 +1,11 @@
 package restudio.resync.network;
 
+import org.sqlite.JDBC;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,6 +16,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -67,7 +69,7 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
                 if (parent != null) {
                     Files.createDirectories(parent);
                 }
-                connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
+                connection = JDBC.createConnection("jdbc:sqlite:" + databasePath, new Properties());
                 try (Statement statement = connection.createStatement()) {
                     statement.execute("PRAGMA foreign_keys = ON");
                     statement.execute("PRAGMA journal_mode = WAL");
@@ -685,6 +687,23 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
     }
 
     @Override
+    public CompletableFuture<List<PlayerLease>> listLeases(String networkId) {
+        return submit("List Player Leases", () -> {
+            requireOpen();
+            List<PlayerLease> leases = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("SELECT * FROM player_ownership WHERE network_id = ? ORDER BY player_id")) {
+                statement.setString(1, required(networkId, "Network ID"));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        leases.add(playerLease(result));
+                    }
+                }
+            }
+            return List.copyOf(leases);
+        });
+    }
+
+    @Override
     public CompletableFuture<PlayerLease> claimOwnership(String networkId, UUID playerId, String nodeId, long now) {
         return submit("Claim Player Ownership", () -> transaction(() -> {
             requireOpen();
@@ -1233,9 +1252,13 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             statement.setString(1, networkId);
             statement.setString(2, playerId.toString());
             try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? Optional.of(new PlayerLease(result.getString("network_id"), UUID.fromString(result.getString("player_id")), result.getString("owner_node_id"), result.getString("pending_node_id"), result.getLong("fence_epoch"), result.getLong("lease_expires_at"), result.getLong("updated_at"))) : Optional.empty();
+                return result.next() ? Optional.of(playerLease(result)) : Optional.empty();
             }
         }
+    }
+
+    private PlayerLease playerLease(ResultSet result) throws SQLException {
+        return new PlayerLease(result.getString("network_id"), UUID.fromString(result.getString("player_id")), result.getString("owner_node_id"), result.getString("pending_node_id"), result.getLong("fence_epoch"), result.getLong("lease_expires_at"), result.getLong("updated_at"));
     }
 
     private void clearPendingOwner(PlayerTransfer transfer, long now, boolean required) throws SQLException {

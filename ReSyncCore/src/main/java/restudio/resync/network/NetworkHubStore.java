@@ -67,6 +67,8 @@ public interface NetworkHubStore extends AutoCloseable {
 
     CompletableFuture<Optional<PlayerLease>> getLease(String networkId, UUID playerId);
 
+    CompletableFuture<List<PlayerLease>> listLeases(String networkId);
+
     CompletableFuture<PlayerLease> claimOwnership(String networkId, UUID playerId, String nodeId, long now);
 
     CompletableFuture<PlayerStateSnapshot> saveOwnerSnapshot(PlayerStateSnapshot snapshot);

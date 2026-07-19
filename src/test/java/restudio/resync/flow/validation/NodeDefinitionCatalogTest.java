@@ -26,7 +26,66 @@ class NodeDefinitionCatalogTest {
             }
         }
 
-        assertEquals(1262, count);
+        assertEquals(1359, count);
+    }
+
+    @Test
+    void genericItemAndEntityDataNodesRemainCatalogued() throws Exception {
+        for (String id : List.of("entity.entity_data", "entity.entity_apply_data")) {
+            assertEquals(id, findNode("entity.json", id).get("id").getAsString());
+        }
+        for (String id : List.of("itemstack.item_components", "itemstack.item_component", "itemstack.item_set_component", "itemstack.item_remove_component", "itemstack.item_apply_components")) {
+            assertEquals(id, findNode("itemstack.json", id).get("id").getAsString());
+        }
+    }
+
+    @Test
+    void runtimeDataNodesExposeTypedQueriesAndItemResolution() throws Exception {
+        assertEquals("Find Data", findNode("runtime_data.json", "data.runtime_query").get("displayName").getAsString());
+        assertEquals("list<runtime_data_entry>", pinType(findNode("runtime_data.json", "data.runtime_query"), "outputs", "results"));
+        assertEquals("list<runtime_data_category>", pinType(findNode("runtime_data.json", "data.runtime_categories"), "outputs", "categories"));
+        assertEquals("Find Items", findNode("runtime_data.json", "data.query_items").get("displayName").getAsString());
+        assertEquals("list<itemstack>", pinType(findNode("runtime_data.json", "data.query_items"), "outputs", "items"));
+        assertEquals("Pick Random Item", findNode("runtime_data.json", "data.random_item").get("displayName").getAsString());
+        assertEquals("itemstack", pinType(findNode("runtime_data.json", "data.random_item"), "outputs", "item"));
+        for (String id : List.of("data.runtime_query", "data.runtime_categories", "data.filter_runtime_entries", "data.random_runtime_entry",
+            "data.runtime_entry_fields", "data.query_items", "data.random_item", "data.item_from_runtime_entry", "data.item_categories", "data.describe_item")) {
+            JsonObject node = findNode("runtime_data.json", id);
+            assertFalse(node.get("displayName").getAsString().contains("Runtime"));
+            assertFalse(hasInput(node, "adapter"));
+            assertFalse(hasInput(node, "adapters"));
+            assertFalse(hasInput(node, "domain"));
+            assertFalse(hasInput(node, "attributes"));
+        }
+        JsonObject legacyRandomItem = findNode("random.json", "random.item");
+        assertTrue(legacyRandomItem.get("hidden").getAsBoolean());
+        assertTrue(legacyRandomItem.get("deprecated").getAsBoolean());
+        assertEquals("data.random_item", legacyRandomItem.get("replacementFor").getAsString());
+    }
+
+    @Test
+    void entityAndItemDataNodesExposeClassifiedTypes() throws Exception {
+        assertTrue(findNode("entity.json", "entity.entity_data").get("hidden").getAsBoolean());
+        assertEquals("string", pinType(findNode("entity.json", "entity.entity_text_data"), "outputs", "text"));
+        assertEquals("boolean", pinType(findNode("entity.json", "entity.entity_boolean_data"), "outputs", "boolean"));
+        assertEquals("number", pinType(findNode("entity.json", "entity.entity_number_data"), "outputs", "number"));
+        assertEquals("vector", pinType(findNode("entity.json", "entity.entity_vector_data"), "outputs", "vector"));
+        assertEquals("location", pinType(findNode("entity.json", "entity.entity_location_data"), "outputs", "location"));
+        assertEquals("living_entity", pinType(findNode("entity.json", "entity.entity_reference_data"), "outputs", "reference"));
+        assertEquals("entity_data", pinType(findNode("entity.json", "entity.entity_number_data_entry"), "outputs", "data"));
+        assertEquals("entity_data", pinType(findNode("entity.json", "entity.entity_spawn"), "inputs", "data"));
+
+        assertTrue(findNode("itemstack.json", "itemstack.item_component").get("hidden").getAsBoolean());
+        assertTrue(findNode("itemstack.json", "itemstack.item_set_component").get("hidden").getAsBoolean());
+        assertEquals("number", pinType(findNode("itemstack.json", "itemstack.item_number_component"), "outputs", "number"));
+        assertEquals("boolean", pinType(findNode("itemstack.json", "itemstack.item_boolean_component"), "outputs", "boolean"));
+        assertEquals("string", pinType(findNode("itemstack.json", "itemstack.item_text_component"), "outputs", "text"));
+        assertEquals("item_component", pinType(findNode("itemstack.json", "itemstack.item_object_component"), "outputs", "component_value"));
+        assertEquals("item_component_list", pinType(findNode("itemstack.json", "itemstack.item_list_component"), "outputs", "items"));
+        assertEquals("item_components", pinType(findNode("itemstack.json", "itemstack.item_components"), "outputs", "components"));
+        assertEquals("item_attribute", pinType(findNode("itemstack.json", "itemstack.item_attribute_modifier"), "outputs", "modifier"));
+        assertEquals("item_component", pinType(findNode("itemstack.json", "itemstack.item_component_number_field"), "outputs", "component_value"));
+        assertEquals("item_component_list", pinType(findNode("itemstack.json", "itemstack.item_component_text_list_entry"), "outputs", "items"));
     }
 
     @Test
@@ -47,6 +106,29 @@ class NodeDefinitionCatalogTest {
             assertTrue(hasActionOption(action, "do"), family + ".actions should expose do");
             assertTrue(hasActionOption(action, "execute"), family + ".actions should expose execute");
             assertFalse(hasActionOption(action, "get"), family + ".actions should not expose get");
+        }
+    }
+
+    @Test
+    void propertySelectorsAreSearchableAcrossEveryPropertyFamily() throws Exception {
+        Path root = Path.of("src", "main", "resources", "nodes", "migrated");
+        try (var files = Files.list(root)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".json") && !path.getFileName().toString().startsWith("_")).toList()) {
+                JsonElement element = JsonParser.parseString(Files.readString(file));
+                Iterable<JsonElement> nodes = element.isJsonArray() ? element.getAsJsonArray() : List.of(element);
+                for (JsonElement nodeElement : nodes) {
+                    JsonObject node = nodeElement.getAsJsonObject();
+                    if (!node.has("inputs")) {
+                        continue;
+                    }
+                    for (JsonElement inputElement : node.getAsJsonArray("inputs")) {
+                        JsonObject input = inputElement.getAsJsonObject();
+                        if (input.has("name") && "property".equals(input.get("name").getAsString()) && input.has("options")) {
+                            assertEquals("SEARCHABLE_LIST", input.get("widget").getAsString(), node.get("id").getAsString());
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -78,7 +160,6 @@ class NodeDefinitionCatalogTest {
             "placeholder.json", List.of("placeholder.placeholder_set", "placeholder.placeholder_remove"),
             "sound.json", List.of("sound.sound_play_ambient", "sound.play.for.player", "sound.play.for.all", "sound.stop.for.player", "sound.stop.all", "sound.play.category", "sound.stop.category", "sound.loop.for.player", "sound.play.sequence", "sound.play.with.distance"),
             "team.json", List.of("team.remove", "team.set.allow.friendly.fire", "team.see.friendly.invisibles", "team.set.display.name"),
-            "misc.json", List.of("misc.delay"),
             "function.json", List.of("function.function_output")
         );
 
@@ -129,6 +210,23 @@ class NodeDefinitionCatalogTest {
         assertFalse(check.has("hidden") && check.get("hidden").getAsBoolean());
         assertFalse(grant.has("hidden") && grant.get("hidden").getAsBoolean());
         assertFalse(temporary.has("hidden") && temporary.get("hidden").getAsBoolean());
+        assertTrue(hasString(pin(check, "inputs", "mode"), "options", "Find None"));
+        assertTrue(hasString(pin(check, "inputs", "mode"), "options", "Count"));
+        assertEquals("number", pinType(check, "outputs", "count"));
+        assertEquals("permission_context", pinType(check, "inputs", "context"));
+        assertEquals("permission_context", pinType(check, "outputs", "resolved_context"));
+        assertEquals("list<permission>", pinType(findNode("permission.json", "perm.get.permissions"), "outputs", "permissions"));
+        assertEquals("list<permission_group>", pinType(findNode("permission.json", "perm.get.all.groups"), "outputs", "groups"));
+        assertEquals("list<permission_track>", pinType(findNode("permission.json", "perm.list.tracks"), "outputs", "tracks"));
+        JsonObject group = pin(findNode("permission.json", "perm.add.group"), "inputs", "group");
+        JsonObject track = pin(findNode("permission.json", "perm.promote"), "inputs", "track");
+        assertEquals("permission_group", group.get("dataType").getAsString());
+        assertEquals("SEARCHABLE_LIST", group.get("widget").getAsString());
+        assertEquals("server:luckperms:group", group.get("optionsSource").getAsString());
+        assertEquals("permission_track", track.get("dataType").getAsString());
+        assertEquals("SEARCHABLE_LIST", track.get("widget").getAsString());
+        assertEquals("server:luckperms:track", track.get("optionsSource").getAsString());
+        assertEquals("permission_group", pinType(findNode("permission.json", "perm.get.primary.group"), "outputs", "group"));
 
         for (String nodeId : List.of("perm.set.group", "perm.get.groups", "perm.get.prefix", "perm.get.suffix", "perm.check", "perm.grant", "perm.revoke")) {
             JsonObject node = findNode("permission.json", nodeId);
@@ -157,6 +255,67 @@ class NodeDefinitionCatalogTest {
         assertTrue(hasString(add, "aliases", "Sum"));
         assertTrue(hasString(add, "aliases", "Plus"));
         assertEquals("add", add.getAsJsonObject("handlerConfig").get("operation").getAsString());
+    }
+
+    @Test
+    void networkNodesUseSemanticTypesAndAuthoritativeCatalogs() throws Exception {
+        JsonObject status = findNode("network.json", "network.status");
+        JsonObject servers = findNode("network.json", "network.get.servers");
+        JsonObject health = findNode("network.json", "network.get.server.health");
+        JsonObject variable = findNode("network.json", "network.variable.get");
+        JsonObject handoff = findNode("network.json", "network.player.handoff");
+
+        assertEquals("network_node", pinType(status, "outputs", "node_id"));
+        assertEquals("list<network_node>", pinType(servers, "outputs", "servers"));
+        assertEquals("network_node", pinType(health, "inputs", "node_id"));
+        assertEquals("server:resync:network_node", pin(health, "inputs", "node_id").get("optionsSource").getAsString());
+        assertEquals("network_scope", pinType(variable, "inputs", "scope"));
+        assertEquals("server:resync:network_scope", pin(variable, "inputs", "scope").get("optionsSource").getAsString());
+        assertEquals("network_variable", pinType(variable, "outputs", "variable"));
+        assertEquals("network_node", pinType(handoff, "inputs", "target_node"));
+        assertEquals("network_route", pinType(handoff, "inputs", "server"));
+        assertEquals("network_transfer_result", pinType(handoff, "outputs", "transfer_result"));
+        assertEquals(2, handoff.get("schemaVersion").getAsInt());
+    }
+
+    @Test
+    void standardCollectionNodesExposeExecutableTypedContracts() throws Exception {
+        Map<String, String> outputs = Map.ofEntries(
+            Map.entry("list.sort", "sorted_list"),
+            Map.entry("list.filter", "filtered_list"),
+            Map.entry("list.map", "transformed_list"),
+            Map.entry("list.reduce", "result"),
+            Map.entry("list.shuffle", "shuffled_list"),
+            Map.entry("list.unique", "unique_list"),
+            Map.entry("list.slice", "slice_list"),
+            Map.entry("list.reverse", "reversed_list"),
+            Map.entry("list.find_first", "found_element"),
+            Map.entry("list.flatten", "flattened_list"),
+            Map.entry("list.intersect", "intersection_list"),
+            Map.entry("list.difference", "difference_list"),
+            Map.entry("list.zip", "pairs_list"),
+            Map.entry("list.group_by", "groups"),
+            Map.entry("list.any", "matches"),
+            Map.entry("list.all", "matches"),
+            Map.entry("list.none", "matches")
+        );
+
+        for (Map.Entry<String, String> entry : outputs.entrySet()) {
+            JsonObject node = findNode("list.json", entry.getKey());
+            assertEquals("GenericListHandler", node.get("handler").getAsString());
+            assertTrue(hasOutput(node, entry.getValue()), entry.getKey() + " should publish " + entry.getValue());
+        }
+
+        assertEquals("map<string,list<type:t>>", pinType(findNode("list.json", "list.group_by"), "outputs", "groups"));
+        assertEquals("boolean", pinType(findNode("list.json", "list.any"), "outputs", "matches"));
+        assertEquals("type:t", pinType(findNode("list.json", "list.find_first"), "outputs", "found_element"));
+        assertTrue(hasInput(findNode("list.json", "list.add_at"), "value"));
+    }
+
+    @Test
+    void standardMapMutationAndContainmentExposeRequiredValues() throws Exception {
+        assertTrue(hasInput(findNode("map.json", "map.set"), "value"));
+        assertTrue(hasInput(findNode("map.json", "map.contains_value"), "value"));
     }
 
     private JsonObject findNode(String fileName, String id) throws Exception {
@@ -258,5 +417,19 @@ class NodeDefinitionCatalogTest {
             }
         }
         return false;
+    }
+
+    private String pinType(JsonObject node, String direction, String name) {
+        return pin(node, direction, name).get("dataType").getAsString();
+    }
+
+    private JsonObject pin(JsonObject node, String direction, String name) {
+        for (JsonElement pinElement : node.getAsJsonArray(direction)) {
+            JsonObject pin = pinElement.getAsJsonObject();
+            if (name.equals(pin.get("name").getAsString())) {
+                return pin;
+            }
+        }
+        throw new AssertionError("Missing pin " + name + " in " + node.get("id").getAsString());
     }
 }

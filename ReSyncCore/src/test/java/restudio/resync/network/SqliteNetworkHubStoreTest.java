@@ -116,6 +116,7 @@ class SqliteNetworkHubStoreTest {
             UUID playerId = UUID.randomUUID();
             long now = 2_000;
             PlayerTransfer transfer = store.beginTransfer("transfer-one", "network", playerId, "lobby", "survival", now + 30_000, now).join();
+            assertEquals(playerId, store.listLeases("network").join().getFirst().playerId());
             byte[] payload = bytes("compressed-state");
             PlayerStateSnapshot snapshot = new PlayerStateSnapshot("snapshot-one", "network", playerId, transfer.fenceEpoch(), "survival-shared", payload, NetworkPayloads.sha256(payload), 1, 1, "lobby", now + 1, false);
 

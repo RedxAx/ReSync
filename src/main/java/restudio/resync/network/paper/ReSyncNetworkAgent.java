@@ -29,6 +29,8 @@ import restudio.resync.network.NetworkProxyActionCodec;
 import restudio.resync.network.NetworkProxyActionType;
 import restudio.resync.network.NetworkRequestContext;
 import restudio.resync.network.NetworkSnapshotChunk;
+import restudio.resync.network.NetworkStateReconciliationCodec;
+import restudio.resync.network.NetworkStateReconciliationTask;
 import restudio.resync.network.NetworkTransferCheckpoint;
 import restudio.resync.network.NetworkTransferCodec;
 import restudio.resync.network.NetworkTransferIntent;
@@ -41,6 +43,7 @@ import restudio.resync.network.NetworkVariableScope;
 import restudio.resync.network.PlayerStateSnapshot;
 import restudio.resync.network.PlayerLease;
 import restudio.resync.network.PlayerTransfer;
+import restudio.resync.network.paper.state.NetworkPlayerStateReconciler;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -67,8 +70,10 @@ public class ReSyncNetworkAgent {
     private final ReSync plugin;
     private final ReSyncNetworkAgentConfig config;
     private final NetworkFrameCodec codec;
+    private final NetworkPlayerStateReconciler stateReconciler;
     private final AtomicBoolean stopping = new AtomicBoolean();
     private final AtomicBoolean reconnectScheduled = new AtomicBoolean();
+    private final AtomicBoolean reconnectRequested = new AtomicBoolean();
     private final AtomicLong requestIds = new AtomicLong();
     private final Map<String, CompletableFuture<NetworkFrame>> pendingRequests = new ConcurrentHashMap<>();
     private final Map<String, NetworkNodePresence> presence = new ConcurrentHashMap<>();
@@ -89,6 +94,7 @@ public class ReSyncNetworkAgent {
         this.plugin = plugin;
         this.config = config;
         this.codec = new NetworkFrameCodec(config.maximumFrameBytes(), config.maximumPayloadBytes());
+        this.stateReconciler = new NetworkPlayerStateReconciler(plugin);
         this.credential = config.credential();
     }
 
@@ -120,6 +126,7 @@ public class ReSyncNetworkAgent {
         transferSnapshots.clear();
         incomingSnapshots.clear();
         transferWork.clear();
+        stateReconciler.shutdown();
         transferReadiness.values().forEach(future -> future.completeExceptionally(new IllegalStateException("ReSync Network Agent Stopped")));
         transferReadiness.clear();
     }
@@ -127,6 +134,23 @@ public class ReSyncNetworkAgent {
     public boolean connected() {
         Client current = client;
         return authorized && current != null && current.isOpen();
+    }
+
+    public boolean hasActiveTransfers() {
+        return !activeTransfers.isEmpty() || !transferWork.isEmpty();
+    }
+
+    public void reconnect() {
+        if (stopping.get()) return;
+        reconnectRequested.set(true);
+        authorized = false;
+        Client current = client;
+        if (current != null && current.isOpen()) {
+            current.close(1000, "Network Configuration Reloaded");
+            return;
+        }
+        reconnectRequested.set(false);
+        Bukkit.getScheduler().runTask(plugin, this::connect);
     }
 
     public String networkId() {
@@ -361,6 +385,11 @@ public class ReSyncNetworkAgent {
             }
             return;
         }
+        if (frame.type() == NetworkFrameType.STATE_RECONCILE && frame.channel().equals(NetworkChannels.STATE)) {
+            NetworkStateReconciliationTask task = NetworkStateReconciliationCodec.decodeTask(frame.payload());
+            stateReconciler.reconcile(task).whenComplete((unused, throwable) -> respondToHub(frame, throwable));
+            return;
+        }
         CompletableFuture<NetworkFrame> future = pendingRequests.remove(frame.context().requestId());
         if (future != null) {
             future.complete(frame);
@@ -396,6 +425,18 @@ public class ReSyncNetworkAgent {
                     Log.warn("ReSync player ownership callback failed: " + rootMessage(exception));
                 }
             }
+        }
+    }
+
+    private void respondToHub(NetworkFrame request, Throwable throwable) {
+        Client current = client;
+        if (!authorized || current == null || !current.isOpen()) {
+            return;
+        }
+        if (throwable == null) {
+            send(current, request.channel(), NetworkFrameType.RESPONSE, request.context().requestId(), new byte[0], Set.of("state.reconcile"));
+        } else {
+            send(current, request.channel(), NetworkFrameType.ERROR, request.context().requestId(), rootMessage(throwable).getBytes(StandardCharsets.UTF_8), Set.of("state.reconcile"));
         }
     }
 
@@ -749,6 +790,10 @@ public class ReSyncNetworkAgent {
             presence.clear();
             failPending(new IllegalStateException("ReSync Network Disconnected: " + reason));
             if (!stopping.get()) {
+                if (reconnectRequested.compareAndSet(true, false)) {
+                    Bukkit.getScheduler().runTask(plugin, ReSyncNetworkAgent.this::connect);
+                    return;
+                }
                 if ("Network Credential Rejected".equals(reason) && !credential.isBlank() && !config.enrollmentToken().isBlank()) {
                     try {
                         config.clearCredential();

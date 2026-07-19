@@ -34,7 +34,7 @@ public final class NetworkFlowValues {
             case INTEGER -> NetworkVariableValues.integerValue(value instanceof Number number ? number.longValue() : Long.parseLong(String.valueOf(value)));
             case DECIMAL -> NetworkVariableValues.decimalValue(value instanceof Number number ? number.doubleValue() : Double.parseDouble(String.valueOf(value)));
             case STRING -> NetworkVariableValues.textValue(value == null ? "" : String.valueOf(value));
-            case JSON -> NetworkVariableValues.textValue(json(value));
+            case JSON -> NetworkVariableValues.textValue(jsonDocument(value));
             case UUID -> NetworkVariableValues.uuidValue(value instanceof UUID uuid ? uuid : UUID.fromString(String.valueOf(value)));
             case BYTES -> value instanceof byte[] bytes ? NetworkVariableValues.bytesValue(bytes) : Base64.getDecoder().decode(String.valueOf(value));
         };
@@ -53,7 +53,7 @@ public final class NetworkFlowValues {
     }
 
     public static byte[] eventPayload(Object value) {
-        return json(value).getBytes(StandardCharsets.UTF_8);
+        return GSON.toJson(value).getBytes(StandardCharsets.UTF_8);
     }
 
     public static String eventText(byte[] payload) {
@@ -72,13 +72,13 @@ public final class NetworkFlowValues {
         }
     }
 
-    private static String json(Object value) {
+    private static String jsonDocument(Object value) {
         if (value instanceof String text) {
             try {
                 JsonElement parsed = JsonParser.parseString(text);
                 return GSON.toJson(parsed);
-            } catch (RuntimeException ignored) {
-                return GSON.toJson(text);
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Network JSON value is invalid", exception);
             }
         }
         return GSON.toJson(value);

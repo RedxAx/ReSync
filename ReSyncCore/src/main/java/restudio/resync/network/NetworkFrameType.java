@@ -32,6 +32,7 @@ public enum NetworkFrameType {
     SNAPSHOT_READ(63),
     SNAPSHOT_PIN(64),
     SNAPSHOT_RESTORE(65),
+    STATE_RECONCILE(66),
     RESPONSE(100),
     ERROR(101);
 

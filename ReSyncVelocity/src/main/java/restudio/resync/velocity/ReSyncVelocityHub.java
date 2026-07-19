@@ -48,6 +48,9 @@ import restudio.resync.network.NetworkSnapshotMetadata;
 import restudio.resync.network.NetworkSnapshotPin;
 import restudio.resync.network.NetworkSnapshotQuery;
 import restudio.resync.network.NetworkSnapshotRestore;
+import restudio.resync.network.NetworkStateReconciliationCodec;
+import restudio.resync.network.NetworkStateReconciliationRequest;
+import restudio.resync.network.NetworkStateReconciliationTask;
 import restudio.resync.network.NetworkTransferCheckpoint;
 import restudio.resync.network.NetworkTransferCodec;
 import restudio.resync.network.NetworkTransferIntent;
@@ -91,6 +94,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private static final long MAXIMUM_TRANSFER_MILLIS = TimeUnit.MINUTES.toMillis(2);
     private static final long MAXIMUM_SNAPSHOT_UPLOAD_MILLIS = TimeUnit.MINUTES.toMillis(2);
     private static final long MAXIMUM_MANUAL_RESTORE_MILLIS = TimeUnit.MINUTES.toMillis(15);
+    private static final int RECONCILIATION_BATCH_SIZE = 5_000;
     private final VelocityNetworkConfig config;
     private final Logger logger;
     private final ProxyServer proxyServer;
@@ -105,6 +109,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private final Map<String, NetworkNodeStatus> nodeModes = new ConcurrentHashMap<>();
     private final SnapshotUploadRegistry snapshotUploads = new SnapshotUploadRegistry(MAXIMUM_ACTIVE_SNAPSHOT_UPLOADS, MAXIMUM_SNAPSHOT_UPLOAD_MILLIS);
     private final Map<String, CompletableFuture<PlayerTransfer>> transferReadiness = new ConcurrentHashMap<>();
+    private final Map<String, PendingReconciliation> pendingReconciliations = new ConcurrentHashMap<>();
     private final AtomicLong lifecycleOrder = new AtomicLong();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "resync-velocity-heartbeats");
@@ -240,6 +245,13 @@ public class ReSyncVelocityHub extends WebSocketServer {
         if (session == null || !connectionsByNode.remove(session.nodeId(), connection)) {
             return;
         }
+        pendingReconciliations.entrySet().removeIf(entry -> {
+            if (!entry.getValue().nodeId().equals(session.nodeId())) {
+                return false;
+            }
+            entry.getValue().result().completeExceptionally(new IllegalStateException("ReSync Backend Disconnected During State Reconciliation"));
+            return true;
+        });
         long now = Instant.now().toEpochMilli();
         store.updateNodeStatus(config.networkId(), session.nodeId(), NetworkNodeStatus.OFFLINE, now).thenAccept(node -> publishPresence(presence(node, NetworkNodeStatus.OFFLINE, now))).exceptionally(throwable -> {
             logger.warn("Failed to mark network node {} offline", session.nodeId(), throwable);
@@ -265,6 +277,20 @@ public class ReSyncVelocityHub extends WebSocketServer {
         try {
             frame = codec.decode(encoded);
             validateSession(frame, session);
+            PendingReconciliation reconciliation = pendingReconciliations.remove(frame.context().requestId());
+            if (reconciliation != null) {
+                if (!reconciliation.nodeId().equals(session.nodeId())) {
+                    throw new SecurityException("State Reconciliation Response Came From The Wrong Node");
+                }
+                if (frame.type() == NetworkFrameType.ERROR) {
+                    reconciliation.result().completeExceptionally(new IllegalStateException(new String(frame.payload(), StandardCharsets.UTF_8)));
+                } else if (frame.type() == NetworkFrameType.RESPONSE) {
+                    reconciliation.result().complete(null);
+                } else {
+                    reconciliation.result().completeExceptionally(new IllegalStateException("State Reconciliation Returned An Invalid Response"));
+                }
+                return;
+            }
             if (frame.type() == NetworkFrameType.HEARTBEAT && frame.channel().equals(NetworkChannels.CONTROL)) {
                 heartbeat(connection, session, frame, null);
                 return;
@@ -347,6 +373,10 @@ public class ReSyncVelocityHub extends WebSocketServer {
             }
             if (frame.type() == NetworkFrameType.SNAPSHOT_RESTORE && frame.channel().equals(NetworkChannels.STATE)) {
                 snapshotRestore(connection, session, frame);
+                return;
+            }
+            if (frame.type() == NetworkFrameType.STATE_RECONCILE && frame.channel().equals(NetworkChannels.STATE)) {
+                stateReconcile(connection, session, frame);
                 return;
             }
             sendError(connection, frame.context().requestId(), "Network Operation Is Not Available");
@@ -520,6 +550,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
         }
         if (capabilities.contains("transfer")) {
             scopes.add("players.route");
+            scopes.add("state.reconcile");
         }
         if (capabilities.contains("state-admin")) {
             scopes.add("state.inspect");
@@ -529,6 +560,62 @@ public class ReSyncVelocityHub extends WebSocketServer {
             scopes.add("state.transfer");
         }
         return Set.copyOf(scopes);
+    }
+
+    private void stateReconcile(WebSocket connection, Session session, NetworkFrame frame) {
+        requireScope(session, "state.restore");
+        NetworkStateReconciliationRequest request = NetworkStateReconciliationCodec.decodeRequest(frame.payload());
+        Set<String> families = request.families().stream().map(value -> value.toLowerCase(Locale.ROOT)).collect(Collectors.toUnmodifiableSet());
+        if (!Set.of("inventory", "ender-chest").containsAll(families)) {
+            throw new IllegalArgumentException("Only Item State Can Be Reconciled");
+        }
+        store.listLeases(config.networkId()).thenCompose(leases -> {
+            if (leases.stream().anyMatch(lease -> !lease.pendingNodeId().isBlank())) {
+                return CompletableFuture.failedFuture(new IllegalStateException("A Player State Transfer Is Still Active"));
+            }
+            PlayerLease unavailableOwner = leases.stream().filter(lease -> !request.nodeIds().contains(lease.ownerNodeId())).findFirst().orElse(null);
+            if (unavailableOwner != null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Owner Backend " + unavailableOwner.ownerNodeId() + " Must Remain In The ReSync Realm"));
+            }
+            List<CompletableFuture<Void>> reconciliations = request.nodeIds().stream().sorted().map(nodeId -> reconcileNode(request.transitionId(), nodeId, families, leases)).toList();
+            return CompletableFuture.allOf(reconciliations.toArray(new CompletableFuture[0]));
+        }).thenCompose(unused -> store.appendAudit(config.networkId(), session.nodeId(), "state.reconciled", request.transitionId(), String.join(",", families), Instant.now().toEpochMilli())).whenComplete((unused, throwable) -> {
+            if (throwable != null) {
+                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                return;
+            }
+            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.STATE, frame.context().requestId(), new byte[0], sessionScopes(session));
+        });
+    }
+
+    private CompletableFuture<Void> reconcileNode(String transitionId, String nodeId, Set<String> families, List<PlayerLease> leases) {
+        Set<UUID> stalePlayers = leases.stream().filter(lease -> !lease.ownerNodeId().equals(nodeId)).map(PlayerLease::playerId).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (stalePlayers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        WebSocket target = connectionsByNode.get(nodeId);
+        Session targetSession = target == null ? null : sessions.get(target);
+        if (target == null || targetSession == null || !sessionScopes(targetSession).contains("state.reconcile")) {
+            return CompletableFuture.failedFuture(new IllegalStateException("ReSync Backend " + nodeId + " Is Not Connected"));
+        }
+        List<UUID> players = List.copyOf(stalePlayers);
+        CompletableFuture<Void> batches = CompletableFuture.completedFuture(null);
+        for (int start = 0; start < players.size(); start += RECONCILIATION_BATCH_SIZE) {
+            int end = Math.min(players.size(), start + RECONCILIATION_BATCH_SIZE);
+            Set<UUID> batch = Set.copyOf(players.subList(start, end));
+            batches = batches.thenCompose(unused -> reconcileBatch(target, nodeId, transitionId, batch, families));
+        }
+        return batches;
+    }
+
+    private CompletableFuture<Void> reconcileBatch(WebSocket target, String nodeId, String transitionId, Set<UUID> players, Set<String> families) {
+        String requestId = "reconcile-" + lifecycleOrder.incrementAndGet();
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        PendingReconciliation pending = new PendingReconciliation(nodeId, result);
+        pendingReconciliations.put(requestId, pending);
+        result.orTimeout(120, TimeUnit.SECONDS).whenComplete((unused, throwable) -> pendingReconciliations.remove(requestId, pending));
+        send(target, NetworkFrameType.STATE_RECONCILE, NetworkChannels.STATE, requestId, NetworkStateReconciliationCodec.encodeTask(new NetworkStateReconciliationTask(transitionId, players, families)), Set.of("state.reconcile"));
+        return result;
     }
 
     private void requireScope(Session session, String scope) {
@@ -1564,5 +1651,8 @@ public class ReSyncVelocityHub extends WebSocketServer {
     }
 
     private record Session(String nodeId, Set<String> scopes) {
+    }
+
+    private record PendingReconciliation(String nodeId, CompletableFuture<Void> result) {
     }
 }

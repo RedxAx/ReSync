@@ -1,9 +1,10 @@
 import groovy.json.JsonSlurper
+import java.util.zip.ZipFile
 
 plugins {
     id("java")
     id("com.gradleup.shadow") version "8.3.0"
-    id("xyz.jpenilla.run-paper") version "2.3.0"
+    id("xyz.jpenilla.run-paper") version "2.3.1"
 }
 
 group = "restudio.resync"
@@ -21,6 +22,7 @@ repositories {
 
 dependencies {
     implementation(project(":ReSyncCore"))
+    implementation(project(":ReSyncVelocity"))
     compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("net.luckperms:api:5.4")
@@ -29,22 +31,26 @@ dependencies {
     compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     implementation("org.apache.logging.log4j:log4j-core:2.25.4")
-    implementation("org.slf4j:slf4j-jdk14:2.0.17")
-    implementation("io.javalin:javalin:6.7.0")
+    implementation("io.javalin:javalin:6.7.0") {
+        exclude(group = "org.slf4j")
+    }
     compileOnly("com.google.code.gson:gson:2.10.1")
-    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7") {
+        exclude(group = "org.slf4j")
+    }
     implementation("com.github.retrooper:packetevents-spigot:2.12.1")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.99.0")
     testImplementation("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
     testImplementation("com.google.code.gson:gson:2.10.1")
+    testImplementation("net.luckperms:api:5.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
 }
 
 val targetJavaVersion = 21
 val generatedContractsDir = layout.buildDirectory.dir("generated/sources/resyncContracts/java")
-val protocolContractFile = layout.projectDirectory.file("../shared/generated-contracts/resync-protocol.json")
+val protocolContractFile = layout.projectDirectory.file("../Remotely/contracts/resync-protocol.json")
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(targetJavaVersion))
@@ -228,6 +234,10 @@ tasks {
         dependsOn(generateReSyncProtocolContract)
     }
 
+    jar {
+        enabled = false
+    }
+
     build {
         dependsOn(shadowJar)
     }
@@ -237,13 +247,13 @@ tasks {
         mergeServiceFiles()
         relocate("io.javalin", "restudio.resync.libs.javalin")
         relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
-        relocate("org.slf4j", "restudio.resync.libs.slf4j")
         relocate("kotlin", "restudio.resync.libs.kotlin")
         relocate("org.java_websocket", "restudio.resync.libs.websocket")
         relocate("com.github.retrooper.packetevents", "restudio.resync.libs.packetevents.api")
         relocate("io.github.retrooper.packetevents", "restudio.resync.libs.packetevents.impl")
         dependencies {
             exclude(dependency("com.google.code.gson:gson:.*"))
+            exclude(dependency("org.slf4j:.*:.*"))
         }
     }
 
@@ -276,4 +286,29 @@ tasks {
     check {
         dependsOn(validateNodeDefinitions)
     }
+}
+
+val universalJar = tasks.shadowJar.flatMap { it.archiveFile }
+
+val verifyUniversalJar by tasks.registering {
+    dependsOn(tasks.shadowJar)
+    inputs.file(universalJar)
+    doLast {
+        val requiredEntries = setOf(
+            "plugin.yml",
+            "velocity-plugin.json",
+            "restudio/resync/ReSync.class",
+            "restudio/resync/velocity/ReSyncVelocity.class",
+            "org/sqlite/JDBC.class",
+            "META-INF/services/java.sql.Driver"
+        )
+        ZipFile(universalJar.get().asFile).use { archive ->
+            val missingEntries = requiredEntries.filter { archive.getEntry(it) == null }
+            check(missingEntries.isEmpty()) { "Universal ReSync jar is missing ${missingEntries.joinToString()}" }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(verifyUniversalJar)
 }

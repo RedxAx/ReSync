@@ -1,5 +1,8 @@
+import org.gradle.api.publish.maven.MavenPublication
+
 plugins {
     `java-library`
+    `maven-publish`
 }
 
 group = "restudio.resync"
@@ -7,6 +10,14 @@ version = "1.3.0"
 
 repositories {
     mavenCentral()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("restudio") {
+            from(components["java"])
+        }
+    }
 }
 
 dependencies {

@@ -1,0 +1,287 @@
+[
+  {
+    "id": "resource.reference",
+    "displayName": "Resource Reference",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_reference" },
+    "inputs": [
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "resource_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "exists", "dataType": "boolean" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.discover",
+    "displayName": "Discover Resources",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_discover" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "query", "dataType": "string", "optional": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "references", "dataType": "list<resource_reference>" },
+      { "name": "result", "dataType": "result<list<resource_reference>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.get",
+    "displayName": "Get Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_get" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference", "optional": true },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind", "optional": true },
+      { "name": "resource_id", "dataType": "string", "optional": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "value", "dataType": "any" },
+      { "name": "result", "dataType": "result<any>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.query",
+    "displayName": "Query Resources",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_query" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "query", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "references", "dataType": "list<resource_reference>" },
+      { "name": "result", "dataType": "result<list<resource_reference>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.validate",
+    "displayName": "Validate Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_validate" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "value", "dataType": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.save",
+    "displayName": "Save Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_save" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "value", "dataType": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "changed", "dataType": "boolean" },
+      { "name": "created", "dataType": "boolean" },
+      { "name": "updated", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.create",
+    "displayName": "Create Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_create" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "value", "dataType": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "changed", "dataType": "boolean" },
+      { "name": "created", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.update",
+    "displayName": "Update Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_update" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind" },
+      { "name": "value", "dataType": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "changed", "dataType": "boolean" },
+      { "name": "updated", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.duplicate",
+    "displayName": "Duplicate Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_duplicate" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference", "optional": true },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind", "optional": true },
+      { "name": "resource_id", "dataType": "string", "optional": true },
+      { "name": "target_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "changed", "dataType": "boolean" },
+      { "name": "created", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.delete",
+    "displayName": "Delete Resource",
+    "category": "UTILITY",
+    "description": "Preview or delete a managed resource through its authoritative service.",
+    "tags": ["delete", "managed", "preview", "resource"],
+    "examples": ["Keep Preview enabled to inspect the target, then disable it only when deletion is intended."],
+    "authorizationPolicy": "trusted_server_flow",
+    "destructive": true,
+    "auditPolicy": "resource_mutation",
+    "confirmationPolicy": "preview_required",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_delete" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference", "optional": true },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind", "optional": true },
+      { "name": "resource_id", "dataType": "string", "optional": true },
+      { "name": "preview", "dataType": "boolean", "defaultValue": "true", "description": "Inspect the deletion without changing the resource." }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference" },
+      { "name": "preview", "dataType": "boolean" },
+      { "name": "would_delete", "dataType": "boolean" },
+      { "name": "changed", "dataType": "boolean" },
+      { "name": "deleted", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<resource_reference>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.reload",
+    "displayName": "Reload Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_reload" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference", "optional": true },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind", "optional": true },
+      { "name": "resource_id", "dataType": "string", "optional": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "value", "dataType": "any" },
+      { "name": "reloaded", "dataType": "boolean" },
+      { "name": "refresh_succeeded", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<any>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "resource.apply",
+    "displayName": "Apply Resource",
+    "category": "UTILITY",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "resource_apply" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "reference", "dataType": "resource_reference", "optional": true },
+      { "name": "resource_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:resource_kind", "optional": true },
+      { "name": "resource_id", "dataType": "string", "optional": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "value", "dataType": "any" },
+      { "name": "result", "dataType": "result<any>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  }
+]

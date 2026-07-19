@@ -11,7 +11,6 @@ import restudio.resync.api.ReSyncExtension;
 import restudio.resync.api.ReSyncExtensionContext;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.sync.FlowCategoryMetadata;
-import restudio.resync.flow.sync.FlowOptionSourceMetadata;
 import restudio.resync.flow.sync.FlowTypeMetadata;
 import restudio.resync.player.PlayerTrackingService;
 
@@ -53,11 +52,10 @@ public class ReQuestExtension implements ReSyncExtension {
         service.storage(context.storage().directory());
         service.tracking(context.service(PlayerTrackingService.class));
         context.flow().registerCategory(new FlowCategoryMetadata(CATEGORY_ID, "ReQuest", COLOR, 1650));
-        context.flow().registerType(new FlowTypeMetadata(TYPE_ID, "Quest", COLOR, "string", true, true, false));
-        context.flow().registerOptionSource(new FlowOptionSourceMetadata(QUEST_OPTION_SOURCE_ID, PLUGIN_ID, "SEARCHABLE_LIST", true));
-        context.flow().registerOptionSource(new FlowOptionSourceMetadata(EVENT_OPTION_SOURCE_ID, PLUGIN_ID, "SEARCHABLE_LIST", true));
+        context.flow().registerType(QUEST_TYPE, new FlowTypeMetadata(TYPE_ID, "Quest", COLOR, "string", true, true, false));
         context.optionCatalogs().register(new QuestCatalog(service));
         context.optionCatalogs().register(new EventCatalog(service));
+        context.flow().registerResource(new ReQuestResourceAdapter(service));
         context.flow().registerHandler(HANDLER_ID, new ReQuestHandler(service));
         context.flow().registerNodes("request/nodes");
         context.modules().register(new ReQuestModule(service));

@@ -4,6 +4,7 @@ import restudio.resync.core.Session;
 import restudio.resync.resources.ReSyncManagedResource;
 
 import java.util.List;
+import java.util.Set;
 
 public interface FlowResourceAdapter<T> {
     ReSyncManagedResource descriptor();
@@ -20,11 +21,70 @@ public interface FlowResourceAdapter<T> {
 
     void delete(String id);
 
-    void sendData(Session session, T value);
+    default void validate(T value) {
+    }
 
-    void sendList(Session session, List<String> ids);
+    default Set<String> supportedOperations() {
+        return Set.of("discover", "query", "get", "create", "validate", "save", "update", "delete");
+    }
 
-    void sendSaveAck(Session session, String id);
+    default String unsupportedOperationReason(String operation) {
+        return switch (operation != null ? operation : "") {
+            case "duplicate" -> "This resource domain does not support duplication";
+            case "reload" -> "This resource domain does not expose an explicit reload operation";
+            case "apply" -> "This resource domain does not expose a generic apply operation";
+            default -> "This resource operation is not supported by the authoritative service";
+        };
+    }
+
+    default T duplicate(T value, String targetId) {
+        throw new UnsupportedOperationException("Resource duplication is unsupported");
+    }
+
+    default T reload(String id) {
+        throw new UnsupportedOperationException("Resource reload is unsupported");
+    }
+
+    default Object apply(T value, Object context) {
+        throw new UnsupportedOperationException("Resource application is unsupported");
+    }
+
+    default String identityRules() {
+        return "stable_id";
+    }
+
+    default String lifecycle() {
+        return "durable";
+    }
+
+    default boolean durable() {
+        return !"ephemeral".equalsIgnoreCase(lifecycle());
+    }
+
+    default String catalogSource() {
+        return "server:resync:" + descriptor().typeId();
+    }
+
+    default String authoritativeService() {
+        return descriptor().jsonStorageSupported() ? "ReSyncJsonResourceStorage" : "FlowStorage";
+    }
+
+    default boolean changeEvents() {
+        return descriptor().jsonStorageSupported();
+    }
+
+    default boolean activeRefresh() {
+        return false;
+    }
+
+    default void sendData(Session session, T value) {
+    }
+
+    default void sendList(Session session, List<String> ids) {
+    }
+
+    default void sendSaveAck(Session session, String id) {
+    }
 
     default void sendSaveAck(Session session, String id, String requestId) {
         sendSaveAck(session, id);
@@ -83,9 +143,17 @@ public interface FlowResourceAdapter<T> {
     }
 
     default void afterSave(Session session, T value) {
+        afterSave(value);
     }
 
     default void afterDelete(Session session, String id) {
+        afterDelete(id);
+    }
+
+    default void afterSave(T value) {
+    }
+
+    default void afterDelete(String id) {
     }
 
     private String compactDisplayName() {

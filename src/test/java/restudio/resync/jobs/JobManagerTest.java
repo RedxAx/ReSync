@@ -1,6 +1,8 @@
 package restudio.resync.jobs;
 
 import org.junit.jupiter.api.Test;
+import restudio.flow.data.FlowJobReference;
+import restudio.resync.flow.jobs.FlowJobRegistry;
 
 import java.util.List;
 import java.util.Map;
@@ -58,5 +60,32 @@ class JobManagerTest {
         JobRecord<String> second = manager.create("saveFlow", "client-b", "flow", "request-1");
 
         assertTrue(!first.getJobId().equals(second.getJobId()));
+    }
+
+    @Test
+    void packetJobsUseTheCanonicalRegistryWhenProvided() {
+        FlowJobRegistry registry = new FlowJobRegistry();
+        JobManager manager = new JobManager(registry, null);
+
+        JobRecord<String> job = manager.create("saveFlow", "client", "flow", "request-1");
+        job.markRunning();
+        job.markSucceeded("saved", "Saved");
+
+        FlowJobReference<?> canonical = registry.get(job.getJobId());
+        assertEquals(FlowJobReference.State.SUCCEEDED, canonical.getState());
+        assertEquals("request-1", canonical.getMetadata().get("requestId"));
+        assertEquals(JobStatus.SUCCEEDED, job.getStatus());
+    }
+
+    @Test
+    void canonicalCancellationPropagatesToPacketJobState() {
+        FlowJobRegistry registry = new FlowJobRegistry();
+        JobManager manager = new JobManager(registry, null);
+        JobRecord<String> job = manager.create("createWorldGenPreview", "client", "preview");
+        job.markRunning();
+
+        assertTrue(registry.cancel(job.getJobId()));
+        assertEquals(JobStatus.CANCELLED, job.getStatus());
+        assertTrue(job.getFuture().isCancelled());
     }
 }

@@ -102,9 +102,15 @@ jobs:
         shell: bash
         run: |
           lock=.restudio/workspace.lock.json
-          for project in ReScreen Rebase; do
+          for project in Remotely ReScreen Rebase; do
             printf '%s=%s\n' "${project,,}" "$(jq -r --arg project "$project" '.[$project]' "$lock")" >> "$GITHUB_OUTPUT"
           done
+      - uses: actions/checkout@v4
+        with:
+          repository: ReStudioMC/Remotely
+          token: ${{ secrets.REPROJECTS_PAT }}
+          path: ReProjects/Remotely
+          ref: ${{ steps.refs.outputs.remotely }}
       - uses: actions/checkout@v4
         with:
           repository: RedxAx/ReScreen

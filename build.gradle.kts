@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "restudio.resync"
-version = "1.3.0"
+version = providers.gradleProperty("releaseVersion").getOrElse("1.3.0")
 
 repositories {
     mavenCentral()

@@ -1,0 +1,169 @@
+[
+  {
+    "id": "player_count_item",
+    "displayName": "Player Count Item",
+    "category": "DATA",
+    "handler": "player_count_item",
+    "inputs": [
+      {"name": "player", "pinType": "DATA", "dataType": "player"},
+      {"name": "material_or_item", "pinType": "DATA", "dataType": "any"}
+    ],
+    "outputs": [{"name": "count", "pinType": "DATA", "dataType": "number"}]
+  },
+  {
+    "id": "player_get_first_empty_slot",
+    "displayName": "Player First Empty Slot",
+    "category": "DATA",
+    "handler": "player_get_first_empty_slot",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "slot_index", "pinType": "DATA", "dataType": "number"}]
+  },
+  {
+    "id": "player_get_all_items",
+    "displayName": "Player Get All Items",
+    "category": "DATA",
+    "handler": "player_get_all_items",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list<item>"}]
+  },
+  {
+    "id": "player_get_hotbar_items",
+    "displayName": "Player Get Hotbar Items",
+    "category": "DATA",
+    "handler": "player_get_hotbar_items",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "items_list", "pinType": "DATA", "dataType": "list<item>"}]
+  },
+  {
+    "id": "player_get_armor_items",
+    "displayName": "Player Get Armor Items",
+    "category": "DATA",
+    "handler": "player_get_armor_items",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [
+      {"name": "helmet", "pinType": "DATA", "dataType": "itemstack"},
+      {"name": "chestplate", "pinType": "DATA", "dataType": "itemstack"},
+      {"name": "leggings", "pinType": "DATA", "dataType": "itemstack"},
+      {"name": "boots", "pinType": "DATA", "dataType": "itemstack"}
+    ]
+  },
+  {
+    "id": "player_get_inventory_size",
+    "displayName": "Player Get Inventory Size",
+    "category": "DATA",
+    "handler": "player_get_inventory_size",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "size", "pinType": "DATA", "dataType": "number"}]
+  },
+  {
+    "id": "player_get_mainhand_item",
+    "displayName": "Player Get Mainhand Item",
+    "category": "DATA",
+    "handler": "player_get_mainhand_item",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "item", "pinType": "DATA", "dataType": "itemstack"}]
+  },
+  {
+    "id": "player_get_offhand_item",
+    "displayName": "Player Get Offhand Item",
+    "category": "DATA",
+    "handler": "player_get_offhand_item",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "item", "pinType": "DATA", "dataType": "itemstack"}]
+  },
+  {
+    "id": "player_is_on_ground",
+    "displayName": "Player Is On Ground",
+    "category": "LOGIC",
+    "handler": "player_is_on_ground",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "on_ground", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "player_is_sleeping",
+    "displayName": "Player Is Sleeping",
+    "category": "LOGIC",
+    "handler": "player_is_sleeping",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "is_sleeping", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "player_get_bed_location",
+    "displayName": "Player Get Bed Location",
+    "category": "DATA",
+    "handler": "player_get_bed_location",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "bed_location", "pinType": "DATA", "dataType": "location"}]
+  },
+  {
+    "id": "player_get_last_damage",
+    "displayName": "Player Get Last Damage",
+    "category": "DATA",
+    "handler": "player_get_last_damage",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [
+      {"name": "damage_cause", "pinType": "DATA", "dataType": "string"},
+      {"name": "damage_source", "pinType": "DATA", "dataType": "entity"}
+    ]
+  },
+  {
+    "id": "player_get_killer",
+    "displayName": "Player Get Killer",
+    "category": "DATA",
+    "handler": "player_get_killer",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "killer", "pinType": "DATA", "dataType": "entity"}]
+  },
+  {
+    "id": "player_get_ping",
+    "displayName": "Player Get Ping",
+    "category": "DATA",
+    "handler": "player_get_ping",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "ping_ms", "pinType": "DATA", "dataType": "number"}]
+  },
+  {
+    "id": "player_get_lore",
+    "displayName": "Player Get Lore",
+    "category": "DATA",
+    "handler": "player_get_lore",
+    "inputs": [
+      {"name": "player", "pinType": "DATA", "dataType": "player"},
+      {"name": "hand", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["main", "off"], "defaultValue": "main"}
+    ],
+    "outputs": [{"name": "lore_lines_list", "pinType": "DATA", "dataType": "list<string>"}]
+  },
+  {
+    "id": "player_get_display_name",
+    "displayName": "Player Get Display Name",
+    "category": "DATA",
+    "handler": "player_get_display_name",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "display_name", "pinType": "DATA", "dataType": "string"}]
+  },
+  {
+    "id": "player_get_player_list_name",
+    "displayName": "Player Get Player List Name",
+    "category": "DATA",
+    "handler": "player_get_player_list_name",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "list_name", "pinType": "DATA", "dataType": "string"}]
+  },
+  {
+    "id": "player_is_op",
+    "displayName": "Player Is OP",
+    "category": "LOGIC",
+    "handler": "player_is_op",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "is_op", "pinType": "DATA", "dataType": "boolean"}]
+  },
+  {
+    "id": "player_get_allowed_flight",
+    "displayName": "Player Get Allowed Flight",
+    "category": "LOGIC",
+    "handler": "player_get_allowed_flight",
+    "inputs": [{"name": "player", "pinType": "DATA", "dataType": "player"}],
+    "outputs": [{"name": "can_fly", "pinType": "DATA", "dataType": "boolean"}]
+  }
+]
+

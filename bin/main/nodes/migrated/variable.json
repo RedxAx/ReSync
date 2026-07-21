@@ -1,0 +1,805 @@
+[
+  {
+    "id": "get.variable",
+    "displayName": "Get Variable",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "get"
+    },
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "set.variable",
+    "displayName": "Set Variable",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "set"
+    },
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "get.server.var",
+    "displayName": "Get Server Variable",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "get"
+    },
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "variable.has",
+    "displayName": "Has",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "has"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "variable.delete",
+    "displayName": "Delete",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "delete"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.increment",
+    "displayName": "Increment",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "increment"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "delta",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.decrement",
+    "displayName": "Decrement",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "decrement"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "delta",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.multiply",
+    "displayName": "Multiply",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "multiply"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "factor",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.divide",
+    "displayName": "Divide",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "divide"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "divisor",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.append",
+    "displayName": "Append",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "append"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.list_keys",
+    "displayName": "List Keys",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableHandler",
+    "handlerConfig": {
+      "operation": "list_keys"
+    },
+    "inputs": [
+      {
+        "name": "prefix",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "keys",
+        "dataType": "list<any>"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_access",
+    "displayName": "Variable Access",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_access"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set",
+          "delete",
+          "list",
+          "increment",
+          "decrement",
+          "multiply",
+          "divide",
+          "exists"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "local",
+          "global",
+          "player"
+        ],
+        "defaultValue": "local"
+      },
+      {
+        "name": "persist",
+        "dataType": "boolean"
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "mode": "get,set,delete,increment,decrement,multiply,divide,exists"
+        }
+      },
+      {
+        "name": "value",
+        "dataType": "any",
+        "visibleWhen": {
+          "mode": "set"
+        }
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": "1",
+        "visibleWhen": {
+          "mode": "increment,decrement,multiply,divide"
+        }
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "visibleWhen": {
+          "scope": "player"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      },
+      {
+        "name": "exists",
+        "dataType": "any"
+      },
+      {
+        "name": "variables",
+        "dataType": "list<any>"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_set_global",
+    "displayName": "Variable Set Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_set_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.variable_set_local",
+    "displayName": "Variable Set Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_set_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.variable_get_global",
+    "displayName": "Variable Get Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_get_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_get_local",
+    "displayName": "Variable Get Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_get_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_delete_global",
+    "displayName": "Variable Delete Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_delete_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.variable_delete_local",
+    "displayName": "Variable Delete Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_delete_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.variable_exists_global",
+    "displayName": "Variable Exists Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_exists_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "exists",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_exists_local",
+    "displayName": "Variable Exists Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_exists_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "exists",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.variable_list_global",
+    "displayName": "Variable List Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_list_global"
+    },
+    "outputs": [
+      {
+        "name": "variables",
+        "dataType": "list<any>"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "variable.variable_list_local",
+    "displayName": "Variable List Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_list_local"
+    },
+    "outputs": [
+      {
+        "name": "variables",
+        "dataType": "list<any>"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "variable.variable_clear_global",
+    "displayName": "Variable Clear Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_clear_global"
+    },
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "variable.variable_clear_local",
+    "displayName": "Variable Clear Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_clear_local"
+    },
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "id": "variable.access",
+    "displayName": "Variable Access",
+    "category": "VARIABLE",
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_access"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set",
+          "delete",
+          "list",
+          "increment",
+          "decrement",
+          "multiply",
+          "divide",
+          "exists"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "scope",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "local",
+          "global",
+          "player"
+        ],
+        "defaultValue": "local"
+      },
+      {
+        "name": "persist",
+        "dataType": "boolean"
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "mode": "get,set,delete,increment,decrement,multiply,divide,exists"
+        }
+      },
+      {
+        "name": "value",
+        "dataType": "any",
+        "visibleWhen": {
+          "mode": "set"
+        }
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": "1",
+        "visibleWhen": {
+          "mode": "increment,decrement,multiply,divide"
+        }
+      },
+      {
+        "name": "player",
+        "dataType": "player",
+        "visibleWhen": {
+          "scope": "player"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "value",
+        "dataType": "any",
+        "visibleWhen": {
+          "mode": "get,set,increment,decrement,multiply,divide"
+        }
+      },
+      {
+        "name": "exists",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "mode": "exists"
+        }
+      },
+      {
+        "name": "variables",
+        "dataType": "list<any>",
+        "visibleWhen": {
+          "mode": "list"
+        }
+      }
+    ]
+  },
+  {
+    "id": "variable.set.global",
+    "displayName": "Variable Set Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_set_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.set.local",
+    "displayName": "Variable Set Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_set_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.set.player",
+    "displayName": "Variable Set Player",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_set_player"
+    },
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "id": "variable.get.global",
+    "displayName": "Variable Get Global",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_get_global"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.get.local",
+    "displayName": "Variable Get Local",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_get_local"
+    },
+    "inputs": [
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.get.player",
+    "displayName": "Variable Get Player",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_get_player"
+    },
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ]
+  },
+  {
+    "id": "variable.exists",
+    "displayName": "Variable Exists",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_exists"
+    },
+    "inputs": [
+      {
+        "name": "scope",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "local",
+          "global",
+          "player"
+        ]
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "exists",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "variable.list.all",
+    "displayName": "Variable List All",
+    "category": "VARIABLE",
+    "hidden": true,
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {
+      "operation": "variable_list_all"
+    },
+    "outputs": [
+      {
+        "name": "variables",
+        "dataType": "list<any>"
+      }
+    ],
+    "inputs": []
+  }
+]
+

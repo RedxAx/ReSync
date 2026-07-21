@@ -1,0 +1,1247 @@
+[
+  {
+    "id": "ability.strike_lightning",
+    "displayName": "Strike Lightning",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "strike_lightning" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.fake_lightning",
+    "displayName": "Fake Lightning",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "fake_lightning" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.damage_area",
+    "displayName": "Damage Area",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "damage_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "damage", "dataType": "number", "widget": "NUMBER", "defaultValue": 4 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.heal_area",
+    "displayName": "Heal Area",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "heal_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.knockback_area",
+    "displayName": "Knockback Area",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "knockback_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1.2 },
+      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.2 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.find_entities_radius",
+    "displayName": "Find Entities Radius",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "find_entities_radius" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" }
+    ]
+  },
+  {
+    "id": "ability.raycast",
+    "displayName": "Raycast",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "raycast" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "distance", "dataType": "number", "widget": "NUMBER", "defaultValue": 20 },
+      { "name": "hit_mode", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "entity", "block"], "defaultValue": "any" },
+      { "name": "stop_on_block", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "stop_on_entity", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
+      { "name": "block_filter", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "block", "dataType": "block" },
+      { "name": "location", "dataType": "location" },
+      { "name": "hit", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.particle_burst",
+    "displayName": "Particle Burst",
+    "category": "ABILITY",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "particle_burst" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 },
+      { "name": "spread", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6 },
+      { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.spawn_particle_burst",
+    "displayName": "Particle Burst",
+    "category": "ABILITY",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "particle_burst" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 },
+      { "name": "spread", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6 },
+      { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.play_sound",
+    "displayName": "Play Sound",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "play_sound" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP" },
+      { "name": "volume", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
+      { "name": "pitch", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.potion_effect",
+    "displayName": "Potion Effect",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "potion_effect" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "effect", "dataType": "potion_effect", "widget": "DROPDOWN", "optionsSource": "server:minecraft:potion_effect", "defaultValue": "SPEED" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 },
+      { "name": "amplifier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.launch_projectile",
+    "displayName": "Launch Projectile",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "launch_projectile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "projectile_type", "dataType": "string", "widget": "DROPDOWN", "options": ["ARROW", "SNOWBALL", "EGG", "TRIDENT", "SMALL_FIREBALL"], "defaultValue": "ARROW" },
+      { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 2 },
+      { "name": "gravity", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "fire_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "damage", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "pierce", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "pickup_mode", "dataType": "string", "widget": "DROPDOWN", "options": ["allowed", "creative_only", "disallowed"], "defaultValue": "allowed" },
+      { "name": "mark_key", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "projectile", "dataType": "entity" }
+    ]
+  },
+  {
+    "id": "ability.nearest_entity",
+    "displayName": "Nearest Entity",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "nearest_entity" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 8 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "found", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.random_entity",
+    "displayName": "Random Entity",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "random_entity" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 8 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "found", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.cone_entities",
+    "displayName": "Cone Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "cone_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "direction", "dataType": "vector" },
+      { "name": "range", "dataType": "number", "widget": "NUMBER", "defaultValue": 8 },
+      { "name": "angle", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" }
+    ]
+  },
+  {
+    "id": "ability.line_entities",
+    "displayName": "Line Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "line_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "direction", "dataType": "vector" },
+      { "name": "range", "dataType": "number", "widget": "NUMBER", "defaultValue": 12 },
+      { "name": "width", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" }
+    ]
+  },
+  {
+    "id": "ability.dash",
+    "displayName": "Dash",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "dash" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "direction", "dataType": "vector" },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1.4 },
+      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.15 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.teleport_caster",
+    "displayName": "Teleport Caster",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "teleport_caster" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "keep_direction", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.teleport_target",
+    "displayName": "Teleport Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "teleport_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.beam",
+    "displayName": "Beam",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "beam" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "start", "dataType": "location" },
+      { "name": "end", "dataType": "location" },
+      { "name": "location", "dataType": "location" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "ELECTRIC_SPARK" },
+      { "name": "steps", "dataType": "number", "widget": "NUMBER", "defaultValue": 24 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.temporary_block",
+    "displayName": "Temporary Block",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "temporary_block" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "ICE" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.pull_entities",
+    "displayName": "Pull Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "pull_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.push_entities",
+    "displayName": "Push Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "push_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.ignite_target",
+    "displayName": "Ignite Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "ignite_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.freeze_target",
+    "displayName": "Freeze Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "freeze_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.set_velocity",
+    "displayName": "Set Velocity",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "set_velocity" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "x", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "y", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "z", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.mark_target",
+    "displayName": "Mark Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "mark_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "key", "dataType": "string", "defaultValue": "mark" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.has_mark",
+    "displayName": "Has Mark",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "has_mark" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "key", "dataType": "string", "defaultValue": "mark" }
+    ],
+    "outputs": [
+      { "name": "true", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "false", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "active", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.remove_mark",
+    "displayName": "Remove Mark",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "remove_mark" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "key", "dataType": "string", "defaultValue": "mark" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.damage_target",
+    "displayName": "Damage Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "damage_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4 },
+      { "name": "use_source", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.heal_target",
+    "displayName": "Heal Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "heal_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.set_health",
+    "displayName": "Set Health",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "set_health" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "health", "dataType": "number", "widget": "NUMBER", "defaultValue": 20 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.cancel_damage",
+    "displayName": "Cancel Damage",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "cancel_damage" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cancelled", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.shield_target",
+    "displayName": "Shield Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "shield_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4 },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.reflect_damage",
+    "displayName": "Reflect Damage",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "reflect_damage" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "percent", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.launch_target",
+    "displayName": "Launch Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "launch_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "direction", "dataType": "vector" },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 },
+      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.5 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.pull_target",
+    "displayName": "Pull Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "pull_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.leap_to_location",
+    "displayName": "Leap To Location",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "leap_to_location" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 20 },
+      { "name": "arrival_radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.35 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "destination", "dataType": "location" },
+      { "name": "blocked", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.stun_target",
+    "displayName": "Stun Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "stun_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.root_target",
+    "displayName": "Root Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "root_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.silence_target",
+    "displayName": "Silence Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "silence_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.disarm_target",
+    "displayName": "Disarm Target",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "disarm_target" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "target", "dataType": "entity" },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 60 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.find_blocks",
+    "displayName": "Find Blocks",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "find_blocks" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 },
+      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "any" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "blocks", "dataType": "list<block>" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.break_blocks",
+    "displayName": "Break Blocks",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "break_blocks" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 3 },
+      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "any" },
+      { "name": "drops", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "max_blocks", "dataType": "number", "widget": "NUMBER", "defaultValue": 128 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.replace_blocks",
+    "displayName": "Replace Blocks",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "replace_blocks" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 3 },
+      { "name": "from", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "any" },
+      { "name": "to", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "STONE" },
+      { "name": "max_blocks", "dataType": "number", "widget": "NUMBER", "defaultValue": 128 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.place_shape",
+    "displayName": "Place Shape",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "place_shape" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "shape", "dataType": "string", "widget": "DROPDOWN", "options": ["cube", "sphere", "cylinder"], "defaultValue": "sphere" },
+      { "name": "material", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "STONE" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 3 },
+      { "name": "air_only", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "max_blocks", "dataType": "number", "widget": "NUMBER", "defaultValue": 128 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.extinguish_area",
+    "displayName": "Extinguish Area",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "extinguish_area" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.grow_block",
+    "displayName": "Grow Block",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "grow_block" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "attempts", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.particle_shape",
+    "displayName": "Particle Shape",
+    "category": "ABILITY",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "particle_shape" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["burst", "ring", "line", "orbit"], "defaultValue": "ring" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 32 },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 2 },
+      { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.filter_entities",
+    "displayName": "Filter Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "filter_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "any" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.sort_entities",
+    "displayName": "Sort Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "sort_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "location", "dataType": "location" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["nearest", "farthest"], "defaultValue": "nearest" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" }
+    ]
+  },
+  {
+    "id": "ability.limit_entities",
+    "displayName": "Limit Entities",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "limit_entities" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "limit", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "count", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.is_holding_content",
+    "displayName": "Is Holding Content",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "is_holding_content" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "content_id", "dataType": "string" },
+      { "name": "hand", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "main hand", "offhand"], "defaultValue": "any" }
+    ],
+    "outputs": [
+      { "name": "true", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "false", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "matches", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.is_wearing_content",
+    "displayName": "Is Wearing Content",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "is_wearing_content" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "content_id", "dataType": "string" },
+      { "name": "slot", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "head", "chest", "legs", "feet"], "defaultValue": "any" }
+    ],
+    "outputs": [
+      { "name": "true", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "false", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "matches", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.has_content_set",
+    "displayName": "Has Content Set",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "has_content_set" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "content_prefix", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "true", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "false", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "matches", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.custom_block_at",
+    "displayName": "Custom Block At",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "custom_block_at" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "true", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "false", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "content_id", "dataType": "string" },
+      { "name": "content_type", "dataType": "string" },
+      { "name": "exists", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.trigger_content_ability",
+    "displayName": "Trigger Content Ability",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "trigger_content_ability" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "content_id", "dataType": "string" },
+      { "name": "trigger", "dataType": "string", "widget": "DROPDOWN", "options": ["item.use", "item.left_click", "item.right_click", "item.hit_entity", "item.damage_entity", "item.break_block", "item.consume", "item.drop", "item.pickup", "item.while_holding", "block.place", "block.break", "block.interact", "block.step_on", "block.nearby_player", "block.redstone", "block.tick", "armor.equip", "armor.unequip", "armor.damaged", "armor.tick", "armor.while_holding", "armor.full_set", "armor.full_set_tick"], "defaultValue": "item.use" },
+      { "name": "location", "dataType": "location" },
+      { "name": "target", "dataType": "entity" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.cooldown_remaining",
+    "displayName": "Cooldown Remaining",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "cooldown_remaining" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "key", "dataType": "string", "defaultValue": "ability" },
+      { "name": "scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player" },
+      { "name": "content_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "ready", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "ticks", "dataType": "number" },
+      { "name": "is_ready", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.set_cooldown",
+    "displayName": "Set Cooldown",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "set_cooldown" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "key", "dataType": "string", "defaultValue": "ability" },
+      { "name": "scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player" },
+      { "name": "content_id", "dataType": "string" },
+      { "name": "ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "ability.get_charge",
+    "displayName": "Get Charge",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "get_charge" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "key", "dataType": "string", "defaultValue": "charge" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "value", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.set_charge",
+    "displayName": "Set Charge",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "set_charge" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "key", "dataType": "string", "defaultValue": "charge" },
+      { "name": "value", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "value", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.add_charge",
+    "displayName": "Add Charge",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "add_charge" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "key", "dataType": "string", "defaultValue": "charge" },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "value", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.consume_charge",
+    "displayName": "Consume Charge",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "consume_charge" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "key", "dataType": "string", "defaultValue": "charge" },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 1 }
+    ],
+    "outputs": [
+      { "name": "success", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "fail", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "value", "dataType": "number" },
+      { "name": "succeeded", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "ability.entity_query",
+    "displayName": "Entity Query",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "entity_query" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["radius", "nearest", "random", "cone", "line", "box", "raycast"], "defaultValue": "radius" },
+      { "name": "location", "dataType": "location", "visibleWhen": { "mode": "radius,nearest,random,cone,line,box" } },
+      { "name": "direction", "dataType": "vector", "visibleWhen": { "mode": "cone,line" } },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 8, "visibleWhen": { "mode": "radius,nearest,random" } },
+      { "name": "range", "dataType": "number", "widget": "NUMBER", "defaultValue": 12, "visibleWhen": { "mode": "cone,line,raycast" } },
+      { "name": "angle", "dataType": "number", "widget": "NUMBER", "defaultValue": 60, "visibleWhen": { "mode": "cone" } },
+      { "name": "width", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "visibleWhen": { "mode": "line,box" } },
+      { "name": "height", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "box" } },
+      { "name": "depth", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "box" } },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity" },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true },
+      { "name": "sort", "dataType": "string", "widget": "DROPDOWN", "options": ["none", "nearest", "farthest", "lowest_health", "random"], "defaultValue": "none" },
+      { "name": "select", "dataType": "string", "widget": "DROPDOWN", "options": ["first", "nearest", "farthest", "random", "lowest_health"], "defaultValue": "first" },
+      { "name": "limit", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "target", "global"], "defaultValue": "player" },
+      { "name": "cooldown_key", "dataType": "string", "defaultValue": "entity_query" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "found", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "empty", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "count", "dataType": "number" },
+      { "name": "has_result", "dataType": "boolean" },
+      { "name": "location", "dataType": "location" },
+      { "name": "cooldown_ticks_left", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.entity_effect",
+    "displayName": "Entity Effect",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "entity_effect" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["damage", "heal", "potion", "ignite", "freeze", "stun", "root", "silence", "disarm", "launch", "pull", "push", "knockback", "set_velocity", "no_damage_ticks", "shield", "mark", "remove_mark", "life_steal"], "defaultValue": "damage" },
+      { "name": "target_source", "dataType": "string", "widget": "DROPDOWN", "options": ["event target", "target", "entities"], "defaultValue": "event target" },
+      { "name": "target", "dataType": "entity", "visibleWhen": { "target_source": "target" } },
+      { "name": "entities", "dataType": "list<entity>", "visibleWhen": { "target_source": "entities" } },
+      { "name": "location", "dataType": "location", "visibleWhen": { "mode": "pull,push,knockback" } },
+      { "name": "direction", "dataType": "vector", "visibleWhen": { "mode": "launch" } },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "damage,heal,shield,life_steal" } },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "visibleWhen": { "mode": "launch,pull,push,knockback" } },
+      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.2, "visibleWhen": { "mode": "launch,push,knockback" } },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "visibleWhen": { "mode": "potion,ignite,freeze,stun,root,silence,disarm,no_damage_ticks,mark" } },
+      { "name": "effect", "dataType": "potion_effect", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:potion_effect", "defaultValue": "SPEED", "visibleWhen": { "mode": "potion" } },
+      { "name": "amplifier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "potion" } },
+      { "name": "key", "dataType": "string", "defaultValue": "mark", "visibleWhen": { "mode": "mark,remove_mark" } },
+      { "name": "x", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "set_velocity" } },
+      { "name": "y", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "set_velocity" } },
+      { "name": "z", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "set_velocity" } },
+      { "name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "target", "global"], "defaultValue": "player" },
+      { "name": "cooldown_key", "dataType": "string", "defaultValue": "entity_effect" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "empty", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "affected", "dataType": "number" },
+      { "name": "cooldown_ticks_left", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.area_effect",
+    "displayName": "Area Effect",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "area_effect" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["damage", "heal", "potion", "ignite", "freeze", "knockback", "pull", "push", "particle", "sound", "extinguish"], "defaultValue": "damage" },
+      { "name": "shape", "dataType": "string", "widget": "DROPDOWN", "options": ["sphere", "cone", "line", "box"], "defaultValue": "sphere" },
+      { "name": "location", "dataType": "location" },
+      { "name": "direction", "dataType": "vector", "visibleWhen": { "shape": "cone,line" } },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 5, "visibleWhen": { "shape": "sphere" } },
+      { "name": "range", "dataType": "number", "widget": "NUMBER", "defaultValue": 8, "visibleWhen": { "shape": "cone,line" } },
+      { "name": "angle", "dataType": "number", "widget": "NUMBER", "defaultValue": 60, "visibleWhen": { "shape": "cone" } },
+      { "name": "width", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "visibleWhen": { "shape": "line,box" } },
+      { "name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living_entity", "hostile", "passive"], "defaultValue": "living_entity", "visibleWhen": { "mode": "damage,heal,potion,ignite,freeze,knockback,pull,push" } },
+      { "name": "exclude_caster", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": true, "visibleWhen": { "mode": "damage,heal,potion,ignite,freeze,knockback,pull,push" } },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "damage,heal" } },
+      { "name": "strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "visibleWhen": { "mode": "knockback,pull,push" } },
+      { "name": "upward_strength", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.2, "visibleWhen": { "mode": "knockback,push" } },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "visibleWhen": { "mode": "potion,ignite,freeze" } },
+      { "name": "effect", "dataType": "potion_effect", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:potion_effect", "defaultValue": "SPEED", "visibleWhen": { "mode": "potion" } },
+      { "name": "amplifier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "potion" } },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME", "visibleWhen": { "mode": "particle" } },
+      { "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP", "visibleWhen": { "mode": "sound" } },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 20, "visibleWhen": { "mode": "particle" } },
+      { "name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 0 },
+      { "name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "target", "global"], "defaultValue": "player" },
+      { "name": "cooldown_key", "dataType": "string", "defaultValue": "area_effect" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entities", "dataType": "list<entity>" },
+      { "name": "affected", "dataType": "number" },
+      { "name": "location", "dataType": "location" },
+      { "name": "cooldown_ticks_left", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "ability.holding_effect",
+    "displayName": "Holding Effect",
+    "category": "ABILITY",
+    "handler": "AbilityEffectHandler",
+    "handlerConfig": { "operation": "holding_effect" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["potion", "particle", "sound", "charge_drain", "charge_regen", "durability_drain"], "defaultValue": "potion" },
+      { "name": "player", "dataType": "player" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "effect", "dataType": "potion_effect", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:potion_effect", "defaultValue": "SPEED", "visibleWhen": { "mode": "potion" } },
+      { "name": "duration_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 40, "visibleWhen": { "mode": "potion" } },
+      { "name": "amplifier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "visibleWhen": { "mode": "potion" } },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME", "visibleWhen": { "mode": "particle" } },
+      { "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "ENTITY_EXPERIENCE_ORB_PICKUP", "visibleWhen": { "mode": "sound" } },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 4, "visibleWhen": { "mode": "particle" } },
+      { "name": "key", "dataType": "string", "defaultValue": "charge", "visibleWhen": { "mode": "charge_drain,charge_regen" } },
+      { "name": "amount", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "visibleWhen": { "mode": "charge_drain,charge_regen,durability_drain" } },
+      { "name": "max", "dataType": "number", "widget": "NUMBER", "defaultValue": 100, "visibleWhen": { "mode": "charge_regen" } },
+      { "name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": 20 },
+      { "name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "global"], "defaultValue": "item instance" },
+      { "name": "cooldown_key", "dataType": "string", "defaultValue": "holding_effect" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "fail", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "item", "dataType": "itemstack" },
+      { "name": "value", "dataType": "number" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "cooldown_ticks_left", "dataType": "number" }
+    ]
+  }
+]
+

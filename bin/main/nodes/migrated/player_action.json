@@ -1,0 +1,2259 @@
+[
+  {
+    "id": "give.item",
+    "displayName": "Give Item",
+    "category": "INVENTORY",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "give_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_message",
+    "displayName": "Player Message",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_message"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_kick",
+    "displayName": "Player Kick",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_kick"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "reason",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_teleport",
+    "displayName": "Player Teleport",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_teleport"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_walking_speed",
+    "displayName": "Player Set Walking Speed",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_walking_speed"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "speed",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_flying_speed",
+    "displayName": "Player Set Flying Speed",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_flying_speed"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "speed",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_execute_command",
+    "displayName": "Player Execute Command",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_execute_command"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "command",
+        "dataType": "string"
+      },
+      {
+        "name": "as_op",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "player.player_chat",
+    "displayName": "Player Chat",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_chat"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_say",
+    "displayName": "Player Say",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_say"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "message",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_resourcepack",
+    "displayName": "Player Send Resourcepack",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_resourcepack"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "url",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_get_exp_level",
+    "displayName": "Player Get Exp Level",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_exp_level"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "level",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_show_bossbar",
+    "displayName": "Player Show Bossbar",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_show_bossbar"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "progress",
+        "dataType": "number"
+      },
+      {
+        "name": "color",
+        "dataType": "string"
+      },
+      {
+        "name": "style",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "bossbar_id",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "player.player_hide_bossbar",
+    "displayName": "Player Hide Bossbar",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_hide_bossbar"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "bossbar_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_update_bossbar",
+    "displayName": "Player Update Bossbar",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_update_bossbar"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "bossbar_id",
+        "dataType": "string"
+      },
+      {
+        "name": "new_title",
+        "dataType": "string"
+      },
+      {
+        "name": "new_progress",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_state",
+    "displayName": "Player State",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_state"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "property",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "sprint",
+          "sneak",
+          "fly",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "gamemode",
+          "food_level",
+          "saturation",
+          "exhaustion",
+          "health",
+          "max_health",
+          "absorption",
+          "walk_speed",
+          "fly_speed",
+          "fire_ticks",
+          "air_ticks",
+          "no_damage_ticks",
+          "freeze_state",
+          "flight_state",
+          "compass_target",
+          "xp",
+          "total_exp"
+        ],
+        "defaultValue": "health"
+      },
+      {
+        "name": "action",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set",
+          "property": "sprint,sneak,fly,vanish,glowing,invulnerable,freeze_state,flight_state"
+        }
+      },
+      {
+        "name": "gamemode",
+        "dataType": "gamemode",
+        "visibleWhen": {
+          "action": "set",
+          "property": "gamemode"
+        }
+      },
+      {
+        "name": "value",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "food_level,saturation,exhaustion,health,max_health,absorption,walk_speed,fly_speed,fire_ticks,air_ticks,no_damage_ticks,total_exp"
+        }
+      },
+      {
+        "name": "compass_location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "set",
+          "property": "compass_target"
+        }
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "xp"
+        }
+      },
+      {
+        "name": "points",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "xp"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "sprint",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sprint"
+        }
+      },
+      {
+        "name": "sneak",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sneak"
+        }
+      },
+      {
+        "name": "fly",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly"
+        }
+      },
+      {
+        "name": "vanish",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "vanish"
+        }
+      },
+      {
+        "name": "glowing",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "name": "invulnerable",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "name": "gamemode",
+        "dataType": "gamemode",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gamemode"
+        }
+      },
+      {
+        "name": "food_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "food_level"
+        }
+      },
+      {
+        "name": "saturation",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "saturation"
+        }
+      },
+      {
+        "name": "exhaustion",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exhaustion"
+        }
+      },
+      {
+        "name": "health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "name": "max_health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "name": "absorption",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "absorption"
+        }
+      },
+      {
+        "name": "walk_speed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "walk_speed"
+        }
+      },
+      {
+        "name": "fly_speed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly_speed"
+        }
+      },
+      {
+        "name": "fire_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fire_ticks"
+        }
+      },
+      {
+        "name": "air_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "air_ticks"
+        }
+      },
+      {
+        "name": "no_damage_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "no_damage_ticks"
+        }
+      },
+      {
+        "name": "freeze_state",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "freeze_state"
+        }
+      },
+      {
+        "name": "flight_state",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "flight_state"
+        }
+      },
+      {
+        "name": "compass_target",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "compass_target"
+        }
+      },
+      {
+        "name": "xp",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp"
+        }
+      },
+      {
+        "name": "total_exp",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "total_exp"
+        }
+      }
+    ]
+  },
+  {
+    "id": "player.player_movement",
+    "displayName": "Player Movement",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_movement"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "teleport",
+          "launch",
+          "push",
+          "spin",
+          "set_rotation"
+        ],
+        "defaultValue": "teleport"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "name": "x",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "name": "y",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "name": "z",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "name": "yaw",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "teleport,spin,set_rotation"
+        }
+      },
+      {
+        "name": "pitch",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "teleport,spin,set_rotation"
+        }
+      },
+      {
+        "name": "reset_velocity",
+        "dataType": "boolean",
+        "widget": "TOGGLE",
+        "defaultValue": false,
+        "visibleWhen": {
+          "mode": "spin,set_rotation"
+        }
+      },
+      {
+        "name": "vx",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "name": "vy",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "name": "vz",
+        "dataType": "number",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "name": "strength",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": -100,
+          "max": 100
+        },
+        "visibleWhen": {
+          "mode": "push"
+        }
+      },
+      {
+        "name": "direction_vector",
+        "dataType": "vector",
+        "visibleWhen": {
+          "mode": "push"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "player.player_potion",
+    "displayName": "Player Potion",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_potion"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "add",
+          "clear",
+          "has"
+        ],
+        "defaultValue": "add"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "effect_type",
+        "dataType": "potion_effect",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:potion_effect"
+      },
+      {
+        "name": "duration_ticks",
+        "dataType": "number"
+      },
+      {
+        "name": "amplifier",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "has_effect",
+        "dataType": "boolean"
+      },
+      {
+        "name": "effect_amplifier",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "player.player_advancement",
+    "displayName": "Player Advancement",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_advancement"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "grant",
+          "revoke",
+          "has"
+        ],
+        "defaultValue": "has"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "advancement_key",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:advancement"
+      },
+      {
+        "name": "criterion",
+        "dataType": "string",
+        "defaultValue": "impossible"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "has_advancement",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "player.player_cooldown",
+    "displayName": "Player Cooldown",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_cooldown"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "has",
+          "get"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "has_cooldown",
+        "dataType": "boolean"
+      },
+      {
+        "name": "remaining_ticks",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_message",
+    "displayName": "Player Send Message",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_message"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_action_bar",
+    "displayName": "Player Send Action Bar",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_action_bar"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_title",
+    "displayName": "Player Send Title",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_title"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "subtitle",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_sound",
+    "displayName": "Player Send Sound",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_sound"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "sound",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 16
+        }
+      },
+      {
+        "name": "pitch",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 2
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_particle",
+    "displayName": "Player Send Particle",
+    "category": "PLAYER",
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_particle"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "particle",
+        "dataType": "string"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      },
+      {
+        "name": "offset_x",
+        "dataType": "number"
+      },
+      {
+        "name": "offset_y",
+        "dataType": "number"
+      },
+      {
+        "name": "offset_z",
+        "dataType": "number"
+      },
+      {
+        "name": "speed",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_book",
+    "displayName": "Player Send Book",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_book"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "book",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_sign",
+    "displayName": "Player Send Sign",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_sign"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_send_raw_json",
+    "displayName": "Player Send Raw Json",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_raw_json"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "json",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_give_item",
+    "displayName": "Player Give Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_give_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_take_item",
+    "displayName": "Player Take Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_take_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item",
+    "displayName": "Player Set Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_clear_slot",
+    "displayName": "Player Clear Slot",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_swap_items",
+    "displayName": "Player Swap Items",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_swap_items"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "slot1",
+        "dataType": "number"
+      },
+      {
+        "name": "slot2",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_helmet",
+    "displayName": "Player Set Helmet",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_helmet"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_chestplate",
+    "displayName": "Player Set Chestplate",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_chestplate"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_leggings",
+    "displayName": "Player Set Leggings",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_leggings"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_boots",
+    "displayName": "Player Set Boots",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_boots"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_mainhand",
+    "displayName": "Player Set Mainhand",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_mainhand"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_offhand",
+    "displayName": "Player Set Offhand",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_offhand"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_inventory_title",
+    "displayName": "Player Set Inventory Title",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_inventory_title"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_armor_color",
+    "displayName": "Player Set Armor Color",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_armor_color"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "slot",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "defaultValue": "CHEST",
+        "options": [
+          "HEAD",
+          "CHEST",
+          "LEGS",
+          "FEET"
+        ]
+      },
+      {
+        "name": "red",
+        "dataType": "number"
+      },
+      {
+        "name": "green",
+        "dataType": "number"
+      },
+      {
+        "name": "blue",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "player.player_repair_item",
+    "displayName": "Player Repair Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_repair_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_enchant_item",
+    "displayName": "Player Enchant Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_enchant_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "enchantment",
+        "dataType": "enchantment"
+      },
+      {
+        "name": "level",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_unenchant_item",
+    "displayName": "Player Unenchant Item",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_unenchant_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "enchantment",
+        "dataType": "enchantment"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_clear_enchants",
+    "displayName": "Player Clear Enchants",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_enchants"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item_name",
+    "displayName": "Player Set Item Name",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_name"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item_lore",
+    "displayName": "Player Set Item Lore",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_lore"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "lore",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item_flags",
+    "displayName": "Player Set Item Flags",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_flags"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "flags",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item_custom_model",
+    "displayName": "Player Set Item Custom Model",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_custom_model"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "model_data",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "player.player_set_item_unbreakable",
+    "displayName": "Player Set Item Unbreakable",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_unbreakable"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "unbreakable",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "get.player.info",
+    "displayName": "Get Player Info",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "get_player_info"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "uuid",
+        "dataType": "uuid"
+      },
+      {
+        "name": "health",
+        "dataType": "number"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "is_op",
+        "dataType": "boolean"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_get_exp_to_level",
+    "displayName": "Player Player Get Exp To Level",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_exp_to_level"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "exp_needed",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_get_total_exp",
+    "displayName": "Player Player Get Total Exp",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_total_exp"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "total_exp",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  }
+]

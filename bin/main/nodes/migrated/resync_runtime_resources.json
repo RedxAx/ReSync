@@ -1,0 +1,403 @@
+[
+  {
+    "id": "loot.generate",
+    "displayName": "Generate Loot",
+    "description": "Generate items from a managed loot table and context.",
+    "tags": ["loot", "table", "generate", "roll"],
+    "schemaVersion": 2,
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_generate" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list<item>" },
+      { "name": "result", "dataType": "result<list<item>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "loot.give",
+    "displayName": "Give Loot",
+    "description": "Generate loot and give every resulting item to a player.",
+    "tags": ["loot", "table", "give", "player"],
+    "schemaVersion": 2,
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_give" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list<item>" },
+      { "name": "result", "dataType": "result<list<item>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "loot.fill_container",
+    "displayName": "Fill Container",
+    "description": "Generate loot and add every resulting item to a container.",
+    "tags": ["loot", "table", "container", "inventory"],
+    "schemaVersion": 2,
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "loot_fill_container" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "location", "dataType": "location" },
+      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "items", "dataType": "list<item>" },
+      { "name": "result", "dataType": "result<list<item>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "trade.apply_trade_profile",
+    "displayName": "Apply Trade Profile",
+    "description": "Apply a managed trade profile to a villager.",
+    "tags": ["trade", "villager", "profile"],
+    "schemaVersion": 2,
+    "category": "TRADE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "trade_apply_trade_profile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "trade.open_trades",
+    "displayName": "Open Trades",
+    "description": "Open a managed trade profile through a villager.",
+    "tags": ["trade", "villager", "merchant"],
+    "schemaVersion": 2,
+    "category": "TRADE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "trade_open_trades" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity" },
+      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "trade.open_virtual_trades",
+    "displayName": "Open Virtual Trades",
+    "description": "Open a managed trade profile without requiring a spawned villager.",
+    "tags": ["trade", "virtual", "merchant"],
+    "schemaVersion": 2,
+    "category": "TRADE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "trade_open_virtual_trades" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "entity", "dataType": "entity", "optional": true },
+      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.spawn",
+    "displayName": "Spawn NPC",
+    "description": "Spawn or resolve the active instance of a managed NPC definition.",
+    "tags": ["npc", "spawn", "definition", "handle"],
+    "schemaVersion": 4,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_spawn" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "handle", "dataType": "npc_handle" },
+      { "name": "entity", "dataType": "entity", "optional": true },
+      { "name": "result", "dataType": "result<npc_handle>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.despawn",
+    "displayName": "Despawn NPC",
+    "description": "Despawn the active instance of a managed NPC definition.",
+    "tags": ["npc", "despawn", "remove", "active"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_despawn" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.open",
+    "displayName": "Open NPC",
+    "description": "Open the configured NPC interaction for a player.",
+    "tags": ["npc", "open", "trade", "interact"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_open" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "player", "dataType": "player" },
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.set_profile",
+    "displayName": "Set NPC Trade",
+    "description": "Apply a managed trade profile to an active villager NPC.",
+    "tags": ["npc", "trade", "profile"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_set_profile" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
+      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.lookup",
+    "displayName": "Find Active NPC",
+    "description": "Resolve a managed NPC definition to its current runtime handle.",
+    "tags": ["npc", "lookup", "active", "handle"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_lookup" },
+    "inputs": [
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+    ],
+    "outputs": [
+      { "name": "handle", "dataType": "npc_handle" },
+      { "name": "result", "dataType": "result<npc_handle>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.list_active",
+    "displayName": "List Active NPCs",
+    "description": "List every active Bukkit-backed and packet-backed NPC handle.",
+    "tags": ["npc", "list", "active", "handles"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_list_active" },
+    "inputs": [],
+    "outputs": [
+      { "name": "handles", "dataType": "list<npc_handle>" },
+      { "name": "result", "dataType": "result<list<npc_handle>>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.is_active",
+    "displayName": "Is NPC Active",
+    "description": "Check whether a managed NPC definition currently has a live runtime instance.",
+    "tags": ["npc", "active", "state", "handle"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_is_active" },
+    "inputs": [
+      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+    ],
+    "outputs": [
+      { "name": "active", "dataType": "boolean" },
+      { "name": "handle", "dataType": "npc_handle", "optional": true },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.get_location",
+    "displayName": "Get NPC Location",
+    "description": "Read the current location of a Bukkit-backed or packet-backed NPC handle.",
+    "tags": ["npc", "location", "position", "handle"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_get_location" },
+    "inputs": [
+      { "name": "handle", "dataType": "npc_handle" }
+    ],
+    "outputs": [
+      { "name": "location", "dataType": "location" },
+      { "name": "result", "dataType": "result<location>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.get_entity",
+    "displayName": "Get NPC Entity",
+    "description": "Resolve the Bukkit entity behind an NPC handle when one exists.",
+    "tags": ["npc", "entity", "bukkit", "handle"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_get_entity" },
+    "inputs": [
+      { "name": "handle", "dataType": "npc_handle" }
+    ],
+    "outputs": [
+      { "name": "entity", "dataType": "entity", "optional": true },
+      { "name": "available", "dataType": "boolean" },
+      { "name": "result", "dataType": "result<boolean>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "npc.teleport",
+    "displayName": "Teleport NPC",
+    "description": "Move a Bukkit-backed or packet-backed NPC to a new location.",
+    "tags": ["npc", "teleport", "move", "location"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": { "operation": "npc_teleport" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "handle", "dataType": "npc_handle" },
+      { "name": "location", "dataType": "location" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "handle", "dataType": "npc_handle" },
+      { "name": "result", "dataType": "result<npc_handle>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "event.npc.interact",
+    "displayName": "NPC Interact",
+    "description": "Run when a player interacts with a Bukkit-backed or packet-backed managed NPC.",
+    "tags": ["npc", "event", "interact", "click"],
+    "schemaVersion": 2,
+    "category": "NPC",
+    "trigger": true,
+    "eventType": "restudio.resync.runtime.event.ReSyncNpcInteractEvent",
+    "handlerConfig": { "priority": "NORMAL", "ignoreCancelled": false, "playerEvent": true },
+    "inputs": [],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "event.handle", "dataType": "npc_handle" },
+      { "name": "event.npc_id", "dataType": "resource_reference<npc_definition>" },
+      { "name": "event.player", "dataType": "player" },
+      { "name": "event.entity", "dataType": "entity", "optional": true },
+      { "name": "event.location", "dataType": "location" },
+      { "name": "event.left_click", "dataType": "boolean" },
+      { "name": "event.right_click", "dataType": "boolean" },
+      { "name": "event.shifting", "dataType": "boolean" },
+      { "name": "event.packet_backed", "dataType": "boolean" },
+      { "name": "event.cancelled", "dataType": "boolean" }
+    ],
+    "outputMappings": [
+      { "source": "event.handle", "target": "event.handle" },
+      { "source": "event.npcId", "target": "event.npc_id" },
+      { "source": "event.player", "target": "event.player" },
+      { "source": "event.entity", "target": "event.entity" },
+      { "source": "event.location", "target": "event.location" },
+      { "source": "event.leftClick", "target": "event.left_click" },
+      { "source": "event.rightClick", "target": "event.right_click" },
+      { "source": "event.shifting", "target": "event.shifting" },
+      { "source": "event.packetBacked", "target": "event.packet_backed" },
+      { "source": "event.cancelled", "target": "event.cancelled" }
+    ]
+  }
+]

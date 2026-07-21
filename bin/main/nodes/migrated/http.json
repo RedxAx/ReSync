@@ -1,0 +1,359 @@
+[
+  {
+    "id": "http.get",
+    "displayName": "HTTP GET",
+    "description": "Send an HTTP GET request with an explicit timeout and structured failure routing.",
+    "tags": ["http", "get", "request", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.post",
+    "displayName": "HTTP POST",
+    "description": "Send an HTTP POST request with an explicit timeout and structured failure routing.",
+    "tags": ["http", "post", "request", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_post" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map<any,any>" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.put",
+    "displayName": "HTTP PUT",
+    "description": "Send an HTTP PUT request with an explicit timeout and structured failure routing.",
+    "tags": ["http", "put", "request", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_put" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map<any,any>" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.delete",
+    "displayName": "HTTP DELETE",
+    "description": "Send an HTTP DELETE request with an explicit timeout and structured failure routing.",
+    "tags": ["http", "delete", "request", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_delete" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.patch",
+    "displayName": "HTTP PATCH",
+    "description": "Send an HTTP PATCH request with an explicit timeout and structured failure routing.",
+    "tags": ["http", "patch", "request", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_patch" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map<any,any>" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.request",
+    "displayName": "HTTP Request",
+    "description": "Send a configurable HTTP request with query parameters, headers, timeout, and structured failure routing.",
+    "tags": ["http", "request", "method", "network"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "HTTP",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_request" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "method", "dataType": "string", "widget": "DROPDOWN", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "defaultValue": "GET" },
+      { "name": "url", "dataType": "string" },
+      { "name": "body", "dataType": "map<any,any>" },
+      { "name": "headers", "dataType": "map<any,any>" },
+      { "name": "query_params", "dataType": "map<any,any>" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "result", "dataType": "result<http_response>" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.get.status",
+    "displayName": "HTTP Get Status",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_status" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "status_code", "dataType": "number" }
+    ]
+  },
+  {
+    "id": "http.get.body",
+    "displayName": "HTTP Get Body",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_body" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "body", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.get.header",
+    "displayName": "HTTP Get Header",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_header" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" },
+      { "name": "header_name", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "header_value", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.get.headers",
+    "displayName": "HTTP Get Headers",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_get_headers" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "headers", "dataType": "map<any,any>" }
+    ]
+  },
+  {
+    "id": "http.is.success",
+    "displayName": "HTTP Is Success",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_is_success" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" }
+    ]
+  },
+  {
+    "id": "http.parse.json",
+    "displayName": "HTTP Parse JSON",
+    "description": "Parse an HTTP response body as JSON with visible validation state.",
+    "tags": ["http", "json", "parse", "response"],
+    "schemaVersion": 2,
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_parse_json" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "response", "dataType": "http_response" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "json", "dataType": "any" },
+      { "name": "valid", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.build.query",
+    "displayName": "HTTP Build Query",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_build_query" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "params", "dataType": "map<any,any>" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "query_string", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.build.url",
+    "displayName": "HTTP Build URL",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_build_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "base_url", "dataType": "string" },
+      { "name": "path", "dataType": "string" },
+      { "name": "query", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.set.timeout",
+    "displayName": "HTTP Set Timeout",
+    "description": "Legacy shared timeout setting retained only for graph migration.",
+    "tags": ["http", "timeout", "legacy", "migration"],
+    "schemaVersion": 2,
+    "category": "HTTP",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "replacementFor": "http.request",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_set_timeout" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "timeout_ms", "dataType": "number", "defaultValue": 10000 }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "success", "dataType": "boolean" },
+      { "name": "error_code", "dataType": "string" },
+      { "name": "message", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.encode.url",
+    "displayName": "HTTP Encode URL",
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_encode_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "encoded_url", "dataType": "string" }
+    ]
+  },
+  {
+    "id": "http.decode.url",
+    "displayName": "HTTP Decode URL",
+    "description": "Decode URL-encoded text and expose malformed input.",
+    "tags": ["http", "url", "decode", "validation"],
+    "schemaVersion": 2,
+    "category": "HTTP",
+    "handler": "HttpHandler",
+    "handlerConfig": { "operation": "http_decode_url" },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "url", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "decoded_url", "dataType": "string" },
+      { "name": "valid", "dataType": "boolean" },
+      { "name": "error", "dataType": "string" }
+    ]
+  }
+]
+

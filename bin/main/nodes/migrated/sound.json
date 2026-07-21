@@ -1,0 +1,455 @@
+[
+  {
+    "id": "sound.play",
+    "displayName": "Play Sound",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "sound.stop",
+    "displayName": "Stop Sound",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_stop"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "sound.sound_play_ambient",
+    "displayName": "Sound Play Ambient",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_ambient"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.fade",
+    "displayName": "Sound Fade",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "fade"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "sound.play.for.player",
+    "displayName": "Play Sound for Player",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_for_player"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.play.for.all",
+    "displayName": "Play Sound for All",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_for_all"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.stop.for.player",
+    "displayName": "Stop Sound for Player",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_stop_for_player"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "sound",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.stop.all",
+    "displayName": "Stop All Sounds",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_stop_all"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.play.category",
+    "displayName": "Play Sound Category",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_category"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "MASTER",
+          "MUSIC",
+          "RECORDS",
+          "WEATHER",
+          "BLOCKS",
+          "HOSTILE",
+          "NEUTRAL",
+          "PLAYERS",
+          "AMBIENT",
+          "VOICE"
+        ],
+        "defaultValue": "MASTER"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.stop.category",
+    "displayName": "Stop Sound Category",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_stop_category"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "MASTER",
+          "MUSIC",
+          "RECORDS",
+          "WEATHER",
+          "BLOCKS",
+          "HOSTILE",
+          "NEUTRAL",
+          "PLAYERS",
+          "AMBIENT",
+          "VOICE"
+        ],
+        "defaultValue": "MASTER"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.loop.for.player",
+    "displayName": "Loop Sound for Player",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_loop_for_player"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      },
+      {
+        "name": "interval_ticks",
+        "dataType": "number"
+      },
+      {
+        "name": "repeat_count",
+        "dataType": "integer",
+        "defaultValue": 10,
+        "constraints": {
+          "min": 1,
+          "max": 256
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.play.sequence",
+    "displayName": "Play Sound Sequence",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_sequence"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "sounds",
+        "dataType": "list<sound>"
+      },
+      {
+        "name": "interval_ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "sound.play.with.distance",
+    "displayName": "Play Sound with Distance",
+    "category": "VISUAL",
+    "handler": "SoundHandler",
+    "handlerConfig": {
+      "operation": "sound_play_with_distance"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "sound_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number"
+      },
+      {
+        "name": "max_distance",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  }
+]

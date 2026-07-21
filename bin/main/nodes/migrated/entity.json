@@ -1,0 +1,4893 @@
+[
+  {
+    "id": "entity.properties",
+    "displayName": "Entity Properties",
+    "category": "ENTITY",
+    "handler": "entity",
+    "inputs": [
+      {
+        "name": "target",
+        "description": "Target entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "name",
+          "custom_name",
+          "glowing",
+          "silent",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "health",
+          "max_health",
+          "persistent",
+          "target",
+          "baby",
+          "tamed",
+          "sitting",
+          "swimming",
+          "pickup_items",
+          "gravity",
+          "visible",
+          "ai",
+          "collidable",
+          "remove",
+          "kill",
+          "exists",
+          "type",
+          "uuid",
+          "location",
+          "velocity",
+          "world",
+          "passengers",
+          "vehicle",
+          "height",
+          "width",
+          "ticks_lived",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "fall_distance",
+          "portal_cooldown",
+          "scoreboard_tags",
+          "absorption",
+          "is_alive",
+          "is_valid",
+          "is_dead"
+        ],
+        "defaultValue": "name"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "name": "custom_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "custom_name"
+        }
+      },
+      {
+        "name": "glowing",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "name": "silent",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "silent"
+        }
+      },
+      {
+        "name": "invulnerable",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "name": "fire_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fire_ticks"
+        }
+      },
+      {
+        "name": "freeze_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "freeze_ticks"
+        }
+      },
+      {
+        "name": "health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "name": "max_health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "name": "persistent",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "persistent"
+        }
+      },
+      {
+        "name": "target",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "get",
+          "property": "target"
+        }
+      },
+      {
+        "name": "baby",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "baby"
+        }
+      },
+      {
+        "name": "tamed",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "tamed"
+        }
+      },
+      {
+        "name": "sitting",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sitting"
+        }
+      },
+      {
+        "name": "swimming",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "swimming"
+        }
+      },
+      {
+        "name": "pickup_items",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "pickup_items"
+        }
+      },
+      {
+        "name": "gravity",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gravity"
+        }
+      },
+      {
+        "name": "visible",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "visible"
+        }
+      },
+      {
+        "name": "ai",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ai"
+        }
+      },
+      {
+        "name": "collidable",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "collidable"
+        }
+      },
+      {
+        "name": "exists",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exists"
+        }
+      },
+      {
+        "name": "type",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "type"
+        }
+      },
+      {
+        "name": "uuid",
+        "dataType": "uuid",
+        "visibleWhen": {
+          "action": "get",
+          "property": "uuid"
+        }
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "location"
+        }
+      },
+      {
+        "name": "velocity",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "velocity"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "world",
+        "visibleWhen": {
+          "action": "get",
+          "property": "world"
+        }
+      },
+      {
+        "name": "passengers",
+        "dataType": "list<entity>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "passengers"
+        }
+      },
+      {
+        "name": "vehicle",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "get",
+          "property": "vehicle"
+        }
+      },
+      {
+        "name": "height",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "height"
+        }
+      },
+      {
+        "name": "width",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "width"
+        }
+      },
+      {
+        "name": "ticks_lived",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ticks_lived"
+        }
+      },
+      {
+        "name": "no_damage_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "no_damage_ticks"
+        }
+      },
+      {
+        "name": "remaining_air",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "remaining_air"
+        }
+      },
+      {
+        "name": "max_air",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_air"
+        }
+      },
+      {
+        "name": "fall_distance",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fall_distance"
+        }
+      },
+      {
+        "name": "portal_cooldown",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "portal_cooldown"
+        }
+      },
+      {
+        "name": "scoreboard_tags",
+        "dataType": "list<string>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "scoreboard_tags"
+        }
+      },
+      {
+        "name": "absorption",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "absorption"
+        }
+      },
+      {
+        "name": "remove",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "remove"
+        }
+      },
+      {
+        "name": "kill",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "kill"
+        }
+      },
+      {
+        "name": "is_alive",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_alive"
+        }
+      },
+      {
+        "name": "is_valid",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_valid"
+        }
+      },
+      {
+        "name": "is_dead",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_dead"
+        }
+      }
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.actions",
+    "displayName": "Entity Actions",
+    "category": "ENTITY",
+    "handler": "entity",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "name",
+          "custom_name",
+          "glowing",
+          "silent",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "health",
+          "max_health",
+          "persistent",
+          "target",
+          "baby",
+          "tamed",
+          "sitting",
+          "swimming",
+          "pickup_items",
+          "gravity",
+          "visible",
+          "ai",
+          "collidable",
+          "remove",
+          "kill",
+          "exists",
+          "type",
+          "uuid",
+          "location",
+          "velocity",
+          "world",
+          "passengers",
+          "vehicle",
+          "height",
+          "width",
+          "ticks_lived",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "fall_distance",
+          "portal_cooldown",
+          "scoreboard_tags",
+          "absorption",
+          "is_alive",
+          "is_valid",
+          "is_dead"
+        ],
+        "defaultValue": "name"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
+  },
+  {
+    "id": "entity.name",
+    "displayName": "Entity Name",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "name"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.custom_name",
+    "displayName": "Entity Custom Name",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "custom_name"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.glowing",
+    "displayName": "Entity Glowing",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "glowing"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.silent",
+    "displayName": "Entity Silent",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "silent"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.invulnerable",
+    "displayName": "Entity Invulnerable",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "invulnerable"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.fire_ticks",
+    "displayName": "Entity Fire Ticks",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "fire_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.freeze_ticks",
+    "displayName": "Entity Freeze Ticks",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "freeze_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.health",
+    "displayName": "Entity Health",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "health"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.max_health",
+    "displayName": "Entity Max Health",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "max_health"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.persistent",
+    "displayName": "Entity Persistent",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "persistent"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.target",
+    "displayName": "Entity Target",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "target"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "entity",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "entity",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.baby",
+    "displayName": "Entity Baby",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "baby"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.tamed",
+    "displayName": "Entity Tamed",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "tamed"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.sitting",
+    "displayName": "Entity Sitting",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "sitting"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.swimming",
+    "displayName": "Entity Swimming",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "swimming"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.pickup_items",
+    "displayName": "Entity Pickup Items",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "pickup_items"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.gravity",
+    "displayName": "Entity Gravity",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "gravity"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.visible",
+    "displayName": "Entity Visible",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "visible"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.ai",
+    "displayName": "Entity Ai",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "ai"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.collidable",
+    "displayName": "Entity Collidable",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "collidable"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.remove",
+    "displayName": "Entity Remove",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "remove"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "do"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "execution",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "FLOW"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.kill",
+    "displayName": "Entity Kill",
+    "category": "ENTITY",
+    "kind": "ACTION",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "kill",
+      "action": "do"
+    },
+    "inputs": [
+      {
+        "dataType": "execution",
+        "description": "Flow input",
+        "name": "flow",
+        "pinType": "FLOW"
+      },
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.exists",
+    "displayName": "Entity Exists",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "exists"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.type",
+    "displayName": "Entity Type",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "type"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.uuid",
+    "displayName": "Entity Uuid",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "uuid"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.location",
+    "displayName": "Entity Location",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "location"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.velocity",
+    "displayName": "Entity Velocity",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "velocity"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "location",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.world",
+    "displayName": "Entity World",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "world"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "world",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.passengers",
+    "displayName": "Entity Passengers",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "passengers"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list<any>",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.vehicle",
+    "displayName": "Entity Vehicle",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "vehicle"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "entity",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.height",
+    "displayName": "Entity Height",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "height"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.width",
+    "displayName": "Entity Width",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "width"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.ticks_lived",
+    "displayName": "Entity Ticks Lived",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "ticks_lived"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_set_type",
+    "displayName": "Entity Set Type",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_type"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_rotation",
+    "displayName": "Entity Set Rotation",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_rotation"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "yaw",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "pitch",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_damage",
+    "displayName": "Entity Set Damage",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_damage"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "damage",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_armor_value",
+    "displayName": "Entity Set Armor Value",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_armor_value"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "armor",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_follow_range",
+    "displayName": "Entity Set Follow Range",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_follow_range"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "range",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_knockback_resistance",
+    "displayName": "Entity Set Knockback Resistance",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_knockback_resistance"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "resistance",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_wet",
+    "displayName": "Entity Set Wet",
+    "category": "ENTITY",
+    "hidden": true,
+    "hiddenReason": "migration-only-unsupported-runtime-state",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_wet"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "wet",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_shaking",
+    "displayName": "Entity Set Shaking",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_shaking"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "shaking",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_owner",
+    "displayName": "Entity Set Owner",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_owner"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "owner",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_angry",
+    "displayName": "Entity Set Angry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_angry"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "angry",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_love_mode",
+    "displayName": "Entity Set Love Mode",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_love_mode"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "ticks",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_color",
+    "displayName": "Entity Set Color",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_color"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "color",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_variant",
+    "displayName": "Entity Set Variant",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_variant"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "variant",
+        "dataType": "string",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_held_item",
+    "displayName": "Entity Set Held Item",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_held_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_armor",
+    "displayName": "Entity Set Armor",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_armor"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "slot",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_set_drop_chances",
+    "displayName": "Entity Set Drop Chances",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_set_drop_chances"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "chance",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_add_drop",
+    "displayName": "Entity Add Drop",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_add_drop"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_clear_drops",
+    "displayName": "Entity Clear Drops",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_clear_drops"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_pickup_item",
+    "displayName": "Entity Pickup Item",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_pickup_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "can_pickup",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_state",
+    "displayName": "Entity State",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_state"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "property",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "name",
+          "name_visible",
+          "glowing",
+          "silent",
+          "invulnerable",
+          "burning",
+          "frozen",
+          "persistent",
+          "health",
+          "max_health",
+          "ai",
+          "gravity",
+          "collidable",
+          "target"
+        ],
+        "defaultValue": "name",
+        "pinType": "DATA"
+      },
+      {
+        "name": "action",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "pinType": "DATA"
+      },
+      {
+        "name": "string_value",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "set",
+          "property": "name"
+        },
+        "pinType": "DATA"
+      },
+      {
+        "name": "boolean_value",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set",
+          "property": "name_visible,glowing,silent,invulnerable,persistent,ai,gravity,collidable"
+        },
+        "pinType": "DATA"
+      },
+      {
+        "name": "number_value",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "set",
+          "property": "burning,frozen,health,max_health"
+        },
+        "pinType": "DATA"
+      },
+      {
+        "name": "entity_value",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "set",
+          "property": "target"
+        },
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "name": "name_visible",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name_visible"
+        }
+      },
+      {
+        "name": "glowing",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "name": "silent",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "silent"
+        }
+      },
+      {
+        "name": "invulnerable",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "name": "burning",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "burning"
+        }
+      },
+      {
+        "name": "frozen",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "frozen"
+        }
+      },
+      {
+        "name": "persistent",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "persistent"
+        }
+      },
+      {
+        "name": "health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "name": "max_health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "name": "speed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "speed"
+        }
+      },
+      {
+        "name": "target",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "get",
+          "property": "target"
+        }
+      },
+      {
+        "name": "baby",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "baby"
+        }
+      },
+      {
+        "name": "tamed",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "tamed"
+        }
+      },
+      {
+        "name": "sitting",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sitting"
+        }
+      },
+      {
+        "name": "swimming",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "swimming"
+        }
+      },
+      {
+        "name": "pickup_items",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "pickup_items"
+        }
+      },
+      {
+        "name": "exists",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exists"
+        }
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_data",
+    "displayName": "Entity Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_data"
+    },
+    "hidden": true,
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:entity_data_property",
+        "defaultValue": "custom_name"
+      },
+      {
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": ["get", "set"],
+        "defaultValue": "get"
+      },
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "optional": true,
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any"
+      },
+      {
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_text_data",
+    "displayName": "Entity Text Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "text"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_text_property", "defaultValue": "custom_name"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_boolean_data",
+    "displayName": "Entity Boolean Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "boolean"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_boolean_property", "defaultValue": "glowing"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_number_data",
+    "displayName": "Entity Number Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "number"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_number_property", "defaultValue": "health"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_vector_data",
+    "displayName": "Entity Vector Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "vector"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_vector_property", "defaultValue": "velocity"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "vector", "dataType": "vector", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "vector", "dataType": "vector", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_location_data",
+    "displayName": "Entity Location Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "location"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_location_property", "defaultValue": "location"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "location", "dataType": "location", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "location", "dataType": "location", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_reference_data",
+    "displayName": "Entity Reference Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "reference"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_reference_property", "defaultValue": "target"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "reference", "dataType": "living_entity", "optional": true, "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "reference", "dataType": "living_entity", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_attribute_data",
+    "displayName": "Entity Attribute Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_typed_data", "valuePin": "number", "propertyPrefix": "attribute:"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:max_health"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set"], "defaultValue": "get"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "set"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entity", "dataType": "entity"},
+      {"name": "number", "dataType": "number", "visibleWhen": {"action": "get"}},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "entity.entity_text_data_entry",
+    "displayName": "Entity Text Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "text"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_text_property", "defaultValue": "custom_name"},
+      {"name": "text", "dataType": "string"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_boolean_data_entry",
+    "displayName": "Entity Boolean Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "boolean"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_boolean_property", "defaultValue": "glowing"},
+      {"name": "boolean", "dataType": "boolean"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_number_data_entry",
+    "displayName": "Entity Number Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_number_property", "defaultValue": "fuse_ticks"},
+      {"name": "number", "dataType": "number"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_vector_data_entry",
+    "displayName": "Entity Vector Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "vector"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_vector_property", "defaultValue": "velocity"},
+      {"name": "vector", "dataType": "vector"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_location_data_entry",
+    "displayName": "Entity Location Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "location"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_location_property", "defaultValue": "location"},
+      {"name": "location", "dataType": "location"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_reference_data_entry",
+    "displayName": "Entity Reference Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "reference"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_reference_property", "defaultValue": "target"},
+      {"name": "reference", "dataType": "living_entity", "optional": true}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_attribute_data_entry",
+    "displayName": "Entity Attribute Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number", "propertyPrefix": "attribute:"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:max_health"},
+      {"name": "number", "dataType": "number"}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
+    "id": "entity.entity_apply_data",
+    "displayName": "Entity Apply Data",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_apply_data"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "entity_data"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      },
+      {
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_spawn",
+    "displayName": "Entity Spawn",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_spawn"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "pinType": "DATA"
+      },
+      {
+        "name": "data",
+        "dataType": "entity_data",
+        "pinType": "DATA",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_despawn",
+    "displayName": "Entity Despawn",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_despawn"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_get_nearby",
+    "displayName": "Entity Get Nearby",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_nearby"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "center",
+        "dataType": "location",
+        "pinType": "DATA"
+      },
+      {
+        "name": "radius",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entities",
+        "dataType": "list<entity>",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_get_all",
+    "displayName": "Entity Get All",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_all"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "world",
+        "dataType": "world",
+        "pinType": "DATA"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entities",
+        "dataType": "list<entity>",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_teleport",
+    "displayName": "Entity Teleport",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_teleport"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_remove",
+    "displayName": "Entity Remove",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_remove"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_get_player_nearby",
+    "displayName": "Entity Get Player Nearby",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_player_nearby"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "center",
+        "dataType": "location",
+        "pinType": "DATA"
+      },
+      {
+        "name": "radius",
+        "dataType": "number",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "players",
+        "dataType": "list<player>",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_get_mob_nearby",
+    "displayName": "Entity Get Mob Nearby",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_mob_nearby"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "center",
+        "dataType": "location",
+        "pinType": "DATA"
+      },
+      {
+        "name": "radius",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "mobs",
+        "dataType": "list<living_entity>",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.entity_is_alive",
+    "displayName": "Entity Is Alive",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_is_alive"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "is_alive",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      },
+      {
+        "name": "is_valid",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      },
+      {
+        "name": "is_dead",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_info",
+    "displayName": "Entity Get Info",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_info"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "pinType": "DATA"
+      },
+      {
+        "name": "uuid",
+        "dataType": "uuid",
+        "pinType": "DATA"
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "custom_name",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "pinType": "DATA"
+      },
+      {
+        "name": "world_name",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "ticks_lived",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "is_dead",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      },
+      {
+        "name": "is_valid",
+        "dataType": "boolean",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_last_damage",
+    "displayName": "Entity Get Last Damage",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_last_damage"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "damage",
+        "dataType": "number",
+        "pinType": "DATA"
+      },
+      {
+        "name": "cause",
+        "dataType": "string",
+        "pinType": "DATA"
+      },
+      {
+        "name": "damager",
+        "dataType": "entity",
+        "pinType": "DATA"
+      }
+    ]
+  },
+  {
+    "id": "entity.no_damage_ticks",
+    "displayName": "No Damage Ticks",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "no_damage_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.remaining_air",
+    "displayName": "Remaining Air",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "remaining_air"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.max_air",
+    "displayName": "Max Air",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "max_air"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.fall_distance",
+    "displayName": "Fall Distance",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "fall_distance"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.portal_cooldown",
+    "displayName": "Portal Cooldown",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "portal_cooldown"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.scoreboard_tags",
+    "displayName": "Scoreboard Tags",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "scoreboard_tags"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list<any>",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.absorption",
+    "displayName": "Absorption",
+    "category": "ENTITY",
+    "handler": "entity",
+    "handlerConfig": {
+      "property": "absorption"
+    },
+    "inputs": [
+      {
+        "dataType": "entity",
+        "description": "Target entity",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_health",
+    "displayName": "Entity Entity Get Health",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_health"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "health",
+        "pinType": "DATA",
+        "dataType": "number"
+      },
+      {
+        "name": "max_health",
+        "pinType": "DATA",
+        "dataType": "number"
+      },
+      {
+        "name": "absorption",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_velocity",
+    "displayName": "Entity Entity Get Velocity",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_velocity"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "velocity",
+        "pinType": "DATA",
+        "dataType": "vector"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_fire_ticks",
+    "displayName": "Entity Entity Get Fire Ticks",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_fire_ticks"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "fire_ticks",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_freeze_ticks",
+    "displayName": "Entity Entity Get Freeze Ticks",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_freeze_ticks"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "freeze_ticks",
+        "pinType": "DATA",
+        "dataType": "number"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  },
+  {
+    "id": "entity.entity_get_location",
+    "displayName": "Entity Entity Get Location",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {
+      "operation": "entity_get_location"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "entity.properties"
+  }
+]

@@ -1,0 +1,457 @@
+[
+  {
+    "id": "log",
+    "displayName": "Log",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "log"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "cancel.event",
+    "displayName": "Cancel Event",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "cancel_event"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.current.ticks",
+    "displayName": "Current Ticks",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_current_ticks"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.current.real.ms",
+    "displayName": "Current Real MS",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_current_real_ms"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.current.real.seconds",
+    "displayName": "Current Real Seconds",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_current_real_seconds"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.between",
+    "displayName": "Time Between",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_between"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.is.before",
+    "displayName": "Time Is Before",
+    "category": "LOGIC",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_is_before"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.is.after",
+    "displayName": "Time Is After",
+    "category": "LOGIC",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_is_after"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.convert.ticks.to.ms",
+    "displayName": "Ticks To MS",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_convert_ticks_to_ms"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "time.convert.ms.to.ticks",
+    "displayName": "MS To Ticks",
+    "category": "DATA",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_convert_ms_to_ticks"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "run.async",
+    "displayName": "Run Async",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "run_async"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "run.sync",
+    "displayName": "Run Sync",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "run_sync"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "console.log",
+    "displayName": "Console Log",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "console_log"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "misc.delay",
+    "displayName": "Delay",
+    "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.wait_ticks",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "delay"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "ticks",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "done",
+        "dataType": "boolean"
+      },
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "misc.event_caller",
+    "displayName": "Event Caller",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "event_caller"
+    },
+    "outputs": [
+      {
+        "name": "caller",
+        "dataType": "player"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "misc.event_type",
+    "displayName": "Event Type",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "event_type"
+    },
+    "outputs": [
+      {
+        "name": "type",
+        "dataType": "string"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "misc.event_is_cancelled",
+    "displayName": "Event Is Cancelled",
+    "category": "UTILITY",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "event_is_cancelled"
+    },
+    "outputs": [
+      {
+        "name": "is_cancelled",
+        "dataType": "boolean"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "id": "misc.time_format",
+    "displayName": "Time Format",
+    "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.format",
+    "replacementFor": "time.format",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_format"
+    },
+    "inputs": [
+      {
+        "name": "timestamp_ms",
+        "dataType": "number"
+      },
+      {
+        "name": "format_pattern",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "formatted_string",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "misc.time_parse",
+    "displayName": "Time Parse",
+    "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.parse",
+    "replacementFor": "time.parse",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_parse"
+    },
+    "inputs": [
+      {
+        "name": "date_string",
+        "dataType": "string"
+      },
+      {
+        "name": "format_pattern",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "timestamp_ms",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "misc.time_add",
+    "displayName": "Time Add",
+    "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.add",
+    "replacementFor": "time.add",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_add"
+    },
+    "inputs": [
+      {
+        "name": "timestamp_ms",
+        "dataType": "number"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      },
+      {
+        "name": "unit",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "new_timestamp",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "misc.time_diff",
+    "displayName": "Time Diff",
+    "category": "UTILITY",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "time.diff",
+    "replacementFor": "time.diff",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "time_diff"
+    },
+    "inputs": [
+      {
+        "name": "timestamp1_ms",
+        "dataType": "number"
+      },
+      {
+        "name": "timestamp2_ms",
+        "dataType": "number"
+      },
+      {
+        "name": "unit",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "diff_value",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "delay.ticks",
+    "displayName": "Delay Ticks",
+    "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.wait_ticks",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "delay"
+    },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "ticks", "dataType": "number", "defaultValue": 20, "constraints": { "min": 0, "step": 1 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "delay.seconds",
+    "displayName": "Delay Seconds",
+    "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.delay",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "delay"
+    },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "seconds", "dataType": "number", "defaultValue": 1, "constraints": { "min": 0 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "delay.minutes",
+    "displayName": "Delay Minutes",
+    "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.delay",
+    "handler": "MiscHandler",
+    "handlerConfig": {
+      "operation": "delay"
+    },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "minutes", "dataType": "number", "defaultValue": 1, "constraints": { "min": 0 } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "done", "dataType": "boolean" }
+    ],
+    "hidden": true
+  },
+  {
+    "id": "cancel.schedule",
+    "displayName": "Cancel Schedule",
+    "category": "UTILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "canonicalId": "schedule.cancel_task",
+    "handler": "ScheduleHandler",
+    "handlerConfig": {
+      "operation": "cancel_task"
+    },
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "task_id", "dataType": "string" }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "failed", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "cancelled", "dataType": "boolean" },
+      { "name": "status", "dataType": "string" },
+      { "name": "task", "dataType": "scheduled_task" }
+    ],
+    "hidden": true
+  }
+]
+

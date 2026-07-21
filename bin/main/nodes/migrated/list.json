@@ -1,0 +1,1487 @@
+[
+  {
+    "id": "list.sort",
+    "displayName": "List Sort",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "sort_order",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "ascending",
+          "descending"
+        ],
+        "defaultValue": "ascending"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sorted_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "sort"
+    }
+  },
+  {
+    "id": "list.filter",
+    "displayName": "List Filter",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string"
+      },
+      {
+        "name": "operator",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "equals",
+          "not_equals",
+          "greater_than",
+          "greater_than_or_equal",
+          "less_than",
+          "less_than_or_equal",
+          "contains",
+          "contains_ignore_case",
+          "starts_with",
+          "ends_with",
+          "is_null",
+          "is_not_null",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "defaultValue": "equals"
+      },
+      {
+        "name": "compare_value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "filtered_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "filter"
+    },
+    "description": "Keeps values that match a property predicate while preserving their element type.",
+    "tags": [
+      "collection",
+      "predicate",
+      "select"
+    ]
+  },
+  {
+    "id": "list.map",
+    "displayName": "List Map",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      },
+      {
+        "name": "transformation_type",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "transformed_list",
+        "dataType": "list<any>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "map"
+    },
+    "description": "Transforms every value using a supported type or property transformation.",
+    "tags": [
+      "collection",
+      "transform"
+    ]
+  },
+  {
+    "id": "list.reduce",
+    "displayName": "List Reduce",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      },
+      {
+        "name": "operation",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "sum",
+          "concat"
+        ],
+        "defaultValue": "sum"
+      },
+      {
+        "name": "separator",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "any"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "reduce"
+    },
+    "description": "Aggregates a list by numeric sum or text concatenation.",
+    "tags": [
+      "collection",
+      "aggregate"
+    ]
+  },
+  {
+    "id": "list.shuffle",
+    "displayName": "List Shuffle",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "shuffled_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "shuffle"
+    }
+  },
+  {
+    "id": "list.unique",
+    "displayName": "List Unique",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "unique_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "unique"
+    }
+  },
+  {
+    "id": "list.slice",
+    "displayName": "List Slice",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "start_index",
+        "dataType": "number"
+      },
+      {
+        "name": "end_index",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "slice_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "slice"
+    }
+  },
+  {
+    "id": "list.reverse",
+    "displayName": "List Reverse",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "reversed_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "reverse"
+    }
+  },
+  {
+    "id": "list.find_first",
+    "displayName": "List Find First",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string"
+      },
+      {
+        "name": "operator",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "equals",
+          "not_equals",
+          "greater_than",
+          "greater_than_or_equal",
+          "less_than",
+          "less_than_or_equal",
+          "contains",
+          "contains_ignore_case",
+          "starts_with",
+          "ends_with",
+          "is_null",
+          "is_not_null",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "defaultValue": "equals"
+      },
+      {
+        "name": "compare_value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "found_element",
+        "dataType": "type:t"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "find_first"
+    },
+    "description": "Returns the first value matching a property predicate.",
+    "tags": [
+      "collection",
+      "predicate",
+      "search"
+    ]
+  },
+  {
+    "id": "list.sum",
+    "displayName": "List Sum",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<number>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sum",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "sum"
+    }
+  },
+  {
+    "id": "list.average",
+    "displayName": "List Average",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<number>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "average",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "average"
+    }
+  },
+  {
+    "id": "list.flatten",
+    "displayName": "List Flatten",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flattened_list",
+        "dataType": "list<any>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "flatten"
+    }
+  },
+  {
+    "id": "list.intersect",
+    "displayName": "List Intersect",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list1",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "list2",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "intersection_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "intersect"
+    }
+  },
+  {
+    "id": "list.difference",
+    "displayName": "List Difference",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list1",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "list2",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "difference_list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "difference"
+    }
+  },
+  {
+    "id": "list.zip",
+    "displayName": "List Zip",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list1",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "list2",
+        "dataType": "list<type:u>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pairs_list",
+        "dataType": "list<map<string,any>>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "zip"
+    }
+  },
+  {
+    "id": "list.create",
+    "displayName": "Create List",
+    "category": "DATA",
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "create"
+    },
+    "inputs": []
+  },
+  {
+    "id": "list.add",
+    "displayName": "List Add",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "add"
+    }
+  },
+  {
+    "id": "list.remove",
+    "displayName": "List Remove",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "remove"
+    }
+  },
+  {
+    "id": "list.remove_at",
+    "displayName": "Remove At",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "remove_at"
+    }
+  },
+  {
+    "id": "list.clear",
+    "displayName": "List Clear",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "clear"
+    }
+  },
+  {
+    "id": "list.get",
+    "displayName": "List Get",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "get"
+    }
+  },
+  {
+    "id": "list.set",
+    "displayName": "List Set",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "set"
+    }
+  },
+  {
+    "id": "list.size",
+    "displayName": "List Size",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "size",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "size"
+    }
+  },
+  {
+    "id": "list.is_empty",
+    "displayName": "List Is Empty",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "empty",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "is_empty"
+    }
+  },
+  {
+    "id": "list.contains",
+    "displayName": "Contains",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "contains",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "contains"
+    }
+  },
+  {
+    "id": "list.index_of",
+    "displayName": "Index Of",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "index",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "index_of"
+    }
+  },
+  {
+    "id": "list.count",
+    "displayName": "Count",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "count"
+    }
+  },
+  {
+    "id": "list.sublist",
+    "displayName": "Sublist",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "start",
+        "dataType": "number"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "sublist"
+    }
+  },
+  {
+    "id": "list.sort_descending",
+    "displayName": "Sort Descending",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "sort_descending"
+    }
+  },
+  {
+    "id": "list.join",
+    "displayName": "List Join",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      },
+      {
+        "name": "separator",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "string",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "join"
+    }
+  },
+  {
+    "id": "list.concat",
+    "displayName": "List Concat",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "listA",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "listB",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "concat"
+    }
+  },
+  {
+    "id": "list.add_at",
+    "displayName": "Add At",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "add_at"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "index",
+        "dataType": "number"
+      },
+      {
+        "name": "value",
+        "dataType": "type:t"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ]
+  },
+  {
+    "id": "list.first",
+    "displayName": "First",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "first"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "type:t"
+      }
+    ]
+  },
+  {
+    "id": "list.last",
+    "displayName": "Last",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "last"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "type:t"
+      }
+    ]
+  },
+  {
+    "id": "list.random",
+    "displayName": "List Random",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "random"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "type:t"
+      }
+    ]
+  },
+  {
+    "id": "list.map_string",
+    "displayName": "Map String",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "map_string"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<string>"
+      }
+    ]
+  },
+  {
+    "id": "list.filter_type",
+    "displayName": "Filter Type",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "filter_type"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "type_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      }
+    ]
+  },
+  {
+    "id": "list.min",
+    "displayName": "List Min",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "min"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<number>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "list.max",
+    "displayName": "List Max",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "max"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<number>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "max",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "list.group_by",
+    "displayName": "List Group By",
+    "category": "DATA",
+    "description": "Groups values by the selected property while preserving list order inside each group.",
+    "tags": [
+      "collection",
+      "group",
+      "property"
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "group_by"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string",
+        "optional": true,
+        "defaultValue": ""
+      }
+    ],
+    "outputs": [
+      {
+        "name": "groups",
+        "dataType": "map<string,list<type:t>>"
+      }
+    ]
+  },
+  {
+    "id": "list.any",
+    "displayName": "List Any",
+    "category": "DATA",
+    "description": "Returns whether at least one value matches a property predicate.",
+    "tags": [
+      "collection",
+      "predicate",
+      "boolean"
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "any"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string",
+        "optional": true,
+        "defaultValue": ""
+      },
+      {
+        "name": "operator",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "equals",
+          "not_equals",
+          "greater_than",
+          "greater_than_or_equal",
+          "less_than",
+          "less_than_or_equal",
+          "contains",
+          "contains_ignore_case",
+          "starts_with",
+          "ends_with",
+          "is_null",
+          "is_not_null",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "defaultValue": "equals"
+      },
+      {
+        "name": "compare_value",
+        "dataType": "any",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "matches",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "list.all",
+    "displayName": "List All",
+    "category": "DATA",
+    "description": "Returns whether every value matches a property predicate.",
+    "tags": [
+      "collection",
+      "predicate",
+      "boolean"
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "all"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string",
+        "optional": true,
+        "defaultValue": ""
+      },
+      {
+        "name": "operator",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "equals",
+          "not_equals",
+          "greater_than",
+          "greater_than_or_equal",
+          "less_than",
+          "less_than_or_equal",
+          "contains",
+          "contains_ignore_case",
+          "starts_with",
+          "ends_with",
+          "is_null",
+          "is_not_null",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "defaultValue": "equals"
+      },
+      {
+        "name": "compare_value",
+        "dataType": "any",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "matches",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "list.none",
+    "displayName": "List None",
+    "category": "DATA",
+    "description": "Returns whether no values match a property predicate.",
+    "tags": [
+      "collection",
+      "predicate",
+      "boolean"
+    ],
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "none"
+    },
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<type:t>"
+      },
+      {
+        "name": "property_name",
+        "dataType": "string",
+        "optional": true,
+        "defaultValue": ""
+      },
+      {
+        "name": "operator",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "equals",
+          "not_equals",
+          "greater_than",
+          "greater_than_or_equal",
+          "less_than",
+          "less_than_or_equal",
+          "contains",
+          "contains_ignore_case",
+          "starts_with",
+          "ends_with",
+          "is_null",
+          "is_not_null",
+          "is_empty",
+          "is_not_empty"
+        ],
+        "defaultValue": "equals"
+      },
+      {
+        "name": "compare_value",
+        "dataType": "any",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "matches",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "list.sort_by_property",
+    "displayName": "List Sort By Property",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "sort_by_property"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.find_all",
+    "displayName": "List Find All",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "find_all"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.find_index",
+    "displayName": "List Find Index",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "find_index"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.contains_any",
+    "displayName": "List Contains Any",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "contains_any"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.contains_all",
+    "displayName": "List Contains All",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "contains_all"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.min_value",
+    "displayName": "List Min Value",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "min_value"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.max_value",
+    "displayName": "List Max Value",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "max_value"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.median",
+    "displayName": "List Median",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "median"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.mode",
+    "displayName": "List Mode",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "mode"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.range",
+    "displayName": "List Range",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "range"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.variance",
+    "displayName": "List Variance",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "variance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.stddev",
+    "displayName": "List Stddev",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "stddev"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.chunk",
+    "displayName": "List Chunk",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "chunk"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.partition",
+    "displayName": "List Partition",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "partition"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.union",
+    "displayName": "List Union",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "union"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.take_first",
+    "displayName": "List Take First",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "take_first"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.take_last",
+    "displayName": "List Take Last",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "take_last"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.drop_first",
+    "displayName": "List Drop First",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "drop_first"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.drop_last",
+    "displayName": "List Drop Last",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "drop_last"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.of",
+    "displayName": "List Of",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "of"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.repeat",
+    "displayName": "List Repeat",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "repeat"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "list.insert",
+    "displayName": "List Insert",
+    "category": "DATA",
+    "handler": "GenericListHandler",
+    "handlerConfig": {
+      "operation": "insert"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

@@ -1,0 +1,166 @@
+[
+  {
+    "id": "to.string",
+    "displayName": "To String",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_string"
+    },
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "string",
+        "dataType": "string"
+      }
+    ]
+  },
+  {
+    "id": "to.number",
+    "displayName": "To Number",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_number"
+    },
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "number",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "to.boolean",
+    "displayName": "To Boolean",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_boolean"
+    },
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "boolean",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "to.player",
+    "displayName": "To Player",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_player"
+    },
+    "inputs": [
+      {
+        "name": "uuid_or_name",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ]
+  },
+  {
+    "id": "to.location",
+    "displayName": "To Location",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_location"
+    },
+    "inputs": [
+      {
+        "name": "x",
+        "dataType": "number"
+      },
+      {
+        "name": "y",
+        "dataType": "number"
+      },
+      {
+        "name": "z",
+        "dataType": "number"
+      },
+      {
+        "name": "world",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "to.item",
+    "displayName": "To Item",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_item"
+    },
+    "inputs": [
+      {
+        "name": "material",
+        "dataType": "string"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "to.list",
+    "displayName": "To List",
+    "category": "DATA",
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_list"
+    },
+    "inputs": [
+      {
+        "name": "value_or_separator",
+        "dataType": "any"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "list",
+        "dataType": "list<any>"
+      }
+    ]
+  }
+]
+

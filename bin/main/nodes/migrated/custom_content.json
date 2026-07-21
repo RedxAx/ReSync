@@ -1,0 +1,294 @@
+[
+  {
+    "id": "custom_content.current",
+    "displayName": "Current Content",
+    "category": "UTILITY",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "current_content"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "content_id",
+        "dataType": "string"
+      },
+      {
+        "name": "content_type",
+        "dataType": "string"
+      },
+      {
+        "name": "trigger",
+        "dataType": "string"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "block",
+        "dataType": "block"
+      },
+      {
+        "name": "target",
+        "dataType": "entity"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "custom_content.give",
+    "displayName": "Give Content",
+    "category": "UTILITY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "give_content"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "content_id",
+        "dataType": "string"
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": 1
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "event.custom_content",
+    "displayName": "Custom Content",
+    "category": "EVENT",
+    "trigger": true,
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "content_id",
+        "dataType": "string"
+      },
+      {
+        "name": "content_type",
+        "dataType": "string"
+      },
+      {
+        "name": "trigger",
+        "dataType": "string"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "block",
+        "dataType": "block"
+      },
+      {
+        "name": "target",
+        "dataType": "entity"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "custom_content.item",
+    "displayName": "Item",
+    "category": "ITEM",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "content_start"
+    },
+    "inputs": [
+      {"name": "content_id", "dataType": "string", "defaultValue": "new_item"},
+      {"name": "name", "dataType": "string", "defaultValue": "New Item"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "STICK", "visibleWhen": {"provider": "vanilla"}},
+      {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla"},
+      {"name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}},
+      {"name": "custom_model_data", "dataType": "any"},
+      {"name": "components", "dataType": "any"},
+      {"name": "lore", "dataType": "string"},
+      {"name": "tags", "dataType": "string"},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": "true"},
+      {"name": "priority", "dataType": "number", "defaultValue": "0"},
+      {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "global"], "defaultValue": "player"},
+      {"name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"},
+      {"name": "permission", "dataType": "string"},
+      {"name": "cancel_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "consume_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_sneaking", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_on_ground", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "hand_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "main hand", "offhand"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "use,left_click,right_click,hit_entity,damage_entity,break_block,while_holding"}},
+      {"name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living entity", "hostile", "passive"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "hit_entity,damage_entity,drop,pickup"}},
+      {"name": "allowed_worlds", "dataType": "string"},
+      {"name": "denied_worlds", "dataType": "string"},
+      {"name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": "100"},
+      {"name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"}
+    ],
+    "outputs": [
+      {"name": "use", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "left_click", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "right_click", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "hit_entity", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "damage_entity", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "break_block", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "consume", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "drop", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "pickup", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "while_holding", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player", "visibleWhen": {"__flow_branches": "use,left_click,right_click,hit_entity,damage_entity,break_block,consume,drop,pickup,while_holding"}},
+      {"name": "content_id", "dataType": "string"},
+      {"name": "content_type", "dataType": "string"},
+      {"name": "trigger", "dataType": "string"},
+      {"name": "item", "dataType": "itemstack", "visibleWhen": {"__flow_branches": "use,left_click,right_click,hit_entity,damage_entity,break_block,consume,drop,pickup,while_holding"}},
+      {"name": "block", "dataType": "block", "visibleWhen": {"__flow_branches": "break_block"}},
+      {"name": "target", "dataType": "entity", "visibleWhen": {"__flow_branches": "hit_entity,damage_entity,drop,pickup"}},
+      {"name": "location", "dataType": "location", "visibleWhen": {"__flow_branches": "hit_entity,damage_entity,break_block,consume,drop,pickup,while_holding"}},
+      {"name": "damage", "dataType": "number", "visibleWhen": {"__flow_branches": "hit_entity,damage_entity"}}
+    ]
+  },
+  {
+    "id": "custom_content.armor",
+    "displayName": "Armor",
+    "category": "ITEM",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "content_start"
+    },
+    "inputs": [
+      {"name": "content_id", "dataType": "string", "defaultValue": "new_armor"},
+      {"name": "name", "dataType": "string", "defaultValue": "New Armor"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "IRON_CHESTPLATE", "visibleWhen": {"provider": "vanilla"}},
+      {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla"},
+      {"name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}},
+      {"name": "custom_model_data", "dataType": "any"},
+      {"name": "components", "dataType": "any"},
+      {"name": "lore", "dataType": "string"},
+      {"name": "tags", "dataType": "string"},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": "true"},
+      {"name": "priority", "dataType": "number", "defaultValue": "0"},
+      {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "global"], "defaultValue": "player"},
+      {"name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"},
+      {"name": "permission", "dataType": "string"},
+      {"name": "cancel_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "consume_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_sneaking", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_on_ground", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living entity", "hostile", "passive"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "damaged"}},
+      {"name": "allowed_worlds", "dataType": "string"},
+      {"name": "denied_worlds", "dataType": "string"},
+      {"name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": "100"},
+      {"name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"}
+    ],
+    "outputs": [
+      {"name": "equip", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "unequip", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "damaged", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "tick", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "while_holding", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "full_set", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "full_set_tick", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player", "visibleWhen": {"__flow_branches": "equip,unequip,damaged,tick,while_holding,full_set,full_set_tick"}},
+      {"name": "content_id", "dataType": "string"},
+      {"name": "content_type", "dataType": "string"},
+      {"name": "trigger", "dataType": "string"},
+      {"name": "item", "dataType": "itemstack", "visibleWhen": {"__flow_branches": "equip,damaged,tick,while_holding,full_set,full_set_tick"}},
+      {"name": "target", "dataType": "entity", "visibleWhen": {"__flow_branches": "damaged"}},
+      {"name": "location", "dataType": "location", "visibleWhen": {"__flow_branches": "equip,unequip,damaged,tick,while_holding,full_set,full_set_tick"}},
+      {"name": "damage", "dataType": "number", "visibleWhen": {"__flow_branches": "damaged"}}
+    ]
+  },
+  {
+    "id": "custom_content.block",
+    "displayName": "Block",
+    "category": "BLOCK",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "content_start"
+    },
+    "inputs": [
+      {"name": "content_id", "dataType": "string", "defaultValue": "new_block"},
+      {"name": "name", "dataType": "string", "defaultValue": "New Block"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "STONE", "visibleWhen": {"provider": "vanilla"}},
+      {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla"},
+      {"name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}},
+      {"name": "custom_model_data", "dataType": "any"},
+      {"name": "components", "dataType": "any"},
+      {"name": "lore", "dataType": "string"},
+      {"name": "tags", "dataType": "string"},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": "true"},
+      {"name": "priority", "dataType": "number", "defaultValue": "0"},
+      {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "content", "global"], "defaultValue": "player"},
+      {"name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"},
+      {"name": "permission", "dataType": "string"},
+      {"name": "cancel_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "consume_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_sneaking", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_on_ground", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "hand_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "main hand", "offhand"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "place,break,interact,step_on"}},
+      {"name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living entity", "hostile", "passive"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "nearby_player,tick"}},
+      {"name": "allowed_worlds", "dataType": "string"},
+      {"name": "denied_worlds", "dataType": "string"},
+      {"name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": "100"},
+      {"name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"}
+    ],
+    "outputs": [
+      {"name": "place", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "break", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "interact", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "step_on", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "nearby_player", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "redstone", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "tick", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,tick"}},
+      {"name": "content_id", "dataType": "string"},
+      {"name": "content_type", "dataType": "string"},
+      {"name": "trigger", "dataType": "string"},
+      {"name": "item", "dataType": "itemstack", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,tick"}},
+      {"name": "block", "dataType": "block", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,redstone,tick"}},
+      {"name": "target", "dataType": "entity", "visibleWhen": {"__flow_branches": "nearby_player,tick"}},
+      {"name": "location", "dataType": "location", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,redstone,tick"}}
+    ]
+  }
+]

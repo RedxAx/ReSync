@@ -1,0 +1,1057 @@
+[
+  {
+    "id": "string.base64_encode",
+    "displayName": "Base64 Encode",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "encoded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "base64_encode"
+    }
+  },
+  {
+    "id": "string.base64_decode",
+    "displayName": "Base64 Decode",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "encoded",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "decoded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "base64_decode"
+    }
+  },
+  {
+    "id": "string.url_encode",
+    "displayName": "URL Encode",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "encoded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "url_encode"
+    }
+  },
+  {
+    "id": "string.url_decode",
+    "displayName": "URL Decode",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "encoded",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "decoded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "url_decode"
+    }
+  },
+  {
+    "id": "string.md5",
+    "displayName": "String MD5",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hash",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "md5"
+    }
+  },
+  {
+    "id": "string.sha256",
+    "displayName": "String SHA256",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hash",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "sha256"
+    }
+  },
+  {
+    "id": "string.sha512",
+    "displayName": "String SHA512",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hash",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "sha512"
+    }
+  },
+  {
+    "id": "string.pad_left",
+    "displayName": "Pad Left",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "length",
+        "dataType": "number"
+      },
+      {
+        "name": "pad_char",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "padded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "pad_left"
+    }
+  },
+  {
+    "id": "string.pad_right",
+    "displayName": "Pad Right",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "length",
+        "dataType": "number"
+      },
+      {
+        "name": "pad_char",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "padded",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "pad_right"
+    }
+  },
+  {
+    "id": "string.truncate",
+    "displayName": "Truncate",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "length",
+        "dataType": "number"
+      },
+      {
+        "name": "add_ellipsis",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "truncated",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "truncate"
+    }
+  },
+  {
+    "id": "string.word_wrap",
+    "displayName": "Word Wrap",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "width",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "wrapped_lines_list",
+        "dataType": "list<string>"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "word_wrap"
+    }
+  },
+  {
+    "id": "string.levenshtein",
+    "displayName": "Levenshtein Distance",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text1",
+        "dataType": "string"
+      },
+      {
+        "name": "text2",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "distance",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "levenshtein"
+    }
+  },
+  {
+    "id": "string.slugify",
+    "displayName": "Slugify",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "slug",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "slugify"
+    }
+  },
+  {
+    "id": "string.camel_case",
+    "displayName": "Camel Case",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "camel_case",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "camel_case"
+    }
+  },
+  {
+    "id": "string.pascal_case",
+    "displayName": "Pascal Case",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pascal_case",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "pascal_case"
+    }
+  },
+  {
+    "id": "string.snake_case",
+    "displayName": "Snake Case",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "snake_case",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "snake_case"
+    }
+  },
+  {
+    "id": "string.kebab_case",
+    "displayName": "Kebab Case",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "kebab_case",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "kebab_case"
+    }
+  },
+  {
+    "id": "string.reverse",
+    "displayName": "Reverse",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "reversed",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "reverse"
+    }
+  },
+  {
+    "id": "string.shuffle",
+    "displayName": "Shuffle",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "shuffled",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "shuffle"
+    }
+  },
+  {
+    "id": "string.repeat",
+    "displayName": "Repeat",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "repeated",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "repeat"
+    }
+  },
+  {
+    "id": "string.is_empty",
+    "displayName": "Is Empty",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_empty",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_empty"
+    }
+  },
+  {
+    "id": "string.is_blank",
+    "displayName": "Is Blank",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_blank",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_blank"
+    }
+  },
+  {
+    "id": "string.is_numeric",
+    "displayName": "Is Numeric",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_numeric",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_numeric"
+    }
+  },
+  {
+    "id": "string.is_alpha",
+    "displayName": "Is Alpha",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_alpha",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_alpha"
+    }
+  },
+  {
+    "id": "string.is_alphanumeric",
+    "displayName": "Is Alphanumeric",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_alphanumeric",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_alphanumeric"
+    }
+  },
+  {
+    "id": "string.is_email",
+    "displayName": "Is Email",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "text",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "is_email",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "is_email"
+    }
+  },
+  {
+    "id": "string.concat",
+    "displayName": "String Concat",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "a",
+        "dataType": "string"
+      },
+      {
+        "name": "b",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "concat"
+    }
+  },
+  {
+    "id": "string.template",
+    "displayName": "String Template",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "template",
+        "dataType": "string",
+        "widget": "TEXT"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "template"
+    }
+  },
+  {
+    "id": "string.substring",
+    "displayName": "Substring",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "start",
+        "dataType": "number"
+      },
+      {
+        "name": "length",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "substring"
+    }
+  },
+  {
+    "id": "string.split",
+    "displayName": "Split",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "delimiter",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "list<string>"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "split"
+    }
+  },
+  {
+    "id": "string.join",
+    "displayName": "String Join",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "list",
+        "dataType": "list<string>"
+      },
+      {
+        "name": "separator",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "join"
+    }
+  },
+  {
+    "id": "string.replace",
+    "displayName": "Replace",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "target",
+        "dataType": "string"
+      },
+      {
+        "name": "replacement",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "replace"
+    }
+  },
+  {
+    "id": "string.replace_regex",
+    "displayName": "Replace Regex",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "pattern",
+        "dataType": "string"
+      },
+      {
+        "name": "replacement",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "replace_regex"
+    }
+  },
+  {
+    "id": "string.upper",
+    "displayName": "Uppercase",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "upper"
+    }
+  },
+  {
+    "id": "string.lower",
+    "displayName": "Lowercase",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "lower"
+    }
+  },
+  {
+    "id": "string.capitalize",
+    "displayName": "Capitalize",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "capitalize"
+    }
+  },
+  {
+    "id": "string.trim",
+    "displayName": "Trim",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "string"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "trim"
+    }
+  },
+  {
+    "id": "string.length",
+    "displayName": "Length",
+    "category": "DATA",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "number"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "length"
+    }
+  },
+  {
+    "id": "string.contains",
+    "displayName": "Contains",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "substring",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "contains"
+    }
+  },
+  {
+    "id": "string.starts_with",
+    "displayName": "Starts With",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "prefix",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "starts_with"
+    }
+  },
+  {
+    "id": "string.ends_with",
+    "displayName": "Ends With",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "suffix",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "ends_with"
+    }
+  },
+  {
+    "id": "string.matches",
+    "displayName": "Matches",
+    "category": "LOGIC",
+    "inputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      },
+      {
+        "name": "pattern",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "boolean"
+      }
+    ],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "matches"
+    }
+  },
+  {
+    "id": "string.to_json",
+    "displayName": "String To Json",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "to_json"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.from_json",
+    "displayName": "String From Json",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "from_json"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.soundex",
+    "displayName": "String Soundex",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "soundex"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.metaphone",
+    "displayName": "String Metaphone",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "metaphone"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.index_of",
+    "displayName": "String Index Of",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "index_of"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.last_index_of",
+    "displayName": "String Last Index Of",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "last_index_of"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "string.equals_ignore_case",
+    "displayName": "String Equals Ignore Case",
+    "category": "DATA",
+    "handler": "GenericStringHandler",
+    "handlerConfig": {
+      "operation": "equals_ignore_case"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]

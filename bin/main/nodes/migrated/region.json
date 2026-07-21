@@ -1,0 +1,1238 @@
+[
+  {
+    "id": "region.paste",
+    "displayName": "Paste Region",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_paste"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.replace",
+    "displayName": "Replace Region",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_replace"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "old_material",
+        "dataType": "material"
+      },
+      {
+        "name": "new_material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.count.blocks",
+    "displayName": "Count Blocks",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_count_blocks"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "region.outline",
+    "displayName": "Create Outline",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_outline"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_create",
+    "displayName": "Region Create",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_create"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_delete",
+    "displayName": "Region Delete",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_delete"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_contains",
+    "displayName": "Region Contains",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_contains"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "contains",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "region.region_get_players",
+    "displayName": "Region Get Players",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_players"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "players",
+        "dataType": "list<player>"
+      }
+    ]
+  },
+  {
+    "id": "region.region_get_entities",
+    "displayName": "Region Get Entities",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_entities"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "entities",
+        "dataType": "list<entity>"
+      }
+    ]
+  },
+  {
+    "id": "region.region_get_size",
+    "displayName": "Region Get Size",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_size"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "size_x",
+        "dataType": "number"
+      },
+      {
+        "name": "size_y",
+        "dataType": "number"
+      },
+      {
+        "name": "size_z",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "region.region_expand",
+    "displayName": "Region Expand",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_expand"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "region.region_contract",
+    "displayName": "Region Contract",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_contract"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "region.region_shift",
+    "displayName": "Region Shift",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_shift"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "shift_x",
+        "dataType": "number"
+      },
+      {
+        "name": "shift_y",
+        "dataType": "number"
+      },
+      {
+        "name": "shift_z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "region.region_clone",
+    "displayName": "Region Clone",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_clone"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "source_clipboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "new_clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_intersect",
+    "displayName": "Region Intersect",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_intersect"
+    },
+    "inputs": [
+      {
+        "name": "min_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "min_location_b",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_b",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has_intersection",
+        "dataType": "boolean"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "region.region_union",
+    "displayName": "Region Union",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_union"
+    },
+    "inputs": [
+      {
+        "name": "min_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "min_location_b",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_b",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ]
+  },
+  {
+    "id": "region.region_difference",
+    "displayName": "Region Difference",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_difference"
+    },
+    "inputs": [
+      {
+        "name": "min_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_a",
+        "dataType": "location"
+      },
+      {
+        "name": "min_location_b",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location_b",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "blocks_list",
+        "dataType": "list<block>"
+      }
+    ]
+  },
+  {
+    "id": "region.region_save",
+    "displayName": "Region Save",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_save"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "file_path",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_load",
+    "displayName": "Region Load",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_load"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "file_path",
+        "dataType": "string"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_set_blocks",
+    "displayName": "Region Set Blocks",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_set_blocks"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_get_blocks",
+    "displayName": "Region Get Blocks",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_blocks"
+    },
+    "inputs": [
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "blocks_list",
+        "dataType": "list<block>"
+      }
+    ]
+  },
+  {
+    "id": "region.region_mirror_x",
+    "displayName": "Region Mirror X",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_x"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_mirror_y",
+    "displayName": "Region Mirror Y",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_y"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_mirror_z",
+    "displayName": "Region Mirror Z",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_z"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_rotate_90",
+    "displayName": "Region Rotate 90",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate_90"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_rotate_180",
+    "displayName": "Region Rotate 180",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate_180"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_move",
+    "displayName": "Region Move",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_move"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "shift_x",
+        "dataType": "number"
+      },
+      {
+        "name": "shift_y",
+        "dataType": "number"
+      },
+      {
+        "name": "shift_z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.region_stack",
+    "displayName": "Region Stack",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_stack"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      },
+      {
+        "name": "direction_x",
+        "dataType": "number"
+      },
+      {
+        "name": "direction_y",
+        "dataType": "number"
+      },
+      {
+        "name": "direction_z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.copy",
+    "displayName": "Region Copy",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_copy"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.cut",
+    "displayName": "Region Cut",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_cut"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "clipboard_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.rotate",
+    "displayName": "Region Rotate",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "angle",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.mirror",
+    "displayName": "Region Mirror",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "axis",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "x",
+          "y",
+          "z"
+        ],
+        "defaultValue": "x"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.clear",
+    "displayName": "Region Clear",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_delete"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.distribute",
+    "displayName": "Region Distribute",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_distribute"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "count",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.walls",
+    "displayName": "Region Walls",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_walls"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.hollow",
+    "displayName": "Region Hollow",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_hollow"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "region.set.air",
+    "displayName": "Set Region to Air",
+    "category": "WORLD",
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_set_air"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  }
+]

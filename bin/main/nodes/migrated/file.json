@@ -1,0 +1,280 @@
+[
+  {
+    "id": "file.write",
+    "displayName": "Write File",
+    "description": "Write UTF-8 text to a file inside the ReSync data folder.",
+    "tags": ["file", "write", "text", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_write"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"},
+      {"name": "content", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.append",
+    "displayName": "Append File",
+    "description": "Append UTF-8 text to a file inside the ReSync data folder.",
+    "tags": ["file", "append", "text", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_append"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"},
+      {"name": "content", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.read",
+    "displayName": "Read File",
+    "description": "Read UTF-8 text from a file inside the ReSync data folder.",
+    "tags": ["file", "read", "text", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_read"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "content", "dataType": "string"},
+      {"name": "result", "dataType": "result<string>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.read.lines",
+    "displayName": "Read File Lines",
+    "description": "Read a UTF-8 file as an ordered list of lines.",
+    "tags": ["file", "read", "lines", "list"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_read_lines"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "lines", "dataType": "list<string>"},
+      {"name": "result", "dataType": "result<list<string>>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.delete",
+    "displayName": "Delete File",
+    "description": "Preview or delete a file inside the ReSync data folder.",
+    "tags": ["file", "delete", "preview", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_delete"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"},
+      {"name": "preview", "dataType": "boolean", "defaultValue": false}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "preview", "dataType": "boolean"},
+      {"name": "would_delete", "dataType": "boolean"},
+      {"name": "deleted", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.exists",
+    "displayName": "File Exists",
+    "description": "Check whether a safe ReSync data path exists.",
+    "tags": ["file", "exists", "query", "storage"],
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_exists"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "exists", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.copy",
+    "displayName": "Copy File",
+    "description": "Copy a file between safe paths inside the ReSync data folder.",
+    "tags": ["file", "copy", "storage", "path"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_copy"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "source_path", "dataType": "string"},
+      {"name": "dest_path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.move",
+    "displayName": "Move File",
+    "description": "Move a file between safe paths inside the ReSync data folder.",
+    "tags": ["file", "move", "storage", "path"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_move"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "source_path", "dataType": "string"},
+      {"name": "dest_path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.list.dir",
+    "displayName": "List Directory",
+    "description": "List direct entries in a directory inside the ReSync data folder.",
+    "tags": ["file", "directory", "list", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_list_dir"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "files", "dataType": "list<string>"},
+      {"name": "result", "dataType": "result<list<string>>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.create.dir",
+    "displayName": "Create Directory",
+    "description": "Create a directory and any missing parents inside the ReSync data folder.",
+    "tags": ["file", "directory", "create", "storage"],
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_create_dir"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "created", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "file.get.size",
+    "displayName": "Get File Size",
+    "description": "Read the byte size of a file inside the ReSync data folder.",
+    "tags": ["file", "size", "bytes", "storage"],
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "category": "DATABASE",
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_get_size"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "path", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "size", "dataType": "number"},
+      {"name": "result", "dataType": "result<number>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  }
+]

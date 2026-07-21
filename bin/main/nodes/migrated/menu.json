@@ -1,0 +1,811 @@
+[
+  {
+    "id": "menu.create",
+    "displayName": "Create Menu",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_create"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      },
+      {
+        "name": "rows",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.item",
+    "displayName": "Set Item",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "widget": "MULTILINE"
+      },
+      {
+        "name": "flow_to_execute",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.add.item",
+    "displayName": "Add Item",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_add_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "widget": "MULTILINE"
+      },
+      {
+        "name": "flow_to_execute",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.clear",
+    "displayName": "Clear Menu",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_clear"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.open",
+    "displayName": "Open Menu",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_open"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.update",
+    "displayName": "Update Menu",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_update"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.close",
+    "displayName": "Close Menu",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_close"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.click.sound",
+    "displayName": "Set Click Sound",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_click_sound"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "sound",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.title",
+    "displayName": "Set Title",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_title"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "title",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.click.action",
+    "displayName": "Set Click Action",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_click_action"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.item.with.action",
+    "displayName": "Set Item With Action",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_item_with_action"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "widget": "MULTILINE"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.enchant",
+    "displayName": "Set Enchant",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_enchant"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "enchanted",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.flags",
+    "displayName": "Set Flags",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_flags"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "flags_list",
+        "dataType": "list<string>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.custom.model",
+    "displayName": "Set Custom Model",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_custom_model"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "model_data",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.head.texture",
+    "displayName": "Set Head Texture",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_head_texture"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      },
+      {
+        "name": "player_name_or_uuid",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.fill.pattern",
+    "displayName": "Fill Pattern",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_fill_pattern"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "start_slot",
+        "dataType": "number"
+      },
+      {
+        "name": "end_slot",
+        "dataType": "number"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      },
+      {
+        "name": "name",
+        "dataType": "string"
+      },
+      {
+        "name": "lore",
+        "dataType": "string",
+        "widget": "MULTILINE"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.clear.slot",
+    "displayName": "Clear Slot",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_clear_slot"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.get.item",
+    "displayName": "Get Item",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_item"
+    },
+    "inputs": [
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "slot",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ]
+  },
+  {
+    "id": "menu.get.all.items",
+    "displayName": "Get All Items",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_all_items"
+    },
+    "inputs": [
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "items_list",
+        "dataType": "list<item>"
+      }
+    ]
+  },
+  {
+    "id": "menu.duplicate",
+    "displayName": "Duplicate",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_duplicate"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "source_menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "new_menu_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.close.action",
+    "displayName": "Set Close Action",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_close_action"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.open.action",
+    "displayName": "Set Open Action",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_open_action"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.set.update.interval",
+    "displayName": "Set Update Interval",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_update_interval"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      },
+      {
+        "name": "interval_ticks",
+        "dataType": "number"
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "menu.get.open.menu.id",
+    "displayName": "Get Open Menu Id",
+    "category": "INVENTORY",
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_open_menu_id"
+    },
+    "inputs": [
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "menu_id",
+        "dataType": "string"
+      }
+    ]
+  }
+]
+

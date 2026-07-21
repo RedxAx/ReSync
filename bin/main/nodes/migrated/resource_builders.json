@@ -1,0 +1,400 @@
+[
+  {
+    "id": "resource.build_gui",
+    "displayName": "Build GUI Definition",
+    "description": "Build a typed persistent GUI definition without raw JSON.",
+    "tags": ["resource", "gui", "definition", "builder"],
+    "category": "ACTION",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_gui"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "title", "dataType": "string", "defaultValue": "Menu"},
+      {"name": "rows", "dataType": "integer", "widget": "NUMBER", "defaultValue": 3},
+      {"name": "extend_to_inventory", "dataType": "boolean", "defaultValue": false},
+      {"name": "click_sound", "dataType": "sound", "optionsSource": "server:minecraft:sound", "defaultValue": "UI_BUTTON_CLICK"},
+      {"name": "open_flow", "dataType": "string"},
+      {"name": "close_flow", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "gui_definition"},
+      {"name": "result", "dataType": "result<gui_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_scoreboard",
+    "displayName": "Build Scoreboard Definition",
+    "description": "Build a typed persistent scoreboard definition.",
+    "tags": ["resource", "scoreboard", "definition", "builder"],
+    "category": "SCOREBOARD",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_scoreboard"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "title", "dataType": "component", "defaultValue": "Scoreboard"},
+      {"name": "objective_id", "dataType": "string"},
+      {"name": "line", "dataType": "component", "repeatable": {"groupId": "lines", "minItems": 0, "maxItems": 64, "itemLabel": "Line"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "scoreboard_definition"},
+      {"name": "result", "dataType": "result<scoreboard_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_tab",
+    "displayName": "Build Tab Definition",
+    "description": "Build a typed persistent tab-list definition.",
+    "tags": ["resource", "tab", "definition", "builder"],
+    "category": "ACTION",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_tab"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "header", "dataType": "component"},
+      {"name": "entry_format", "dataType": "component", "defaultValue": "%player%"},
+      {"name": "footer", "dataType": "component"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "tab_definition"},
+      {"name": "result", "dataType": "result<tab_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_custom_content",
+    "displayName": "Build Custom Content Definition",
+    "description": "Build a typed custom item, block, armor, or content definition.",
+    "tags": ["resource", "custom", "content", "definition", "builder"],
+    "category": "ITEM",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_custom_content"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "display_name", "dataType": "component", "defaultValue": "Custom Content"},
+      {"name": "content_type", "dataType": "string", "widget": "DROPDOWN", "options": ["item", "block", "armor", "furniture"], "defaultValue": "item"},
+      {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla"},
+      {"name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset"},
+      {"name": "material", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STICK"},
+      {"name": "flow_id", "dataType": "string"},
+      {"name": "lore", "dataType": "component", "repeatable": {"groupId": "lore", "minItems": 0, "maxItems": 64, "itemLabel": "Lore"}},
+      {"name": "tag", "dataType": "string", "repeatable": {"groupId": "tags", "minItems": 0, "maxItems": 64, "itemLabel": "Tag"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "custom_content_definition"},
+      {"name": "result", "dataType": "result<custom_content_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_trade",
+    "displayName": "Build Trade",
+    "description": "Build a typed trade definition.",
+    "tags": ["resource", "trade", "builder"],
+    "category": "TRADE",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_trade"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "cost", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "EMERALD"},
+      {"name": "cost_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "second_cost", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material"},
+      {"name": "second_cost_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "result", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
+      {"name": "result_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "max_uses", "dataType": "integer", "widget": "NUMBER", "defaultValue": 12},
+      {"name": "experience", "dataType": "integer", "widget": "NUMBER", "defaultValue": 0},
+      {"name": "price_multiplier", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.05}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "trade", "dataType": "trade_definition"},
+      {"name": "result", "dataType": "result<trade_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_trade_profile",
+    "displayName": "Build Trade Profile",
+    "description": "Build a typed trade profile from repeatable trade definitions.",
+    "tags": ["resource", "trade", "profile", "builder"],
+    "category": "TRADE",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_trade_profile"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "display_name", "dataType": "component", "defaultValue": "Trade Profile"},
+      {"name": "profession", "dataType": "string", "defaultValue": "none"},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": true},
+      {"name": "offer", "dataType": "trade_definition", "repeatable": {"groupId": "offers", "minItems": 1, "maxItems": 128, "itemLabel": "Trade"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "trade_profile"},
+      {"name": "result", "dataType": "result<trade_profile>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_loot_entry",
+    "displayName": "Build Loot Entry",
+    "description": "Build a typed loot-table entry.",
+    "tags": ["resource", "loot", "entry", "builder"],
+    "category": "LOOT",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_loot_entry"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "item", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
+      {"name": "weight", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "chance", "dataType": "number", "widget": "NUMBER", "defaultValue": 100},
+      {"name": "min_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "max_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "entry", "dataType": "loot_entry_definition"},
+      {"name": "result", "dataType": "result<loot_entry_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_loot_pool",
+    "displayName": "Build Loot Pool",
+    "description": "Build a typed loot pool from repeatable entries.",
+    "tags": ["resource", "loot", "pool", "builder"],
+    "category": "LOOT",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_loot_pool"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "rolls", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "entry", "dataType": "loot_entry_definition", "repeatable": {"groupId": "entries", "minItems": 1, "maxItems": 128, "itemLabel": "Entry"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "pool", "dataType": "loot_pool_definition"},
+      {"name": "result", "dataType": "result<loot_pool_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_loot_table",
+    "displayName": "Build Loot Table",
+    "description": "Build a typed managed loot table from repeatable pools.",
+    "tags": ["resource", "loot", "table", "builder"],
+    "category": "LOOT",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_loot_table"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": true},
+      {"name": "pool", "dataType": "loot_pool_definition", "repeatable": {"groupId": "pools", "minItems": 1, "maxItems": 32, "itemLabel": "Pool"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "loot_table_definition"},
+      {"name": "result", "dataType": "result<loot_table_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_npc",
+    "displayName": "Build NPC Definition",
+    "description": "Build a typed managed NPC definition.",
+    "tags": ["resource", "npc", "definition", "builder"],
+    "schemaVersion": 3,
+    "category": "NPC",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_npc"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "display_name", "dataType": "component", "defaultValue": "NPC"},
+      {"name": "entity_type", "dataType": "entity_type", "widget": "DROPDOWN", "optionsSource": "server:minecraft:entity_type", "defaultValue": "VILLAGER"},
+      {"name": "spawn_mode", "dataType": "string", "widget": "DROPDOWN", "options": ["manual", "startup"], "defaultValue": "manual"},
+      {"name": "location", "dataType": "location", "optional": true},
+      {"name": "skin_username", "dataType": "string", "optional": true},
+      {"name": "skin_uuid", "dataType": "string", "optional": true},
+      {"name": "skin_texture", "dataType": "string", "optional": true},
+      {"name": "skin_signature", "dataType": "string", "optional": true},
+      {"name": "ai", "dataType": "boolean", "defaultValue": false},
+      {"name": "gravity", "dataType": "boolean", "defaultValue": true},
+      {"name": "invulnerable", "dataType": "boolean", "defaultValue": true},
+      {"name": "follow_player", "dataType": "boolean", "defaultValue": false},
+      {"name": "follow_range", "dataType": "number", "defaultValue": 12.0},
+      {"name": "main_hand", "dataType": "string", "optional": true},
+      {"name": "off_hand", "dataType": "string", "optional": true},
+      {"name": "helmet", "dataType": "string", "optional": true},
+      {"name": "chestplate", "dataType": "string", "optional": true},
+      {"name": "leggings", "dataType": "string", "optional": true},
+      {"name": "boots", "dataType": "string", "optional": true},
+      {"name": "spawn_flow", "dataType": "string", "optional": true},
+      {"name": "interact_flow", "dataType": "string", "optional": true},
+      {"name": "right_click_flow", "dataType": "string", "optional": true},
+      {"name": "left_click_flow", "dataType": "string", "optional": true},
+      {"name": "damage_flow", "dataType": "string", "optional": true},
+      {"name": "death_flow", "dataType": "string", "optional": true},
+      {"name": "despawn_flow", "dataType": "string", "optional": true},
+      {"name": "trade_profile", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile", "optional": true},
+      {"name": "dialog", "dataType": "resource_reference<dialog>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:dialog", "optional": true},
+      {"name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table", "optional": true},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "npc_definition"},
+      {"name": "result", "dataType": "result<npc_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_dialog",
+    "displayName": "Build Dialog Definition",
+    "description": "Build a typed managed Paper dialog definition.",
+    "tags": ["resource", "dialog", "paper", "definition", "builder"],
+    "category": "ACTION",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_dialog"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "display_name", "dataType": "component", "defaultValue": "Dialog"},
+      {"name": "title", "dataType": "component", "defaultValue": "Dialog"},
+      {"name": "dialog_type", "dataType": "string", "widget": "DROPDOWN", "options": ["minecraft:notice", "minecraft:confirmation", "minecraft:dialog_list", "minecraft:multi_action", "minecraft:server_links"], "defaultValue": "minecraft:notice"},
+      {"name": "body", "dataType": "component"},
+      {"name": "body_width", "dataType": "integer", "widget": "NUMBER", "defaultValue": 200},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "dialog_definition"},
+      {"name": "result", "dataType": "result<dialog_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_advancement_tree",
+    "displayName": "Build Advancement Tree",
+    "description": "Build a typed managed advancement tree with a root criterion.",
+    "tags": ["resource", "advancement", "tree", "definition", "builder"],
+    "category": "ACTION",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_advancement_tree"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "display_name", "dataType": "component", "defaultValue": "Advancement Tree"},
+      {"name": "title", "dataType": "component", "defaultValue": "Root"},
+      {"name": "description", "dataType": "component"},
+      {"name": "icon", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
+      {"name": "frame", "dataType": "string", "widget": "DROPDOWN", "options": ["task", "goal", "challenge"], "defaultValue": "task"},
+      {"name": "show_toast", "dataType": "boolean", "defaultValue": true},
+      {"name": "announce_to_chat", "dataType": "boolean", "defaultValue": false},
+      {"name": "hidden", "dataType": "boolean", "defaultValue": false}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "advancement_tree_definition"},
+      {"name": "result", "dataType": "result<advancement_tree_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_recipe_ingredient",
+    "displayName": "Build Recipe Ingredient",
+    "description": "Build a typed recipe ingredient.",
+    "tags": ["resource", "recipe", "ingredient", "builder"],
+    "category": "ITEM",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_recipe_ingredient"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "material", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
+      {"name": "amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "ingredient", "dataType": "recipe_ingredient_definition"},
+      {"name": "result", "dataType": "result<recipe_ingredient_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "resource.build_recipe",
+    "displayName": "Build Recipe Definition",
+    "description": "Build a typed managed recipe from repeatable ingredients.",
+    "tags": ["resource", "recipe", "definition", "builder"],
+    "category": "ITEM",
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {"operation": "build_recipe"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "id", "dataType": "string", "required": true},
+      {"name": "recipe_type", "dataType": "string", "widget": "DROPDOWN", "options": ["shaped", "shapeless", "furnace", "blasting", "smoking", "campfire", "stonecutting", "smithing_transform", "smithing_trim"], "defaultValue": "shapeless"},
+      {"name": "result", "dataType": "material", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE"},
+      {"name": "result_amount", "dataType": "integer", "widget": "NUMBER", "defaultValue": 1},
+      {"name": "ingredient", "dataType": "recipe_ingredient_definition", "repeatable": {"groupId": "ingredients", "minItems": 1, "maxItems": 64, "itemLabel": "Ingredient"}},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "definition", "dataType": "recipe_definition"},
+      {"name": "result", "dataType": "result<recipe_definition>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  }
+]

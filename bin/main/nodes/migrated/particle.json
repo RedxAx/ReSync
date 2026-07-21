@@ -1,0 +1,297 @@
+[
+  {
+    "id": "particle.apply",
+    "displayName": "Particle",
+    "category": "VISUAL",
+    "kind": "FAMILY",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_apply"
+    },
+    "aliases": [
+      "effect",
+      "particles",
+      "burst",
+      "shape"
+    ],
+    "inputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "mode", "dataType": "string", "widget": "DROPDOWN", "options": ["point", "burst", "player", "area", "line", "circle", "ring", "sphere", "ellipse", "spiral", "cone", "cube", "wave", "text", "block_dust", "item_break", "explosion"], "defaultValue": "point" },
+      { "name": "particle", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:particle", "defaultValue": "FLAME" },
+      { "name": "location", "dataType": "location", "visibleWhen": { "mode": "point,burst,player,circle,ring,sphere,ellipse,spiral,cone,text,block_dust,item_break,explosion" } },
+      { "name": "player", "dataType": "player", "visibleWhen": { "mode": "player" } },
+      { "name": "start_location", "dataType": "location", "visibleWhen": { "mode": "line,wave" } },
+      { "name": "end_location", "dataType": "location", "visibleWhen": { "mode": "line" } },
+      { "name": "min_location", "dataType": "location", "visibleWhen": { "mode": "area,cube" } },
+      { "name": "max_location", "dataType": "location", "visibleWhen": { "mode": "area,cube" } },
+      { "name": "count", "dataType": "number", "widget": "NUMBER", "defaultValue": 24, "constraints": { "min": 0, "max": 10000, "step": 1 }, "visibleWhen": { "mode": "point,burst,player,circle,ring,sphere,ellipse,spiral,cone,block_dust" } },
+      { "name": "density", "dataType": "number", "widget": "NUMBER", "defaultValue": 10, "constraints": { "min": 1, "max": 10000, "step": 1 }, "visibleWhen": { "mode": "area,line" } },
+      { "name": "offset_x", "dataType": "number", "widget": "NUMBER", "defaultValue": "0", "visibleWhen": { "mode": "point,player" } },
+      { "name": "offset_y", "dataType": "number", "widget": "NUMBER", "defaultValue": "0", "visibleWhen": { "mode": "point,player" } },
+      { "name": "offset_z", "dataType": "number", "widget": "NUMBER", "defaultValue": "0", "visibleWhen": { "mode": "point,player" } },
+      { "name": "spread", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.6, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "burst" } },
+      { "name": "speed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.02, "constraints": { "min": 0, "max": 100 }, "visibleWhen": { "mode": "point,burst,player" } },
+      { "name": "radius", "dataType": "number", "widget": "NUMBER", "defaultValue": 3, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "circle,ring,sphere,spiral,cone" } },
+      { "name": "radius_x", "dataType": "number", "widget": "NUMBER", "defaultValue": 5, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "ellipse" } },
+      { "name": "radius_z", "dataType": "number", "widget": "NUMBER", "defaultValue": 3, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "ellipse" } },
+      { "name": "height", "dataType": "number", "widget": "NUMBER", "defaultValue": 5, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "spiral,cone" } },
+      { "name": "rotations", "dataType": "number", "widget": "NUMBER", "defaultValue": 3, "constraints": { "min": 0.01, "max": 100 }, "visibleWhen": { "mode": "spiral" } },
+      { "name": "axis", "dataType": "string", "widget": "DROPDOWN", "options": ["x", "y", "z"], "defaultValue": "y", "visibleWhen": { "mode": "ring" } },
+      { "name": "filled", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": "false", "visibleWhen": { "mode": "cube" } },
+      { "name": "step", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "constraints": { "min": 0.1, "max": 1024 }, "visibleWhen": { "mode": "cube" } },
+      { "name": "direction", "dataType": "vector", "visibleWhen": { "mode": "wave" } },
+      { "name": "amplitude", "dataType": "number", "widget": "NUMBER", "defaultValue": 1, "constraints": { "min": -1024, "max": 1024 }, "visibleWhen": { "mode": "wave" } },
+      { "name": "frequency", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.5, "constraints": { "min": -1000, "max": 1000 }, "visibleWhen": { "mode": "wave" } },
+      { "name": "length", "dataType": "number", "widget": "NUMBER", "defaultValue": 10, "constraints": { "min": 0, "max": 1024 }, "visibleWhen": { "mode": "wave" } },
+      { "name": "text", "dataType": "string", "widget": "TEXT", "defaultValue": "Text", "visibleWhen": { "mode": "text" } },
+      { "name": "size", "dataType": "number", "widget": "NUMBER", "defaultValue": 0.3, "constraints": { "min": 0.01, "max": 10 }, "visibleWhen": { "mode": "text" } },
+      { "name": "block_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:block", "defaultValue": "STONE", "visibleWhen": { "mode": "block_dust" } },
+      { "name": "item_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:material", "defaultValue": "STONE", "visibleWhen": { "mode": "item_break" } },
+      { "name": "large", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": "false", "visibleWhen": { "mode": "explosion" } }
+    ],
+    "outputs": [
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+    ]
+  },
+  {
+    "id": "particle.spawn",
+    "displayName": "Spawn Particle",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_spawn"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.area",
+    "displayName": "Particle Area",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_area"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.player.spawn",
+    "displayName": "Particle Player Spawn",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_player_spawn"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.line",
+    "displayName": "Particle Line",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_line"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.circle",
+    "displayName": "Particle Circle",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_circle"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.sphere",
+    "displayName": "Particle Sphere",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_sphere"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.ellipse",
+    "displayName": "Particle Ellipse",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_ellipse"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.spiral",
+    "displayName": "Particle Spiral",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_spiral"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.cone",
+    "displayName": "Particle Cone",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_cone"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.ring",
+    "displayName": "Particle Ring",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_ring"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.cube",
+    "displayName": "Particle Cube",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_cube"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.wave",
+    "displayName": "Particle Wave",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_wave"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.text",
+    "displayName": "Particle Text",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_text"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.block.dust",
+    "displayName": "Block Dust Particle",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_block_dust"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.item.break",
+    "displayName": "Item Break Particle",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_item_break"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "particle.explosion",
+    "displayName": "Explosion Particle",
+    "category": "VISUAL",
+    "canonicalId": "particle.apply",
+    "deprecated": true,
+    "hiddenReason": "migrated-to-particle-family",
+    "handler": "ParticleHandler",
+    "handlerConfig": {
+      "operation": "particle_explosion"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  }
+]
+

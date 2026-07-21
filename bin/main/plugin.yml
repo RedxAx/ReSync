@@ -3,10 +3,14 @@ version: '${version}'
 main: restudio.resync.ReSync
 api-version: '1.21'
 prefix: ReSync
-authors: [RedxAx, DumbFridge]
-description: High-performance data synchronizer for Remotely - v2
+authors: [RedxAx]
+description: Game Engine for Minecraft
 softdepend:
   - PlaceholderAPI
+  - Vault
+  - LuckPerms
+  - ProtocolLib
+  - Nexo
 permissions:
   resync.api.access:
     description: Allows API access to ReSync from Remotely
@@ -17,5 +21,5 @@ permissions:
 commands:
   resync:
     description: Manage ReSync systems
-    usage: /resync <scoreboard|tab|world|portal> ...
+    usage: /resync <status|network|scoreboard|tab|world|portal|flow|item|resource|npc|trade> ...
     permission: resync.command

@@ -28,6 +28,12 @@ import restudio.resync.network.NetworkProxyAction;
 import restudio.resync.network.NetworkProxyActionCodec;
 import restudio.resync.network.NetworkProxyActionType;
 import restudio.resync.network.NetworkRequestContext;
+import restudio.resync.network.NetworkResource;
+import restudio.resync.network.NetworkResourceCodec;
+import restudio.resync.network.NetworkResourceKey;
+import restudio.resync.network.NetworkResourceMutation;
+import restudio.resync.network.NetworkResourcePage;
+import restudio.resync.network.NetworkResourceQuery;
 import restudio.resync.network.NetworkSnapshotChunk;
 import restudio.resync.network.NetworkStateReconciliationCodec;
 import restudio.resync.network.NetworkStateReconciliationTask;
@@ -196,6 +202,19 @@ public class ReSyncNetworkAgent {
 
     public CompletableFuture<NetworkEvent> publishEvent(NetworkEventPublish event) {
         return request(NetworkChannels.EVENTS, NetworkFrameType.EVENT_PUBLISH, NetworkEventCodec.encodePublish(event), Set.of("events.publish")).thenApply(frame -> NetworkEventCodec.decodeEvent(frame.payload()));
+    }
+
+    public CompletableFuture<Optional<NetworkResource>> getResource(String type, String resourceId) {
+        NetworkResourceKey key = new NetworkResourceKey(type, resourceId);
+        return request(NetworkChannels.RESOURCES, NetworkFrameType.RESOURCE_GET, NetworkResourceCodec.encodeKey(key), Set.of("resources.read")).thenApply(frame -> frame.payload().length == 0 ? Optional.empty() : Optional.of(NetworkResourceCodec.decodeResource(frame.payload())));
+    }
+
+    public CompletableFuture<NetworkResourcePage> listResources(NetworkResourceQuery query) {
+        return request(NetworkChannels.RESOURCES, NetworkFrameType.RESOURCE_LIST, NetworkResourceCodec.encodeQuery(query), Set.of("resources.read")).thenApply(frame -> NetworkResourceCodec.decodePage(frame.payload()));
+    }
+
+    public CompletableFuture<NetworkResource> setResource(NetworkResourceMutation mutation) {
+        return request(NetworkChannels.RESOURCES, NetworkFrameType.RESOURCE_SET, NetworkResourceCodec.encodeMutation(mutation), Set.of("resources.write")).thenApply(frame -> NetworkResourceCodec.decodeResource(frame.payload()));
     }
 
     public CompletableFuture<Void> setNodeMode(String nodeId, NetworkNodeStatus status) {
@@ -404,6 +423,11 @@ public class ReSyncNetworkAgent {
         if (frame.type() == NetworkFrameType.VARIABLE_CHANGED && frame.channel().equals(NetworkChannels.VARIABLES)) {
             NetworkVariable variable = NetworkVariableCodec.decodeVariable(frame.payload());
             listeners.forEach(listener -> listener.onVariableChanged(variable));
+            return;
+        }
+        if (frame.type() == NetworkFrameType.RESOURCE_CHANGED && frame.channel().equals(NetworkChannels.RESOURCES)) {
+            NetworkResource resource = NetworkResourceCodec.decodeResource(frame.payload());
+            listeners.forEach(listener -> listener.onResourceChanged(resource));
             return;
         }
         if (frame.type() == NetworkFrameType.EVENT_DELIVERY && frame.channel().equals(NetworkChannels.EVENTS)) {
@@ -661,14 +685,20 @@ public class ReSyncNetworkAgent {
 
     private void notifyConnected() {
         TransferHandler handler = transferHandler;
-        if (handler == null) {
-            return;
+        if (handler != null) {
+            try {
+                handler.connected();
+            } catch (RuntimeException exception) {
+                Log.warn("ReSync network connection callback failed: " + rootMessage(exception));
+            }
         }
-        try {
-            handler.connected();
-        } catch (RuntimeException exception) {
-            Log.warn("ReSync network connection callback failed: " + rootMessage(exception));
-        }
+        listeners.forEach(listener -> {
+            try {
+                listener.onConnected();
+            } catch (RuntimeException exception) {
+                Log.warn("ReSync network listener connection callback failed: " + rootMessage(exception));
+            }
+        });
     }
 
     private void scheduleReconnect() {
@@ -695,6 +725,12 @@ public class ReSyncNetworkAgent {
 
         default CompletionStage<Void> onEventReceived(NetworkEvent event) {
             return CompletableFuture.completedFuture(null);
+        }
+
+        default void onResourceChanged(NetworkResource resource) {
+        }
+
+        default void onConnected() {
         }
     }
 

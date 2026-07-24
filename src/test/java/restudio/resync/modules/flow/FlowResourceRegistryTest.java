@@ -101,6 +101,28 @@ class FlowResourceRegistryTest {
     }
 
     @Test
+    void publishesDurableResourceMutations() {
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registry.register(new TestAdapter());
+        List<String> mutations = new ArrayList<>();
+        registry.setMutationListener(new FlowResourceMutationListener() {
+            @Override
+            public void saved(String type, String resourceId, String payload) {
+                mutations.add("save:" + type + ":" + resourceId + ":" + payload);
+            }
+
+            @Override
+            public void deleted(String type, String resourceId) {
+                mutations.add("delete:" + type + ":" + resourceId);
+            }
+        });
+
+        assertTrue(registry.save("gui", "main").success());
+        assertTrue(registry.delete("gui", "main").success());
+        assertEquals(List.of("save:gui:main:\"main\"", "delete:gui:main"), mutations);
+    }
+
+    @Test
     void authorizationFailuresAreStructuredAndAudited() {
         FlowResourceRegistry registry = new FlowResourceRegistry();
         registry.register(new TestAdapter());

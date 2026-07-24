@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
@@ -15,6 +16,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.text.ReTextService;
 
 import java.util.List;
 import java.util.Map;
@@ -39,7 +41,8 @@ class FlowBlueprintStartupBindingTest {
         storage.saveGraph(graph);
         TriggerRegistry triggers = new TriggerRegistry(plugin);
         GlobalTriggers globalTriggers = new GlobalTriggers(storage,
-            new FlowExecutor(new HandlerRegistry(), new TypeAdapterRegistry(), Map.of()), triggers);
+            new FlowExecutor(new HandlerRegistry(), new TypeAdapterRegistry(), Map.of()), triggers,
+            new ReTextService(new ReSyncJsonResourceStorage(plugin)));
 
         new FlowBlueprintPacketHandler(storage, triggers, globalTriggers, null);
 

@@ -807,7 +807,12 @@ public class PlayerNpcPacketRuntime implements PlayerNpcRuntime, Listener {
     }
 
     private String profileName(String id) {
-        return "RS_" + uuid(id).toString().replace("-", "").substring(0, 13);
+        String identity = uuid(id).toString().replace("-", "");
+        StringBuilder invisibleName = new StringBuilder(16);
+        for (int index = 0; index < 8; index++) {
+            invisibleName.append('§').append(identity.charAt(index));
+        }
+        return invisibleName.toString();
     }
 
     private String teamName(PacketNpc npc) {

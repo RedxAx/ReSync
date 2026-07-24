@@ -8,10 +8,15 @@ import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
 import restudio.resync.bridge.ReSyncPluginMessageBridge;
 import restudio.resync.flow.network.NetworkFlowBridge;
+import restudio.resync.modules.ChatModule;
+import restudio.resync.modules.FlowModule;
+import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.network.paper.ReSyncNetworkAgent;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig;
+import restudio.resync.network.paper.NetworkResourceSynchronizer;
 import restudio.resync.network.paper.state.NetworkPlayerStateConfig;
 import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
@@ -27,6 +32,7 @@ public class ReSync extends JavaPlugin {
     private ReSyncServer server;
     private ReSyncPluginMessageBridge pluginMessageBridge;
     private ReSyncNetworkAgent networkAgent;
+    private NetworkResourceSynchronizer networkResourceSynchronizer;
     private NetworkPlayerStateCoordinator networkPlayerStateCoordinator;
     private boolean networkStateReloadScheduled;
     private Object placeholderExpansion;
@@ -57,6 +63,22 @@ public class ReSync extends JavaPlugin {
                 NetworkFlowBridge networkFlowBridge = server.getModuleContext().getService(NetworkFlowBridge.class);
                 if (networkFlowBridge != null) {
                     networkFlowBridge.connect(networkAgent);
+                }
+                ChatModule chatModule = server.getModuleContext().getService(ChatModule.class);
+                if (chatModule != null) {
+                    chatModule.connectNetwork(networkAgent, networkConfig.chat());
+                }
+                FlowResourceRegistry resourceRegistry = server.getModuleContext().getService(FlowResourceRegistry.class);
+                ReSyncNetworkAgentConfig.ResourcePolicy resourcePolicy = networkConfig.chatEnabled() ? networkConfig.resources().withIncluded(ReSyncResourceCatalog.CHAT) : networkConfig.resources();
+                resourcePolicy = resourcePolicy.enabled() ? resourcePolicy.withIncluded(ReSyncResourceCatalog.PROJECT_METADATA) : resourcePolicy;
+                if (resourcePolicy.enabled() && resourceRegistry != null) {
+                    FlowModule flowModule = server.getModuleContext().getService(FlowModule.class);
+                    networkResourceSynchronizer = new NetworkResourceSynchronizer(this, networkAgent, resourceRegistry, resourcePolicy, getDataFolder().toPath(), resource -> {
+                        if (flowModule != null) {
+                            flowModule.refreshSharedResource(resource.type(), resource.resourceId(), resource.deleted());
+                        }
+                    });
+                    networkResourceSynchronizer.start();
                 }
                 NetworkPlayerStateConfig playerStateConfig = NetworkPlayerStateConfig.load(getDataFolder().toPath());
                 if (playerStateConfig.enabled()) {
@@ -121,6 +143,10 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (networkResourceSynchronizer != null) {
+            networkResourceSynchronizer.shutdown();
+            networkResourceSynchronizer = null;
+        }
         if (networkPlayerStateCoordinator != null) {
             if (networkAgent != null) {
                 networkAgent.setTransferHandler(null);

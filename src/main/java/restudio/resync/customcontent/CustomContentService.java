@@ -105,7 +105,7 @@ public class CustomContentService {
             return List.of();
         }
         return switch (catalog.toLowerCase(Locale.ROOT)) {
-            case "item", "items" -> nexoProvider.itemIds();
+            case "item", "items", "projectile", "projectiles" -> nexoProvider.itemIds();
             case "block", "blocks" -> nexoProvider.blockContentIds();
             case "furniture" -> nexoProvider.furnitureIds();
             case "armor" -> nexoProvider.armorIds();
@@ -143,7 +143,7 @@ public class CustomContentService {
                 continue;
             }
             String contentType = definition.getType() != null ? definition.getType().toLowerCase(Locale.ROOT) : "";
-            if (!Set.of("item", "armor", "block").contains(contentType)) {
+            if (!Set.of("item", "armor", "block", "projectile").contains(contentType)) {
                 continue;
             }
             String value = "content:" + definition.getId();
@@ -607,6 +607,44 @@ public class CustomContentService {
         return true;
     }
 
+    public CooldownState cooldownState(String contentId, String trigger, Player player, String instanceId) {
+        if (contentId == null || contentId.isBlank() || trigger == null || trigger.isBlank()) {
+            return new CooldownState(false, "", "", 0, 0, 0, true, 1.0, "");
+        }
+        CustomContentDefinition definition = contentStorage.get(contentId);
+        if (definition == null) {
+            return new CooldownState(false, "", "", 0, 0, 0, true, 1.0, "");
+        }
+        CustomAbilityBinding binding = definition.getAbilities().stream()
+            .filter(candidate -> candidate != null && candidate.isEnabled() && candidate.getTrigger() != null
+                && candidate.getTrigger().equalsIgnoreCase(trigger))
+            .findFirst()
+            .orElse(null);
+        if (binding == null || binding.getRule() == null || binding.getRule().getCooldownTicks() <= 0) {
+            return new CooldownState(false, "", "", 0, currentTick, currentTick, true, 1.0, trigger);
+        }
+        Map<String, Object> vars = new HashMap<>();
+        if (instanceId != null && !instanceId.isBlank()) {
+            vars.put("event.instance_id", instanceId);
+        }
+        String key = cooldownKey(definition, binding, player, vars);
+        long readyTick = cooldowns.getOrDefault(key, 0L);
+        int cooldownTicks = Math.max(0, binding.getRule().getCooldownTicks());
+        long remainingTicks = Math.max(0L, readyTick - currentTick);
+        double progress = cooldownTicks <= 0 ? 1.0 : 1.0 - Math.min(1.0, remainingTicks / (double) cooldownTicks);
+        return new CooldownState(
+            true,
+            key,
+            binding.getRule().getCooldownScope() != null ? binding.getRule().getCooldownScope() : "player",
+            cooldownTicks,
+            currentTick,
+            readyTick,
+            remainingTicks <= 0,
+            Math.clamp(progress, 0.0, 1.0),
+            binding.getTrigger()
+        );
+    }
+
     @SuppressWarnings("deprecation")
     private boolean isOnGround(Player player) {
         return player.isOnGround();
@@ -641,6 +679,19 @@ public class CustomContentService {
 
     public VanillaContentProvider getVanillaProvider() {
         return vanillaProvider;
+    }
+
+    public record CooldownState(
+        boolean supported,
+        String key,
+        String scope,
+        int cooldownTicks,
+        long currentTick,
+        long readyTick,
+        boolean ready,
+        double progress,
+        String trigger
+    ) {
     }
 
     private record CompiledContentDefinition(CustomContentDefinition definition, int graphIdentity, int graphVersion) {

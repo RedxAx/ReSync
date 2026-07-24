@@ -15,6 +15,8 @@ import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,6 +27,7 @@ import java.util.regex.Pattern;
 
 public class ReTextService {
     private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation[:_]([^%]+)%", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RESOURCE_PATTERN = Pattern.compile("%resync_text[:_]([^%]+)%", Pattern.CASE_INSENSITIVE);
     private static final Pattern MINIMESSAGE_PATTERN = Pattern.compile("<[^>]+>");
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
     private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.builder()
@@ -35,6 +38,7 @@ public class ReTextService {
     private final LegacyComponentSerializer sectionSerializer = LegacyComponentSerializer.legacySection();
     private final ReSyncJsonResourceStorage storage;
     private final Map<String, ReTextTemplate> templateCache = new ConcurrentHashMap<>();
+    private final Map<String, ReTextResource> resourceCache = new ConcurrentHashMap<>();
 
     public ReTextService(ReSyncJsonResourceStorage storage) {
         this.storage = storage;
@@ -66,9 +70,10 @@ public class ReTextService {
     public String renderPlain(String input, Player subject, Player viewer, long timeMillis) {
         String text = normalize(input);
         text = applyAnimations(text, subject, viewer, timeMillis);
+        text = applyResources(text);
         text = ReSyncPlaceholderUtil.apply(subject, text, true);
         text = applyLuckPermsMeta(subject, text);
-        return ReSyncPlaceholderUtil.apply(viewer != null ? viewer : subject, text, true);
+        return viewer != null && viewer != subject ? ReSyncPlaceholderUtil.apply(viewer, text, true) : text;
     }
 
     public Component parse(String input, boolean strict) {
@@ -102,20 +107,52 @@ public class ReTextService {
     }
 
     public ReTextTemplate template(String id) {
-        if (id == null || id.isBlank()) {
+        ReTextResource resource = resource(id);
+        if (resource == null || resource.kind() != ReTextKind.ANIMATION) {
             return null;
         }
-        String templateId = resolveTemplateId(id);
+        String templateId = resource.id();
         ReTextTemplate cached = templateCache.get(templateId);
         if (cached != null) {
             return cached;
         }
-        JsonObject json = storage.get(ReSyncResourceCatalog.TEXT_TEMPLATE, templateId);
-        ReTextTemplate template = ReTextTemplate.fromJson(json);
+        ReTextTemplate template = ReTextTemplate.fromJson(resource.source());
         if (template != null) {
             templateCache.put(templateId, template);
         }
         return template;
+    }
+
+    public ReTextResource resource(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        String resourceId = resolveTemplateId(id);
+        ReTextResource cached = resourceCache.get(resourceId);
+        if (cached != null) {
+            return cached;
+        }
+        JsonObject json = storage.get(ReSyncResourceCatalog.TEXT_TEMPLATE, resourceId);
+        ReTextResource resource = ReTextResource.fromJson(resourceId, json);
+        if (resource != null) {
+            resourceCache.put(resourceId, resource);
+        }
+        return resource;
+    }
+
+    public List<String> lines(String id) {
+        ReTextResource resource = resource(id);
+        return resource == null ? List.of() : resource.lines();
+    }
+
+    public Map<String, String> entries(String id) {
+        ReTextResource resource = resource(id);
+        return resource == null ? Map.of() : resource.entries();
+    }
+
+    public String lookup(String id, String key, String fallback) {
+        ReTextResource resource = resource(id);
+        return resource == null ? normalizeFallback(fallback) : resource.lookup(key, fallback);
     }
 
     private String resolveTemplateId(String id) {
@@ -136,6 +173,11 @@ public class ReTextService {
 
     public void clearTemplateCache() {
         templateCache.clear();
+        resourceCache.clear();
+    }
+
+    private String normalizeFallback(String fallback) {
+        return fallback == null ? "" : fallback;
     }
 
     private String applyAnimations(String input, Player subject, Player viewer, long timeMillis) {
@@ -144,6 +186,23 @@ public class ReTextService {
         while (matcher.find()) {
             ReTextTemplate template = template(matcher.group(1));
             String replacement = template != null ? template.frame(subject, viewer, timeMillis) : matcher.group();
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    private String applyResources(String input) {
+        Matcher matcher = RESOURCE_PATTERN.matcher(input);
+        StringBuffer out = new StringBuffer();
+        while (matcher.find()) {
+            ReTextResource resource = resource(matcher.group(1));
+            String replacement = matcher.group();
+            if (resource != null && resource.kind() == ReTextKind.LIST) {
+                replacement = String.join("\n", resource.lines());
+            } else if (resource != null && resource.kind() == ReTextKind.MAP) {
+                replacement = String.join("\n", resource.entries().entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).toList());
+            }
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);
@@ -186,6 +245,67 @@ public class ReTextService {
 
     private String string(Object value) {
         return value != null ? value.toString() : "";
+    }
+
+    public enum ReTextKind {
+        ANIMATION,
+        LIST,
+        MAP
+    }
+
+    public record ReTextResource(String id, ReTextKind kind, List<String> lines, Map<String, String> entries, JsonObject source) {
+        public ReTextResource {
+            id = id == null ? "" : id;
+            kind = kind == null ? ReTextKind.ANIMATION : kind;
+            lines = lines == null ? List.of() : List.copyOf(lines);
+            entries = entries == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(entries));
+            source = source == null ? new JsonObject() : source.deepCopy();
+        }
+
+        public String lookup(String key, String fallback) {
+            if (key == null) {
+                return fallback == null ? "" : fallback;
+            }
+            return entries.entrySet().stream().filter(entry -> entry.getKey().equalsIgnoreCase(key.trim())).map(Map.Entry::getValue).findFirst().orElse(fallback == null ? "" : fallback);
+        }
+
+        private static ReTextResource fromJson(String id, JsonObject json) {
+            if (json == null) {
+                return null;
+            }
+            ReTextKind kind = switch (text(json, "kind").toLowerCase(Locale.ROOT)) {
+                case "list" -> ReTextKind.LIST;
+                case "map" -> ReTextKind.MAP;
+                default -> ReTextKind.ANIMATION;
+            };
+            List<String> lines = new ArrayList<>();
+            Map<String, String> entries = new LinkedHashMap<>();
+            if (kind == ReTextKind.LIST && json.has("values") && json.get("values").isJsonArray()) {
+                json.getAsJsonArray("values").forEach(value -> {
+                    if (value.isJsonPrimitive() && !value.getAsString().isBlank()) {
+                        lines.add(value.getAsString());
+                    }
+                });
+            }
+            if (kind == ReTextKind.MAP && json.has("entries") && json.get("entries").isJsonArray()) {
+                json.getAsJsonArray("entries").forEach(value -> {
+                    if (!value.isJsonObject()) {
+                        return;
+                    }
+                    JsonObject entry = value.getAsJsonObject();
+                    String key = text(entry, "key").trim();
+                    if (!key.isBlank()) {
+                        entries.putIfAbsent(key, text(entry, "value"));
+                    }
+                });
+                lines.addAll(entries.keySet());
+            }
+            return new ReTextResource(id, kind, lines, entries, json);
+        }
+
+        private static String text(JsonObject json, String key) {
+            return json != null && json.has(key) && json.get(key).isJsonPrimitive() ? json.get(key).getAsString() : "";
+        }
     }
 
     public static class ReTextTemplate {
@@ -247,7 +367,8 @@ public class ReTextService {
         }
 
         private String blinkFrame(long timeMillis) {
-            return Math.floorMod(timeMillis / frameMillis, 2) == 0 ? frames.getFirst() : "";
+            String value = !text.isBlank() ? text : frames.getFirst();
+            return Math.floorMod(timeMillis / frameMillis, 2) == 0 ? value : "";
         }
 
         private String typingFrame(long timeMillis) {
@@ -290,8 +411,8 @@ public class ReTextService {
 
         private String rainbowFrame(long timeMillis) {
             String value = !text.isBlank() ? text : frames.getFirst();
-            int phase = (int) Math.floorMod(timeMillis / frameMillis, 32);
-            return "<rainbow:" + phase + ">" + value + "</rainbow>";
+            double phase = Math.floorMod(timeMillis / frameMillis, 32) / 32.0;
+            return "<rainbow:" + String.format(Locale.ROOT, "%.3f", phase) + ">" + value + "</rainbow>";
         }
 
         private String waveFrame(long timeMillis) {
@@ -368,7 +489,8 @@ public class ReTextService {
                     }
                     continue;
                 }
-                for (int offset = 0; offset < part.text().length(); offset++) {
+                for (int offset = 0; offset < part.text().length();) {
+                    int codePoint = part.text().codePointAt(offset);
                     if (visible == start && !startTagsEmitted) {
                         for (String tag : openTags) {
                             out.append(tag);
@@ -376,8 +498,9 @@ public class ReTextService {
                         startTagsEmitted = true;
                     }
                     if (visible >= start && visible < end) {
-                        out.append(part.text().charAt(offset));
+                        out.appendCodePoint(codePoint);
                     }
+                    offset += Character.charCount(codePoint);
                     visible++;
                     if (visible >= end) {
                         break;
@@ -397,7 +520,7 @@ public class ReTextService {
             int length = 0;
             for (TextPart part : textParts(value)) {
                 if (!part.tag()) {
-                    length += part.text().length();
+                    length += part.text().codePointCount(0, part.text().length());
                 }
             }
             return length;
@@ -410,8 +533,10 @@ public class ReTextService {
                 if (part.tag()) {
                     continue;
                 }
-                for (int i = 0; i < part.text().length(); i++) {
-                    chars.add(new VisibleChar(index, String.valueOf(part.text().charAt(i))));
+                for (int offset = 0; offset < part.text().length();) {
+                    int codePoint = part.text().codePointAt(offset);
+                    chars.add(new VisibleChar(index, new String(Character.toChars(codePoint))));
+                    offset += Character.charCount(codePoint);
                     index++;
                 }
             }
@@ -466,6 +591,9 @@ public class ReTextService {
                 return value;
             }
             String clean = tag.trim();
+            if (clean.matches("(?i)#?[0-9a-f]{6}")) {
+                clean = clean.startsWith("#") ? clean : "#" + clean;
+            }
             if (clean.startsWith("<") && clean.endsWith(">")) {
                 return clean + value + closeTag(clean);
             }

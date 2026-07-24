@@ -19,6 +19,14 @@ class ReSyncNetworkAgentConfigTest {
     void loadsLoopbackEnrollmentConfigurationAndPersistsCredential() throws Exception {
         Files.writeString(directory.resolve("resync.properties"), """
             network.enabled=true
+            network.chat.enabled=true
+            network.chat.channel-mode=ALLOW_LIST
+            network.chat.channels=global, Staff
+            network.chat.retention-millis=45000
+            network.resources.enabled=true
+            network.resources.type-mode=DENY_LIST
+            network.resources.types=world, CUSTOM_CONTENT
+            network.resources.conflict-policy=LOCAL_WINS
             network.id=network-one
             network.node-id=lobby-one
             network.display-name=Lobby
@@ -37,6 +45,18 @@ class ReSyncNetworkAgentConfigTest {
         ReSyncNetworkAgentConfig reloaded = ReSyncNetworkAgentConfig.load(directory);
 
         assertTrue(config.enabled());
+        assertTrue(config.chatEnabled());
+        assertEquals(ReSyncNetworkAgentConfig.SelectionMode.ALLOW_LIST, config.chat().channelMode());
+        assertEquals(45000, config.chat().retentionMillis());
+        assertTrue(config.chat().includes("GLOBAL"));
+        assertTrue(config.chat().includes("staff"));
+        assertFalse(config.chat().includes("local"));
+        assertTrue(config.resourcesEnabled());
+        assertEquals(ReSyncNetworkAgentConfig.SelectionMode.DENY_LIST, config.resources().typeMode());
+        assertEquals(ReSyncNetworkAgentConfig.ResourceConflictPolicy.LOCAL_WINS, config.resources().conflictPolicy());
+        assertFalse(config.resources().includes("world"));
+        assertFalse(config.resources().includes("custom_content"));
+        assertTrue(config.resources().includes("chat"));
         assertEquals("ws://127.0.0.1:12442", config.hubUrl());
         assertEquals(100, config.capacity());
         assertEquals("issued-credential", reloaded.credential());
@@ -51,6 +71,17 @@ class ReSyncNetworkAgentConfigTest {
         ReSyncNetworkAgentConfig config = ReSyncNetworkAgentConfig.load(directory);
 
         assertFalse(config.enabled());
+        assertFalse(config.chatEnabled());
+        assertFalse(config.resourcesEnabled());
+        assertEquals(ReSyncNetworkAgentConfig.SelectionMode.ALL, config.chat().channelMode());
+        assertEquals(120000, config.chat().retentionMillis());
+        assertEquals(ReSyncNetworkAgentConfig.SelectionMode.ALL, config.resources().typeMode());
+        assertEquals(ReSyncNetworkAgentConfig.ResourceConflictPolicy.NETWORK_WINS, config.resources().conflictPolicy());
+
+        ReSyncNetworkAgentConfig.ResourcePolicy chatResources = config.resources().withIncluded("CHAT");
+        assertTrue(chatResources.enabled());
+        assertTrue(chatResources.includes("chat"));
+        assertFalse(chatResources.includes("world"));
     }
 
     @Test
@@ -62,6 +93,21 @@ class ReSyncNetworkAgentConfigTest {
             network.hub-url=ws://10.0.0.10:12442
             network.enrollment-token=one-time-token
             """);
+
+        assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+    }
+
+    @Test
+    void rejectsInvalidNetworkPolicies() throws Exception {
+        Files.writeString(directory.resolve("resync.properties"), "network.chat.channel-mode=SOME_CHANNELS");
+
+        assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+
+        Files.writeString(directory.resolve("resync.properties"), "network.chat.retention-millis=0");
+
+        assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+
+        Files.writeString(directory.resolve("resync.properties"), "network.chat.retention-millis=31536000001");
 
         assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
     }

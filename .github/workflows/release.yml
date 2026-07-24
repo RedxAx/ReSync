@@ -78,6 +78,10 @@ jobs:
             changelog=$INPUT_CHANGELOG
             source_ref=$GITHUB_REF
           fi
+          if [[ ${#version} -gt 64 || ! "$version" =~ ^[0-9]+([.][0-9A-Za-z]+|[-+_][0-9A-Za-z]+)*$ ]]; then
+            printf 'Release Version Is Invalid: %s\n' "$version" >&2
+            exit 1
+          fi
           delimiter="RESTUDIO_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           {
             printf 'version=%s\n' "$version"
@@ -92,8 +96,9 @@ jobs:
     runs-on: [self-hosted, node1, linux, release]
     env:
       GRADLE_USER_HOME: /var/cache/restudio-gradle
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: ReProjects/ReSync
           ref: ${{ needs.prepare.outputs.source_ref }}
@@ -105,19 +110,19 @@ jobs:
           for project in Remotely ReScreen Rebase; do
             printf '%s=%s\n' "${project,,}" "$(jq -r --arg project "$project" '.[$project]' "$lock")" >> "$GITHUB_OUTPUT"
           done
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ReStudioMC/Remotely
           token: ${{ secrets.REPROJECTS_PAT }}
           path: ReProjects/Remotely
           ref: ${{ steps.refs.outputs.remotely }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: RedxAx/ReScreen
           token: ${{ secrets.REPROJECTS_PAT }}
           path: ReProjects/ReScreen
           ref: ${{ steps.refs.outputs.rescreen }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: RedxAx/Rebase
           token: ${{ secrets.REPROJECTS_PAT }}
@@ -128,12 +133,12 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          flock /var/lock/restudio-release-build.lock ./gradlew -PreleaseVersion=${{ needs.prepare.outputs.version }} shadowJar verifyUniversalJar --no-daemon --stacktrace
+          flock /var/lock/restudio-release-build.lock ./gradlew "-PreleaseVersion=$RELEASE_VERSION" shadowJar verifyUniversalJar --no-daemon --stacktrace
           install -d release-artifacts
           artifact=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -print -quit)
           [[ -n "$artifact" ]] || { printf 'ReSync Jar Was Not Created\n' >&2; exit 1; }
-          cp "$artifact" "release-artifacts/ReSync-${{ needs.prepare.outputs.version }}.jar"
-      - uses: actions/upload-artifact@v4
+          cp "$artifact" "release-artifacts/ReSync-$RELEASE_VERSION.jar"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: resync-universal
           path: ReProjects/ReSync/release-artifacts/*.jar
@@ -148,20 +153,25 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: resync-universal
           path: artifacts
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: RedxAx/ReStudio
           token: ${{ secrets.REPROJECTS_PAT }}
           path: release-tools
-          ref: master
+          ref: 78d63bab135fc1819ea3f4b0f3b48d20b2e5b122
       - name: Publish ReSync
         shell: bash
         env:
           RELEASE_CHANGELOG: ${{ needs.prepare.outputs.changelog }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+          RELEASE_VISIBILITY: ${{ needs.prepare.outputs.visibility }}
         run: |
           chmod +x release-tools/scripts/releases/publish-release.sh
-          release-tools/scripts/releases/publish-release.sh "artifacts/ReSync-${{ needs.prepare.outputs.version }}.jar" resync "${{ needs.prepare.outputs.version }}" "${{ needs.prepare.outputs.channel }}" universal "${{ needs.prepare.outputs.visibility }}"
+          artifact="artifacts/ReSync-$RELEASE_VERSION.jar"
+          [[ -s "$artifact" ]] || { printf 'Release Artifact Is Missing Or Empty: %s\n' "$artifact" >&2; exit 1; }
+          release-tools/scripts/releases/publish-release.sh "$artifact" resync "$RELEASE_VERSION" "$RELEASE_CHANNEL" universal "$RELEASE_VISIBILITY"

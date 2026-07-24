@@ -94,7 +94,7 @@ class CustomContentDispatchRuntimeTest {
     @Test
     void everyAdvertisedContentTriggerSelectsItsEmbeddedExecutionBranch() {
         List<String> expected = new ArrayList<>();
-        for (String type : List.of("item", "block", "armor")) {
+        for (String type : List.of("item", "block", "armor", "projectile")) {
             String contentId = "runtime_" + type;
             List<CustomContentGraphAdapter.TriggerDescriptor> triggers = CustomContentGraphAdapter.triggersForType(type);
             saveContentGraph(contentId, type, triggers);

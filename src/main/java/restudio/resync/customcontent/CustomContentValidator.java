@@ -1,6 +1,9 @@
 package restudio.resync.customcontent;
 
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Projectile;
 import restudio.flow.data.CustomAbilityBinding;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.CustomTriggerRule;
@@ -10,11 +13,15 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class CustomContentValidator {
-    private static final Set<String> TYPES = Set.of("item", "block", "armor");
+    private static final Set<String> TYPES = Set.of("item", "block", "armor", "projectile");
     private static final Set<String> ARMOR_SLOTS = Set.of("head", "chest", "legs", "feet");
+    private static final Set<String> PROJECTILE_SOURCES = Set.of("automatic", "bow ammo", "item use", "both");
+    private static final Set<String> PROJECTILE_PICKUP = Set.of("allowed", "disallowed", "creative only");
+    private static final Set<String> PROJECTILE_FLAGS = Set.of("gravity", "glowing", "consume_item", "remove_on_hit");
 
     public List<String> validate(CustomContentDefinition definition) {
         List<String> errors = new ArrayList<>();
@@ -28,7 +35,7 @@ public class CustomContentValidator {
         }
         String type = lower(definition.getType());
         if (!TYPES.contains(type)) {
-            errors.add("Type must be item, block, or armor");
+            errors.add("Type must be item, block, armor, or projectile");
         }
         String provider = lower(definition.getProvider());
         if (!provider.isBlank()) {
@@ -39,6 +46,9 @@ public class CustomContentValidator {
         }
         if ("armor".equals(type) && !ARMOR_SLOTS.contains(lower(definition.getArmorSlot()))) {
             errors.add("Armor slot must be head, chest, legs, or feet");
+        }
+        if ("projectile".equals(type)) {
+            validateProjectile(definition, errors);
         }
         if (definition.getVersion() < 0) {
             errors.add("Version must be >= 0");
@@ -80,6 +90,73 @@ public class CustomContentValidator {
             }
         }
         return errors;
+    }
+
+    private void validateProjectile(CustomContentDefinition definition, List<String> errors) {
+        Map<String, Object> properties = definition.getGraph() != null && definition.getGraph().getContentProperties() != null
+            ? definition.getGraph().getContentProperties()
+            : Map.of();
+        String entityName = text(properties, "projectile.entity_type", "ARROW").replace(' ', '_').toUpperCase(Locale.ROOT);
+        if ("ENDERPEARL".equals(entityName)) entityName = "ENDER_PEARL";
+        try {
+            EntityType entityType = EntityType.valueOf(entityName);
+            Class<?> entityClass = entityType.getEntityClass();
+            if (entityClass == null || !Projectile.class.isAssignableFrom(entityClass)) {
+                errors.add("Projectile entity type must create a projectile: " + entityName);
+            }
+        } catch (IllegalArgumentException exception) {
+            errors.add("Projectile entity type does not exist: " + entityName);
+        }
+
+        String source = lower(text(properties, "projectile.launch_source", "Automatic"));
+        if (!PROJECTILE_SOURCES.contains(source)) {
+            errors.add("Projectile launch source must be Automatic, Bow Ammo, Item Use, or Both");
+        }
+        String pickup = lower(text(properties, "projectile.pickup", "Allowed"));
+        if (!PROJECTILE_PICKUP.contains(pickup)) {
+            errors.add("Projectile pickup must be Allowed, Disallowed, or Creative Only");
+        }
+        validateProjectileNumber(properties, "projectile.speed", "Projectile speed", 0.05, Double.MAX_VALUE, errors);
+        validateProjectileNumber(properties, "projectile.damage", "Projectile damage", 0.0, Double.MAX_VALUE, errors);
+        validateProjectileNumber(properties, "projectile.sound_volume", "Projectile sound volume", 0.0, 16.0, errors);
+        validateProjectileNumber(properties, "projectile.sound_pitch", "Projectile sound pitch", 0.5, 2.0, errors);
+        for (String flag : PROJECTILE_FLAGS) {
+            Object value = properties.get("projectile." + flag);
+            if (value != null && !(value instanceof Boolean) && !Set.of("true", "false").contains(lower(value.toString()))) {
+                errors.add("Projectile " + flag.replace('_', ' ') + " must be enabled or disabled");
+            }
+        }
+        validateSound(properties, "projectile.fire_sound", "Projectile fire sound", errors);
+        validateSound(properties, "projectile.hit_sound", "Projectile hit sound", errors);
+    }
+
+    private void validateProjectileNumber(Map<String, Object> properties, String key, String label, double minimum, double maximum, List<String> errors) {
+        Object value = properties.get(key);
+        if (value == null) return;
+        double number;
+        try {
+            number = value instanceof Number numeric ? numeric.doubleValue() : Double.parseDouble(value.toString().trim());
+        } catch (NumberFormatException exception) {
+            errors.add(label + " must be a number");
+            return;
+        }
+        if (!Double.isFinite(number) || number < minimum || number > maximum) {
+            errors.add(maximum == Double.MAX_VALUE ? label + " must be at least " + minimum : label + " must be between " + minimum + " and " + maximum);
+        }
+    }
+
+    private void validateSound(Map<String, Object> properties, String key, String label, List<String> errors) {
+        String value = text(properties, key, "").toLowerCase(Locale.ROOT);
+        if (value.isBlank()) return;
+        NamespacedKey soundKey = NamespacedKey.fromString(value.contains(":") ? value : "minecraft:" + value);
+        if (soundKey == null) errors.add(label + " must be a valid sound id");
+    }
+
+    private String text(Map<String, Object> properties, String key, String fallback) {
+        Object value = properties.get(key);
+        if (value == null) return fallback;
+        String text = value.toString().trim();
+        return text.isBlank() ? fallback : text;
     }
 
     private void validateId(String id, String field, List<String> errors) {

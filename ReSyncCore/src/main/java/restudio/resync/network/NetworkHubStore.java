@@ -43,6 +43,12 @@ public interface NetworkHubStore extends AutoCloseable {
 
     CompletableFuture<Integer> purgeEvents(long before, long now);
 
+    CompletableFuture<NetworkResource> compareAndSetResource(String networkId, String originNodeId, NetworkResourceMutation mutation, long updatedAt);
+
+    CompletableFuture<Optional<NetworkResource>> getResource(String networkId, String type, String resourceId);
+
+    CompletableFuture<NetworkResourcePage> listResources(String networkId, NetworkResourceQuery query);
+
     CompletableFuture<PlayerTransfer> beginTransfer(String transferId, String networkId, UUID playerId, String sourceNodeId, String targetNodeId, long deadline, long now);
 
     CompletableFuture<PlayerStateSnapshot> commitSnapshot(String transferId, PlayerStateSnapshot snapshot);

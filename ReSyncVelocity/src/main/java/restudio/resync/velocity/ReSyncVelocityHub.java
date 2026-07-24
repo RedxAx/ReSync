@@ -39,6 +39,11 @@ import restudio.resync.network.NetworkProxyAction;
 import restudio.resync.network.NetworkProxyActionCodec;
 import restudio.resync.network.NetworkProxyActionType;
 import restudio.resync.network.NetworkRequestContext;
+import restudio.resync.network.NetworkResource;
+import restudio.resync.network.NetworkResourceCodec;
+import restudio.resync.network.NetworkResourceKey;
+import restudio.resync.network.NetworkResourceMutation;
+import restudio.resync.network.NetworkResourceQuery;
 import restudio.resync.network.NetworkRoute;
 import restudio.resync.network.NetworkRouteSet;
 import restudio.resync.network.NetworkRouteSetCodec;
@@ -331,6 +336,18 @@ public class ReSyncVelocityHub extends WebSocketServer {
                 eventAcknowledge(connection, session, frame);
                 return;
             }
+            if (frame.type() == NetworkFrameType.RESOURCE_GET && frame.channel().equals(NetworkChannels.RESOURCES)) {
+                resourceGet(connection, session, frame);
+                return;
+            }
+            if (frame.type() == NetworkFrameType.RESOURCE_LIST && frame.channel().equals(NetworkChannels.RESOURCES)) {
+                resourceList(connection, session, frame);
+                return;
+            }
+            if (frame.type() == NetworkFrameType.RESOURCE_SET && frame.channel().equals(NetworkChannels.RESOURCES)) {
+                resourceSet(connection, session, frame);
+                return;
+            }
             if (frame.type() == NetworkFrameType.PLAYER_ROUTE && frame.channel().equals(NetworkChannels.TRANSFER)) {
                 playerRoute(connection, session, frame);
                 return;
@@ -548,6 +565,10 @@ public class ReSyncVelocityHub extends WebSocketServer {
             scopes.add("events.publish");
             scopes.add("events.consume");
         }
+        if (capabilities.contains("resources")) {
+            scopes.add("resources.read");
+            scopes.add("resources.write");
+        }
         if (capabilities.contains("transfer")) {
             scopes.add("players.route");
             scopes.add("state.reconcile");
@@ -639,6 +660,54 @@ public class ReSyncVelocityHub extends WebSocketServer {
             }
             byte[] payload = variable.map(NetworkVariableCodec::encodeVariable).orElseGet(() -> new byte[0]);
             send(connection, NetworkFrameType.RESPONSE, NetworkChannels.VARIABLES, frame.context().requestId(), payload, sessionScopes(session));
+        });
+    }
+
+    private void resourceGet(WebSocket connection, Session session, NetworkFrame frame) {
+        requireScope(session, "resources.read");
+        NetworkResourceKey key = NetworkResourceCodec.decodeKey(frame.payload());
+        store.getResource(config.networkId(), key.type(), key.resourceId()).whenComplete((resource, throwable) -> {
+            if (throwable != null) {
+                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                return;
+            }
+            byte[] payload = resource.map(NetworkResourceCodec::encodeResource).orElseGet(() -> new byte[0]);
+            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, sessionScopes(session));
+        });
+    }
+
+    private void resourceList(WebSocket connection, Session session, NetworkFrame frame) {
+        requireScope(session, "resources.read");
+        NetworkResourceQuery query = NetworkResourceCodec.decodeQuery(frame.payload());
+        store.listResources(config.networkId(), query).whenComplete((page, throwable) -> {
+            if (throwable != null) {
+                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                return;
+            }
+            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), NetworkResourceCodec.encodePage(page), sessionScopes(session));
+        });
+    }
+
+    private void resourceSet(WebSocket connection, Session session, NetworkFrame frame) {
+        requireScope(session, "resources.write");
+        NetworkResourceMutation mutation = NetworkResourceCodec.decodeMutation(frame.payload());
+        store.compareAndSetResource(config.networkId(), session.nodeId(), mutation, Instant.now().toEpochMilli()).whenComplete((resource, throwable) -> {
+            if (throwable != null) {
+                sendError(connection, frame.context().requestId(), rootMessage(throwable));
+                return;
+            }
+            byte[] payload = NetworkResourceCodec.encodeResource(resource);
+            send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, sessionScopes(session));
+            publishResource(resource, session.nodeId());
+        });
+    }
+
+    private void publishResource(NetworkResource resource, String sourceNodeId) {
+        byte[] payload = NetworkResourceCodec.encodeResource(resource);
+        sessions.forEach((connection, session) -> {
+            if (!session.nodeId().equals(sourceNodeId) && sessionScopes(session).contains("resources.read")) {
+                send(connection, NetworkFrameType.RESOURCE_CHANGED, NetworkChannels.RESOURCES, "resource-" + resource.type() + "-" + resource.revision(), payload, Set.of("resources.read"));
+            }
         });
     }
 

@@ -63,7 +63,7 @@ class SqliteNetworkHubStoreTest {
 
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database); var statement = connection.createStatement(); var result = statement.executeQuery("PRAGMA user_version")) {
             assertTrue(result.next());
-            assertEquals(2, result.getInt(1));
+            assertEquals(3, result.getInt(1));
         }
     }
 
@@ -107,6 +107,27 @@ class SqliteNetworkHubStoreTest {
             store.acknowledgeEvent(event.eventId(), "lobby", now + 1).join();
             assertTrue(store.pendingEvents("network", "lobby", 10, now + 2).join().isEmpty());
             assertEquals(event.eventId(), store.pendingEvents("network", "survival", 10, now + 2).join().getFirst().eventId());
+        }
+    }
+
+    @Test
+    void storesRevisionedResourcesAndDurableTombstones() {
+        try (SqliteNetworkHubStore store = store()) {
+            byte[] firstPayload = bytes("{\"id\":\"welcome\"}");
+            NetworkResource first = store.compareAndSetResource("network", "lobby", NetworkResourceMutation.save("function", "welcome", 0, firstPayload), 1_000).join();
+
+            assertEquals(1, first.revision());
+            assertArrayEquals(firstPayload, store.getResource("network", "function", "welcome").join().orElseThrow().payload());
+            assertEquals(first.metadata(), store.listResources("network", NetworkResourceQuery.firstPage()).join().resources().getFirst());
+
+            CompletionException conflict = assertThrows(CompletionException.class, () -> store.compareAndSetResource("network", "survival", NetworkResourceMutation.save("function", "welcome", 0, bytes("{}")), 1_001).join());
+            assertInstanceOf(NetworkResourceConflictException.class, conflict.getCause());
+
+            NetworkResource deleted = store.compareAndSetResource("network", "lobby", NetworkResourceMutation.delete("function", "welcome", first.revision()), 1_002).join();
+            assertEquals(2, deleted.revision());
+            assertTrue(deleted.deleted());
+            assertArrayEquals(new byte[0], deleted.payload());
+            assertTrue(store.getResource("network", "function", "welcome").join().orElseThrow().deleted());
         }
     }
 

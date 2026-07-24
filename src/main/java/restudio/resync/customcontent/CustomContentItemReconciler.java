@@ -320,7 +320,7 @@ class CustomContentItemReconciler {
 
     private boolean isItemBacked(CustomContentDefinition definition) {
         String type = definition.getType() != null ? definition.getType().toLowerCase(Locale.ROOT) : "";
-        return type.equals("item") || type.equals("armor") || type.equals("block");
+        return type.equals("item") || type.equals("armor") || type.equals("block") || type.equals("projectile");
     }
 
     private void reconcileWorldPlayerStates(String contentId, boolean clearDeleted) {

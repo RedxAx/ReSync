@@ -10,6 +10,9 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
@@ -43,7 +46,10 @@ class CustomContentListenerContractTest {
             CustomContentListener.class.getMethod("onRedstone", BlockRedstoneEvent.class),
             CustomContentListener.class.getMethod("onConsume", PlayerItemConsumeEvent.class),
             CustomContentListener.class.getMethod("onDrop", PlayerDropItemEvent.class),
-            CustomContentListener.class.getMethod("onPickup", EntityPickupItemEvent.class)
+            CustomContentListener.class.getMethod("onPickup", EntityPickupItemEvent.class),
+            CustomContentListener.class.getMethod("onShootBow", EntityShootBowEvent.class),
+            CustomContentListener.class.getMethod("onProjectileLaunch", ProjectileLaunchEvent.class),
+            CustomContentListener.class.getMethod("onProjectileHit", ProjectileHitEvent.class)
         );
 
         for (Method method : methods) {
@@ -54,7 +60,7 @@ class CustomContentListenerContractTest {
     @Test
     void triggerSchemaGraphAdapterAndListenerStayInExactParity() throws Exception {
         Set<String> adapterTriggers = new HashSet<>();
-        for (String type : List.of("item", "block", "armor")) {
+        for (String type : List.of("item", "block", "armor", "projectile")) {
             CustomContentGraphAdapter.triggersForType(type).forEach(trigger -> adapterTriggers.add(trigger.trigger()));
         }
 
@@ -77,7 +83,7 @@ class CustomContentListenerContractTest {
         triggerPin.getAsJsonArray("options").forEach(option -> schemaTriggers.add(option.getAsString()));
 
         String listenerSource = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/CustomContentListener.java"));
-        Matcher matcher = Pattern.compile("\\\"((?:item|block|armor)\\.[a-z_]+)\\\"").matcher(listenerSource);
+        Matcher matcher = Pattern.compile("\\\"((?:item|block|armor|projectile)\\.[a-z_]+)\\\"").matcher(listenerSource);
         Set<String> listenerTriggers = new HashSet<>();
         while (matcher.find()) {
             listenerTriggers.add(matcher.group(1));

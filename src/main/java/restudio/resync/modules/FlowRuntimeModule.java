@@ -58,6 +58,7 @@ import restudio.resync.flow.handler.generic.EntityActionHandler;
 import restudio.resync.flow.handler.generic.FileHandler;
 import restudio.resync.flow.handler.generic.FlowControlHandler;
 import restudio.resync.flow.handler.generic.FlowJobHandler;
+import restudio.resync.flow.handler.generic.FunctionCatalogHandler;
 import restudio.resync.flow.handler.generic.FunctionHandler;
 import restudio.resync.flow.handler.generic.GenericListHandler;
 import restudio.resync.flow.handler.generic.GenericMapHandler;
@@ -68,6 +69,8 @@ import restudio.resync.flow.handler.generic.InventoryActionHandler;
 import restudio.resync.flow.handler.generic.JsonHandler;
 import restudio.resync.flow.handler.generic.LocationHandler;
 import restudio.resync.flow.handler.generic.LogicHandler;
+import restudio.resync.flow.handler.generic.ResultHandler;
+import restudio.resync.flow.handler.generic.ResourceValueHandler;
 import restudio.resync.flow.handler.generic.MenuHandler;
 import restudio.resync.flow.handler.generic.MiscHandler;
 import restudio.resync.flow.handler.generic.NetworkFlowHandler;
@@ -87,6 +90,8 @@ import restudio.resync.flow.handler.generic.ServerHandler;
 import restudio.resync.flow.handler.generic.SoundHandler;
 import restudio.resync.flow.handler.generic.TeamHandler;
 import restudio.resync.flow.handler.generic.TextFormatHandler;
+import restudio.resync.flow.handler.generic.TextResourceHandler;
+import restudio.resync.text.ReTextService;
 import restudio.resync.flow.handler.generic.TimeHandler;
 import restudio.resync.flow.handler.generic.TitleHandler;
 import restudio.resync.flow.handler.generic.UuidHandler;
@@ -139,6 +144,7 @@ import restudio.resync.runtime.data.ExternalItemDataAdapter;
 import restudio.resync.runtime.data.RuntimeDataOptionCatalogService;
 import restudio.resync.runtime.data.VanillaItemDataAdapter;
 import restudio.resync.network.NetworkNodePresence;
+import restudio.resync.network.NetworkNodeStatus;
 import restudio.resync.network.paper.ReSyncNetworkAgent;
 
 import java.nio.file.Files;
@@ -276,7 +282,7 @@ public class FlowRuntimeModule implements Module {
         lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher);
         tradeProfileService = new TradeProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
-        globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry);
+        globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry, context.getRequiredService(ReTextService.class));
         networkFlowBridge = new NetworkFlowBridge(context.getPlugin());
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher(), typeAdapterRegistry);
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
@@ -866,6 +872,8 @@ public class FlowRuntimeModule implements Module {
         new GenericMapHandler().registerTo(handlerRegistry);
         new VariableHandler().registerTo(handlerRegistry);
         new LogicHandler().registerTo(handlerRegistry);
+        new ResultHandler().registerTo(handlerRegistry);
+        new ResourceValueHandler().registerTo(handlerRegistry);
         new ConversionHandler().registerTo(handlerRegistry);
         new DebugHandler().registerTo(handlerRegistry);
         new DiscordHandler().registerTo(handlerRegistry);
@@ -897,6 +905,7 @@ public class FlowRuntimeModule implements Module {
         new NetworkFlowHandler().registerTo(handlerRegistry);
         new TeamHandler().registerTo(handlerRegistry);
         new TextFormatHandler().registerTo(handlerRegistry);
+        new TextResourceHandler(moduleContext.getRequiredService(ReTextService.class)).registerTo(handlerRegistry);
         new ScheduleHandler(storage).registerTo(handlerRegistry);
         new TitleHandler().registerTo(handlerRegistry);
         new TimeHandler().registerTo(handlerRegistry);
@@ -906,6 +915,7 @@ public class FlowRuntimeModule implements Module {
         new CustomContentHandler().registerTo(handlerRegistry);
         new CustomFunctionCallHandler().registerTo(handlerRegistry);
         new VariableScopeHandler().registerTo(handlerRegistry);
+        new FunctionCatalogHandler(storage).registerTo(handlerRegistry);
         new FunctionHandler().registerTo(handlerRegistry);
         new PlayerActionHandler().registerTo(handlerRegistry);
         new EntityActionHandler().registerTo(handlerRegistry);
@@ -1085,7 +1095,7 @@ public class FlowRuntimeModule implements Module {
                 }
                 return agent.presenceSnapshot().values().stream().sorted(Comparator.comparing(NetworkNodePresence::nodeId)).map(presence ->
                     new OptionCatalogItem(presence.nodeId(), presence.nodeId(), presence.status().name() + " • " + presence.players() + "/"
-                        + presence.capacity() + " Players", "server", presence.status().name(), Map.of(
+                        + presence.capacity() + " Players", "server", networkServerGroup(presence.status()), Map.of(
                             "status", presence.status().name(),
                             "players", presence.players(),
                             "capacity", presence.capacity(),
@@ -1107,6 +1117,49 @@ public class FlowRuntimeModule implements Module {
                 return agent == null ? "Network Agent Is Not Configured" : agent.connected() ? "" : "Network Agent Is Disconnected";
             }
         });
+        registry.register(new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "server:resync:network_server_group";
+            }
+
+            @Override
+            public String revision() {
+                return "network_server_group:v1";
+            }
+
+            @Override
+            public List<String> values() {
+                return List.of("All Servers", "Online Servers", "Offline Servers");
+            }
+
+            @Override
+            public List<OptionCatalogItem> items() {
+                return List.of(
+                    new OptionCatalogItem("All Servers", "All Servers", "Every server currently known to the network.", "server", "All Servers", Map.of()),
+                    new OptionCatalogItem("Online Servers", "Online Servers", "Servers that are online, draining, or in maintenance.", "server", "Online Servers", Map.of()),
+                    new OptionCatalogItem("Offline Servers", "Offline Servers", "Servers that are offline or revoked.", "server", "Offline Servers", Map.of())
+                );
+            }
+
+            @Override
+            public String status(OptionCatalogQuery query) {
+                return "available";
+            }
+
+            @Override
+            public String diagnostic(OptionCatalogQuery query) {
+                return "";
+            }
+        });
+    }
+
+    private String networkServerGroup(NetworkNodeStatus status) {
+        return isOnlineNetworkServer(status) ? "Online Servers" : "Offline Servers";
+    }
+
+    private boolean isOnlineNetworkServer(NetworkNodeStatus status) {
+        return status == NetworkNodeStatus.ONLINE || status == NetworkNodeStatus.DRAINING || status == NetworkNodeStatus.MAINTENANCE;
     }
 
     private void registerCoreResourceCatalogs(OptionCatalogRegistry registry, FlowStorage flowStorage, CustomContentStorage contentStorage,

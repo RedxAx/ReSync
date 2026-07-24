@@ -98,7 +98,7 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
     }
 
     private boolean isItemContent(CustomContentDefinition definition) {
-        return definition != null && definition.getId() != null && Set.of("item", "block", "armor").contains(normalized(definition.getType(), "item"));
+        return definition != null && definition.getId() != null && Set.of("item", "block", "armor", "projectile").contains(normalized(definition.getType(), "item"));
     }
 
     private static String normalized(String value, String fallback) {

@@ -16,6 +16,7 @@ import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.StorageSafety;
 
 import java.util.Locale;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -41,8 +42,45 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> validateRecipeDefinition(value);
             case ReSyncResourceCatalog.DIALOG -> validateDialogDefinition(value);
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> advancementTreeValidator.validate(Map.of(text(value, "id"), value));
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> validateText(value);
             default -> validateCommonStructure(value);
         }
+    }
+
+    private void validateText(JsonObject value) {
+        String kind = text(value, "kind").toLowerCase(Locale.ROOT);
+        if (kind.isBlank() || "animation".equals(kind)) {
+            validateCommonStructure(value);
+            return;
+        }
+        if ("list".equals(kind)) {
+            JsonArray values = requiredArray(value, "values", "Text list values");
+            for (int index = 0; index < values.size(); index++) {
+                if (!values.get(index).isJsonPrimitive() || !values.get(index).getAsJsonPrimitive().isString()) {
+                    throw new IllegalArgumentException("Text list value " + index + " must be text");
+                }
+            }
+            return;
+        }
+        if ("map".equals(kind)) {
+            JsonArray entries = requiredArray(value, "entries", "Text map entries");
+            Set<String> keys = new HashSet<>();
+            for (int index = 0; index < entries.size(); index++) {
+                JsonObject entry = requiredObject(entries.get(index), "Text map entry " + index);
+                String key = text(entry, "key").trim();
+                if (key.isBlank()) {
+                    throw new IllegalArgumentException("Text map entry " + index + " requires a key");
+                }
+                if (!keys.add(key.toLowerCase(Locale.ROOT))) {
+                    throw new IllegalArgumentException("Text map contains the key more than once: " + key);
+                }
+                if (!entry.has("value") || !entry.get("value").isJsonPrimitive() || !entry.getAsJsonPrimitive("value").isString()) {
+                    throw new IllegalArgumentException("Text map value for " + key + " must be text");
+                }
+            }
+            return;
+        }
+        throw new IllegalArgumentException("Unknown Text type: " + kind);
     }
 
     @Override

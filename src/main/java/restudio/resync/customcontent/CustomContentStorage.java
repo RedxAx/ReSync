@@ -107,6 +107,11 @@ public class CustomContentStorage {
         }
         CustomContentDefinition definition = assetStore.get(safeId);
         if (definition != null) {
+            List<String> errors = validator.validate(definition);
+            if (!errors.isEmpty()) {
+                if (plugin != null) plugin.getLogger().warning("Custom content " + safeId + " was not loaded: " + String.join("; ", errors));
+                return null;
+            }
             cache.put(safeId, definition);
         }
         return definition;
@@ -300,6 +305,7 @@ public class CustomContentStorage {
         return switch (definition != null && definition.getType() != null ? definition.getType().toLowerCase() : "item") {
             case "armor" -> "Content/Armor";
             case "block" -> "Content/Blocks";
+            case "projectile" -> "Content/Projectiles";
             default -> "Content/Items";
         };
     }

@@ -18,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.plugin.Plugin;
 import restudio.flow.data.FlowGraph;
+import restudio.resync.Log;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customization.ResourceJson;
 import restudio.resync.flow.FlowExecutor;
@@ -28,9 +29,17 @@ import restudio.resync.modules.chat.event.ReSyncChannelLeaveEvent;
 import restudio.resync.modules.chat.event.ReSyncChannelSendEvent;
 import restudio.resync.modules.chat.event.ReSyncMentionEvent;
 import restudio.resync.modules.chat.event.ReSyncPrivateMessageEvent;
+import restudio.resync.network.NetworkChatMessage;
+import restudio.resync.network.NetworkChatMessageCodec;
+import restudio.resync.network.NetworkEvent;
+import restudio.resync.network.NetworkEventPublish;
+import restudio.resync.network.NetworkEventTopics;
+import restudio.resync.network.paper.ReSyncNetworkAgent;
+import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ChatPolicy;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.text.ReTextService;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,24 +48,32 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-public class ChatModule implements Module, Listener {
+public class ChatModule implements Module, Listener, ReSyncNetworkAgent.Listener {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("chat", "Chat").withDependencies("flow");
+    private static final String NETWORK_CHAT_SUBJECT = "message";
+    private static final int RECENT_NETWORK_CHAT_LIMIT = 2048;
     private ReSyncJsonResourceStorage storage;
     private ReTextService text;
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
     private MessageLogService messageLog;
     private Plugin plugin;
+    private volatile ReSyncNetworkAgent networkAgent;
+    private volatile ChatPolicy networkPolicy = ChatPolicy.disabled();
     private final Map<UUID, UUID> conversations = new HashMap<>();
     private final Map<UUID, Set<String>> channelMembership = new HashMap<>();
     private final Map<UUID, Map<String, Long>> channelCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> spyTargets = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> ignoredPlayers = new ConcurrentHashMap<>();
     private final Set<UUID> spies = new HashSet<>();
+    private final Set<String> recentNetworkChat = new HashSet<>();
+    private final ArrayDeque<String> recentNetworkChatOrder = new ArrayDeque<>();
     private final GsonComponentSerializer gsonComponent = GsonComponentSerializer.gson();
     private final PlainTextComponentSerializer plainText = PlainTextComponentSerializer.plainText();
 
@@ -83,7 +100,30 @@ public class ChatModule implements Module, Listener {
 
     @Override
     public void stop(ModuleContext context) {
+        disconnectNetwork();
         HandlerList.unregisterAll(this);
+    }
+
+    public synchronized void connectNetwork(ReSyncNetworkAgent agent, ChatPolicy policy) {
+        disconnectNetwork();
+        if (agent == null || policy == null || !policy.enabled()) {
+            return;
+        }
+        networkPolicy = policy;
+        networkAgent = agent;
+        agent.addListener(this);
+    }
+
+    public synchronized void disconnectNetwork() {
+        if (networkAgent != null) {
+            networkAgent.removeListener(this);
+            networkAgent = null;
+        }
+        networkPolicy = ChatPolicy.disabled();
+        synchronized (recentNetworkChatOrder) {
+            recentNetworkChat.clear();
+            recentNetworkChatOrder.clear();
+        }
     }
 
     @EventHandler
@@ -136,6 +176,7 @@ public class ChatModule implements Module, Listener {
             deliveries.add(new ChatDelivery(viewer, render(format, channel, sender, sender.displayName(), event.message(), viewer)));
         }
         Bukkit.getScheduler().runTask(plugin, () -> deliveries.forEach(this::deliver));
+        publishNetworkChat(sender, channel, format, event.message());
         dispatchFlow(channel, "routedFlow", sender, event, Map.of("event.message", ruleResult.message(), "event.channel", resourceId(channel), "event.viewers", event.viewers().size()));
     }
 
@@ -282,8 +323,45 @@ public class ChatModule implements Module, Listener {
                 sendPlayerMessage(viewer, render(format, channel, sender, sender.displayName(), Component.text(message), viewer));
             }
         }
+        publishNetworkChat(sender, channel, format, Component.text(message));
         dispatchFlow(channel, "sentFlow", sender, null, Map.of("event.message", message, "event.channel", resourceId(channel)));
         return true;
+    }
+
+    @Override
+    public CompletionStage<Void> onEventReceived(NetworkEvent event) {
+        ReSyncNetworkAgent agent = networkAgent;
+        ChatPolicy policy = networkPolicy;
+        if (agent == null || !policy.enabled() || !NetworkEventTopics.CHAT.equals(event.channel()) || !NETWORK_CHAT_SUBJECT.equals(event.subject()) || agent.nodeId().equals(event.originNodeId()) || !rememberNetworkChat(event.eventId())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        NetworkChatMessage message;
+        try {
+            message = NetworkChatMessageCodec.decode(event.payload());
+        } catch (IllegalArgumentException exception) {
+            Log.warn("Ignored invalid network chat message from " + event.originNodeId() + ": " + exception.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+        if (!policy.includes(message.channelId())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<Void> delivered = new CompletableFuture<>();
+        Runnable action = () -> {
+            try {
+                deliverNetworkChat(message);
+                delivered.complete(null);
+            } catch (RuntimeException exception) {
+                delivered.completeExceptionally(exception);
+            }
+        };
+        if (!plugin.isEnabled()) {
+            delivered.complete(null);
+        } else if (Bukkit.isPrimaryThread()) {
+            action.run();
+        } else {
+            Bukkit.getScheduler().runTask(plugin, action);
+        }
+        return delivered;
     }
 
     public boolean sendChannelMessage(Player sender, String channelId, String rawMessage) {
@@ -546,6 +624,75 @@ public class ChatModule implements Module, Listener {
         }
         playerCooldowns.put(id, now + duration);
         return true;
+    }
+
+    private void publishNetworkChat(Player sender, JsonObject channel, JsonObject format, Component messageComponent) {
+        ReSyncNetworkAgent agent = networkAgent;
+        ChatPolicy policy = networkPolicy;
+        String channelId = resourceId(channel);
+        if (agent == null || !agent.connected() || !policy.enabled() || !policy.includes(channelId) || channelId.isBlank() || ResourceJson.bool(channel, "sameWorld", false) || ResourceJson.decimal(channel, "range", -1) > 0) {
+            return;
+        }
+        try {
+            long now = System.currentTimeMillis();
+            Component rendered = render(format, channel, sender, sender.displayName(), messageComponent, sender);
+            NetworkChatMessage message = new NetworkChatMessage(sender.getUniqueId(), sender.getName(), gsonComponent.serialize(sender.displayName()), channelId, gsonComponent.serialize(rendered), now);
+            NetworkEventPublish event = new NetworkEventPublish(UUID.randomUUID().toString(), NetworkEventTopics.CHAT, NETWORK_CHAT_SUBJECT, NetworkChatMessageCodec.encode(message), now, Math.addExact(now, policy.retentionMillis()));
+            agent.publishEvent(event).exceptionally(throwable -> {
+                Log.fine("Network chat delivery skipped: " + rootMessage(throwable));
+                return null;
+            });
+        } catch (RuntimeException exception) {
+            Log.fine("Network chat delivery skipped: " + rootMessage(exception));
+        }
+    }
+
+    private void deliverNetworkChat(NetworkChatMessage message) {
+        if (!networkPolicy.enabled() || !networkPolicy.includes(message.channelId())) {
+            return;
+        }
+        JsonObject channel = getChannel(message.channelId());
+        if (channel == null || ResourceJson.bool(channel, "sameWorld", false) || ResourceJson.decimal(channel, "range", -1) > 0) {
+            return;
+        }
+        Component rendered;
+        try {
+            rendered = gsonComponent.deserialize(message.message());
+            gsonComponent.deserialize(message.displayName());
+        } catch (RuntimeException exception) {
+            Log.warn("Ignored invalid network chat component from " + message.playerName() + ": " + exception.getMessage());
+            return;
+        }
+        String readPermission = ResourceJson.string(channel, "readPermission", "");
+        List<String> allowedWorlds = ResourceJson.strings(channel, "worldAllowList");
+        List<String> deniedWorlds = ResourceJson.strings(channel, "worldDenyList");
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (isIgnoring(viewer, message.playerId()) || !readPermission.isBlank() && !viewer.hasPermission(readPermission) || !allowedWorlds.isEmpty() && !allowedWorlds.contains(viewer.getWorld().getName()) || deniedWorlds.contains(viewer.getWorld().getName())) {
+                continue;
+            }
+            sendPlayerMessage(viewer, rendered);
+        }
+    }
+
+    private boolean rememberNetworkChat(String eventId) {
+        synchronized (recentNetworkChatOrder) {
+            if (!recentNetworkChat.add(eventId)) {
+                return false;
+            }
+            recentNetworkChatOrder.addLast(eventId);
+            while (recentNetworkChatOrder.size() > RECENT_NETWORK_CHAT_LIMIT) {
+                recentNetworkChat.remove(recentNetworkChatOrder.removeFirst());
+            }
+        }
+        return true;
+    }
+
+    private String rootMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
     private Component render(JsonObject format, JsonObject channel, Player source, Component sourceDisplayName, Component message, Audience viewer) {

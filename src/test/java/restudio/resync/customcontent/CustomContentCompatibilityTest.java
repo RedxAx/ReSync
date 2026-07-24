@@ -174,12 +174,31 @@ class CustomContentCompatibilityTest {
     void validatorAcceptsGraphDerivedDefaultContent() {
         CustomContentValidator validator = new CustomContentValidator();
 
-        for (String type : new String[]{"item", "block", "armor"}) {
+        for (String type : new String[]{"item", "block", "armor", "projectile"}) {
             FlowGraph graph = CustomContentGraphAdapter.createContentGraph("flow_default_" + type, type, "Default " + type);
             CustomContentDefinition definition = CustomContentGraphAdapter.toDefinition(graph);
 
             assertTrue(validator.validate(definition).isEmpty(), () -> type + " should be valid");
         }
+    }
+
+    @Test
+    void validatorRejectsUnsafeProjectileConfiguration() {
+        FlowGraph graph = CustomContentGraphAdapter.createContentGraph("unsafe_projectile", "projectile", "Unsafe Projectile");
+        graph.getContentProperties().put("projectile.entity_type", "ZOMBIE");
+        graph.getContentProperties().put("projectile.launch_source", "Unknown");
+        graph.getContentProperties().put("projectile.speed", "NaN");
+        graph.getContentProperties().put("projectile.sound_pitch", 4.0);
+        graph.getContentProperties().put("projectile.fire_sound", "invalid sound");
+        CustomContentDefinition definition = CustomContentGraphAdapter.toDefinition(graph);
+
+        List<String> errors = new CustomContentValidator().validate(definition);
+
+        assertTrue(errors.stream().anyMatch(error -> error.contains("must create a projectile")));
+        assertTrue(errors.stream().anyMatch(error -> error.contains("launch source")));
+        assertTrue(errors.stream().anyMatch(error -> error.contains("speed")));
+        assertTrue(errors.stream().anyMatch(error -> error.contains("sound pitch")));
+        assertTrue(errors.stream().anyMatch(error -> error.contains("fire sound")));
     }
 
     @Test

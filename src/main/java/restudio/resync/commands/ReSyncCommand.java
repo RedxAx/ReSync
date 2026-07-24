@@ -179,7 +179,7 @@ public class ReSyncCommand implements TabExecutor {
                 return true;
             }
             List<CustomContentDefinition> items = storage.getAll().stream()
-                .filter(definition -> definition != null && List.of("item", "armor", "block").contains(safeText(definition.getType()).toLowerCase(Locale.ROOT)))
+                .filter(definition -> definition != null && List.of("item", "armor", "block", "projectile").contains(safeText(definition.getType()).toLowerCase(Locale.ROOT)))
                 .sorted(Comparator.comparing(CustomContentDefinition::getId, String.CASE_INSENSITIVE_ORDER))
                 .toList();
             if (items.isEmpty()) {
@@ -794,7 +794,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.MOTD_PROFILE -> List.of("line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers");
             case ReSyncResourceCatalog.CHAT -> List.of("displayName", "channel.prefix", "format.template", "channel.range", "channel.speakPermission", "channel.readPermission", "channel.allowMiniMessage", "channel.miniMessagePermission", "rule.contains", "rule.action", "rule.replacement", "rule.channel", "rule.flowId", "privateMessages.sender", "privateMessages.receiver", "privateMessages.spy", "privateMessages.privateMessageFlow", "mention.template", "mention.mentionFlow", "ignore.players", "enabled");
             case ReSyncResourceCatalog.MESSAGE_RULE -> List.of("source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission", "players", "flowPredicate", "flowId");
-            case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "colors", "color", "secondaryColor");
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> List.of("kind", "text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "values", "entries", "colors", "color", "secondaryColor");
             case ReSyncResourceCatalog.RECIPE_DEFINITION -> List.of("type", "output.material", "output.amount", "shape", "ingredients", "experience", "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions.permission", "conditions.world", "enabled");
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");

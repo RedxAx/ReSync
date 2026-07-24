@@ -1,6 +1,7 @@
 package restudio.resync.resources;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -49,5 +50,14 @@ class CustomizationResourceCatalogTest {
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xBD));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xCA));
         assertNotNull(ReSyncResourceCatalog.byFlowPacket((byte) 0xD1));
+    }
+
+    @Test
+    void chatProfilesUseTheSharedJsonResourceLifecycle() {
+        ReSyncManagedResource chat = ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CHAT);
+
+        assertNotNull(chat);
+        assertTrue(chat.jsonStorageSupported());
+        assertTrue(ReSyncJsonResourceStorage.resourceTypesStatic().contains(ReSyncResourceCatalog.CHAT));
     }
 }

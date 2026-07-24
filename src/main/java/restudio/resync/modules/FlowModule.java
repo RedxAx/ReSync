@@ -57,6 +57,7 @@ import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -183,10 +184,10 @@ public class FlowModule implements Module {
         this.customContentStorage = customContentStorage;
         this.sessionLinkService = sessionLinkService;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions, flowJobs);
-        this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, sender);
+        FlowResourceRegistry resources = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
+        this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, resources);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, optionCatalogRegistry, catalogs);
-        FlowResourceRegistry resources = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
         resources.setChangeListener(optionCatalogHandler::broadcastCatalog);
         this.resourceRouter = new FlowResourcePacketRouter(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService,
             optionCatalogHandler::broadcastCustomContentCatalogs, resources, optionCatalogHandler::broadcastCatalog, quickEditAttributeService);
@@ -290,6 +291,16 @@ public class FlowModule implements Module {
     public void refreshCustomFunctionDefinitions() {
         CustomFunctionNodeDefinitions.rebuild(definitionRegistry, storage);
         sender.broadcastNodeRegistry(buildFullNodeRegistrySnapshot());
+    }
+
+    public void refreshSharedResource(String type, String resourceId, boolean deleted) {
+        if (!Set.of(ReSyncResourceCatalog.FLOW, ReSyncResourceCatalog.FUNCTION, ReSyncResourceCatalog.COMMAND).contains(type)) {
+            return;
+        }
+        blueprintHandler.refreshGraphBinding(resourceId, deleted);
+        if (ReSyncResourceCatalog.FUNCTION.equals(type)) {
+            refreshCustomFunctionDefinitions();
+        }
     }
 
     private NodeRegistrySnapshot buildFullNodeRegistrySnapshot() {

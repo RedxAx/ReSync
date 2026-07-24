@@ -4,8 +4,11 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,7 +32,8 @@ public class FlowControlHandler implements NodeHandler {
 
         operations.put("switch_case", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", Object.class, null);
-            List<?> cases = ctx.getInputValue(node, "cases", List.class, List.of());
+            boolean branching = ctx.getInputValue(node, "branch", Boolean.class, false);
+            List<?> cases = branching ? switchCases(ctx, node) : ctx.getInputValue(node, "cases", List.class, List.of());
             int matchedIndex = -1;
             for (int i = 0; i < cases.size(); i++) {
                 if (caseMatches(cases.get(i), value)) {
@@ -39,7 +43,11 @@ public class FlowControlHandler implements NodeHandler {
             }
             ctx.setOutput(node, "matched", matchedIndex >= 0);
             ctx.setOutput(node, "index", matchedIndex);
-            ctx.triggerOutput("flow");
+            if (!branching) {
+                ctx.triggerOutput("flow");
+                return;
+            }
+            ctx.triggerOutput(matchedIndex >= 0 ? switchCaseOutput(ctx, node, matchedIndex) : "default");
         });
 
         operations.put("branch_random", (ctx, node) -> {
@@ -84,6 +92,84 @@ public class FlowControlHandler implements NodeHandler {
             }
         }
         return Objects.equals(caseValue, value);
+    }
+
+    private static List<Object> switchCases(FlowContext ctx, FlowNode node) {
+        NodeDefinition definition = ctx.getRuntime().getDefinition(node);
+        NodeDefinition.PinDefinition base = definition != null ? definition.getInputs().stream()
+            .filter(pin -> "case".equals(pin.getName()))
+            .findFirst()
+            .orElse(null) : null;
+        NodeDefinition.RepeatablePin repeatable = base != null ? base.getRepeatable() : null;
+        if (repeatable == null) {
+            List<Object> single = new ArrayList<>();
+            single.add(ctx.getInputValue(node, "case", Object.class, null));
+            return single;
+        }
+        int count = repeatable.getMinItems();
+        Object storedCount = node.getInputValues() != null ? node.getInputValues().get("__repeatable_count:" + repeatable.getGroupId()) : null;
+        if (storedCount instanceof Number number) {
+            count = number.intValue();
+        } else if (storedCount != null) {
+            try {
+                count = Integer.parseInt(storedCount.toString());
+            } catch (NumberFormatException ignored) {
+                count = repeatable.getMinItems();
+            }
+        }
+        count = Math.clamp(count, repeatable.getMinItems(), repeatable.getMaxItems());
+        Set<String> removed = new HashSet<>();
+        if (node.getInputValues() != null && node.getInputValues().get("__removed_optional_inputs") instanceof Iterable<?> names) {
+            for (Object name : names) {
+                if (name != null) {
+                    removed.add(name.toString());
+                }
+            }
+        }
+        List<Object> cases = new ArrayList<>();
+        for (int index = 1; index <= count; index++) {
+            String pinName = index == 1 ? "case" : "case_" + index;
+            if (!removed.contains(pinName)) {
+                cases.add(ctx.getInputValue(node, pinName, Object.class, null));
+            }
+        }
+        return cases;
+    }
+
+    private static String switchCaseOutput(FlowContext ctx, FlowNode node, int matchedIndex) {
+        NodeDefinition definition = ctx.getRuntime().getDefinition(node);
+        NodeDefinition.PinDefinition base = definition != null ? definition.getInputs().stream()
+            .filter(pin -> "case".equals(pin.getName()))
+            .findFirst()
+            .orElse(null) : null;
+        NodeDefinition.RepeatablePin repeatable = base != null ? base.getRepeatable() : null;
+        int count = repeatable != null ? repeatable.getMinItems() : matchedIndex + 1;
+        Object storedCount = repeatable != null && node.getInputValues() != null ? node.getInputValues().get("__repeatable_count:" + repeatable.getGroupId()) : null;
+        if (storedCount instanceof Number number) {
+            count = number.intValue();
+        } else if (storedCount != null) {
+            try {
+                count = Integer.parseInt(storedCount.toString());
+            } catch (NumberFormatException ignored) {
+                count = repeatable != null ? repeatable.getMinItems() : matchedIndex + 1;
+            }
+        }
+        Set<String> removed = new HashSet<>();
+        if (node.getInputValues() != null && node.getInputValues().get("__removed_optional_inputs") instanceof Iterable<?> names) {
+            for (Object name : names) {
+                if (name != null) {
+                    removed.add(name.toString());
+                }
+            }
+        }
+        int activeIndex = -1;
+        for (int index = 1; index <= count; index++) {
+            String pinName = index == 1 ? "case" : "case_" + index;
+            if (!removed.contains(pinName) && ++activeIndex == matchedIndex) {
+                return pinName;
+            }
+        }
+        return "default";
     }
 
     @Override

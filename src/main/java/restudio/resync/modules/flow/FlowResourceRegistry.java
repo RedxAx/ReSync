@@ -2,6 +2,7 @@ package restudio.resync.modules.flow;
 
 import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowResourceReference;
+import restudio.resync.Log;
 import restudio.resync.flow.sync.FlowResourceMetadata;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -27,6 +28,7 @@ public final class FlowResourceRegistry {
     private final Deque<FlowResourceAuditRecord> auditRecords = new ArrayDeque<>();
     private Consumer<String> changeListener = ignored -> {
     };
+    private FlowResourceMutationListener mutationListener = FlowResourceMutationListener.NONE;
     private FlowResourceAuthorizationPolicy authorizationPolicy = (context, operation, resourceType, resourceId) ->
         "system".equals(context.source()) || "flow".equals(context.source());
 
@@ -38,6 +40,10 @@ public final class FlowResourceRegistry {
     public void setChangeListener(Consumer<String> changeListener) {
         this.changeListener = changeListener != null ? changeListener : ignored -> {
         };
+    }
+
+    public void setMutationListener(FlowResourceMutationListener mutationListener) {
+        this.mutationListener = mutationListener != null ? mutationListener : FlowResourceMutationListener.NONE;
     }
 
     public void setAuthorizationPolicy(FlowResourceAuthorizationPolicy authorizationPolicy) {
@@ -90,7 +96,9 @@ public final class FlowResourceRegistry {
     }
 
     public Collection<FlowResourceAdapter<?>> adapters() {
-        return registrations.values().stream().map(ResourceRegistration::adapter).toList();
+        return registrations.values().stream()
+            .<FlowResourceAdapter<?>>map(ResourceRegistration::adapter)
+            .toList();
     }
 
     public FlowResourceReference reference(String typeId, String id, boolean available) {
@@ -203,6 +211,7 @@ public final class FlowResourceRegistry {
             adapter.validate(value);
             adapter.save(value);
             RefreshOutcome refresh = refreshAfterSave(adapter, value);
+            notifySaved(adapter, value);
             return new FlowOperationResult<>(true, reference(registration, id, true), "", "",
                 mutationDetails(typeId, id, !existed, existed, false, adapter, refresh));
         } catch (RuntimeException exception) {
@@ -251,6 +260,7 @@ public final class FlowResourceRegistry {
             adapter.validate(copy);
             adapter.save(copy);
             RefreshOutcome refresh = refreshAfterSave(adapter, copy);
+            notifySaved(adapter, copy);
             return new FlowOperationResult<>(true, reference(registration, targetId, true), "", "",
                 mutationDetails(typeId, targetId, true, false, false, adapter, refresh));
         } catch (RuntimeException exception) {
@@ -310,6 +320,33 @@ public final class FlowResourceRegistry {
 
     public FlowOperationResult<Object> apply(String typeId, String id, Object runtimeContext, FlowResourceMutationContext mutationContext) {
         return authorizedMutation(typeId, id, "apply", mutationContext, () -> applyAuthorized(typeId, id, runtimeContext));
+    }
+
+    public FlowOperationResult<Object> applyValue(String typeId, Object value, Object runtimeContext, FlowResourceMutationContext mutationContext) {
+        ResourceRegistration registration = registration(typeId);
+        FlowResourceAdapter<?> rawAdapter = registration != null ? registration.adapter() : null;
+        if (rawAdapter == null) {
+            return unavailable(typeId, "apply");
+        }
+        if (!rawAdapter.supportedOperations().contains("apply")) {
+            return unsupported(typeId, "apply");
+        }
+        if (value == null) {
+            return FlowOperationResult.failure("RESOURCE_VALUE_REQUIRED", "Resource value is required", Map.of("resourceType", typeId));
+        }
+        FlowResourceAdapter<Object> adapter = adapter(rawAdapter);
+        String id = adapter.id(value);
+        if (id == null || id.isBlank()) {
+            return FlowOperationResult.failure("RESOURCE_ID_REQUIRED", "Resource value has no ID", Map.of("resourceType", typeId));
+        }
+        return authorizedMutation(typeId, id, "apply", mutationContext, () -> {
+            try {
+                return FlowOperationResult.success(adapter.apply(value, runtimeContext));
+            } catch (RuntimeException exception) {
+                return FlowOperationResult.failure("RESOURCE_APPLY_FAILED", failureMessage(exception),
+                    Map.of("resourceType", typeId, "resourceId", id));
+            }
+        });
     }
 
     private FlowOperationResult<Object> applyAuthorized(String typeId, String id, Object context) {
@@ -414,6 +451,7 @@ public final class FlowResourceRegistry {
             }
             adapter.delete(id);
             RefreshOutcome refresh = refreshAfterDelete(adapter, id);
+            notifyDeleted(typeId, id);
             return new FlowOperationResult<>(true, reference(registration, id, false), "", "",
                 mutationDetails(typeId, id, false, false, true, adapter, refresh));
         } catch (RuntimeException exception) {
@@ -609,6 +647,25 @@ public final class FlowResourceRegistry {
 
     private ResourceRegistration registration(String typeId) {
         return typeId != null ? registrations.get(normalize(typeId)) : null;
+    }
+
+    public <T> void notifySaved(FlowResourceAdapter<T> adapter, T value) {
+        if (adapter == null || value == null) {
+            return;
+        }
+        try {
+            mutationListener.saved(adapter.descriptor().typeId(), adapter.id(value), adapter.serialize(value));
+        } catch (RuntimeException exception) {
+            Log.warn("Publish ReSync resource change failed: " + failureMessage(exception));
+        }
+    }
+
+    public void notifyDeleted(String typeId, String resourceId) {
+        try {
+            mutationListener.deleted(typeId, resourceId);
+        } catch (RuntimeException exception) {
+            Log.warn("Publish ReSync resource deletion failed: " + failureMessage(exception));
+        }
     }
 
     private String text(String value) {

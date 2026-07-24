@@ -32,6 +32,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
 import restudio.resync.ReSync;
+import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
@@ -46,12 +47,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 public class PlayerActionHandler implements NodeHandler, Listener {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private final ParticleHandler particleHandler = new ParticleHandler();
+    private final ItemAttributeSchemaService itemComponents = new ItemAttributeSchemaService();
     private final Map<String, BossBar> bossBars = new ConcurrentHashMap<>();
     private final Map<UUID, MovementSpeeds> frozenPlayers = new ConcurrentHashMap<>();
 
@@ -723,6 +726,40 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = requireItem(ctx, node, "item");
             runSync(() -> addItemFully(target, item.clone()));
+        });
+
+        operations.put("player_give_item_stack", (ctx, node) -> {
+            Player target = requirePlayer(ctx, node, "target");
+            ItemStack stack = requireItem(ctx, node, "item").clone();
+            boolean forceStackSize = ctx.getInputValue(node, "force_stack_size", Boolean.class, false);
+            int forcedStackSize = ctx.getInputValue(node, "forced_stack_size", Integer.class, 64);
+            if (forceStackSize) {
+                if (forcedStackSize < 1 || forcedStackSize > 99) throw new IllegalArgumentException("Forced stack size must be between 1 and 99");
+                stack = itemComponents.applyComponents(stack, Map.of("minecraft:max_stack_size", forcedStackSize));
+            }
+            int stackLimit = Math.max(1, stack.getMaxStackSize());
+            String sizeMode = ctx.getInputValue(node, "size_mode", String.class, "Item Amount").trim().replace(' ', '_').toUpperCase(Locale.ROOT);
+            int amount = switch (sizeMode) {
+                case "ITEM_AMOUNT" -> stack.getAmount();
+                case "MAX_STACK" -> stackLimit;
+                case "CUSTOM" -> ctx.getInputValue(node, "amount", Integer.class, 1);
+                case "RANDOM" -> {
+                    int minimum = ctx.getInputValue(node, "min_size", Integer.class, 1);
+                    int maximum = ctx.getInputValue(node, "max_size", Integer.class, stackLimit);
+                    if (minimum < 1 || maximum < minimum || maximum > stackLimit) {
+                        throw new IllegalArgumentException("Random stack range must be between 1 and " + stackLimit);
+                    }
+                    yield ThreadLocalRandom.current().nextInt(minimum, maximum + 1);
+                }
+                default -> throw new IllegalArgumentException("Unknown stack size mode: " + sizeMode);
+            };
+            if (amount < 1 || amount > stackLimit) throw new IllegalArgumentException("Stack amount must be between 1 and " + stackLimit);
+            stack.setAmount(amount);
+            ItemStack given = stack;
+            runSync(() -> addItemFully(target, given));
+            ctx.setOutput(node, "item", given);
+            ctx.setOutput(node, "amount", amount);
+            ctx.setOutput(node, "max_stack_size", stackLimit);
         });
 
         operations.put("player_take_item", (ctx, node) -> {

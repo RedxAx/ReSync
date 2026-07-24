@@ -386,7 +386,7 @@
       },
       {
         "name": "scoreboard_id",
-        "dataType": "resource_reference<scoreboard>",
+        "dataType": "scoreboard_id",
         "optionsSource": "server:resync:scoreboard"
       },
       {

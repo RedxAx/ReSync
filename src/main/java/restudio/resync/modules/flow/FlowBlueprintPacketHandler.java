@@ -22,6 +22,7 @@ import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.jobs.JobRecord;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -43,18 +44,24 @@ public class FlowBlueprintPacketHandler {
     private final GlobalTriggers globalTriggers;
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowPacketSender sender;
+    private final FlowResourceRegistry resourceRegistry;
     private final Gson gson = new Gson();
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, FlowPacketSender sender) {
-        this(storage, triggerRegistry, globalTriggers, NodeDefinitionRegistry.getInstance(), sender);
+        this(storage, triggerRegistry, globalTriggers, NodeDefinitionRegistry.getInstance(), sender, null);
     }
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender) {
+        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, null);
+    }
+
+    public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender, FlowResourceRegistry resourceRegistry) {
         this.storage = storage;
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
         this.definitionRegistry = definitionRegistry;
         this.sender = sender;
+        this.resourceRegistry = resourceRegistry;
         refreshAllGraphBindings();
     }
 
@@ -133,6 +140,12 @@ public class FlowBlueprintPacketHandler {
                     }
                 }
                 Log.fine("Custom content saved from flow: " + content.getId());
+                notifySaved(ReSyncResourceCatalog.CUSTOM_CONTENT, content);
+                for (String previousContentId : previousContent.keySet()) {
+                    if (!previousContentId.equalsIgnoreCase(content.getId())) {
+                        notifyDeleted(ReSyncResourceCatalog.CUSTOM_CONTENT, previousContentId);
+                    }
+                }
                 sender.sendFlowSaveAck(session, flowId, payload.requestId());
                 sender.succeedJob(job, flowId, "Saved");
                 return;
@@ -144,6 +157,7 @@ public class FlowBlueprintPacketHandler {
             }
             updateGraphBindings(graph);
             Log.fine("Flow saved: " + flowId);
+            notifySaved(storage.getGraphResourceType(flowId), graph);
             sender.sendFlowSaveAck(session, flowId, payload.requestId());
             sender.succeedJob(job, flowId, "Saved");
         } catch (FlowGraphValidationException e) {
@@ -178,6 +192,7 @@ public class FlowBlueprintPacketHandler {
                 return;
             }
             previousGraph = storage.getGraph(flowId);
+            String resourceType = storage.getGraphResourceType(flowId);
             storage.deleteGraph(flowId);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             if (customContentStorage != null) {
@@ -198,6 +213,8 @@ public class FlowBlueprintPacketHandler {
                 globalTriggers.refreshBindings();
             }
             Log.fine("Flow deleted: " + flowId);
+            notifyDeleted(resourceType, flowId);
+            previousContent.keySet().forEach(contentId -> notifyDeleted(ReSyncResourceCatalog.CUSTOM_CONTENT, contentId));
             sender.succeedJob(job, flowId, "Deleted");
         } catch (FlowFunctionInUseException e) {
             sender.failJob(job, e.getMessage(), e);
@@ -253,6 +270,44 @@ public class FlowBlueprintPacketHandler {
         if (globalTriggers != null) {
             globalTriggers.refreshBindings();
         }
+    }
+
+    public void refreshGraphBinding(String flowId, boolean deleted) {
+        if (flowId == null || flowId.isBlank() || triggerRegistry == null) {
+            return;
+        }
+        if (deleted) {
+            triggerRegistry.removeFlowBindings(flowId);
+            if (globalTriggers != null) {
+                globalTriggers.refreshBindings();
+            }
+            return;
+        }
+        FlowGraph graph = storage.getGraph(flowId);
+        if (graph != null) {
+            updateGraphBindings(graph);
+        }
+    }
+
+    private void notifyDeleted(String type, String resourceId) {
+        if (resourceRegistry != null && type != null && !type.isBlank()) {
+            resourceRegistry.notifyDeleted(type, resourceId);
+        }
+    }
+
+    private void notifySaved(String type, Object value) {
+        if (resourceRegistry == null || type == null || type.isBlank() || value == null) {
+            return;
+        }
+        FlowResourceAdapter<?> adapter = resourceRegistry.get(type);
+        if (adapter != null) {
+            notifySaved(adapter, value);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void notifySaved(FlowResourceAdapter<T> adapter, Object value) {
+        resourceRegistry.notifySaved(adapter, (T) value);
     }
 
     private void updateGraphBindings(FlowGraph graph) {

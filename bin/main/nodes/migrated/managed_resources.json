@@ -1,6 +1,7 @@
 [
   {
     "id": "resource.reference",
+    "hidden": true,
     "displayName": "Resource Reference",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -20,6 +21,7 @@
   },
   {
     "id": "resource.discover",
+    "hidden": true,
     "displayName": "Discover Resources",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -41,6 +43,7 @@
   },
   {
     "id": "resource.get",
+    "hidden": true,
     "displayName": "Get Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -64,6 +67,7 @@
   },
   {
     "id": "resource.query",
+    "hidden": true,
     "displayName": "Query Resources",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -85,6 +89,7 @@
   },
   {
     "id": "resource.validate",
+    "hidden": true,
     "displayName": "Validate Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -106,6 +111,7 @@
   },
   {
     "id": "resource.save",
+    "hidden": true,
     "displayName": "Save Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -131,6 +137,7 @@
   },
   {
     "id": "resource.create",
+    "hidden": true,
     "displayName": "Create Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -155,6 +162,7 @@
   },
   {
     "id": "resource.update",
+    "hidden": true,
     "displayName": "Update Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -179,6 +187,7 @@
   },
   {
     "id": "resource.duplicate",
+    "hidden": true,
     "displayName": "Duplicate Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -205,6 +214,7 @@
   },
   {
     "id": "resource.delete",
+    "hidden": true,
     "displayName": "Delete Resource",
     "category": "UTILITY",
     "description": "Preview or delete a managed resource through its authoritative service.",
@@ -240,6 +250,7 @@
   },
   {
     "id": "resource.reload",
+    "hidden": true,
     "displayName": "Reload Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",
@@ -264,6 +275,7 @@
   },
   {
     "id": "resource.apply",
+    "hidden": true,
     "displayName": "Apply Resource",
     "category": "UTILITY",
     "handler": "ReSyncRuntimeResourceHandler",

@@ -53,6 +53,7 @@ public final class BuiltinOptionCatalogService {
         catalog("enchantment", true),
         catalog("entity_type", false),
         catalog("entity_data_property", true),
+        catalog("entity_writable_data_property", true),
         catalog("entity_text_property", true),
         catalog("entity_boolean_property", true),
         catalog("entity_number_property", true),
@@ -427,6 +428,7 @@ public final class BuiltinOptionCatalogService {
             case "enchantment" -> registryKeys(Registry.ENCHANTMENT);
             case "entity_type" -> enumNames(EntityType.values());
             case "entity_data_property" -> entityDataProperties();
+            case "entity_writable_data_property" -> entityDataProperties().stream().filter(value -> !"type".equals(value) && !"uuid".equals(value)).toList();
             case "entity_text_property" -> List.of("custom_name");
             case "entity_boolean_property" -> List.of("custom_name_visible", "glowing", "silent", "invulnerable", "gravity", "visual_fire", "ai", "collidable", "can_pickup_items", "persistent", "remove_when_far_away", "age_locked", "baby", "incendiary", "powered", "ignited");
             case "entity_number_property" -> List.of("fire_ticks", "freeze_ticks", "ticks_lived", "fall_distance", "portal_cooldown", "health", "absorption", "age", "fuse_ticks", "yield", "explosion_radius", "max_fuse_ticks");

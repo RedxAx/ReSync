@@ -26,11 +26,14 @@ class GenericDataNodeContractTest {
         assertTrue(operations.contains("operations.put(\"entity_apply_data\""));
         assertTrue(operations.contains("EntityDataAccess.apply(ctx, entity, ctx.getInputValue(node, \"data\""));
         assertTrue(nodes.contains("\"id\": \"entity.entity_data\""));
+        assertTrue(nodes.contains("\"id\": \"entity.entity_data_entry\""));
+        assertFalse(nodes.contains("\"name\": \"data_type\""));
         assertTrue(nodes.contains("\"id\": \"entity.entity_apply_data\""));
         assertTrue(nodes.contains("\"id\": \"entity.entity_number_data\""));
         assertTrue(nodes.contains("\"dataType\": \"entity_data\""));
         assertTrue(nodes.contains("\"optionsSource\": \"server:minecraft:entity_data_property\""));
         assertTrue(catalogs.contains("catalog(\"entity_data_property\", true)"));
+        assertTrue(catalogs.contains("catalog(\"entity_writable_data_property\", true)"));
         assertTrue(catalogs.contains("registryKeysByField(\"ATTRIBUTE\").stream().map(value -> \"attribute:\" + value)"));
     }
 

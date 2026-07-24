@@ -977,7 +977,7 @@
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "player", "dataType": "player" },
       { "name": "content_id", "dataType": "string" },
-      { "name": "trigger", "dataType": "string", "widget": "DROPDOWN", "options": ["item.use", "item.left_click", "item.right_click", "item.hit_entity", "item.damage_entity", "item.break_block", "item.consume", "item.drop", "item.pickup", "item.while_holding", "block.place", "block.break", "block.interact", "block.step_on", "block.nearby_player", "block.redstone", "block.tick", "armor.equip", "armor.unequip", "armor.damaged", "armor.tick", "armor.while_holding", "armor.full_set", "armor.full_set_tick"], "defaultValue": "item.use" },
+      { "name": "trigger", "dataType": "string", "widget": "DROPDOWN", "options": ["item.use", "item.left_click", "item.right_click", "item.hit_entity", "item.damage_entity", "item.break_block", "item.consume", "item.drop", "item.pickup", "item.while_holding", "block.place", "block.break", "block.interact", "block.step_on", "block.nearby_player", "block.redstone", "block.tick", "armor.equip", "armor.unequip", "armor.damaged", "armor.tick", "armor.while_holding", "armor.full_set", "armor.full_set_tick", "projectile.fire", "projectile.hit"], "defaultValue": "item.use" },
       { "name": "location", "dataType": "location" },
       { "name": "target", "dataType": "entity" }
     ],
@@ -989,6 +989,7 @@
   {
     "id": "ability.cooldown_remaining",
     "displayName": "Cooldown Remaining",
+    "description": "Reads a cooldown as ready state, remaining and elapsed time, normalized progress, percent progress, and timestamps for bars, labels, animations, and other visual feedback.",
     "category": "ABILITY",
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "cooldown_remaining" },
@@ -1002,6 +1003,13 @@
       { "name": "ready", "pinType": "FLOW", "dataType": "execution" },
       { "name": "cooldown", "pinType": "FLOW", "dataType": "execution" },
       { "name": "ticks", "dataType": "number" },
+      { "name": "seconds", "dataType": "number" },
+      { "name": "duration_ticks", "dataType": "number" },
+      { "name": "elapsed_ticks", "dataType": "number" },
+      { "name": "progress", "dataType": "number" },
+      { "name": "progress_percent", "dataType": "number" },
+      { "name": "started_at", "dataType": "number" },
+      { "name": "ready_at", "dataType": "number" },
       { "name": "is_ready", "dataType": "boolean" }
     ]
   },

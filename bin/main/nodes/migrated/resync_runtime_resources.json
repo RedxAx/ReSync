@@ -13,7 +13,7 @@
       { "name": "player", "dataType": "player" },
       { "name": "entity", "dataType": "entity" },
       { "name": "location", "dataType": "location" },
-      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+      { "name": "loot_table", "dataType": "loot_table_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -37,7 +37,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "player", "dataType": "player" },
-      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+      { "name": "loot_table", "dataType": "loot_table_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -63,7 +63,7 @@
       { "name": "player", "dataType": "player" },
       { "name": "entity", "dataType": "entity" },
       { "name": "location", "dataType": "location" },
-      { "name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
+      { "name": "loot_table", "dataType": "loot_table_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -87,7 +87,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "entity", "dataType": "entity" },
-      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+      { "name": "profile_id", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -111,7 +111,7 @@
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "player", "dataType": "player" },
       { "name": "entity", "dataType": "entity" },
-      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+      { "name": "profile_id", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -135,7 +135,7 @@
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "player", "dataType": "player" },
       { "name": "entity", "dataType": "entity", "optional": true },
-      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+      { "name": "profile_id", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -157,7 +157,7 @@
     "handlerConfig": { "operation": "npc_spawn" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
       { "name": "location", "dataType": "location" }
     ],
     "outputs": [
@@ -182,7 +182,7 @@
     "handlerConfig": { "operation": "npc_despawn" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -205,7 +205,7 @@
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "player", "dataType": "player" },
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -227,8 +227,8 @@
     "handlerConfig": { "operation": "npc_set_profile" },
     "inputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
-      { "name": "profile_id", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" },
+      { "name": "profile_id", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile" }
     ],
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
@@ -249,7 +249,7 @@
     "handler": "ReSyncRuntimeResourceHandler",
     "handlerConfig": { "operation": "npc_lookup" },
     "inputs": [
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
     ],
     "outputs": [
       { "name": "handle", "dataType": "npc_handle" },
@@ -287,7 +287,7 @@
     "handler": "ReSyncRuntimeResourceHandler",
     "handlerConfig": { "operation": "npc_is_active" },
     "inputs": [
-      { "name": "npc_id", "dataType": "resource_reference<npc_definition>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
+      { "name": "npc_id", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition" }
     ],
     "outputs": [
       { "name": "active", "dataType": "boolean" },
@@ -377,7 +377,7 @@
     "outputs": [
       { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
       { "name": "event.handle", "dataType": "npc_handle" },
-      { "name": "event.npc_id", "dataType": "resource_reference<npc_definition>" },
+      { "name": "event.npc_id", "dataType": "npc_id" },
       { "name": "event.player", "dataType": "player" },
       { "name": "event.entity", "dataType": "entity", "optional": true },
       { "name": "event.location", "dataType": "location" },

@@ -1,0 +1,89 @@
+[
+  {
+    "id": "text.lines",
+    "displayName": "Text List",
+    "description": "Loads the ordered values from a saved Text list.",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "handler": "TextResourceHandler",
+    "handlerConfig": {
+      "operation": "lines"
+    },
+    "inputs": [
+      {
+        "name": "text_id",
+        "displayName": "Text",
+        "dataType": "string",
+        "optionsSource": "server:resync:text_template"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "lines",
+        "dataType": "list<string>"
+      }
+    ]
+  },
+  {
+    "id": "text.entries",
+    "displayName": "Text Map",
+    "description": "Loads the ordered key and value pairs from a saved Text map.",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "handler": "TextResourceHandler",
+    "handlerConfig": {
+      "operation": "entries"
+    },
+    "inputs": [
+      {
+        "name": "text_id",
+        "displayName": "Text",
+        "dataType": "string",
+        "optionsSource": "server:resync:text_template"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "entries",
+        "dataType": "map<string,string>"
+      }
+    ]
+  },
+  {
+    "id": "text.lookup",
+    "displayName": "Text Lookup",
+    "description": "Finds a value in a saved Text map without caring about letter case.",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "handler": "TextResourceHandler",
+    "handlerConfig": {
+      "operation": "lookup"
+    },
+    "inputs": [
+      {
+        "name": "text_id",
+        "displayName": "Text",
+        "dataType": "string",
+        "optionsSource": "server:resync:text_template"
+      },
+      {
+        "name": "key",
+        "dataType": "string"
+      },
+      {
+        "name": "fallback",
+        "dataType": "string",
+        "defaultValue": ""
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "dataType": "string"
+      }
+    ]
+  }
+]

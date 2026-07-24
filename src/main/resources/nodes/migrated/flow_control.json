@@ -263,7 +263,7 @@
   {
     "id": "flow.switch_case",
     "displayName": "Switch Case",
-    "description": "Find a value in the case list and publish its match state and index.",
+    "description": "Keep Create Branches off to find a matching index. Turn it on to add editable cases with one execution output per case.",
     "category": "LOGIC",
     "schemaVersion": 2,
     "kind": "ACTION",
@@ -283,27 +283,81 @@
         "dataType": "execution"
       },
       {
+        "name": "branch",
+        "dataType": "boolean",
+        "widget": "TOGGLE",
+        "defaultValue": false,
+        "description": "Create one editable execution branch for every case."
+      },
+      {
         "name": "value",
         "dataType": "type:t"
       },
       {
         "name": "cases",
-        "dataType": "list<type:t>"
+        "dataType": "list<type:t>",
+        "visibleWhen": {
+          "branch": "false"
+        }
+      },
+      {
+        "name": "case",
+        "dataType": "type:t",
+        "visibleWhen": {
+          "branch": "true"
+        },
+        "repeatable": {
+          "groupId": "cases",
+          "minItems": 1,
+          "maxItems": 128,
+          "itemLabel": "Case"
+        }
       }
     ],
     "outputs": [
       {
         "name": "flow",
         "pinType": "FLOW",
-        "dataType": "execution"
+        "dataType": "execution",
+        "visibleWhen": {
+          "branch": "false"
+        }
+      },
+      {
+        "name": "case",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "visibleWhen": {
+          "branch": "true"
+        },
+        "repeatable": {
+          "groupId": "cases",
+          "minItems": 1,
+          "maxItems": 128,
+          "itemLabel": "Case"
+        }
+      },
+      {
+        "name": "default",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "visibleWhen": {
+          "branch": "true"
+        }
       },
       {
         "name": "matched",
-        "dataType": "boolean"
+        "dataType": "boolean",
+        "visibleWhen": {
+          "branch": "false"
+        }
       },
       {
         "name": "index",
-        "dataType": "number"
+        "dataType": "number",
+        "visibleWhen": {
+          "branch": "false"
+        }
       }
     ]
   },

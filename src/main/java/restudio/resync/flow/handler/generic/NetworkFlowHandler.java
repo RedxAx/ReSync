@@ -81,11 +81,26 @@ public class NetworkFlowHandler implements NodeHandler {
 
     private void networkServers(FlowContext ctx, FlowNode node) {
         ReSyncNetworkAgent agent = requireAgent();
-        List<FlowResourceReference> servers = agent.presenceSnapshot().values().stream().filter(observed -> observed.capacity() > 0)
+        String category = ctx.getInputValue(node, "category", String.class, "All Servers");
+        List<FlowResourceReference> servers = agent.presenceSnapshot().values().stream()
+            .filter(observed -> matchesServerCategory(observed, category))
             .sorted((left, right) -> left.nodeId().compareToIgnoreCase(right.nodeId())).map(this::presence).toList();
         ctx.setOutput(node, "servers", servers);
         ctx.setOutput(node, "count", servers.size());
         ctx.triggerOutput("flow");
+    }
+
+    private boolean matchesServerCategory(NetworkNodePresence presence, String category) {
+        String normalized = category != null ? category.trim().replace(' ', '_').toUpperCase(Locale.ROOT) : "ALL_SERVERS";
+        return switch (normalized) {
+            case "ONLINE", "ONLINE_SERVERS" -> isOnline(presence.status());
+            case "OFFLINE", "OFFLINE_SERVERS" -> !isOnline(presence.status());
+            default -> true;
+        };
+    }
+
+    private boolean isOnline(NetworkNodeStatus status) {
+        return status == NetworkNodeStatus.ONLINE || status == NetworkNodeStatus.DRAINING || status == NetworkNodeStatus.MAINTENANCE;
     }
 
     private void networkServerHealth(FlowContext ctx, FlowNode node) {

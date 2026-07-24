@@ -1,5 +1,11 @@
 package restudio.resync.flow;
 
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.PacketEventsAPI;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerListHeaderAndFooter;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -9,14 +15,18 @@ import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.flow.util.TextFormatter;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public final class TabListService {
+    private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation[:_][^%]+%", Pattern.CASE_INSENSITIVE);
     private static final Map<UUID, ActiveTabState> ACTIVE_TABS = new ConcurrentHashMap<>();
     private static BukkitTask updaterTask;
+    private static long updaterTick;
 
     private TabListService() {
     }
@@ -27,8 +37,8 @@ public final class TabListService {
         if (storage == null || FlowRuntimeAccess.getPlugin() == null) {
             return;
         }
-        int interval = Math.max(1, storage.getTabRefreshIntervalTicks());
-        updaterTask = Bukkit.getScheduler().runTaskTimer(FlowRuntimeAccess.getPlugin(), TabListService::refreshActive, interval, interval);
+        updaterTick = 0L;
+        updaterTask = Bukkit.getScheduler().runTaskTimer(FlowRuntimeAccess.getPlugin(), TabListService::refreshActive, 1L, 1L);
     }
 
     public static synchronized void stopUpdater() {
@@ -60,7 +70,7 @@ public final class TabListService {
         String tabId = definition.getId() != null ? definition.getId() : "main";
         applyViewerHeaderFooter(viewer, definition, usePapi);
         ACTIVE_TABS.put(viewer.getUniqueId(), new ActiveTabState(tabId, usePapi));
-        applyEntryFormat(definition.getEntryFormat(), usePapi);
+        applyEntryFormat(viewer, definition.getEntryFormat(), usePapi);
         return true;
     }
 
@@ -71,16 +81,18 @@ public final class TabListService {
         for (Player player : Bukkit.getOnlinePlayers()) {
             applyViewerHeaderFooter(player, definition, usePapi);
             ACTIVE_TABS.put(player.getUniqueId(), new ActiveTabState(definition.getId() != null ? definition.getId() : "main", usePapi));
+            applyEntryFormat(player, definition.getEntryFormat(), usePapi);
         }
-        applyEntryFormat(definition.getEntryFormat(), usePapi);
     }
 
     public static void clearForPlayer(Player player) {
         if (player == null) {
             return;
         }
-        player.setPlayerListHeader("");
-        player.setPlayerListFooter("");
+        send(player, new WrapperPlayServerPlayerListHeaderAndFooter(Component.empty(), Component.empty()));
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            sendEntryName(player, target, null);
+        }
         ACTIVE_TABS.remove(player.getUniqueId());
     }
 
@@ -92,8 +104,10 @@ public final class TabListService {
     }
 
     public static void resetEntryNames() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.setPlayerListName(player.getName());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            for (Player target : Bukkit.getOnlinePlayers()) {
+                sendEntryName(viewer, target, null);
+            }
         }
     }
 
@@ -109,7 +123,7 @@ public final class TabListService {
             ActiveTabState state = ACTIVE_TABS.get(player.getUniqueId());
             if (state != null && tabId.equalsIgnoreCase(state.tabId())) {
                 applyViewerHeaderFooter(player, definition, state.usePapi());
-                applyEntryFormat(definition.getEntryFormat(), state.usePapi());
+                applyEntryFormat(player, definition.getEntryFormat(), state.usePapi());
             }
         }
         String defaultTabId = storage.getDefaultTabId();
@@ -120,9 +134,9 @@ public final class TabListService {
                 if (state == null || defaultTabId.equalsIgnoreCase(state.tabId())) {
                     applyViewerHeaderFooter(player, definition, usePapi);
                     ACTIVE_TABS.put(player.getUniqueId(), new ActiveTabState(defaultTabId, usePapi));
+                    applyEntryFormat(player, definition.getEntryFormat(), usePapi);
                 }
             }
-            applyEntryFormat(definition.getEntryFormat(), usePapi);
         }
     }
 
@@ -145,7 +159,6 @@ public final class TabListService {
             for (Player player : affected) {
                 clearForPlayer(player);
             }
-            resetEntryNames();
         }
     }
 
@@ -205,26 +218,50 @@ public final class TabListService {
         if (storage == null) {
             return;
         }
-        String defaultTabId = storage.getDefaultTabId();
-        if (defaultTabId != null && !defaultTabId.isBlank()) {
-            TabDefinition defaultDefinition = storage.getTab(defaultTabId);
-            if (defaultDefinition != null) {
-                applyTemplateToAll(defaultDefinition, storage.isDefaultTabUsePapi());
-            }
-        } else if (!ACTIVE_TABS.isEmpty()) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                ActiveTabState state = ACTIVE_TABS.get(player.getUniqueId());
-                if (state == null) {
-                    continue;
+        long tick = ++updaterTick;
+        boolean regularRefresh = Math.floorMod(tick, Math.max(1, storage.getTabRefreshIntervalTicks())) == 0;
+        if (regularRefresh || hasAnimatedTabs(storage)) {
+            String defaultTabId = storage.getDefaultTabId();
+            if (defaultTabId != null && !defaultTabId.isBlank()) {
+                TabDefinition defaultDefinition = storage.getTab(defaultTabId);
+                if (defaultDefinition != null) {
+                    applyTemplateToAll(defaultDefinition, storage.isDefaultTabUsePapi());
                 }
-                TabDefinition definition = storage.getTab(state.tabId());
-                if (definition != null) {
-                    applyViewerHeaderFooter(player, definition, state.usePapi());
-                    applyEntryFormat(definition.getEntryFormat(), state.usePapi());
+            } else if (!ACTIVE_TABS.isEmpty()) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    ActiveTabState state = ACTIVE_TABS.get(player.getUniqueId());
+                    if (state == null) {
+                        continue;
+                    }
+                    TabDefinition definition = storage.getTab(state.tabId());
+                    if (definition != null) {
+                        applyViewerHeaderFooter(player, definition, state.usePapi());
+                        applyEntryFormat(player, definition.getEntryFormat(), state.usePapi());
+                    }
                 }
             }
         }
-        ScoreboardTemplateManager.refreshActiveTemplates(storage);
+        if (regularRefresh || ScoreboardTemplateManager.hasAnimatedTemplates(storage)) {
+            ScoreboardTemplateManager.refreshActiveTemplates(storage);
+        }
+    }
+
+    private static boolean hasAnimatedTabs(FlowStorage storage) {
+        for (ActiveTabState state : ACTIVE_TABS.values()) {
+            if (state != null && hasAnimation(storage.getTab(state.tabId()))) {
+                return true;
+            }
+        }
+        String defaultId = storage.getDefaultTabId();
+        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getTab(defaultId));
+    }
+
+    private static boolean hasAnimation(TabDefinition definition) {
+        return definition != null && (hasAnimation(definition.getHeader()) || hasAnimation(definition.getFooter()) || hasAnimation(definition.getEntryFormat()));
+    }
+
+    private static boolean hasAnimation(String value) {
+        return value != null && ANIMATION_PATTERN.matcher(value).find();
     }
 
     private static FlowStorage getFlowStorage() {
@@ -232,21 +269,35 @@ public final class TabListService {
     }
 
     private static void applyViewerHeaderFooter(Player viewer, TabDefinition definition, boolean usePapi) {
-        String header = TextFormatter.formatLegacy(ReSyncPlaceholderUtil.apply(viewer, definition.getHeader(), usePapi));
-        String footer = TextFormatter.formatLegacy(ReSyncPlaceholderUtil.apply(viewer, definition.getFooter(), usePapi));
-        viewer.setPlayerListHeader(header);
-        viewer.setPlayerListFooter(footer);
+        Component header = TextFormatter.parseResolved(ReSyncPlaceholderUtil.apply(viewer, definition.getHeader(), true));
+        Component footer = TextFormatter.parseResolved(ReSyncPlaceholderUtil.apply(viewer, definition.getFooter(), true));
+        send(viewer, new WrapperPlayServerPlayerListHeaderAndFooter(header, footer));
     }
 
-    private static void applyEntryFormat(String rawFormat, boolean usePapi) {
+    private static void applyEntryFormat(Player viewer, String rawFormat, boolean usePapi) {
         String format = rawFormat != null && !rawFormat.isEmpty() ? rawFormat : "%player%";
         for (Player target : Bukkit.getOnlinePlayers()) {
-            String rendered = ReSyncPlaceholderUtil.apply(target, format, usePapi);
-            if (!rendered.contains("%player%")) {
-                rendered = rendered + " %player%";
+            boolean hasPlayer = format.contains("%player%");
+            String rendered = format.replace("%player%", target.getName());
+            rendered = ReSyncPlaceholderUtil.apply(target, rendered, true);
+            Component displayName = TextFormatter.parseResolved(rendered);
+            if (!hasPlayer) {
+                displayName = displayName.append(Component.space()).append(Component.text(target.getName()));
             }
-            rendered = rendered.replace("%player%", target.getName());
-            target.setPlayerListName(TextFormatter.formatLegacy(rendered));
+            sendEntryName(viewer, target, displayName);
+        }
+    }
+
+    private static void sendEntryName(Player viewer, Player target, Component displayName) {
+        WrapperPlayServerPlayerInfoUpdate.PlayerInfo info = new WrapperPlayServerPlayerInfoUpdate.PlayerInfo(target.getUniqueId());
+        info.setDisplayName(displayName);
+        send(viewer, new WrapperPlayServerPlayerInfoUpdate(EnumSet.of(WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_DISPLAY_NAME), info));
+    }
+
+    private static void send(Player player, PacketWrapper<?> packet) {
+        PacketEventsAPI<?> api = PacketEvents.getAPI();
+        if (api != null && api.isInitialized()) {
+            api.getPlayerManager().sendPacket(player, packet);
         }
     }
 

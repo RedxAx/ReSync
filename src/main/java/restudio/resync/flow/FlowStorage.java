@@ -1378,9 +1378,14 @@ public class FlowStorage {
         changed |= ensureFolder(metadata, "Customization", "", 3);
         changed |= ensureFolder(metadata, "Customization/Scoreboards", "Customization", 0);
         changed |= ensureFolder(metadata, "Customization/Tabs", "Customization", 1);
-        changed |= ensureFolder(metadata, "Worlds", "", 4);
-        changed |= ensureFolder(metadata, "WorldGen", "", 5);
-        changed |= ensureFolder(metadata, "Groups", "", 6);
+        changed |= ensureFolder(metadata, "Text", "", 4);
+        changed |= ensureFolder(metadata, "Text/Lists", "Text", 0);
+        changed |= ensureFolder(metadata, "Text/Maps", "Text", 1);
+        changed |= ensureFolder(metadata, "Text/Animations", "Text", 2);
+        changed |= ensureFolder(metadata, "Text/Templates", "Text", 3);
+        changed |= ensureFolder(metadata, "Worlds", "", 5);
+        changed |= ensureFolder(metadata, "WorldGen", "", 6);
+        changed |= ensureFolder(metadata, "Groups", "", 7);
         return changed;
     }
 
@@ -1457,6 +1462,7 @@ public class FlowStorage {
             String folder = switch (legacyCustomContentType(id)) {
                 case "armor" -> "Content/Armor";
                 case "block" -> "Content/Blocks";
+                case "projectile" -> "Content/Projectiles";
                 default -> "Content/Items";
             };
             changed |= ensureResource(metadata, "custom_content", id, id, folder);

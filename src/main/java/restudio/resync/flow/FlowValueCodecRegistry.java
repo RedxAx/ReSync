@@ -9,10 +9,12 @@ import org.bukkit.Color;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowJobReference;
+import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNpcHandle;
 import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowPermission;
 import restudio.flow.data.FlowResourceReference;
+import restudio.flow.data.FlowSerializer;
 import restudio.flow.data.FlowTypeRef;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.GuiElement;
@@ -64,6 +66,10 @@ public final class FlowValueCodecRegistry {
         register(codec("scoreboard_definition", ScoreboardDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), ScoreboardDefinition.class)));
         register(codec("tab_definition", TabDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), TabDefinition.class)));
         register(codec("custom_content_definition", CustomContentDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), CustomContentDefinition.class)));
+        register(codec("flow_definition", FlowGraph.class, value -> FlowSerializer.serialize(value), value -> FlowSerializer.deserialize(String.valueOf(value))));
+        registerAlias("function_definition", "flow_definition");
+        registerAlias("command_definition", "flow_definition");
+        registerAliases("json_object", "chat_profile", "motd_profile", "message_rule", "text_template");
         registerAlias("dialog_definition", "json_object");
         registerAlias("trade_profile", "json_object");
         registerAlias("trade_definition", "json_object");
@@ -82,7 +88,9 @@ public final class FlowValueCodecRegistry {
         registerAlias("http_response", "structured_value");
         registerAliases("resource_reference", "permission_track", "gui_session", "sidebar_session", "tab_application", "merchant",
             "trade_session", "placed_content", "structure", "worldgen_project", "player_identity", "network_node", "network_route");
-        registerAliases("string", "permission_group", "region", "network_scope");
+        registerAliases("string", "permission_group", "region", "network_scope", "flow_id", "function", "command_id", "custom_content_id", "gui_id",
+            "scoreboard_id", "tab_id", "chat_id", "motd_profile_id", "message_rule_id", "recipe_id", "text_template_id", "advancement_tree_id",
+            "dialog_id", "trade_profile_id", "npc_id", "loot_table_id", "worldgen_id");
         registerAlias("worldgen_job", "job_reference");
     }
 

@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class FlowGraphValidator {
+    private static final String CALL_PARAMETERS_KEY = "__call_parameters";
     private static final Set<String> EXECUTION_CYCLE_BOUNDARY_IDS = Set.of(
         "loop_while",
         "loop.count",
@@ -176,6 +177,7 @@ public final class FlowGraphValidator {
                 continue;
             }
             definition = functionBoundaryDefinition(graph, canonicalType, definition);
+            definition = functionCallDefinition(graph, nodeId, node, canonicalType, definition, diagnostics);
             resolved.put(nodeId, definition);
             if (node.getVersion() < 1 || node.getVersion() > definition.getSchemaVersion()) {
                 diagnostics.add(error("NODE_VERSION_UNSUPPORTED", graphId, nodeId, "", "Node version " + node.getVersion() + " is incompatible with schema " + definition.getSchemaVersion(), "Migrate this node to the current schema"));
@@ -223,6 +225,138 @@ public final class FlowGraphValidator {
             }
         }
         return definition.withPins(inputs, outputs);
+    }
+
+    private NodeDefinition functionCallDefinition(FlowGraph graph, String nodeId, FlowNode node, String type, NodeDefinition definition,
+                                                  List<FlowGraphDiagnostic> diagnostics) {
+        if (!"call.function".equals(type) && !"call_function".equals(type)) {
+            return definition;
+        }
+        List<FlowGraph.FunctionParameter> declared = functionCallParameters(graph.getId(), nodeId, node, diagnostics);
+        boolean dynamic = graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> "function".equals(connection.getTargetPin()));
+        Object selected = node.getInputValues() != null ? node.getInputValues().get("function") : null;
+        String functionId = selected != null ? selected.toString().trim() : "";
+        NodeDefinition signature = !dynamic && !functionId.isBlank() && definitions != null
+            ? definitions.get("custom_function:" + functionId)
+            : null;
+        if (signature == null && declared.isEmpty()) {
+            return definition;
+        }
+        List<NodeDefinition.PinDefinition> inputs = new ArrayList<>(definition.getInputs());
+        List<NodeDefinition.PinDefinition> outputs = new ArrayList<>(definition.getOutputs());
+        inputs.removeIf(pin -> "arguments".equals(pin.getName()));
+        if (!declared.isEmpty()) {
+            for (FlowGraph.FunctionParameter parameter : declared) {
+                inputs.add(new NodeDefinition.PinBuilder(
+                    parameter.getName(),
+                    NodeDefinition.PinType.DATA,
+                    NodeDefinition.PinDirection.INPUT,
+                    parameter.getType()
+                ).typeRef(parameter.getTypeRef()).build());
+            }
+            if (signature != null) {
+                validateFunctionCallContract(graph.getId(), nodeId, declared, signature, diagnostics);
+            }
+        } else if (signature != null) {
+            appendUniquePins(inputs, signature.getInputs(), "flow");
+        }
+        if (signature != null) {
+            appendUniquePins(outputs, signature.getOutputs(), "flow");
+        }
+        return definition.withPins(inputs, outputs);
+    }
+
+    private List<FlowGraph.FunctionParameter> functionCallParameters(String graphId, String nodeId, FlowNode node,
+                                                                     List<FlowGraphDiagnostic> diagnostics) {
+        if (node.getInputValues() == null || !(node.getInputValues().get(CALL_PARAMETERS_KEY) instanceof Iterable<?> values)) {
+            return List.of();
+        }
+        List<FlowGraph.FunctionParameter> parameters = new ArrayList<>();
+        Set<String> names = new HashSet<>();
+        int index = 0;
+        for (Object value : values) {
+            String location = CALL_PARAMETERS_KEY + '[' + index++ + ']';
+            if (!(value instanceof Map<?, ?> entry) || entry.get("name") == null || entry.get("type") == null) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_INVALID", graphId, nodeId, location,
+                    "Function argument needs a name and type", "Remove the invalid argument and add it again"));
+                continue;
+            }
+            String name = entry.get("name").toString().trim();
+            if (!isTemplateName(name)) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_NAME_INVALID", graphId, nodeId, location,
+                    "Function argument name is invalid: " + name, "Use letters, numbers, and underscores"));
+                continue;
+            }
+            if (!names.add(name)) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_DUPLICATE", graphId, nodeId, name,
+                    "Function argument is declared more than once: " + name, "Remove or rename the duplicate argument"));
+                continue;
+            }
+            FlowTypeRef typeRef;
+            try {
+                typeRef = FlowTypeRef.parse(entry.get("type").toString()).normalizedGenerics();
+            } catch (IllegalArgumentException exception) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_TYPE_INVALID", graphId, nodeId, name,
+                    "Function argument type is invalid", "Choose a supported argument type"));
+                continue;
+            }
+            if (!typeRef.isResolved() || containsAnyType(typeRef)) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_TYPE_REQUIRED", graphId, nodeId, name,
+                    "Function argument needs a specific type", "Choose the type expected by the called function"));
+                continue;
+            }
+            FlowGraph.FunctionParameter parameter = new FlowGraph.FunctionParameter(name, FlowDataType.fromString(typeRef.getTypeId()));
+            parameter.setTypeRef(typeRef);
+            parameters.add(parameter);
+        }
+        return parameters;
+    }
+
+    private void validateFunctionCallContract(String graphId, String nodeId, List<FlowGraph.FunctionParameter> declared,
+                                              NodeDefinition signature, List<FlowGraphDiagnostic> diagnostics) {
+        Map<String, NodeDefinition.PinDefinition> expected = new HashMap<>();
+        for (NodeDefinition.PinDefinition pin : signature.getInputs()) {
+            if (pin != null && !"flow".equals(pin.getName())) {
+                expected.put(pin.getName(), pin);
+            }
+        }
+        Set<String> declaredNames = new HashSet<>();
+        for (FlowGraph.FunctionParameter parameter : declared) {
+            declaredNames.add(parameter.getName());
+            NodeDefinition.PinDefinition expectedPin = expected.get(parameter.getName());
+            if (expectedPin == null) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_UNKNOWN", graphId, nodeId, parameter.getName(),
+                    "Called function has no input named " + parameter.getName(), "Match the argument names to the function inputs"));
+                continue;
+            }
+            if (!expectedPin.getTypeRef().normalizedGenerics().equals(parameter.getTypeRef().normalizedGenerics())) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_TYPE_MISMATCH", graphId, nodeId, parameter.getName(),
+                    "Argument " + parameter.getName() + " is " + parameter.getTypeRef() + " but the function expects " + expectedPin.getTypeRef(),
+                    "Choose the same type as the function input"));
+            }
+        }
+        for (String expectedName : expected.keySet()) {
+            if (!declaredNames.contains(expectedName)) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_MISSING", graphId, nodeId, expectedName,
+                    "Function call does not declare " + expectedName, "Add the missing argument with the function input type"));
+            }
+        }
+    }
+
+    private boolean containsAnyType(FlowTypeRef typeRef) {
+        return "any".equals(typeRef.getTypeId()) || typeRef.getArguments().stream().anyMatch(this::containsAnyType);
+    }
+
+    private void appendUniquePins(List<NodeDefinition.PinDefinition> target, List<NodeDefinition.PinDefinition> additions, String excludedName) {
+        Set<String> names = new HashSet<>();
+        for (NodeDefinition.PinDefinition pin : target) {
+            names.add(pin.getName());
+        }
+        for (NodeDefinition.PinDefinition pin : additions) {
+            if (pin != null && !excludedName.equals(pin.getName()) && names.add(pin.getName())) {
+                target.add(pin);
+            }
+        }
     }
 
     private boolean isFunctionStartType(String type) {
@@ -337,13 +471,17 @@ public final class FlowGraphValidator {
         }
         if (actualValue instanceof Iterable<?> values) {
             for (Object value : values) {
-                if (value != null && expected.equalsIgnoreCase(value.toString().trim())) {
+                if (value != null && matchesVisibleValue(value, expected)) {
                     return true;
                 }
             }
             return false;
         }
         String actual = actualValue != null ? actualValue.toString().trim() : "";
+        if (expected.endsWith("*")) {
+            String prefix = expected.substring(0, expected.length() - 1);
+            return actual.regionMatches(true, 0, prefix, 0, prefix.length());
+        }
         return actual.equalsIgnoreCase(expected);
     }
 
@@ -589,13 +727,27 @@ public final class FlowGraphValidator {
             return;
         }
         boolean matches = values != null && values.stream().anyMatch(candidate -> candidate != null
-            && (candidate.equals(literal) || (sourceId.startsWith("server:minecraft:") && candidate.equalsIgnoreCase(literal))));
+            && (candidate.equals(literal) || minecraftCatalogValueMatches(sourceId, candidate, literal)));
         if (!matches) {
             boolean managedResource = isManagedResourceCatalog(pin, sourceId);
             diagnostics.add(error(managedResource ? "RESOURCE_REFERENCE_UNRESOLVED" : "CATALOG_VALUE_UNRESOLVED", graphId, nodeId, pin.getName(),
                 managedResource ? "Managed resource does not exist: " + literal : "Catalog value does not exist in " + sourceId + ": " + literal,
                 managedResource ? "Create the resource or select an existing ID" : "Select a value supplied by the authoritative catalog"));
         }
+    }
+
+    private boolean minecraftCatalogValueMatches(String sourceId, String candidate, String literal) {
+        if (!sourceId.startsWith("server:minecraft:") || candidate == null || literal == null) {
+            return false;
+        }
+        String normalizedCandidate = candidate.trim().toLowerCase(Locale.ROOT);
+        String normalizedLiteral = literal.trim().toLowerCase(Locale.ROOT);
+        if (normalizedCandidate.equals(normalizedLiteral)) {
+            return true;
+        }
+        String candidatePath = normalizedCandidate.startsWith("minecraft:") ? normalizedCandidate.substring("minecraft:".length()) : normalizedCandidate;
+        String literalPath = normalizedLiteral.startsWith("minecraft:") ? normalizedLiteral.substring("minecraft:".length()) : normalizedLiteral;
+        return candidatePath.replace('.', '_').replace('-', '_').equals(literalPath.replace('.', '_').replace('-', '_'));
     }
 
     private boolean isManagedResourceCatalog(NodeDefinition.PinDefinition pin, String sourceId) {
@@ -1075,7 +1227,8 @@ public final class FlowGraphValidator {
         if (name == null) {
             return false;
         }
-        if ("__flow_branches".equals(name) || "__removed_optional_inputs".equals(name) || "__permission_count".equals(name)) {
+        if ("__flow_branches".equals(name) || "__removed_optional_inputs".equals(name) || "__permission_count".equals(name)
+            || CALL_PARAMETERS_KEY.equals(name) || "__function_signature".equals(name) || "__function_signature_issues".equals(name)) {
             return true;
         }
         if (!name.startsWith("__repeatable_count:")) {

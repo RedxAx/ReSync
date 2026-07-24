@@ -132,7 +132,7 @@ public class FlowResourcePacketRouter {
             resourceRegistry.register(adapter);
         }
         if (sender != null) {
-            handlers.add(new FlowResourcePacketHandler<>(adapter, sender));
+            handlers.add(new FlowResourcePacketHandler<>(adapter, sender, resourceRegistry));
         }
     }
 
@@ -164,6 +164,11 @@ public class FlowResourcePacketRouter {
             @Override
             public FlowGraph deserialize(String json) {
                 return FlowSerializer.deserialize(json);
+            }
+
+            @Override
+            public String serialize(FlowGraph value) {
+                return FlowSerializer.serialize(value);
             }
 
             @Override
@@ -253,6 +258,11 @@ public class FlowResourcePacketRouter {
             @Override
             public WorldGenProject deserialize(String json) {
                 return WorldGenSerializer.deserializeProject(json);
+            }
+
+            @Override
+            public String serialize(WorldGenProject value) {
+                return WorldGenSerializer.serializeProject(value);
             }
 
             @Override
@@ -498,6 +508,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public String serialize(GuiDefinition value) {
+                return FlowSerializer.serializeGui(value);
+            }
+
+            @Override
             public String id(GuiDefinition value) {
                 return value.getId();
             }
@@ -610,6 +625,11 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public String serialize(ScoreboardDefinition value) {
+                return FlowSerializer.serializeScoreboard(value);
+            }
+
+            @Override
             public String id(ScoreboardDefinition value) {
                 return value.getId();
             }
@@ -708,6 +728,11 @@ public class FlowResourcePacketRouter {
             @Override
             public TabDefinition deserialize(String json) {
                 return FlowSerializer.deserializeTab(json);
+            }
+
+            @Override
+            public String serialize(TabDefinition value) {
+                return FlowSerializer.serializeTab(value);
             }
 
             @Override
@@ -811,6 +836,11 @@ public class FlowResourcePacketRouter {
             @Override
             public CustomContentDefinition deserialize(String json) {
                 return storage.repairMalformedFlowIdentity(FlowSerializer.deserializeCustomContent(json));
+            }
+
+            @Override
+            public String serialize(CustomContentDefinition value) {
+                return FlowSerializer.serializeCustomContent(value);
             }
 
             @Override
@@ -950,6 +980,11 @@ public class FlowResourcePacketRouter {
             @Override
             public String deserialize(String json) {
                 return json;
+            }
+
+            @Override
+            public String serialize(String value) {
+                return value;
             }
 
             @Override

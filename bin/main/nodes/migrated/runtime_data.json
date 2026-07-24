@@ -1,0 +1,230 @@
+[
+  {
+    "id": "data.runtime_query",
+    "displayName": "Find Data",
+    "description": "Find server data using sources, categories, tags, properties, or search text.",
+    "category": "DATA",
+    "tags": ["data", "query", "filter", "catalog"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "query"},
+    "inputs": [
+      {"name": "data_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:type", "defaultValue": "item"},
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "category", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:category", "optional": true},
+      {"name": "categories", "dataType": "list<string>", "optional": true},
+      {"name": "tags", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_categories", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_tags", "dataType": "list<string>", "optional": true},
+      {"name": "properties", "dataType": "map<string,any>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true},
+      {"name": "category_match", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "all"], "defaultValue": "any"},
+      {"name": "tag_match", "dataType": "string", "widget": "DROPDOWN", "options": ["all", "any"], "defaultValue": "all"},
+      {"name": "limit", "dataType": "number", "defaultValue": 0}
+    ],
+    "outputs": [
+      {"name": "results", "dataType": "list<runtime_data_entry>"},
+      {"name": "count", "dataType": "number"}
+    ]
+  },
+  {
+    "id": "data.runtime_categories",
+    "displayName": "Get Data Categories",
+    "description": "Get the categories available for a type of server data.",
+    "category": "DATA",
+    "tags": ["data", "category", "query"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "categories"},
+    "inputs": [
+      {"name": "data_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:type", "defaultValue": "item"},
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true}
+    ],
+    "outputs": [
+      {"name": "categories", "dataType": "list<runtime_data_category>"},
+      {"name": "ids", "dataType": "list<string>"},
+      {"name": "count", "dataType": "number"}
+    ]
+  },
+  {
+    "id": "data.filter_runtime_entries",
+    "displayName": "Filter Data",
+    "description": "Filter existing data results without loading them again.",
+    "category": "DATA",
+    "tags": ["data", "filter", "category", "tag"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "filter"},
+    "inputs": [
+      {"name": "data", "dataType": "list<runtime_data_entry>"},
+      {"name": "source", "dataType": "string", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "category", "dataType": "string", "optional": true},
+      {"name": "categories", "dataType": "list<string>", "optional": true},
+      {"name": "tags", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_categories", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_tags", "dataType": "list<string>", "optional": true},
+      {"name": "properties", "dataType": "map<string,any>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true},
+      {"name": "category_match", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "all"], "defaultValue": "any"},
+      {"name": "tag_match", "dataType": "string", "widget": "DROPDOWN", "options": ["all", "any"], "defaultValue": "all"},
+      {"name": "limit", "dataType": "number", "defaultValue": 0}
+    ],
+    "outputs": [
+      {"name": "results", "dataType": "list<runtime_data_entry>"},
+      {"name": "count", "dataType": "number"}
+    ]
+  },
+  {
+    "id": "data.random_runtime_entry",
+    "displayName": "Pick Random Data",
+    "description": "Pick one random result using the selected filters.",
+    "category": "DATA",
+    "tags": ["data", "random", "query"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "random"},
+    "inputs": [
+      {"name": "data_type", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:type", "defaultValue": "item"},
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "category", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:category", "optional": true},
+      {"name": "categories", "dataType": "list<string>", "optional": true},
+      {"name": "tags", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_categories", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_tags", "dataType": "list<string>", "optional": true},
+      {"name": "properties", "dataType": "map<string,any>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true},
+      {"name": "category_match", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "all"], "defaultValue": "any"},
+      {"name": "tag_match", "dataType": "string", "widget": "DROPDOWN", "options": ["all", "any"], "defaultValue": "all"}
+    ],
+    "outputs": [
+      {"name": "result", "dataType": "runtime_data_entry"},
+      {"name": "found", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "data.runtime_entry_fields",
+    "displayName": "Get Data Details",
+    "description": "Get the source, ID, name, categories, tags, and properties of data.",
+    "category": "DATA",
+    "tags": ["data", "entry", "fields"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "entry_fields"},
+    "inputs": [{"name": "data", "dataType": "runtime_data_entry"}],
+    "outputs": [
+      {"name": "data_type", "dataType": "string"},
+      {"name": "source", "dataType": "string"},
+      {"name": "id", "dataType": "string"},
+      {"name": "name", "dataType": "string"},
+      {"name": "details", "dataType": "string"},
+      {"name": "categories", "dataType": "list<string>"},
+      {"name": "tags", "dataType": "list<string>"},
+      {"name": "properties", "dataType": "map<string,any>"}
+    ]
+  },
+  {
+    "id": "data.query_items",
+    "displayName": "Find Items",
+    "description": "Find vanilla, ReSync, and external items using categories, tags, properties, or search text.",
+    "category": "ITEM",
+    "tags": ["item", "query", "filter", "custom content"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "query_items"},
+    "inputs": [
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "category", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:category", "optional": true},
+      {"name": "categories", "dataType": "list<string>", "optional": true},
+      {"name": "tags", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_categories", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_tags", "dataType": "list<string>", "optional": true},
+      {"name": "properties", "dataType": "map<string,any>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true},
+      {"name": "category_match", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "all"], "defaultValue": "any"},
+      {"name": "tag_match", "dataType": "string", "widget": "DROPDOWN", "options": ["all", "any"], "defaultValue": "all"},
+      {"name": "limit", "dataType": "number", "defaultValue": 0},
+      {"name": "amount", "dataType": "number", "defaultValue": 1}
+    ],
+    "outputs": [
+      {"name": "items", "dataType": "list<itemstack>"},
+      {"name": "count", "dataType": "number"}
+    ]
+  },
+  {
+    "id": "data.random_item",
+    "displayName": "Pick Random Item",
+    "description": "Create one random vanilla, ReSync, or external item using the selected filters.",
+    "category": "ITEM",
+    "tags": ["item", "random", "query", "custom content"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "random_item"},
+    "inputs": [
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "category", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:category", "optional": true},
+      {"name": "categories", "dataType": "list<string>", "optional": true},
+      {"name": "tags", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_categories", "dataType": "list<string>", "optional": true},
+      {"name": "exclude_tags", "dataType": "list<string>", "optional": true},
+      {"name": "properties", "dataType": "map<string,any>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true},
+      {"name": "category_match", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "all"], "defaultValue": "any"},
+      {"name": "tag_match", "dataType": "string", "widget": "DROPDOWN", "options": ["all", "any"], "defaultValue": "all"},
+      {"name": "amount", "dataType": "number", "defaultValue": 1}
+    ],
+    "outputs": [
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "data", "dataType": "runtime_data_entry"},
+      {"name": "found", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "data.item_from_runtime_entry",
+    "displayName": "Create Item From Data",
+    "description": "Create an item from a data result.",
+    "category": "ITEM",
+    "tags": ["item", "data", "create"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "item_from_entry"},
+    "inputs": [
+      {"name": "data", "dataType": "runtime_data_entry"},
+      {"name": "amount", "dataType": "number", "defaultValue": 1}
+    ],
+    "outputs": [
+      {"name": "item", "dataType": "itemstack"},
+      {"name": "found", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "data.item_categories",
+    "displayName": "Get Item Categories",
+    "description": "Get all current vanilla, ReSync, and external item categories.",
+    "category": "ITEM",
+    "tags": ["item", "category", "query"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "item_categories"},
+    "inputs": [
+      {"name": "source", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:runtime_data:source", "optional": true},
+      {"name": "sources", "dataType": "list<string>", "optional": true},
+      {"name": "search", "dataType": "string", "optional": true}
+    ],
+    "outputs": [
+      {"name": "categories", "dataType": "list<runtime_data_category>"},
+      {"name": "ids", "dataType": "list<string>"}
+    ]
+  },
+  {
+    "id": "data.describe_item",
+    "displayName": "Identify Item",
+    "description": "Get the data source and details behind an item.",
+    "category": "ITEM",
+    "tags": ["item", "data", "identify"],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {"operation": "describe_item"},
+    "inputs": [{"name": "item", "dataType": "itemstack"}],
+    "outputs": [
+      {"name": "data", "dataType": "runtime_data_entry"},
+      {"name": "found", "dataType": "boolean"}
+    ]
+  }
+]

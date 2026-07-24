@@ -1,12 +1,18 @@
 package restudio.resync.flow;
 
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.PacketEventsAPI;
+import com.github.retrooper.packetevents.protocol.score.BlankScoreFormat;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDisplayScoreboard;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerResetScore;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerScoreboardObjective;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateScore;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Score;
-import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.ScoreboardManager;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.resync.core.Session;
 import restudio.resync.flow.util.ReSyncPlaceholderUtil;
@@ -18,10 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public final class ScoreboardTemplateManager {
-
+    private static final String[] LINE_ENTRIES = {"§0", "§1", "§2", "§3", "§4", "§5", "§6", "§7", "§8", "§9", "§a", "§b", "§c", "§d", "§e"};
+    private static final Pattern ANIMATION_PATTERN = Pattern.compile("%resync_animation[:_][^%]+%", Pattern.CASE_INSENSITIVE);
     private static final Map<UUID, ActiveScoreboardState> ACTIVE_SCOREBOARDS = new ConcurrentHashMap<>();
+    private static final Map<UUID, PacketScoreboardState> PACKET_SCOREBOARDS = new ConcurrentHashMap<>();
     private static volatile EditTargetStateSender editTargetStateSender;
     private static volatile PlayerSessionLinkService sessionLinkService;
 
@@ -75,10 +84,7 @@ public final class ScoreboardTemplateManager {
         if (player == null) {
             return;
         }
-        ScoreboardManager manager = Bukkit.getScoreboardManager();
-        if (manager != null) {
-            player.setScoreboard(manager.getMainScoreboard());
-        }
+        removePacketScoreboard(player);
         ACTIVE_SCOREBOARDS.remove(player.getUniqueId());
         publishState(player, null);
     }
@@ -111,7 +117,6 @@ public final class ScoreboardTemplateManager {
                 ScoreboardDefinition definition = storage.getScoreboard(state.scoreboardId());
                 if (definition != null) {
                     applyTemplate(player, definition, state.usePapi());
-                    publishState(player, state.scoreboardId());
                 }
             }
         }
@@ -143,7 +148,6 @@ public final class ScoreboardTemplateManager {
             ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
             if (state != null && scoreboardId.equalsIgnoreCase(state.scoreboardId())) {
                 applyTemplate(player, definition, state.usePapi());
-                publishState(player, state.scoreboardId());
             }
         }
         String defaultId = storage.getDefaultScoreboardId();
@@ -210,6 +214,7 @@ public final class ScoreboardTemplateManager {
             return;
         }
         ACTIVE_SCOREBOARDS.remove(player.getUniqueId());
+        PACKET_SCOREBOARDS.remove(player.getUniqueId());
         publishState(player, null);
     }
 
@@ -228,32 +233,105 @@ public final class ScoreboardTemplateManager {
         }
     }
 
-    private static void applyTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
-        ScoreboardManager manager = Bukkit.getScoreboardManager();
-        if (manager == null) {
-            return;
+    static boolean hasAnimatedTemplates(FlowStorage storage) {
+        if (storage == null) {
+            return false;
         }
-        Scoreboard scoreboard = manager.getNewScoreboard();
-        String objectiveId = definition.getObjectiveId() != null ? definition.getObjectiveId() : definition.getId();
-        String title = ReSyncPlaceholderUtil.apply(player, definition.getTitle(), usePapi);
-        Objective objective = scoreboard.registerNewObjective(objectiveId, "dummy", TextFormatter.parse(title));
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-
-        List<String> lines = definition.getLines();
-        if (lines != null) {
-            int scoreValue = lines.size();
-            for (String line : lines) {
-                String formatted = ReSyncPlaceholderUtil.apply(player, line, usePapi);
-                String entry = TextFormatter.formatLegacy(formatted);
-                if (entry.length() > 40) {
-                    entry = entry.substring(0, 40);
-                }
-                Score score = objective.getScore(entry);
-                score.setScore(scoreValue);
-                scoreValue--;
+        for (ActiveScoreboardState state : ACTIVE_SCOREBOARDS.values()) {
+            if (state != null && hasAnimation(storage.getScoreboard(state.scoreboardId()))) {
+                return true;
             }
         }
-        player.setScoreboard(scoreboard);
+        String defaultId = storage.getDefaultScoreboardId();
+        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getScoreboard(defaultId));
+    }
+
+    private static void applyTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
+        if (!packetsAvailable()) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        PacketScoreboardState board = PACKET_SCOREBOARDS.get(playerId);
+        Component title = TextFormatter.parseResolved(ReSyncPlaceholderUtil.apply(player, definition.getTitle(), true));
+        List<String> sourceLines = definition.getLines() != null ? definition.getLines() : List.of();
+        int lineCount = Math.min(sourceLines.size(), LINE_ENTRIES.length);
+        if (board == null) {
+            board = new PacketScoreboardState(objectiveId(player), 0);
+            for (int index = 0; index < LINE_ENTRIES.length; index++) {
+                send(player, new WrapperPlayServerTeams(teamId(board, index), WrapperPlayServerTeams.TeamMode.REMOVE, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null));
+                send(player, new WrapperPlayServerResetScore(LINE_ENTRIES[index], board.objectiveId()));
+            }
+            send(player, new WrapperPlayServerScoreboardObjective(board.objectiveId(), WrapperPlayServerScoreboardObjective.ObjectiveMode.REMOVE, Component.empty(),
+                WrapperPlayServerScoreboardObjective.RenderType.INTEGER));
+            send(player, new WrapperPlayServerScoreboardObjective(board.objectiveId(), WrapperPlayServerScoreboardObjective.ObjectiveMode.CREATE, title,
+                WrapperPlayServerScoreboardObjective.RenderType.INTEGER, BlankScoreFormat.INSTANCE));
+            send(player, new WrapperPlayServerDisplayScoreboard(1, board.objectiveId()));
+        } else {
+            send(player, new WrapperPlayServerScoreboardObjective(board.objectiveId(), WrapperPlayServerScoreboardObjective.ObjectiveMode.UPDATE, title,
+                WrapperPlayServerScoreboardObjective.RenderType.INTEGER, BlankScoreFormat.INSTANCE));
+        }
+        for (int index = 0; index < lineCount; index++) {
+            String entry = LINE_ENTRIES[index];
+            Component line = TextFormatter.parseResolved(ReSyncPlaceholderUtil.apply(player, sourceLines.get(index), true));
+            send(player, new WrapperPlayServerUpdateScore(entry, WrapperPlayServerUpdateScore.Action.CREATE_OR_UPDATE_ITEM, board.objectiveId(), lineCount - index,
+                null, BlankScoreFormat.INSTANCE));
+            send(player, teamPacket(board, index, index < board.lineCount() ? WrapperPlayServerTeams.TeamMode.UPDATE : WrapperPlayServerTeams.TeamMode.CREATE, line, entry));
+        }
+        for (int index = lineCount; index < board.lineCount(); index++) {
+            send(player, new WrapperPlayServerTeams(teamId(board, index), WrapperPlayServerTeams.TeamMode.REMOVE, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null));
+            send(player, new WrapperPlayServerResetScore(LINE_ENTRIES[index], board.objectiveId()));
+        }
+        PACKET_SCOREBOARDS.put(playerId, new PacketScoreboardState(board.objectiveId(), lineCount));
+    }
+
+    private static WrapperPlayServerTeams teamPacket(PacketScoreboardState board, int index, WrapperPlayServerTeams.TeamMode mode, Component line, String entry) {
+        WrapperPlayServerTeams.ScoreBoardTeamInfo teamInfo = new WrapperPlayServerTeams.ScoreBoardTeamInfo(Component.empty(), line, Component.empty(),
+            WrapperPlayServerTeams.NameTagVisibility.ALWAYS, WrapperPlayServerTeams.CollisionRule.ALWAYS, NamedTextColor.WHITE, WrapperPlayServerTeams.OptionData.NONE);
+        return new WrapperPlayServerTeams(teamId(board, index), mode, teamInfo, mode == WrapperPlayServerTeams.TeamMode.CREATE ? List.of(entry) : List.of());
+    }
+
+    private static void removePacketScoreboard(Player player) {
+        PacketScoreboardState board = PACKET_SCOREBOARDS.remove(player.getUniqueId());
+        if (board == null || !packetsAvailable()) {
+            return;
+        }
+        for (int index = 0; index < board.lineCount(); index++) {
+            send(player, new WrapperPlayServerTeams(teamId(board, index), WrapperPlayServerTeams.TeamMode.REMOVE, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null));
+            send(player, new WrapperPlayServerResetScore(LINE_ENTRIES[index], board.objectiveId()));
+        }
+        send(player, new WrapperPlayServerScoreboardObjective(board.objectiveId(), WrapperPlayServerScoreboardObjective.ObjectiveMode.REMOVE, Component.empty(),
+            WrapperPlayServerScoreboardObjective.RenderType.INTEGER));
+    }
+
+    private static boolean packetsAvailable() {
+        PacketEventsAPI<?> api = PacketEvents.getAPI();
+        return api != null && api.isInitialized();
+    }
+
+    private static void send(Player player, PacketWrapper<?> packet) {
+        PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
+    }
+
+    private static String objectiveId(Player player) {
+        return "rs" + player.getUniqueId().toString().replace("-", "").substring(0, 14);
+    }
+
+    private static String teamId(PacketScoreboardState board, int index) {
+        return board.objectiveId() + ':' + index;
+    }
+
+    private static boolean hasAnimation(ScoreboardDefinition definition) {
+        if (definition == null) {
+            return false;
+        }
+        if (hasAnimation(definition.getTitle())) {
+            return true;
+        }
+        return definition.getLines() != null && definition.getLines().stream().anyMatch(ScoreboardTemplateManager::hasAnimation);
+    }
+
+    private static boolean hasAnimation(String value) {
+        return value != null && ANIMATION_PATTERN.matcher(value).find();
     }
 
     private static FlowStorage getFlowStorage() {
@@ -262,42 +340,7 @@ public final class ScoreboardTemplateManager {
 
     private static String findActiveScoreboardId(Player player) {
         ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
-        if (state != null) {
-            return state.scoreboardId();
-        }
-        FlowStorage storage = getFlowStorage();
-        if (player == null || storage == null || player.getScoreboard() == null) {
-            return null;
-        }
-        Objective objective = player.getScoreboard().getObjective(DisplaySlot.SIDEBAR);
-        if (objective == null) {
-            return null;
-        }
-        String objectiveName = objective.getName();
-        String defaultId = storage.getDefaultScoreboardId();
-        if (matchesScoreboardObjective(storage, defaultId, objectiveName)) {
-            ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(defaultId, storage.isDefaultScoreboardUsePapi()));
-            return defaultId;
-        }
-        for (String scoreboardId : storage.listScoreboardIds()) {
-            if (matchesScoreboardObjective(storage, scoreboardId, objectiveName)) {
-                ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(scoreboardId, true));
-                return scoreboardId;
-            }
-        }
-        return null;
-    }
-
-    private static boolean matchesScoreboardObjective(FlowStorage storage, String scoreboardId, String objectiveName) {
-        if (storage == null || scoreboardId == null || scoreboardId.isBlank() || objectiveName == null || objectiveName.isBlank()) {
-            return false;
-        }
-        ScoreboardDefinition definition = storage.getScoreboard(scoreboardId);
-        if (definition == null) {
-            return false;
-        }
-        String expected = definition.getObjectiveId() != null && !definition.getObjectiveId().isBlank() ? definition.getObjectiveId() : definition.getId();
-        return objectiveName.equals(expected);
+        return state != null ? state.scoreboardId() : null;
     }
 
     private static void publishState(Player player, String scoreboardId) {
@@ -322,5 +365,8 @@ public final class ScoreboardTemplateManager {
     }
 
     private record ActiveScoreboardState(String scoreboardId, boolean usePapi) {
+    }
+
+    private record PacketScoreboardState(String objectiveId, int lineCount) {
     }
 }

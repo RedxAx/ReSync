@@ -24,7 +24,8 @@
     "handler": "NetworkFlowHandler",
     "handlerConfig": { "operation": "network_servers" },
     "inputs": [
-      { "name": "flow", "pinType": "FLOW", "dataType": "execution" }
+      { "name": "flow", "pinType": "FLOW", "dataType": "execution" },
+      { "name": "category", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:resync:network_server_group", "defaultValue": "All Servers", "description": "Lists every known server, active network servers, or servers that are offline or revoked." }
     ],
     "outputs": [
       { "name": "servers", "dataType": "list<network_node>" },

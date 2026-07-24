@@ -2,7 +2,16 @@
   {
     "id": "call.function",
     "displayName": "Call Function",
+    "description": "Call a function selected directly or resolved from a function name at runtime.",
     "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "call",
+      "function",
+      "dynamic",
+      "programmatic"
+    ],
     "handler": "FunctionHandler",
     "handlerConfig": {
       "operation": "call_function"
@@ -15,7 +24,22 @@
       },
       {
         "name": "function",
-        "dataType": "string"
+        "dataType": "function",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:function"
+      },
+      {
+        "name": "arguments",
+        "dataType": "any",
+        "optional": true,
+        "description": "For one-input functions, connect the value directly. For multiple inputs, connect Arguments from Add Function Argument."
+      },
+      {
+        "name": "continue_on_failure",
+        "dataType": "boolean",
+        "widget": "TOGGLE",
+        "defaultValue": false,
+        "description": "Continue with a failed Result instead of stopping the Flow."
       }
     ],
     "outputs": [
@@ -23,9 +47,70 @@
         "name": "flow",
         "pinType": "FLOW",
         "dataType": "execution"
+      },
+      {
+        "name": "results",
+        "dataType": "map<string,any>"
+      },
+      {
+        "name": "result",
+        "dataType": "result<map<string,any>>"
+      }
+    ]
+  },
+  {
+    "id": "function.argument",
+    "displayName": "Add Function Argument",
+    "description": "Add one named value to a dynamic function call. Chain these nodes when the function has multiple inputs.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "argument", "input", "dynamic"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "argument"},
+    "inputs": [
+      {
+        "name": "arguments",
+        "dataType": "map<string,any>",
+        "optional": true,
+        "description": "Connect the previous Arguments output when adding another value."
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "description": "The input name declared by the function."
+      },
+      {
+        "name": "value",
+        "dataType": "any",
+        "description": "The player, item, text, number, or other value to pass."
       }
     ],
-    "hidden": true
+    "outputs": [
+      {"name": "arguments", "dataType": "map<string,any>"}
+    ]
+  },
+  {
+    "id": "function.result_value",
+    "displayName": "Get Function Result",
+    "description": "Read one named output from a dynamically selected function.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "result", "output", "dynamic"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "result"},
+    "inputs": [
+      {"name": "results", "dataType": "map<string,any>"},
+      {
+        "name": "name",
+        "dataType": "string",
+        "description": "The output name declared by the function."
+      }
+    ],
+    "outputs": [
+      {"name": "value", "dataType": "any"}
+    ]
   },
   {
     "id": "return",
@@ -143,5 +228,131 @@
     "inputs": [],
     "outputs": [],
     "hidden": true
+  },
+  {
+    "id": "function.list",
+    "displayName": "List Functions",
+    "description": "Get every callable function in alphabetical order.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "list", "catalog"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "list"},
+    "inputs": [],
+    "outputs": [
+      {"name": "functions", "dataType": "list<function>"}
+    ]
+  },
+  {
+    "id": "function.find",
+    "displayName": "Find Function",
+    "description": "Find a callable function by its exact name.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "find", "name", "lookup"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "find"},
+    "inputs": [
+      {"name": "name", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "function", "dataType": "function"},
+      {"name": "found", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<function>"}
+    ]
+  },
+  {
+    "id": "function.exists",
+    "displayName": "Function Exists",
+    "description": "Check whether a function name is available to call.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "exists", "check"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "exists"},
+    "inputs": [
+      {"name": "function", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function"}
+    ],
+    "outputs": [
+      {"name": "exists", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "function.index",
+    "displayName": "Find Function Index",
+    "description": "Find where a function appears in a list. An empty list searches every function.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "index", "list", "find"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "index"},
+    "inputs": [
+      {"name": "functions", "dataType": "list<function>", "optional": true},
+      {"name": "function", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function"}
+    ],
+    "outputs": [
+      {"name": "index", "dataType": "number"},
+      {"name": "found", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "function.at_index",
+    "displayName": "Function At Index",
+    "description": "Get the function at an index. An empty list uses every function.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "index", "list", "get"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "at_index"},
+    "inputs": [
+      {"name": "functions", "dataType": "list<function>", "optional": true},
+      {"name": "index", "dataType": "number"}
+    ],
+    "outputs": [
+      {"name": "function", "dataType": "function"},
+      {"name": "found", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<function>"}
+    ]
+  },
+  {
+    "id": "function.filter",
+    "displayName": "Filter Functions",
+    "description": "Find every function whose name contains the search text.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "filter", "search", "list"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "filter"},
+    "inputs": [
+      {"name": "query", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "functions", "dataType": "list<function>"}
+    ]
+  },
+  {
+    "id": "function.describe",
+    "displayName": "Function Details",
+    "description": "Get the input and output names of a function. Each value describes the expected type.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "details", "inputs", "outputs", "signature"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "describe"},
+    "inputs": [
+      {"name": "function", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function"}
+    ],
+    "outputs": [
+      {"name": "inputs", "dataType": "map<string,string>"},
+      {"name": "outputs", "dataType": "map<string,string>"},
+      {"name": "result", "dataType": "result<function>"}
+    ]
   }
 ]

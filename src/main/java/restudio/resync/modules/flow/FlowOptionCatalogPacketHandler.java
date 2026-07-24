@@ -81,7 +81,9 @@ public class FlowOptionCatalogPacketHandler {
         }
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
-            sender.sendOptionCatalog(session, sourceId, request.contextKey(), optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), sequence,
+            List<OptionCatalogItem> items = optionCatalogRegistry.items(sourceId, query);
+            List<String> values = items.stream().map(OptionCatalogItem::value).toList();
+            sender.sendOptionCatalog(session, sourceId, request.contextKey(), values, items, provider.revision(query), sequence,
                 provider.status(query), provider.diagnostic(query));
             return;
         }

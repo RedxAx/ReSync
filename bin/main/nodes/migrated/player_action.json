@@ -1427,6 +1427,92 @@
     ]
   },
   {
+    "id": "player.player_give_item_stack",
+    "displayName": "Give Item Stack",
+    "description": "Gives one complete item stack using the item amount, its maximum stack size, a custom amount, or a random amount. The optional forced stack size is applied through the item component before the stack is given.",
+    "category": "PLAYER",
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_give_item_stack"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "dataType": "player"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "size_mode",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": ["Item Amount", "Max Stack", "Custom", "Random"],
+        "defaultValue": "Item Amount",
+        "description": "Selects how the amount in the given stack is calculated."
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "visibleWhen": {"size_mode": "Custom"}
+      },
+      {
+        "name": "min_size",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "visibleWhen": {"size_mode": "Random"}
+      },
+      {
+        "name": "max_size",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 64,
+        "visibleWhen": {"size_mode": "Random"}
+      },
+      {
+        "name": "force_stack_size",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "description": "Overrides the item's maximum stack size with the Minecraft max stack size component."
+      },
+      {
+        "name": "forced_stack_size",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 64,
+        "visibleWhen": {"force_stack_size": "true"}
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      },
+      {
+        "name": "max_stack_size",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
     "id": "player.player_take_item",
     "displayName": "Player Take Item",
     "category": "PLAYER",

@@ -7,9 +7,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.FlowConnection;
+import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowSerializer;
+import restudio.flow.data.FlowTypeRef;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
 import restudio.resync.flow.handler.FlowHandlerException;
@@ -51,6 +54,8 @@ public class FlowExecutor {
     private static final long DEFAULT_MAX_EXECUTION_DURATION_MILLIS = 300_000L;
     private static final int DEFAULT_MAX_FUNCTION_CALL_DEPTH = 64;
     private static final int MAX_AUDIT_RECORDS = 1_024;
+    private static final Set<String> FUNCTION_CALL_RESERVED_INPUTS = Set.of("function", "arguments", "continue_on_failure");
+    private static final String CALL_PARAMETERS_KEY = "__call_parameters";
     private final HandlerRegistry handlerRegistry;
     private final NodeDefinitionRegistry nodeDefinitionRegistry;
     private final TypeAdapterRegistry typeAdapter;
@@ -472,7 +477,17 @@ public class FlowExecutor {
 
         String functionId = resolveFunctionCallId(runtime, node, definition);
         if (functionId != null) {
-            return executeFunctionCallNode(runtime, node, startNodeId, functionId, player, event, steps);
+            int depthBefore = runtime.getCallDepth();
+            CompletableFuture<Void> call = executeFunctionCallNode(runtime, node, startNodeId, functionId, player, event, steps);
+            if (!isRecoverableFunctionCall(runtime, node)) {
+                return call;
+            }
+            return call.handle((ignored, failure) -> {
+                if (failure == null) {
+                    return CompletableFuture.<Void>completedFuture(null);
+                }
+                return recoverFunctionCall(runtime, startNodeId, depthBefore, unwrapCompletionFailure(failure), player, event, steps);
+            }).thenCompose(result -> result);
         }
 
         NodeHandler handler = resolveHandler(node);
@@ -827,17 +842,22 @@ public class FlowExecutor {
                 "Add a Function Start node to " + functionId));
         }
 
-        Map<String, Object> callInputs = new HashMap<>();
-        if (functionGraph.getFunctionInputs() != null) {
-            for (FlowGraph.FunctionParameter input : functionGraph.getFunctionInputs()) {
-                if (input == null || input.getName() == null || input.getName().isBlank()) {
-                    continue;
-                }
-                callInputs.put(input.getName(), runtime.resolveInput(node, input.getName()));
-            }
+        FlowExecutionException contractFailure = validateFunctionCallContract(node, functionGraph, startNodeId);
+        if (contractFailure != null) {
+            return CompletableFuture.failedFuture(contractFailure);
         }
-
+        Map<String, Object> callInputs;
+        try {
+            callInputs = resolveFunctionInputs(runtime, node, startNodeId, functionGraph);
+        } catch (FlowExecutionException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+        FlowExecutionException inputFailure = validateFunctionInputs(functionGraph, callInputs, startNodeId);
+        if (inputFailure != null) {
+            return CompletableFuture.failedFuture(inputFailure);
+        }
         int depthBefore = runtime.getCallDepth();
+        List<FlowGraph.FunctionParameter> functionOutputs = functionGraph.getFunctionOutputs() != null ? List.copyOf(functionGraph.getFunctionOutputs()) : List.of();
         runtime.callFunction(functionGraph, startNodeId, callInputs);
         CompletableFuture<Void> functionExecution = execute(runtime, functionStartNodeId, player, event, steps + 1);
 
@@ -852,9 +872,189 @@ public class FlowExecutor {
                 callerNodeId = startNodeId;
             }
 
+            Map<String, Object> results = new HashMap<>();
+            for (FlowGraph.FunctionParameter output : functionOutputs) {
+                if (output != null && output.getName() != null && !output.getName().isBlank()) {
+                    results.put(output.getName(), runtime.getNodeOutput(callerNodeId, output.getName()));
+                }
+            }
+            runtime.setNodeOutput(callerNodeId, "results", results);
+            runtime.setNodeOutput(callerNodeId, "result", FlowOperationResult.success(results));
+
             List<String> nextNodeIds = findTargetNodes(runtime.getGraph(), callerNodeId, "flow");
             return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
         });
+    }
+
+    private Map<String, Object> resolveFunctionInputs(FlowRuntime runtime, FlowNode node, String nodeId,
+                                                      FlowGraph functionGraph) throws FlowExecutionException {
+        Map<String, Object> callInputs = new HashMap<>();
+        Object dynamicArguments = runtime.resolveInput(node, "arguments");
+        if (dynamicArguments instanceof Map<?, ?> arguments) {
+            for (Map.Entry<?, ?> argument : arguments.entrySet()) {
+                if (argument.getKey() != null) {
+                    callInputs.put(argument.getKey().toString(), argument.getValue());
+                }
+            }
+        } else if (dynamicArguments != null) {
+            List<FlowGraph.FunctionParameter> declared = functionGraph.getFunctionInputs() != null
+                ? functionGraph.getFunctionInputs().stream()
+                    .filter(input -> input != null && input.getName() != null && !input.getName().isBlank())
+                    .toList()
+                : List.of();
+            if (declared.size() != 1) {
+                throw new FlowExecutionException("FUNCTION_ARGUMENTS_NEED_NAMES",
+                    "This function has multiple inputs, so each value needs an argument name", null, nodeId,
+                    "Add named arguments to Call Function",
+                    Map.of("function", functionGraph.getId(), "inputCount", declared.size()));
+            }
+            callInputs.put(declared.getFirst().getName(), dynamicArguments);
+        }
+        if (functionGraph.getFunctionInputs() != null) {
+            for (FlowGraph.FunctionParameter input : functionGraph.getFunctionInputs()) {
+                if (input == null || input.getName() == null || input.getName().isBlank()) {
+                    continue;
+                }
+                if (FUNCTION_CALL_RESERVED_INPUTS.contains(input.getName())) {
+                    callInputs.putIfAbsent(input.getName(), null);
+                    continue;
+                }
+                boolean hasLiteral = node.getInputValues() != null && node.getInputValues().containsKey(input.getName());
+                boolean hasConnection = runtime.getGraph().getConnectionsToTarget(nodeId).stream()
+                    .anyMatch(connection -> input.getName().equals(connection.getTargetPin()));
+                if (hasLiteral || hasConnection || !callInputs.containsKey(input.getName())) {
+                    callInputs.put(input.getName(), runtime.resolveInput(node, input.getName()));
+                }
+            }
+        }
+        return callInputs;
+    }
+
+    private FlowExecutionException validateFunctionCallContract(FlowNode node, FlowGraph functionGraph, String nodeId) {
+        if (node.getInputValues() == null || !(node.getInputValues().get(CALL_PARAMETERS_KEY) instanceof Iterable<?> values)) {
+            return null;
+        }
+        Map<String, FlowTypeRef> declared = new LinkedHashMap<>();
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> entry) || entry.get("name") == null || entry.get("type") == null) {
+                return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_INVALID", "Function argument needs a name and type", null, nodeId,
+                    "Remove the invalid argument and add it again", Map.of("function", functionGraph.getId()));
+            }
+            String name = entry.get("name").toString().trim();
+            FlowTypeRef type;
+            try {
+                type = FlowTypeRef.parse(entry.get("type").toString()).normalizedGenerics();
+            } catch (IllegalArgumentException exception) {
+                return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_TYPE_INVALID", "Function argument type is invalid: " + name, exception, nodeId,
+                    "Choose the type expected by the called function", Map.of("argument", name, "function", functionGraph.getId()));
+            }
+            if (declared.putIfAbsent(name, type) != null) {
+                return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_DUPLICATE", "Function argument is declared more than once: " + name, null, nodeId,
+                    "Remove or rename the duplicate argument", Map.of("argument", name, "function", functionGraph.getId()));
+            }
+        }
+        if (declared.isEmpty()) {
+            return null;
+        }
+        Map<String, FlowTypeRef> expected = new LinkedHashMap<>();
+        if (functionGraph.getFunctionInputs() != null) {
+            for (FlowGraph.FunctionParameter parameter : functionGraph.getFunctionInputs()) {
+                if (parameter != null && parameter.getName() != null && !parameter.getName().isBlank()) {
+                    expected.put(parameter.getName(), parameter.getTypeRef().normalizedGenerics());
+                }
+            }
+        }
+        List<String> missing = expected.keySet().stream().filter(name -> !declared.containsKey(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        List<String> unknown = declared.keySet().stream().filter(name -> !expected.containsKey(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        if (!missing.isEmpty() || !unknown.isEmpty()) {
+            return new FlowExecutionException("FUNCTION_CALL_ARGUMENTS_DO_NOT_MATCH", "Function arguments do not match the selected function", null, nodeId,
+                "Match the argument names to the function inputs", Map.of(
+                    "function", functionGraph.getId(),
+                    "missing", missing,
+                    "unknown", unknown
+                ));
+        }
+        for (Map.Entry<String, FlowTypeRef> argument : declared.entrySet()) {
+            FlowTypeRef expectedType = expected.get(argument.getKey());
+            if (!expectedType.equals(argument.getValue())) {
+                return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_TYPE_MISMATCH",
+                    "Argument " + argument.getKey() + " is " + argument.getValue() + " but the function expects " + expectedType, null, nodeId,
+                    "Choose the same type as the function input", Map.of(
+                        "argument", argument.getKey(),
+                        "declaredType", argument.getValue().toString(),
+                        "expectedType", expectedType.toString(),
+                        "function", functionGraph.getId()
+                    ));
+            }
+        }
+        return null;
+    }
+
+    private FlowExecutionException validateFunctionInputs(FlowGraph functionGraph, Map<String, Object> inputs, String nodeId) {
+        Set<String> declared = new HashSet<>();
+        List<FlowGraph.FunctionParameter> parameters = functionGraph.getFunctionInputs() != null ? functionGraph.getFunctionInputs() : List.of();
+        for (FlowGraph.FunctionParameter parameter : parameters) {
+            if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
+                continue;
+            }
+            String name = parameter.getName();
+            declared.add(name);
+            Object value = inputs.get(name);
+            if (value == null && parameter.getDefaultValue() != null && !parameter.getDefaultValue().isBlank()) {
+                value = parameter.getDefaultValue();
+            }
+            if (value == null) {
+                return new FlowExecutionException("FUNCTION_ARGUMENT_REQUIRED", "Function argument is missing: " + name, null, nodeId,
+                    "Connect " + name + " on Call Function", Map.of("argument", name, "function", functionGraph.getId()));
+            }
+            FlowDataType type = parameter.getType();
+            Class<?> javaType = type != null ? type.getJavaType() : Object.class;
+            Object adapted = javaType == null || Object.class.equals(javaType) ? value : typeAdapter.adapt(value, javaType);
+            if (adapted == null) {
+                return new FlowExecutionException("FUNCTION_ARGUMENT_TYPE_MISMATCH", "Function argument has the wrong type: " + name, null, nodeId,
+                    "Provide a value compatible with " + parameter.getTypeRef(), Map.of(
+                        "argument", name,
+                        "expectedType", parameter.getTypeRef().toString(),
+                        "actualType", value.getClass().getSimpleName(),
+                        "function", functionGraph.getId()
+                    ));
+            }
+            inputs.put(name, adapted);
+        }
+        List<String> unknown = inputs.keySet().stream().filter(name -> !declared.contains(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        if (!unknown.isEmpty()) {
+            return new FlowExecutionException("FUNCTION_ARGUMENT_UNKNOWN", "Function arguments are not declared: " + String.join(", ", unknown), null, nodeId,
+                "Remove the unknown arguments or update the function signature", Map.of("arguments", unknown, "function", functionGraph.getId()));
+        }
+        return null;
+    }
+
+    private boolean isRecoverableFunctionCall(FlowRuntime runtime, FlowNode node) {
+        if (!"call.function".equals(node.getType()) && !"call_function".equals(node.getType())) {
+            return false;
+        }
+        Object value = runtime.resolveInput(node, "continue_on_failure");
+        return value instanceof Boolean flag ? flag : Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private CompletableFuture<Void> recoverFunctionCall(FlowRuntime runtime, String nodeId, int depthBefore, Throwable failure,
+                                                         Player player, Event event, int steps) {
+        while (runtime.getCallDepth() > depthBefore) {
+            runtime.returnFromFunction(Collections.emptyMap());
+        }
+        runtime.consumeFunctionReturnRequested();
+        runtime.consumeReturnedCallerNodeId();
+        FlowExecutionException executionFailure = failure instanceof FlowExecutionException value
+            ? value
+            : new FlowExecutionException("FUNCTION_CALL_FAILED", failure != null && failure.getMessage() != null ? failure.getMessage() : "Function Call Failed",
+                failure, nodeId, "Review the selected function and its arguments");
+        runtime.setNodeOutput(nodeId, "results", Map.of());
+        runtime.setNodeOutput(nodeId, "result", FlowOperationResult.failure(
+            executionFailure.getCode(),
+            executionFailure.getMessage(),
+            executionFailure.getDetails()
+        ));
+        return executeTargets(runtime, findTargetNodes(runtime.getGraph(), nodeId, "flow"), player, event, steps + 1);
     }
 
     private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, String operation, Player player, Event event, int steps) {

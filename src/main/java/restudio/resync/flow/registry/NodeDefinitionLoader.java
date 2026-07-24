@@ -682,13 +682,14 @@ public class NodeDefinitionLoader {
 
     private NodeDefinition.PinDefinition toPinDefinition(PinJson pin, NodeDefinition.PinDirection direction) {
         NodeDefinition.PinType pinType = pin.pinType != null ? pin.pinType : NodeDefinition.PinType.DATA;
+        String declaredType = semanticCatalogType(pin.optionsSource, pin.dataType);
         FlowTypeRef typeRef;
         try {
-            typeRef = pin.dataType == null || pin.dataType.isBlank()
+            typeRef = declaredType == null || declaredType.isBlank()
                 ? FlowTypeRef.simple(pinType == NodeDefinition.PinType.FLOW ? "execution" : "any")
-                : FlowTypeRef.parse(pin.dataType);
+                : FlowTypeRef.parse(declaredType);
         } catch (IllegalArgumentException exception) {
-            Log.warn("[NodeDefinitionLoader] Invalid dataType expression: " + pin.dataType);
+            Log.warn("[NodeDefinitionLoader] Invalid dataType expression: " + declaredType);
             return null;
         }
         FlowDataType dataType = typeRef.isTypeVariable() ? FlowDataType.ANY : parseAndValidateDataType(typeRef.getTypeId(), pinType);
@@ -733,6 +734,33 @@ public class NodeDefinitionLoader {
             typeRef,
             repeatable
         );
+    }
+
+    private String semanticCatalogType(String optionsSource, String fallback) {
+        if (optionsSource == null || !optionsSource.startsWith("server:resync:")) {
+            return fallback;
+        }
+        return switch (optionsSource.substring("server:resync:".length())) {
+            case "flow" -> "flow_id";
+            case "function" -> "function";
+            case "command" -> "command_id";
+            case "custom_content" -> "custom_content_id";
+            case "gui" -> "gui_id";
+            case "scoreboard" -> "scoreboard_id";
+            case "tab" -> "tab_id";
+            case "chat" -> "chat_id";
+            case "motd_profile" -> "motd_profile_id";
+            case "message_rule" -> "message_rule_id";
+            case "recipe_definition" -> "recipe_id";
+            case "text_template" -> "text_template_id";
+            case "advancement_tree" -> "advancement_tree_id";
+            case "dialog" -> "dialog_id";
+            case "trade_profile" -> "trade_profile_id";
+            case "npc_definition" -> "npc_id";
+            case "loot_table" -> "loot_table_id";
+            case "worldgen" -> "worldgen_id";
+            default -> fallback;
+        };
     }
 
     private FlowDataType parseAndValidateDataType(String raw, NodeDefinition.PinType pinType) {

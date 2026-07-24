@@ -9,10 +9,12 @@ import java.nio.charset.StandardCharsets;
 public class FlowResourcePacketHandler<T> {
     private final FlowResourceAdapter<T> adapter;
     private final FlowPacketSender sender;
+    private final FlowResourceRegistry registry;
 
-    public FlowResourcePacketHandler(FlowResourceAdapter<T> adapter, FlowPacketSender sender) {
+    public FlowResourcePacketHandler(FlowResourceAdapter<T> adapter, FlowPacketSender sender, FlowResourceRegistry registry) {
         this.adapter = adapter;
         this.sender = sender;
+        this.registry = registry;
     }
 
     public boolean handle(Session session, byte packetId, ByteBuffer buffer) {
@@ -83,6 +85,7 @@ public class FlowResourcePacketHandler<T> {
             adapter.validate(value);
             adapter.save(value);
             adapter.afterSave(session, value);
+            registry.notifySaved(adapter, value);
             adapter.sendSaveAck(session, id, payload.requestId());
             sender.succeedJob(job, id, "Saved");
         } catch (Exception exception) {
@@ -104,6 +107,7 @@ public class FlowResourcePacketHandler<T> {
         try {
             adapter.delete(id);
             adapter.afterDelete(session, id);
+            registry.notifyDeleted(adapter.descriptor().typeId(), id);
             sender.succeedJob(job, id, "Deleted");
         } catch (Exception exception) {
             sender.failJob(job, exception.getMessage(), exception);

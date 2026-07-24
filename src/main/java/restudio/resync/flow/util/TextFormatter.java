@@ -40,6 +40,10 @@ public final class TextFormatter {
         if (service != null) {
             return service.render(text, null, null);
         }
+        return parseResolved(text);
+    }
+
+    public static Component parseResolved(String text) {
         if (text == null || text.isEmpty()) {
             return Component.empty();
         }

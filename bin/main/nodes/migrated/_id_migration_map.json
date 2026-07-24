@@ -749,6 +749,7 @@
   "player_send_sign": "player.player_send_sign",
   "player_send_raw_json": "player.player_send_raw_json",
   "player_give_item": "player.player_give_item",
+  "player_give_item_stack": "player.player_give_item_stack",
   "player_take_item": "player.player_take_item",
   "player_set_item": "player.player_set_item",
   "player_clear_slot": "player.player_clear_slot",

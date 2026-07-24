@@ -292,8 +292,8 @@ public final class NodeDefinitionBuildValidator {
                 errors.add(id + "." + name + " uses an object for options; dynamic catalogs require optionsSource");
             }
             if (pin.has("repeatable")) {
-                if (!"inputs".equals(key) || !pin.get("repeatable").isJsonObject()) {
-                    errors.add(id + "." + name + " has invalid repeatable input metadata");
+                if (!pin.get("repeatable").isJsonObject()) {
+                    errors.add(id + "." + name + " has invalid repeatable pin metadata");
                 } else {
                     JsonObject repeatable = pin.getAsJsonObject("repeatable");
                     String groupId = string(repeatable, "groupId");

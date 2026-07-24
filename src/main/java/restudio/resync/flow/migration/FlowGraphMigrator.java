@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class FlowGraphMigrator {
+    private static final String PASSTHROUGH_OUTPUT_PREFIX = "__passthrough:";
     private static final Set<String> LEGACY_EVENT_FLOW_PINS = Set.of("next", "left", "right", "middle", "shift_left", "shift_right");
     private static final Map<Character, String> LEGACY_NAMED_COLORS = Map.ofEntries(
         Map.entry('0', "black"), Map.entry('1', "dark_blue"), Map.entry('2', "dark_green"), Map.entry('3', "dark_aqua"),
@@ -125,6 +126,7 @@ public class FlowGraphMigrator {
         int changedNodes = 0;
         boolean legacyGraph = forceLegacyGraph || graph.getVersion() <= 0;
         boolean outdatedGraph = forceLegacyGraph || graph.getVersion() < FlowGraph.CURRENT_VERSION;
+        boolean malformedPassthroughGraph = hasRawPassthroughConnections(graph);
         if (outdatedGraph) {
             graph.setVersion(FlowGraph.CURRENT_VERSION);
             migrateGraphMetadata(graph);
@@ -150,7 +152,7 @@ public class FlowGraphMigrator {
                 changed = true;
                 nodeChanged = true;
             }
-            if (migrateNodeValues(graph, node, originalType, outdatedGraph)) {
+            if (migrateNodeValues(graph, node, originalType, outdatedGraph, malformedPassthroughGraph)) {
                 changed = true;
                 nodeChanged = true;
             }
@@ -237,7 +239,7 @@ public class FlowGraphMigrator {
         return changed;
     }
 
-    private boolean migrateNodeValues(FlowGraph graph, FlowNode node, String originalType, boolean outdatedGraph) {
+    private boolean migrateNodeValues(FlowGraph graph, FlowNode node, String originalType, boolean outdatedGraph, boolean malformedPassthroughGraph) {
         if (node == null) {
             return false;
         }
@@ -256,6 +258,14 @@ public class FlowGraphMigrator {
         }
         if (outdatedGraph && "entity.kill".equals(node.getType()) && inputValues.remove("action") != null) {
             changed = true;
+        }
+        if ((outdatedGraph || node.getVersion() < targetNodeVersion(node) || malformedPassthroughGraph) && "if".equals(node.getType()) && !inputValues.containsKey("condition")) {
+            String nodeId = graph != null ? graph.findNodeId(node) : null;
+            boolean connected = graph != null && nodeId != null && graph.getConnections().stream().anyMatch(connection -> nodeId.equals(connection.getTargetNodeId()) && "condition".equals(connection.getTargetPin()));
+            if (!connected) {
+                inputValues.put("condition", false);
+                changed = true;
+            }
         }
         if ("custom_content.item".equals(node.getType()) || "custom_content.block".equals(node.getType()) || "custom_content.armor".equals(node.getType())) {
             Object legacyArmorSlot = inputValues.remove("armor_slot");
@@ -539,6 +549,9 @@ public class FlowGraphMigrator {
             if (connection == null) {
                 continue;
             }
+            if (normalizePassthroughSource(graph, connection)) {
+                changed = true;
+            }
             FlowNode sourceNode = graph.getNodes().get(connection.getSourceNodeId());
             FlowNode targetNode = graph.getNodes().get(connection.getTargetNodeId());
             String originalSourceType = originalTypes.get(connection.getSourceNodeId());
@@ -564,7 +577,59 @@ public class FlowGraphMigrator {
                 changed = true;
             }
         }
+        if (changed) {
+            graph.setConnections(new ArrayList<>(graph.getConnections()));
+        }
         return changed;
+    }
+
+    private boolean normalizePassthroughSource(FlowGraph graph, FlowConnection connection) {
+        String editorNodeId = connection.getEditorSourceNodeId();
+        String editorPin = connection.getEditorSourcePin();
+        boolean rawPassthrough = passthrough(connection.getSourcePin());
+        if (!rawPassthrough && !passthrough(editorPin)) {
+            return false;
+        }
+        String visibleNodeId = rawPassthrough ? connection.getSourceNodeId() : editorNodeId;
+        String visiblePin = rawPassthrough ? connection.getSourcePin() : editorPin;
+        ResolvedSource resolved = resolvePassthroughSource(graph, visibleNodeId, visiblePin, new HashSet<>());
+        if (resolved == null || passthrough(resolved.pin())) {
+            return false;
+        }
+        boolean changed = !equals(resolved.nodeId(), connection.getSourceNodeId()) || !equals(resolved.pin(), connection.getSourcePin());
+        connection.setSourceNodeId(resolved.nodeId());
+        connection.setSourcePin(resolved.pin());
+        if (rawPassthrough) {
+            connection.setEditorSourceNodeId(visibleNodeId);
+            connection.setEditorSourcePin(visiblePin);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private ResolvedSource resolvePassthroughSource(FlowGraph graph, String nodeId, String pin, Set<String> visited) {
+        if (!passthrough(pin)) {
+            return new ResolvedSource(nodeId, pin);
+        }
+        if (nodeId == null || !visited.add(nodeId + ':' + pin)) {
+            return null;
+        }
+        String inputPin = pin.substring(PASSTHROUGH_OUTPUT_PREFIX.length());
+        FlowConnection incoming = graph.getConnections().stream().filter(connection -> connection != null && nodeId.equals(connection.getTargetNodeId()) && inputPin.equals(connection.getTargetPin())).findFirst().orElse(null);
+        if (incoming == null) {
+            return null;
+        }
+        String nextNodeId = passthrough(incoming.getEditorSourcePin()) ? incoming.getEditorSourceNodeId() : incoming.getSourceNodeId();
+        String nextPin = passthrough(incoming.getEditorSourcePin()) ? incoming.getEditorSourcePin() : incoming.getSourcePin();
+        return resolvePassthroughSource(graph, nextNodeId, nextPin, visited);
+    }
+
+    private boolean passthrough(String pin) {
+        return pin != null && pin.startsWith(PASSTHROUGH_OUTPUT_PREFIX);
+    }
+
+    private boolean hasRawPassthroughConnections(FlowGraph graph) {
+        return graph != null && graph.getConnections().stream().filter(connection -> connection != null).anyMatch(connection -> passthrough(connection.getSourcePin()));
     }
 
     private boolean isLegacyBreakContinuation(String originalType, FlowNode sourceNode, String pin) {
@@ -698,6 +763,9 @@ public class FlowGraphMigrator {
 
     private boolean equals(String first, String second) {
         return first == null ? second == null : first.equals(second);
+    }
+
+    private record ResolvedSource(String nodeId, String pin) {
     }
 
     private record GraphMigrationResult(boolean changed, int changedNodes) {

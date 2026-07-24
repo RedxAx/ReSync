@@ -3665,11 +3665,31 @@
     ]
   },
   {
+    "id": "entity.entity_data_entry",
+    "displayName": "Entity Data Entry",
+    "category": "ENTITY",
+    "handler": "EntityActionHandler",
+    "handlerConfig": {"operation": "entity_data_entry"},
+    "inputs": [
+      {"name": "data", "dataType": "entity_data", "optional": true},
+      {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_writable_data_property", "defaultValue": "custom_name"},
+      {"name": "text", "dataType": "string", "visibleWhen": {"property": "custom_name"}},
+      {"name": "boolean", "dataType": "boolean", "visibleWhen": {"property": "custom_name_visible,glowing,silent,invulnerable,gravity,visual_fire,ai,collidable,can_pickup_items,persistent,remove_when_far_away,age_locked,baby,incendiary,powered,ignited"}},
+      {"name": "number", "dataType": "number", "visibleWhen": {"property": "fire_ticks,freeze_ticks,ticks_lived,fall_distance,portal_cooldown,health,absorption,age,fuse_ticks,yield,explosion_radius,max_fuse_ticks,attribute:*"}},
+      {"name": "vector", "dataType": "vector", "visibleWhen": {"property": "velocity"}},
+      {"name": "location", "dataType": "location", "visibleWhen": {"property": "location"}},
+      {"name": "reference", "dataType": "living_entity", "optional": true, "visibleWhen": {"property": "target"}}
+    ],
+    "outputs": [{"name": "data", "dataType": "entity_data"}],
+    "kind": "QUERY"
+  },
+  {
     "id": "entity.entity_text_data_entry",
     "displayName": "Entity Text Data Entry",
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "text"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_text_property", "defaultValue": "custom_name"},
@@ -3684,6 +3704,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "boolean"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_boolean_property", "defaultValue": "glowing"},
@@ -3698,6 +3719,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_number_property", "defaultValue": "fuse_ticks"},
@@ -3712,6 +3734,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "vector"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_vector_property", "defaultValue": "velocity"},
@@ -3726,6 +3749,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "location"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_location_property", "defaultValue": "location"},
@@ -3740,6 +3764,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "reference"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:entity_reference_property", "defaultValue": "target"},
@@ -3754,6 +3779,7 @@
     "category": "ENTITY",
     "handler": "EntityActionHandler",
     "handlerConfig": {"operation": "entity_data_entry", "valuePin": "number", "propertyPrefix": "attribute:"},
+    "hidden": true,
     "inputs": [
       {"name": "data", "dataType": "entity_data", "optional": true},
       {"name": "property", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:attribute", "defaultValue": "minecraft:max_health"},

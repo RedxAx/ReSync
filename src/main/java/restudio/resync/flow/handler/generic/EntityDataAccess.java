@@ -267,6 +267,24 @@ final class EntityDataAccess {
         return number;
     }
 
+    static String valuePin(String rawProperty) {
+        String property = property(rawProperty);
+        if (property.startsWith("attribute:")) {
+            return "number";
+        }
+        return switch (property) {
+            case "custom_name", "name" -> "text";
+            case "custom_name_visible", "name_visible", "glowing", "silent", "invulnerable", "gravity", "visual_fire", "ai", "collidable",
+                 "can_pickup_items", "pickup_items", "persistent", "remove_when_far_away", "age_locked", "baby", "incendiary", "powered", "ignited" -> "boolean";
+            case "fire_ticks", "burning", "freeze_ticks", "frozen", "ticks_lived", "fall_distance", "portal_cooldown", "health", "absorption",
+                 "age", "fuse_ticks", "yield", "explosion_radius", "max_fuse_ticks" -> "number";
+            case "velocity" -> "vector";
+            case "location" -> "location";
+            case "target" -> "reference";
+            default -> throw new IllegalArgumentException("Unsupported entity data property: " + property);
+        };
+    }
+
     private static String property(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Entity data property is required");

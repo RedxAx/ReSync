@@ -48,8 +48,38 @@ class FunctionHandlerTest {
         assertEquals("FUNCTION_OUTPUT_NAME_REQUIRED", outputFailure.getCode());
     }
 
+    @Test
+    void namedArgumentsCanBeBuiltAndFunctionResultsCanBeRead() {
+        FunctionHandler handler = new FunctionHandler();
+        FlowNode argument = node("argument", Map.of(
+            "arguments", Map.of("player", "Alex"),
+            "name", "item",
+            "value", "diamond"
+        ));
+        FlowContext argumentContext = context("argument", argument);
+
+        handler.execute(argumentContext, argument);
+
+        assertEquals(Map.of("player", "Alex", "item", "diamond"), argumentContext.getOutput(argument, "arguments"));
+
+        FlowNode result = node("result", Map.of(
+            "results", Map.of("message", "Done"),
+            "name", "message"
+        ));
+        FlowContext resultContext = context("result", result);
+
+        handler.execute(resultContext, result);
+
+        assertEquals("Done", resultContext.getOutput(result, "value"));
+    }
+
     private FlowContext context() {
         FlowGraph graph = new FlowGraph("test", Map.of(), List.of(), List.of());
+        return new FlowContext(new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of()), null, null);
+    }
+
+    private FlowContext context(String nodeId, FlowNode node) {
+        FlowGraph graph = new FlowGraph("test", Map.of(nodeId, node), List.of(), List.of());
         return new FlowContext(new FlowRuntime(graph, new TypeAdapterRegistry(), Map.of()), null, null);
     }
 

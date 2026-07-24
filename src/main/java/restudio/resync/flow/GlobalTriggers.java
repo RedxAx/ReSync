@@ -17,10 +17,12 @@ import restudio.resync.flow.triggers.TriggerDefinitions;
 import restudio.resync.flow.triggers.TriggerDispatcher;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.text.ReTextService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class GlobalTriggers implements Listener {
     private final FlowExecutor executor;
     private final TriggerRegistry triggerRegistry;
     private final TriggerDispatcher triggerDispatcher;
+    private final ReTextService text;
     private SystemEventListener systemEventListener;
     private final Gson gson = new Gson();
 
@@ -116,11 +119,12 @@ public class GlobalTriggers implements Listener {
         }
     }
 
-    public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry) {
+    public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry, ReTextService text) {
         this.plugin = triggerRegistry.getPlugin();
         this.storage = storage;
         this.executor = executor;
         this.triggerRegistry = triggerRegistry;
+        this.text = text;
         this.triggerDispatcher = new TriggerDispatcher(storage, executor, triggerRegistry.getPlugin());
         this.triggerDispatcher.registerFromContainer(new TriggerDefinitions());
         this.systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
@@ -244,7 +248,7 @@ public class GlobalTriggers implements Listener {
         if (args == null || args.isBlank()) {
             return parsed;
         }
-        for (String part : args.split(" ")) {
+        for (String part : args.trim().split("\\s+")) {
             if (!part.isBlank()) {
                 parsed.add(part);
             }
@@ -294,6 +298,21 @@ public class GlobalTriggers implements Listener {
             return values;
         }
         String lower = token.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("<text:") && lower.endsWith(">")) {
+            String reference = token.substring("<text:".length(), token.length() - 1).trim();
+            boolean valuesMode = reference.toLowerCase(Locale.ROOT).endsWith(":values");
+            String resourceId = valuesMode ? reference.substring(0, reference.length() - ":values".length()).trim() : reference;
+            ReTextService.ReTextResource resource = text != null ? text.resource(resourceId) : null;
+            if (resource == null) {
+                return values;
+            }
+            if (resource.kind() == ReTextService.ReTextKind.LIST) {
+                values.addAll(resource.lines());
+            } else if (resource.kind() == ReTextService.ReTextKind.MAP) {
+                values.addAll(valuesMode ? resource.entries().values() : resource.entries().keySet());
+            }
+            return new ArrayList<>(new LinkedHashSet<>(values));
+        }
         if (lower.startsWith("<player_with_perm:") && lower.endsWith(">")) {
             String permission = token.substring("<player_with_perm:".length(), token.length() - 1).trim();
             if (!permission.isBlank()) {
@@ -319,41 +338,109 @@ public class GlobalTriggers implements Listener {
         if (!dynamicValues.isEmpty()) {
             return dynamicValues.stream().anyMatch(value -> value.equalsIgnoreCase(arg));
         }
+        if (isTextToken(token)) {
+            return false;
+        }
         if (token.startsWith("<") && token.endsWith(">")) {
             return true;
         }
         return token.equalsIgnoreCase(arg);
     }
 
-    private List<String> collectPathSuggestions(CommandTrigger trigger, List<String> argsTokens, String currentArg) {
-        List<String> suggestions = new ArrayList<>();
-        int index = argsTokens.size();
-        for (List<String> path : trigger.commandPaths) {
-            if (path.size() <= index) {
-                continue;
-            }
-            boolean prefixMatches = true;
-            for (int i = 0; i < index; i++) {
-                if (path.size() <= i || !tokenMatches(path.get(i), argsTokens.get(i))) {
-                    prefixMatches = false;
-                    break;
+    private boolean matchesCommandPath(List<String> path, List<String> args) {
+        return matchesCommandPath(path, 0, args, 0);
+    }
+
+    private boolean matchesCommandPath(List<String> path, int pathIndex, List<String> args, int argIndex) {
+        if (pathIndex >= path.size()) {
+            return true;
+        }
+        if (argIndex >= args.size()) {
+            return false;
+        }
+        String token = path.get(pathIndex);
+        if (isTextToken(token)) {
+            for (String value : resolveDynamicTokenValues(token)) {
+                List<String> valueTokens = parseArgsList(value);
+                if (!valueTokens.isEmpty() && matchesArguments(valueTokens, args, argIndex)
+                    && matchesCommandPath(path, pathIndex + 1, args, argIndex + valueTokens.size())) {
+                    return true;
                 }
             }
-            if (!prefixMatches) {
-                continue;
-            }
-            String token = path.get(index);
-            List<String> tokenValues = resolveDynamicTokenValues(token);
-            if (tokenValues.isEmpty()) {
-                tokenValues = List.of(token);
-            }
-            for (String value : tokenValues) {
-                if (value.toLowerCase(Locale.ROOT).startsWith(currentArg.toLowerCase(Locale.ROOT))) {
-                    suggestions.add(value);
-                }
+            return false;
+        }
+        return tokenMatches(token, args.get(argIndex)) && matchesCommandPath(path, pathIndex + 1, args, argIndex + 1);
+    }
+
+    private boolean matchesArguments(List<String> expected, List<String> args, int argIndex) {
+        if (argIndex + expected.size() > args.size()) {
+            return false;
+        }
+        for (int index = 0; index < expected.size(); index++) {
+            if (!expected.get(index).equalsIgnoreCase(args.get(argIndex + index))) {
+                return false;
             }
         }
-        return suggestions;
+        return true;
+    }
+
+    private List<String> collectPathSuggestions(CommandTrigger trigger, List<String> argsTokens, String currentArg) {
+        List<String> suggestions = new ArrayList<>();
+        for (List<String> path : trigger.commandPaths) {
+            collectPathSuggestions(path, 0, argsTokens, 0, currentArg, suggestions);
+        }
+        return new ArrayList<>(new LinkedHashSet<>(suggestions));
+    }
+
+    private void collectPathSuggestions(List<String> path, int pathIndex, List<String> args, int argIndex, String currentArg, List<String> suggestions) {
+        if (pathIndex >= path.size()) {
+            return;
+        }
+        String token = path.get(pathIndex);
+        if (isTextToken(token)) {
+            for (String value : resolveDynamicTokenValues(token)) {
+                List<String> valueTokens = parseArgsList(value);
+                if (valueTokens.isEmpty()) {
+                    continue;
+                }
+                int valueIndex = 0;
+                int cursor = argIndex;
+                while (cursor < args.size() && valueIndex < valueTokens.size() && valueTokens.get(valueIndex).equalsIgnoreCase(args.get(cursor))) {
+                    cursor++;
+                    valueIndex++;
+                }
+                if (cursor < args.size() && valueIndex < valueTokens.size()) {
+                    continue;
+                }
+                if (cursor == args.size() && valueIndex < valueTokens.size()) {
+                    addSuggestion(valueTokens.get(valueIndex), currentArg, suggestions);
+                    continue;
+                }
+                collectPathSuggestions(path, pathIndex + 1, args, cursor, currentArg, suggestions);
+            }
+            return;
+        }
+        if (argIndex < args.size()) {
+            if (tokenMatches(token, args.get(argIndex))) {
+                collectPathSuggestions(path, pathIndex + 1, args, argIndex + 1, currentArg, suggestions);
+            }
+            return;
+        }
+        List<String> values = resolveDynamicTokenValues(token);
+        if (values.isEmpty()) {
+            values = List.of(token);
+        }
+        values.forEach(value -> addSuggestion(value, currentArg, suggestions));
+    }
+
+    private void addSuggestion(String value, String currentArg, List<String> suggestions) {
+        if (value.toLowerCase(Locale.ROOT).startsWith(currentArg.toLowerCase(Locale.ROOT))) {
+            suggestions.add(value);
+        }
+    }
+
+    private boolean isTextToken(String token) {
+        return token != null && token.toLowerCase(Locale.ROOT).startsWith("<text:") && token.endsWith(">");
     }
 
     private boolean executeCommandTrigger(CommandTrigger trigger, String commandLabel, String args, Player player, Event event, boolean isConsole) {
@@ -363,23 +450,7 @@ public class GlobalTriggers implements Listener {
         List<String> argsList = parseArgsList(args);
         String firstArg = argsList.isEmpty() ? "" : argsList.getFirst();
         if (trigger.structured && !trigger.commandPaths.isEmpty()) {
-            boolean matchedPath = false;
-            for (List<String> path : trigger.commandPaths) {
-                if (argsList.size() < path.size()) {
-                    continue;
-                }
-                boolean allMatch = true;
-                for (int i = 0; i < path.size(); i++) {
-                    if (!tokenMatches(path.get(i), argsList.get(i))) {
-                        allMatch = false;
-                        break;
-                    }
-                }
-                if (allMatch) {
-                    matchedPath = true;
-                    break;
-                }
-            }
+            boolean matchedPath = trigger.commandPaths.stream().anyMatch(path -> matchesCommandPath(path, argsList));
             if (!matchedPath) {
                 return false;
             }

@@ -1,0 +1,501 @@
+[
+  {
+    "id": "gui.open",
+    "displayName": "Open GUI",
+    "description": "Open a saved GUI for the current player.",
+    "category": "MENU",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_apply", "resource_type": "gui", "resource_pin": "gui", "value_pin": "opened"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "gui", "dataType": "gui_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:gui", "required": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "opened", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"}
+    ]
+  },
+  {
+    "id": "tab.apply",
+    "displayName": "Apply Tab List",
+    "description": "Apply a saved tab list to the current player.",
+    "category": "TAB_LIST",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_apply", "resource_type": "tab", "resource_pin": "tab", "value_pin": "applied"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "tab", "dataType": "tab_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:tab", "required": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "applied", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"}
+    ]
+  },
+  {
+    "id": "gui.get",
+    "displayName": "Get GUI",
+    "description": "Get a saved GUI as a typed value.",
+    "category": "MENU",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "gui", "resource_pin": "gui", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "gui", "dataType": "gui_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:gui"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "gui_definition"}, {"name": "result", "dataType": "result<gui_definition>"}]
+  },
+  {
+    "id": "scoreboard.get.template",
+    "displayName": "Get Scoreboard",
+    "description": "Get a saved scoreboard as a typed value.",
+    "category": "SCOREBOARD",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "scoreboard", "resource_pin": "scoreboard", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "scoreboard", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "scoreboard_definition"}, {"name": "result", "dataType": "result<scoreboard_definition>"}]
+  },
+  {
+    "id": "tab.get",
+    "displayName": "Get Tab List",
+    "description": "Get a saved tab list as a typed value.",
+    "category": "TAB_LIST",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "tab", "resource_pin": "tab", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "tab", "dataType": "tab_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:tab"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "tab_definition"}, {"name": "result", "dataType": "result<tab_definition>"}]
+  },
+  {
+    "id": "custom_content.get",
+    "displayName": "Get Custom Content",
+    "description": "Get saved custom content as a typed value.",
+    "category": "CUSTOM_CONTENT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "custom_content", "resource_pin": "content", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "content", "dataType": "custom_content_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:custom_content"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "custom_content_definition"}, {"name": "result", "dataType": "result<custom_content_definition>"}]
+  },
+  {
+    "id": "chat.get.profile",
+    "displayName": "Get Chat Profile",
+    "description": "Get a saved chat profile as a typed value.",
+    "category": "CHAT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "chat", "resource_pin": "profile", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "profile", "dataType": "chat_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:chat"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "chat_profile"}, {"name": "result", "dataType": "result<chat_profile>"}]
+  },
+  {
+    "id": "motd.get.profile",
+    "displayName": "Get MOTD Profile",
+    "description": "Get a saved MOTD profile as a typed value.",
+    "category": "NETWORK",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "motd_profile", "resource_pin": "profile", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "profile", "dataType": "motd_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:motd_profile"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "motd_profile"}, {"name": "result", "dataType": "result<motd_profile>"}]
+  },
+  {
+    "id": "message_rule.get",
+    "displayName": "Get Message Rule",
+    "description": "Get a saved message rule as a typed value.",
+    "category": "CHAT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "message_rule", "resource_pin": "rule", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "rule", "dataType": "message_rule_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:message_rule"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "message_rule"}, {"name": "result", "dataType": "result<message_rule>"}]
+  },
+  {
+    "id": "text.get.template",
+    "displayName": "Get Text Template",
+    "description": "Get a saved text template as a typed value.",
+    "category": "TEXT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "text_template", "resource_pin": "template", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "template", "dataType": "text_template_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:text_template"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "text_template"}, {"name": "result", "dataType": "result<text_template>"}]
+  },
+  {
+    "id": "dialog.get",
+    "displayName": "Get Dialog",
+    "description": "Get a saved dialog as a typed value.",
+    "category": "DIALOG",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "dialog", "resource_pin": "dialog", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "dialog", "dataType": "dialog_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:dialog"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "dialog_definition"}, {"name": "result", "dataType": "result<dialog_definition>"}]
+  },
+  {
+    "id": "trade.get.profile",
+    "displayName": "Get Trade Profile",
+    "description": "Get a saved trade profile as a typed value.",
+    "category": "TRADE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "trade_profile", "resource_pin": "profile", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "profile", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "trade_profile"}, {"name": "result", "dataType": "result<trade_profile>"}]
+  },
+  {
+    "id": "npc.get",
+    "displayName": "Get NPC",
+    "description": "Get a saved NPC as a typed value.",
+    "category": "NPC",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "npc_definition", "resource_pin": "npc", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "npc", "dataType": "npc_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:npc_definition"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "npc_definition"}, {"name": "result", "dataType": "result<npc_definition>"}]
+  },
+  {
+    "id": "loot.get.table",
+    "displayName": "Get Loot Table",
+    "description": "Get a saved loot table as a typed value.",
+    "category": "LOOT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "loot_table", "resource_pin": "loot_table", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "loot_table", "dataType": "loot_table_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "loot_table_definition"}, {"name": "result", "dataType": "result<loot_table_definition>"}]
+  },
+  {
+    "id": "advancement.get.tree",
+    "displayName": "Get Advancement Tree",
+    "description": "Get a saved advancement tree as a typed value.",
+    "category": "ADVANCEMENT",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "advancement_tree", "resource_pin": "tree", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "tree", "dataType": "advancement_tree_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:advancement_tree"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "advancement_tree_definition"}, {"name": "result", "dataType": "result<advancement_tree_definition>"}]
+  },
+  {
+    "id": "recipe.get",
+    "displayName": "Get Recipe",
+    "description": "Get a saved recipe as a typed value.",
+    "category": "RECIPE",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "recipe_definition", "resource_pin": "recipe", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "recipe", "dataType": "recipe_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:recipe_definition"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "recipe_definition"}, {"name": "result", "dataType": "result<recipe_definition>"}]
+  },
+  {
+    "id": "flow.get",
+    "displayName": "Get Flow",
+    "description": "Get a saved Flow as a typed value.",
+    "category": "FLOW",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "flow", "resource_pin": "flow_id", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "flow_id", "dataType": "flow_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:flow"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "flow_definition"}, {"name": "result", "dataType": "result<flow_definition>"}]
+  },
+  {
+    "id": "function.get",
+    "displayName": "Get Function",
+    "description": "Get a saved function and its signature as a typed value.",
+    "category": "FUNCTION",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "function", "resource_pin": "function", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "function", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "function_definition"}, {"name": "result", "dataType": "result<function_definition>"}]
+  },
+  {
+    "id": "command.get",
+    "displayName": "Get Command",
+    "description": "Get a saved command as a typed value.",
+    "category": "COMMAND",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "command", "resource_pin": "command", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "command", "dataType": "command_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:command"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "command_definition"}, {"name": "result", "dataType": "result<command_definition>"}]
+  },
+  {
+    "id": "worldgen.get",
+    "displayName": "Get Worldgen Project",
+    "description": "Get a saved world generation project as a typed value.",
+    "category": "WORLD",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_get", "resource_type": "worldgen", "resource_pin": "project", "value_pin": "value"},
+    "inputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "project", "dataType": "worldgen_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen"}],
+    "outputs": [{"name": "flow", "pinType": "FLOW", "dataType": "execution"}, {"name": "failed", "pinType": "FLOW", "dataType": "execution"}, {"name": "value", "dataType": "worldgen_project"}, {"name": "result", "dataType": "result<worldgen_project>"}]
+  },
+  {
+    "id": "custom_content.details",
+    "displayName": "Read Custom Content",
+    "description": "Expose a loaded custom content definition for use in the Flow.",
+    "category": "CUSTOM_CONTENT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "custom_content_definition"}],
+    "outputs": [{"name": "id", "dataType": "custom_content_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "chat.profile.details",
+    "displayName": "Read Chat Profile",
+    "description": "Expose a loaded chat profile for use in the Flow.",
+    "category": "CHAT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "chat_profile"}],
+    "outputs": [{"name": "id", "dataType": "chat_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "message_rule.details",
+    "displayName": "Read Message Rule",
+    "description": "Expose a loaded message rule for use in the Flow.",
+    "category": "CHAT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "message_rule"}],
+    "outputs": [{"name": "id", "dataType": "message_rule_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "text.template.details",
+    "displayName": "Read Text Template",
+    "description": "Expose a loaded text template for use in the Flow.",
+    "category": "TEXT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "text_template"}],
+    "outputs": [{"name": "id", "dataType": "text_template_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "dialog.details",
+    "displayName": "Read Dialog",
+    "description": "Expose a loaded dialog for use in the Flow.",
+    "category": "DIALOG",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "dialog_definition"}],
+    "outputs": [{"name": "id", "dataType": "dialog_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "trade.profile.details",
+    "displayName": "Read Trade Profile",
+    "description": "Expose a loaded trade profile for use in the Flow.",
+    "category": "TRADE",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "trade_profile"}],
+    "outputs": [{"name": "id", "dataType": "trade_profile_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "npc.details",
+    "displayName": "Read NPC",
+    "description": "Expose a loaded NPC definition for use in the Flow.",
+    "category": "NPC",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "npc_definition"}],
+    "outputs": [{"name": "id", "dataType": "npc_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "loot.table.details",
+    "displayName": "Read Loot Table",
+    "description": "Expose a loaded loot table for use in the Flow.",
+    "category": "LOOT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "loot_table_definition"}],
+    "outputs": [{"name": "id", "dataType": "loot_table_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "advancement.tree.details",
+    "displayName": "Read Advancement Tree",
+    "description": "Expose a loaded advancement tree for use in the Flow.",
+    "category": "ADVANCEMENT",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "advancement_tree_definition"}],
+    "outputs": [{"name": "id", "dataType": "advancement_tree_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "recipe.details",
+    "displayName": "Read Recipe",
+    "description": "Expose a loaded recipe for use in the Flow.",
+    "category": "RECIPE",
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "resource_details"},
+    "inputs": [{"name": "value", "dataType": "recipe_definition"}],
+    "outputs": [{"name": "id", "dataType": "recipe_id"}, {"name": "details", "dataType": "map<string,any>"}]
+  },
+  {
+    "id": "flow.run",
+    "displayName": "Run Flow",
+    "description": "Run a saved Flow, then continue when it finishes.",
+    "category": "FLOW",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "run_graph_id", "resource_type": "flow", "resource_pin": "selected_flow"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "selected_flow", "dataType": "flow_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:flow", "required": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<flow_id>"}
+    ]
+  },
+  {
+    "id": "command.run",
+    "displayName": "Run Command",
+    "description": "Run a saved command, then continue when it finishes.",
+    "category": "COMMAND",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "run_graph_id", "resource_type": "command", "resource_pin": "command"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "command", "dataType": "command_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:command", "required": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<command_id>"}
+    ]
+  },
+  {
+    "id": "flow.run.value",
+    "displayName": "Run Loaded Flow",
+    "description": "Run the Flow value produced by Get Flow, then continue when it finishes.",
+    "category": "FLOW",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "run_graph"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "flow_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<flow_id>"}
+    ]
+  },
+  {
+    "id": "command.run.value",
+    "displayName": "Run Loaded Command",
+    "description": "Run the command value produced by Get Command, then continue when it finishes.",
+    "category": "COMMAND",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "run_graph"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "command_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<command_id>"}
+    ]
+  },
+  {
+    "id": "function.call.value",
+    "displayName": "Call Loaded Function",
+    "description": "Call the function value produced by Get Function. Connect a single input directly or use Add Function Argument for multiple inputs.",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "call_function"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "function_definition"},
+      {"name": "arguments", "dataType": "any", "optional": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "results", "dataType": "map<string,any>"},
+      {"name": "result", "dataType": "result<map<string,any>>"}
+    ]
+  },
+  {
+    "id": "gui.open.value",
+    "displayName": "Open Loaded GUI",
+    "description": "Open the GUI value produced by Get GUI for the current player.",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_apply_value", "resource_type": "gui", "value_pin": "opened"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "gui_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "opened", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"}
+    ]
+  },
+  {
+    "id": "scoreboard.show.value",
+    "displayName": "Show Loaded Scoreboard",
+    "description": "Show the scoreboard value produced by Get Scoreboard for the current player.",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_apply_value", "resource_type": "scoreboard", "value_pin": "shown"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "scoreboard_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "shown", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"}
+    ]
+  },
+  {
+    "id": "tab.apply.value",
+    "displayName": "Apply Loaded Tab List",
+    "description": "Apply the tab list value produced by Get Tab List to the current player.",
+    "category": "TAB_LIST",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {"operation": "resource_apply_value", "resource_type": "tab", "value_pin": "applied"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "tab_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "applied", "dataType": "boolean"},
+      {"name": "result", "dataType": "result<boolean>"}
+    ]
+  },
+  {
+    "id": "motd.profile.details",
+    "displayName": "Read MOTD Profile",
+    "description": "Read the lines, priority, and player counts from a loaded MOTD profile.",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {"operation": "motd_details"},
+    "inputs": [
+      {"name": "profile", "dataType": "motd_profile"}
+    ],
+    "outputs": [
+      {"name": "id", "dataType": "motd_profile_id"},
+      {"name": "line_1", "dataType": "string"},
+      {"name": "line_2", "dataType": "string"},
+      {"name": "priority", "dataType": "number"},
+      {"name": "online_players", "dataType": "number"},
+      {"name": "max_players", "dataType": "number"}
+    ]
+  }
+]

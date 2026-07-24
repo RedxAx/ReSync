@@ -72,7 +72,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private final ParticleHandler particleHandler = new ParticleHandler();
     private final Map<String, Long> marks = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack> disarmedItems = new ConcurrentHashMap<>();
-    private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
+    private final Map<String, CooldownEntry> cooldowns = new ConcurrentHashMap<>();
 
     public AbilityEffectHandler() {
         ReSync plugin = ReSync.getInstance();
@@ -676,9 +676,23 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         });
         operations.put("cooldown_remaining", (ctx, node) -> {
             String key = cooldownKey(ctx, node);
-            long remaining = Math.max(0L, cooldowns.getOrDefault(key, 0L) - System.currentTimeMillis());
+            long now = System.currentTimeMillis();
+            CooldownEntry entry = cooldowns.get(key);
+            long remaining = entry != null ? Math.max(0L, entry.readyAt() - now) : 0L;
+            long duration = entry != null ? entry.durationMillis() : 0L;
+            long elapsed = Math.max(0L, duration - remaining);
             int ticks = (int) Math.ceil(remaining / 50.0);
+            int durationTicks = (int) Math.ceil(duration / 50.0);
+            int elapsedTicks = (int) Math.floor(elapsed / 50.0);
+            double progress = duration <= 0L ? 1.0 : Math.clamp(elapsed / (double) duration, 0.0, 1.0);
             ctx.setOutput(node, "ticks", ticks);
+            ctx.setOutput(node, "seconds", remaining / 1000.0);
+            ctx.setOutput(node, "duration_ticks", durationTicks);
+            ctx.setOutput(node, "elapsed_ticks", elapsedTicks);
+            ctx.setOutput(node, "progress", progress);
+            ctx.setOutput(node, "progress_percent", progress * 100.0);
+            ctx.setOutput(node, "started_at", entry != null ? entry.startedAt() : now);
+            ctx.setOutput(node, "ready_at", entry != null ? entry.readyAt() : now);
             ctx.setOutput(node, "is_ready", ticks <= 0);
             ctx.triggerOutput(ticks <= 0 ? "ready" : "cooldown");
         });
@@ -686,7 +700,8 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             String key = cooldownKey(ctx, node);
             int ticks = integer(ctx, node, "ticks", 100);
             if (ticks < 0 || ticks > 72_000) throw new IllegalArgumentException("Cooldown ticks must be between 0 and 72000");
-            cooldowns.put(key, System.currentTimeMillis() + ticks * 50L);
+            long now = System.currentTimeMillis();
+            cooldowns.put(key, new CooldownEntry(now, now + ticks * 50L));
             ctx.triggerOutput("flow");
         });
         operations.put("get_charge", (ctx, node) -> {
@@ -898,12 +913,13 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         }
         String key = familyCooldownKey(ctx, node, fallbackKey);
         long now = System.currentTimeMillis();
-        long readyAt = cooldowns.getOrDefault(key, 0L);
+        CooldownEntry entry = cooldowns.get(key);
+        long readyAt = entry != null ? entry.readyAt() : 0L;
         if (readyAt > now) {
             ctx.setOutput(node, "cooldown_ticks_left", (int) Math.ceil((readyAt - now) / 50.0));
             return false;
         }
-        cooldowns.put(key, now + ticks * 50L);
+        cooldowns.put(key, new CooldownEntry(now, now + ticks * 50L));
         ctx.setOutput(node, "cooldown_ticks_left", 0);
         return true;
     }
@@ -1971,6 +1987,12 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             case "player" -> key + ':' + requirePlayer(ctx, node, "player").getUniqueId();
             default -> throw new IllegalArgumentException("Unknown cooldown scope: " + scope);
         };
+    }
+
+    private record CooldownEntry(long startedAt, long readyAt) {
+        private long durationMillis() {
+            return Math.max(0L, readyAt - startedAt);
+        }
     }
 
     private double getCharge(ItemStack item, String key) {

@@ -21,11 +21,11 @@ import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.handler.property.PropertyRegistry;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeDefinition;
-import restudio.resync.flow.sync.FlowCategoryMetadata;
+import restudio.resync.flow.contract.FlowCategoryMetadata;
 import restudio.resync.flow.sync.FlowConversionRule;
 import restudio.resync.flow.sync.FlowOptionSourceMetadata;
 import restudio.resync.flow.sync.FlowPropertyMetadata;
-import restudio.resync.flow.sync.FlowTypeMetadata;
+import restudio.resync.flow.contract.FlowTypeMetadata;
 import restudio.resync.flow.sync.NodePluginPayload;
 import restudio.resync.flow.sync.NodeRegistryRequest;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
@@ -613,6 +613,47 @@ public class FlowNodeRegistryPacketHandler {
     }
 
     private String displayName(String id) {
+        String domainName = switch (id) {
+            case "resource_reference" -> "Resource";
+            case "job_reference" -> "Job";
+            case "flow_id" -> "Flow";
+            case "function" -> "Function";
+            case "command_id" -> "Command";
+            case "custom_content_id" -> "Custom Content";
+            case "gui_id" -> "GUI";
+            case "scoreboard_id" -> "Scoreboard";
+            case "tab_id" -> "Tab List";
+            case "chat_id" -> "Chat Profile";
+            case "motd_profile_id" -> "MOTD Profile";
+            case "message_rule_id" -> "Message Rule";
+            case "recipe_id" -> "Recipe";
+            case "text_template_id" -> "Text Template";
+            case "advancement_tree_id" -> "Advancement Tree";
+            case "dialog_id" -> "Dialog";
+            case "trade_profile_id" -> "Trade Profile";
+            case "npc_id" -> "NPC";
+            case "loot_table_id" -> "Loot Table";
+            case "worldgen_id" -> "Worldgen Project";
+            case "flow_definition" -> "Flow";
+            case "function_definition" -> "Function";
+            case "command_definition" -> "Command";
+            case "gui_definition" -> "GUI";
+            case "gui_session" -> "Open GUI";
+            case "scoreboard_definition" -> "Scoreboard";
+            case "sidebar_session" -> "Active Scoreboard";
+            case "tab_definition" -> "Tab List";
+            case "dialog_definition" -> "Dialog";
+            case "npc_definition" -> "NPC";
+            case "npc_handle" -> "Active NPC";
+            case "chat_profile" -> "Chat Profile";
+            case "motd_profile" -> "MOTD Profile";
+            case "message_rule" -> "Message Rule";
+            case "text_template" -> "Text Template";
+            default -> "";
+        };
+        if (!domainName.isBlank()) {
+            return domainName;
+        }
         String[] words = id.replace(':', '_').split("_");
         StringBuilder displayName = new StringBuilder();
         for (String word : words) {
@@ -630,13 +671,36 @@ public class FlowNodeRegistryPacketHandler {
     private List<FlowCategoryMetadata> buildCategoryMetadata() {
         List<FlowCategoryMetadata> list = new ArrayList<>();
         for (NodeDefinition.NodeCategory cat : NodeDefinition.NodeCategory.values()) {
-            list.add(new FlowCategoryMetadata(cat.getId(), cat.getDisplayName(), cat.getColor(), cat.getPriority()));
+            CategoryGroup group = categoryGroup(cat.getId());
+            list.add(new FlowCategoryMetadata(cat.getId(), cat.getDisplayName(), cat.getColor(), cat.getPriority(), group.id(), group.name(), group.color(), group.priority()));
         }
         if (extensionData != null) {
-            list.addAll(extensionData.categories());
+            for (FlowCategoryMetadata category : extensionData.categories()) {
+                if (category.getGroupId() == null || category.getGroupId().isBlank()) {
+                    category.setGroupId("integrations");
+                    category.setGroupName("Integrations");
+                    category.setGroupColor(0xFF7289DA);
+                    category.setGroupPriority(400);
+                }
+                list.add(category);
+            }
         }
-        list.sort(Comparator.comparing(FlowCategoryMetadata::getId, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)));
+        list.sort(Comparator.comparingInt(FlowCategoryMetadata::getGroupPriority)
+            .thenComparingInt(FlowCategoryMetadata::getPriority)
+            .thenComparing(FlowCategoryMetadata::getDisplayName, Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)));
         return list;
+    }
+
+    private CategoryGroup categoryGroup(String categoryId) {
+        return switch (categoryId) {
+            case "logic", "data", "variable", "flow", "function", "utility" -> new CategoryGroup("flow", "Flow", 0xFF55FFFF, 100);
+            case "event", "action", "player", "entity", "block", "world", "inventory", "item", "visual" -> new CategoryGroup("minecraft", "Minecraft", 0xFF55AA55, 200);
+            case "command", "network", "chat", "scoreboard", "trade", "npc", "loot", "menu", "tab_list", "dialog", "custom_content", "recipe", "advancement", "text", "permission", "ability" -> new CategoryGroup("resync", "ReSync", 0xFF5CC8FF, 300);
+            default -> new CategoryGroup("integrations", "Integrations", 0xFF7289DA, 400);
+        };
+    }
+
+    private record CategoryGroup(String id, String name, int color, int priority) {
     }
 
     List<FlowOptionSourceMetadata> buildOptionSourceMetadata() {

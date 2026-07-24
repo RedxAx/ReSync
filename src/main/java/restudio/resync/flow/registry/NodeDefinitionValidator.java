@@ -298,9 +298,6 @@ public class NodeDefinitionValidator {
         validateTypeRef(pin, errors, warnings);
         NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
         if (repeatable != null) {
-            if (expectedDirection != NodeDefinition.PinDirection.INPUT || pin.getType() != NodeDefinition.PinType.DATA) {
-                errors.add("Repeatable pin " + pin.getName() + " must be a data input");
-            }
             if (repeatable.getGroupId() == null || repeatable.getGroupId().isBlank()) {
                 errors.add("Repeatable pin " + pin.getName() + " requires a groupId");
             }

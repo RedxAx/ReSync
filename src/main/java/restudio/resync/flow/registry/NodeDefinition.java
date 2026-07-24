@@ -2,6 +2,7 @@ package restudio.resync.flow.registry;
 
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowTypeRef;
+import restudio.resync.flow.contract.FlowNodeCategoryContract;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,32 +28,42 @@ public class NodeDefinition {
     public static final class NodeCategory {
         private static final Map<String, NodeCategory> REGISTRY = new LinkedHashMap<>();
 
-        public static final NodeCategory EVENT = new NodeCategory("event", "Event", 0xFFFF5555, 100);
-        public static final NodeCategory ACTION = new NodeCategory("action", "Action", 0xFF5555FF, 200);
-        public static final NodeCategory PLAYER = new NodeCategory("player", "Player", 0xFF55AAFF, 250);
-        public static final NodeCategory LOGIC = new NodeCategory("logic", "Logic", 0xFFFF55FF, 300);
-        public static final NodeCategory NETWORK = new NodeCategory("network", "Network", 0xFF4F8CFF, 350);
-        public static final NodeCategory CHAT = new NodeCategory("chat", "Chat", 0xFF55FFAA, 375);
-        public static final NodeCategory DATA = new NodeCategory("data", "Data", 0xFF55FFFF, 400);
-        public static final NodeCategory VARIABLE = new NodeCategory("variable", "Variable", 0xFFFFFF55, 500);
-        public static final NodeCategory FUNCTION = new NodeCategory("function", "Function", 0xFFFFAA55, 600);
-        public static final NodeCategory ENTITY = new NodeCategory("entity", "Entity", 0xFF8B4513, 700);
-        public static final NodeCategory BLOCK = new NodeCategory("block", "Block", 0xFF228B22, 800);
-        public static final NodeCategory WORLD = new NodeCategory("world", "World", 0xFF228B22, 900);
-        public static final NodeCategory INVENTORY = new NodeCategory("inventory", "Inventory", 0xFF00CED1, 1000);
-        public static final NodeCategory ITEM = new NodeCategory("item", "Item", 0xFF32CD32, 1100);
-        public static final NodeCategory SCOREBOARD = new NodeCategory("scoreboard", "Scoreboard", 0xFFDAA520, 1200);
-        public static final NodeCategory TRADE = new NodeCategory("trade", "Trade", 0xFFB8860B, 1225);
-        public static final NodeCategory NPC = new NodeCategory("npc", "NPC", 0xFFCD853F, 1250);
-        public static final NodeCategory LOOT = new NodeCategory("loot", "Loot", 0xFFFFA500, 1275);
-        public static final NodeCategory ECONOMY = new NodeCategory("economy", "Economy", 0xFFFFFF00, 1300);
-        public static final NodeCategory PERMISSION = new NodeCategory("permission", "Permission", 0xFFBA55D3, 1400);
-        public static final NodeCategory ABILITY = new NodeCategory("ability", "Ability", 0xFF00BFA5, 1500);
-        public static final NodeCategory VISUAL = new NodeCategory("visual", "Visual", 0xFFFF1493, 1600);
-        public static final NodeCategory DATABASE = new NodeCategory("database", "Database", 0xFF4B0082, 1700);
-        public static final NodeCategory HTTP = new NodeCategory("http", "HTTP", 0xFFFF6347, 1800);
-        public static final NodeCategory DISCORD = new NodeCategory("discord", "Discord", 0xFF7289DA, 1900);
-        public static final NodeCategory UTILITY = new NodeCategory("utility", "Utility", 0xFFA9A9A9, 2000);
+        public static final NodeCategory EVENT = builtin("event");
+        public static final NodeCategory ACTION = builtin("action");
+        public static final NodeCategory PLAYER = builtin("player");
+        public static final NodeCategory LOGIC = builtin("logic");
+        public static final NodeCategory NETWORK = builtin("network");
+        public static final NodeCategory CHAT = builtin("chat");
+        public static final NodeCategory DATA = builtin("data");
+        public static final NodeCategory VARIABLE = builtin("variable");
+        public static final NodeCategory FLOW = builtin("flow");
+        public static final NodeCategory FUNCTION = builtin("function");
+        public static final NodeCategory COMMAND = builtin("command");
+        public static final NodeCategory ENTITY = builtin("entity");
+        public static final NodeCategory BLOCK = builtin("block");
+        public static final NodeCategory WORLD = builtin("world");
+        public static final NodeCategory INVENTORY = builtin("inventory");
+        public static final NodeCategory ITEM = builtin("item");
+        public static final NodeCategory SCOREBOARD = builtin("scoreboard");
+        public static final NodeCategory TRADE = builtin("trade");
+        public static final NodeCategory NPC = builtin("npc");
+        public static final NodeCategory LOOT = builtin("loot");
+        public static final NodeCategory MENU = builtin("menu");
+        public static final NodeCategory TAB_LIST = builtin("tab_list");
+        public static final NodeCategory DIALOG = builtin("dialog");
+        public static final NodeCategory CUSTOM_CONTENT = builtin("custom_content");
+        public static final NodeCategory RECIPE = builtin("recipe");
+        public static final NodeCategory ECONOMY = builtin("economy");
+        public static final NodeCategory ADVANCEMENT = builtin("advancement");
+        public static final NodeCategory TEXT = builtin("text");
+        public static final NodeCategory PERMISSION = builtin("permission");
+        public static final NodeCategory ABILITY = builtin("ability");
+        public static final NodeCategory VISUAL = builtin("visual");
+        public static final NodeCategory DATABASE = builtin("database");
+        public static final NodeCategory HTTP = builtin("http");
+        public static final NodeCategory DISCORD = builtin("discord");
+        public static final NodeCategory UTILITY = builtin("utility");
+        public static final NodeCategory WORLD_GEN = builtin("world_gen");
 
         private final String id;
         private final String displayName;
@@ -65,6 +76,11 @@ public class NodeDefinition {
             this.color = color;
             this.priority = priority;
             REGISTRY.put(id, this);
+        }
+
+        private static NodeCategory builtin(String id) {
+            FlowNodeCategoryContract.Category category = FlowNodeCategoryContract.category(id);
+            return new NodeCategory(category.id(), category.displayName(), category.color(), category.priority());
         }
 
         public String getId() {

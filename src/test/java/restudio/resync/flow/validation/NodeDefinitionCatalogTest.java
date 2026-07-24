@@ -26,7 +26,36 @@ class NodeDefinitionCatalogTest {
             }
         }
 
-        assertEquals(1359, count);
+        assertEquals(1420, count);
+    }
+
+    @Test
+    void functionCatalogSupportsTypedCallsAndProgrammaticLookup() throws Exception {
+        JsonObject call = findNode("function.json", "call.function");
+        assertEquals("function", pinType(call, "inputs", "function"));
+        assertEquals("any", pinType(call, "inputs", "arguments"));
+        assertEquals("boolean", pinType(call, "inputs", "continue_on_failure"));
+        assertEquals("result<map<string,any>>", pinType(call, "outputs", "result"));
+        assertEquals("map<string,any>", pinType(findNode("function.json", "function.argument"), "outputs", "arguments"));
+        assertEquals("any", pinType(findNode("function.json", "function.result_value"), "outputs", "value"));
+        assertEquals("list<function>", pinType(findNode("function.json", "function.list"), "outputs", "functions"));
+        assertEquals("result<function>", pinType(findNode("function.json", "function.find"), "outputs", "result"));
+        assertEquals("number", pinType(findNode("function.json", "function.index"), "outputs", "index"));
+        assertEquals("function", pinType(findNode("function.json", "function.at_index"), "outputs", "function"));
+        assertEquals("map<string,string>", pinType(findNode("function.json", "function.describe"), "outputs", "inputs"));
+    }
+
+    @Test
+    void graphResourcesExposeTypedGetterNodes() throws Exception {
+        assertEquals("flow_definition", pinType(findNode("domain_resources.json", "flow.get"), "outputs", "value"));
+        assertEquals("function_definition", pinType(findNode("domain_resources.json", "function.get"), "outputs", "value"));
+        assertEquals("command_definition", pinType(findNode("domain_resources.json", "command.get"), "outputs", "value"));
+        assertEquals("worldgen_project", pinType(findNode("domain_resources.json", "worldgen.get"), "outputs", "value"));
+        assertEquals("flow_id", pinType(findNode("domain_resources.json", "flow.run"), "inputs", "selected_flow"));
+        assertEquals("flow_definition", pinType(findNode("domain_resources.json", "flow.run.value"), "inputs", "value"));
+        assertEquals("function_definition", pinType(findNode("domain_resources.json", "function.call.value"), "inputs", "value"));
+        assertEquals("motd_profile", pinType(findNode("domain_resources.json", "motd.profile.details"), "inputs", "profile"));
+        assertEquals("map<string,any>", pinType(findNode("domain_resources.json", "recipe.details"), "outputs", "details"));
     }
 
     @Test
@@ -72,7 +101,17 @@ class NodeDefinitionCatalogTest {
         assertEquals("vector", pinType(findNode("entity.json", "entity.entity_vector_data"), "outputs", "vector"));
         assertEquals("location", pinType(findNode("entity.json", "entity.entity_location_data"), "outputs", "location"));
         assertEquals("living_entity", pinType(findNode("entity.json", "entity.entity_reference_data"), "outputs", "reference"));
-        assertEquals("entity_data", pinType(findNode("entity.json", "entity.entity_number_data_entry"), "outputs", "data"));
+        JsonObject dataEntry = findNode("entity.json", "entity.entity_data_entry");
+        assertEquals("entity_data", pinType(dataEntry, "outputs", "data"));
+        assertEquals("server:minecraft:entity_writable_data_property", pin(dataEntry, "inputs", "property").get("optionsSource").getAsString());
+        assertFalse(hasInput(dataEntry, "data_type"));
+        assertEquals("vector", pinType(dataEntry, "inputs", "vector"));
+        assertEquals("boolean", pinType(dataEntry, "inputs", "boolean"));
+        assertEquals("number", pinType(dataEntry, "inputs", "number"));
+        for (String id : List.of("entity.entity_text_data_entry", "entity.entity_boolean_data_entry", "entity.entity_number_data_entry",
+            "entity.entity_vector_data_entry", "entity.entity_location_data_entry", "entity.entity_reference_data_entry", "entity.entity_attribute_data_entry")) {
+            assertTrue(findNode("entity.json", id).get("hidden").getAsBoolean());
+        }
         assertEquals("entity_data", pinType(findNode("entity.json", "entity.entity_spawn"), "inputs", "data"));
 
         assertTrue(findNode("itemstack.json", "itemstack.item_component").get("hidden").getAsBoolean());

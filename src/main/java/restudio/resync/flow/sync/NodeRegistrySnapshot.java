@@ -1,6 +1,8 @@
 package restudio.resync.flow.sync;
 
 import restudio.flow.data.FlowDataType;
+import restudio.resync.flow.contract.FlowCategoryMetadata;
+import restudio.resync.flow.contract.FlowTypeMetadata;
 
 import java.util.ArrayList;
 import java.util.List;

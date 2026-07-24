@@ -1,6 +1,7 @@
 package restudio.resync.flow.util;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import restudio.resync.flow.FlowRuntimeAccess;
 
@@ -43,6 +44,9 @@ public final class ReSyncPlaceholderUtil {
                 continue;
             }
             String replacement = resolveToken(globals, contextPlayer, token);
+            if (replacement == null) {
+                replacement = matcher.group();
+            }
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);
@@ -108,7 +112,7 @@ public final class ReSyncPlaceholderUtil {
             }
         }
 
-        return "";
+        return null;
     }
 
     private static String applyPlaceholderApi(Player player, String text) {
@@ -118,9 +122,10 @@ public final class ReSyncPlaceholderUtil {
         try {
             if (setPlaceholdersMethod == null) {
                 Class<?> papiClass = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-                setPlaceholdersMethod = papiClass.getMethod("setPlaceholders", Player.class, String.class);
+                setPlaceholdersMethod = papiClass.getMethod("setPlaceholders", OfflinePlayer.class, String.class);
             }
-            return (String) setPlaceholdersMethod.invoke(null, player, text);
+            Object resolved = setPlaceholdersMethod.invoke(null, player, text);
+            return resolved instanceof String value ? value : text;
         } catch (Exception e) {
             return text;
         }

@@ -5,6 +5,7 @@ import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.ReSyncRuntimeResourceHandler;
+import restudio.resync.flow.handler.generic.TextResourceHandler;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionDiagnostic;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
@@ -74,6 +75,27 @@ class NodeDefinitionRegistryIntegrityTest {
         assertEquals(Set.of("server:resync:loot_table", "server:resync:trade_profile", "server:resync:npc_definition"),
             definitions.stream().flatMap(definition -> definition.getInputs().stream()).map(NodeDefinition.PinDefinition::getOptionsSource)
                 .filter(source -> source != null && !source.isBlank()).collect(Collectors.toSet()));
+    }
+
+    @Test
+    void textResourceDefinitionsResolveThroughRegisteredHandlerOperations() throws Exception {
+        OptionCatalogRegistry catalogs = new OptionCatalogRegistry();
+        register(catalogs, "server:resync:text_template");
+        HandlerRegistry handlers = new HandlerRegistry();
+        new TextResourceHandler(null).registerTo(handlers);
+        NodeDefinitionLoader loader = new NodeDefinitionLoader();
+        loader.setValidator(new NodeDefinitionValidator(handlers, catalogs, true));
+        Path path = Path.of("src", "main", "resources", "nodes", "migrated", "text_resources.json");
+
+        List<NodeDefinition> definitions;
+        try (InputStream input = Files.newInputStream(path)) {
+            definitions = loader.parse(input, path.toString());
+        }
+        NodeDefinitionRegistry registry = new NodeDefinitionRegistry();
+        loader.validateAndRegister(definitions, registry, handlers, "json-classpath");
+
+        assertEquals(Set.of("text.lines", "text.entries", "text.lookup"), registry.getAllDefinitions().values().stream().map(NodeDefinition::getId).collect(Collectors.toSet()));
+        assertTrue(loader.getDiagnostics().stream().noneMatch(value -> value.severity() == NodeDefinitionDiagnostic.Severity.ERROR));
     }
 
     @Test
@@ -249,7 +271,7 @@ class NodeDefinitionRegistryIntegrityTest {
             "enabled", "priority", "cooldown_scope", "cooldown_ticks", "permission", "cancel_event", "consume_event", "require_sneaking",
             "require_on_ground", "allowed_worlds", "denied_worlds", "chance_percent", "max_activations_per_tick");
 
-        for (String nodeId : List.of("custom_content.item", "custom_content.armor", "custom_content.block")) {
+        for (String nodeId : List.of("custom_content.item", "custom_content.armor", "custom_content.block", "custom_content.projectile")) {
             NodeDefinition definition = registry.get(nodeId);
             assertNotNull(definition);
             Set<String> inputs = definition.getInputs().stream().map(NodeDefinition.PinDefinition::getName).collect(Collectors.toSet());

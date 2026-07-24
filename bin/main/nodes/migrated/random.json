@@ -214,6 +214,9 @@
     "id": "random.item",
     "displayName": "Random Item",
     "category": "UTILITY",
+    "deprecated": true,
+    "replacementFor": "data.random_item",
+    "hidden": true,
     "handler": "RandomHandler",
     "handlerConfig": {
       "operation": "random_item"

@@ -4,7 +4,7 @@
     "displayName": "Build GUI Definition",
     "description": "Build a typed persistent GUI definition without raw JSON.",
     "tags": ["resource", "gui", "definition", "builder"],
-    "category": "ACTION",
+    "category": "MENU",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_gui"},
     "inputs": [
@@ -57,7 +57,7 @@
     "displayName": "Build Tab Definition",
     "description": "Build a typed persistent tab-list definition.",
     "tags": ["resource", "tab", "definition", "builder"],
-    "category": "ACTION",
+    "category": "TAB_LIST",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_tab"},
     "inputs": [
@@ -82,7 +82,7 @@
     "displayName": "Build Custom Content Definition",
     "description": "Build a typed custom item, block, armor, or content definition.",
     "tags": ["resource", "custom", "content", "definition", "builder"],
-    "category": "ITEM",
+    "category": "CUSTOM_CONTENT",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_custom_content"},
     "inputs": [
@@ -274,9 +274,9 @@
       {"name": "damage_flow", "dataType": "string", "optional": true},
       {"name": "death_flow", "dataType": "string", "optional": true},
       {"name": "despawn_flow", "dataType": "string", "optional": true},
-      {"name": "trade_profile", "dataType": "resource_reference<trade_profile>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile", "optional": true},
-      {"name": "dialog", "dataType": "resource_reference<dialog>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:dialog", "optional": true},
-      {"name": "loot_table", "dataType": "resource_reference<loot_table>", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table", "optional": true},
+      {"name": "trade_profile", "dataType": "trade_profile_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:trade_profile", "optional": true},
+      {"name": "dialog", "dataType": "dialog_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:dialog", "optional": true},
+      {"name": "loot_table", "dataType": "loot_table_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:loot_table", "optional": true},
       {"name": "enabled", "dataType": "boolean", "defaultValue": true}
     ],
     "outputs": [
@@ -294,7 +294,7 @@
     "displayName": "Build Dialog Definition",
     "description": "Build a typed managed Paper dialog definition.",
     "tags": ["resource", "dialog", "paper", "definition", "builder"],
-    "category": "ACTION",
+    "category": "DIALOG",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_dialog"},
     "inputs": [
@@ -322,7 +322,7 @@
     "displayName": "Build Advancement Tree",
     "description": "Build a typed managed advancement tree with a root criterion.",
     "tags": ["resource", "advancement", "tree", "definition", "builder"],
-    "category": "ACTION",
+    "category": "ADVANCEMENT",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_advancement_tree"},
     "inputs": [
@@ -352,7 +352,7 @@
     "displayName": "Build Recipe Ingredient",
     "description": "Build a typed recipe ingredient.",
     "tags": ["resource", "recipe", "ingredient", "builder"],
-    "category": "ITEM",
+    "category": "RECIPE",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_recipe_ingredient"},
     "inputs": [
@@ -375,7 +375,7 @@
     "displayName": "Build Recipe Definition",
     "description": "Build a typed managed recipe from repeatable ingredients.",
     "tags": ["resource", "recipe", "definition", "builder"],
-    "category": "ITEM",
+    "category": "RECIPE",
     "handler": "ResourceDefinitionHandler",
     "handlerConfig": {"operation": "build_recipe"},
     "inputs": [

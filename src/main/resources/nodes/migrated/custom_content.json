@@ -2,7 +2,7 @@
   {
     "id": "custom_content.current",
     "displayName": "Current Content",
-    "category": "UTILITY",
+    "category": "CUSTOM_CONTENT",
     "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
@@ -47,7 +47,7 @@
   {
     "id": "custom_content.give",
     "displayName": "Give Content",
-    "category": "UTILITY",
+    "category": "CUSTOM_CONTENT",
     "handler": "CustomContentHandler",
     "handlerConfig": {
       "operation": "give_content"
@@ -89,9 +89,44 @@
     ]
   },
   {
+    "id": "custom_content.cooldown",
+    "displayName": "Content Cooldown",
+    "description": "Reads the active cooldown for one custom-content event with values ready for progress bars, countdown text, animations, and branching.",
+    "category": "CUSTOM_CONTENT",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "content_cooldown_state"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player", "optional": true},
+      {"name": "content_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:custom_content"},
+      {"name": "trigger", "dataType": "string", "defaultValue": "item.use"},
+      {"name": "instance_id", "dataType": "string", "optional": true}
+    ],
+    "outputs": [
+      {"name": "ready", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "cooldown", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "supported", "dataType": "boolean"},
+      {"name": "is_ready", "dataType": "boolean"},
+      {"name": "remaining_ticks", "dataType": "number"},
+      {"name": "remaining_seconds", "dataType": "number"},
+      {"name": "elapsed_ticks", "dataType": "number"},
+      {"name": "cooldown_ticks", "dataType": "number"},
+      {"name": "progress", "dataType": "number"},
+      {"name": "progress_percent", "dataType": "number"},
+      {"name": "current_tick", "dataType": "number"},
+      {"name": "ready_tick", "dataType": "number"},
+      {"name": "scope", "dataType": "string"},
+      {"name": "key", "dataType": "string"},
+      {"name": "trigger", "dataType": "string"}
+    ]
+  },
+  {
     "id": "event.custom_content",
     "displayName": "Custom Content",
-    "category": "EVENT",
+    "category": "CUSTOM_CONTENT",
     "trigger": true,
     "outputs": [
       {
@@ -132,7 +167,7 @@
   {
     "id": "custom_content.item",
     "displayName": "Item",
-    "category": "ITEM",
+    "category": "CUSTOM_CONTENT",
     "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
@@ -189,7 +224,7 @@
   {
     "id": "custom_content.armor",
     "displayName": "Armor",
-    "category": "ITEM",
+    "category": "CUSTOM_CONTENT",
     "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
@@ -241,7 +276,7 @@
   {
     "id": "custom_content.block",
     "displayName": "Block",
-    "category": "BLOCK",
+    "category": "CUSTOM_CONTENT",
     "kind": "QUERY",
     "handler": "CustomContentHandler",
     "handlerConfig": {
@@ -289,6 +324,58 @@
       {"name": "block", "dataType": "block", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,redstone,tick"}},
       {"name": "target", "dataType": "entity", "visibleWhen": {"__flow_branches": "nearby_player,tick"}},
       {"name": "location", "dataType": "location", "visibleWhen": {"__flow_branches": "place,break,interact,step_on,nearby_player,redstone,tick"}}
+    ]
+  },
+  {
+    "id": "custom_content.projectile",
+    "displayName": "Projectile",
+    "description": "Defines a projectile item that can launch from item use or bow ammunition and exposes separate fire and hit workflow branches.",
+    "category": "CUSTOM_CONTENT",
+    "kind": "QUERY",
+    "handler": "CustomContentHandler",
+    "handlerConfig": {
+      "operation": "content_start"
+    },
+    "inputs": [
+      {"name": "content_id", "dataType": "string", "defaultValue": "new_projectile"},
+      {"name": "name", "dataType": "string", "defaultValue": "New Projectile"},
+      {"name": "material", "dataType": "string", "optionsSource": "server:minecraft:material", "defaultValue": "ARROW", "visibleWhen": {"provider": "vanilla"}},
+      {"name": "provider", "dataType": "string", "widget": "DROPDOWN", "optionsSource": "server:custom_content:provider", "defaultValue": "vanilla"},
+      {"name": "external_id", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:custom_content:asset", "visibleWhen": {"provider": "nexo"}},
+      {"name": "custom_model_data", "dataType": "any"},
+      {"name": "components", "dataType": "any"},
+      {"name": "lore", "dataType": "string"},
+      {"name": "tags", "dataType": "string"},
+      {"name": "enabled", "dataType": "boolean", "defaultValue": "true"},
+      {"name": "priority", "dataType": "number", "defaultValue": "0"},
+      {"name": "cooldown_scope", "dataType": "string", "widget": "DROPDOWN", "options": ["player", "item instance", "content", "global"], "defaultValue": "player"},
+      {"name": "cooldown_ticks", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"},
+      {"name": "permission", "dataType": "string"},
+      {"name": "cancel_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "consume_event", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_sneaking", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "require_on_ground", "dataType": "boolean", "defaultValue": "false"},
+      {"name": "hand_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "main hand", "offhand"], "defaultValue": "any"},
+      {"name": "target_filter", "dataType": "string", "widget": "DROPDOWN", "options": ["any", "player", "living entity", "hostile", "passive"], "defaultValue": "any", "visibleWhen": {"__flow_branches": "hit"}},
+      {"name": "allowed_worlds", "dataType": "string"},
+      {"name": "denied_worlds", "dataType": "string"},
+      {"name": "chance_percent", "dataType": "number", "widget": "NUMBER", "defaultValue": "100"},
+      {"name": "max_activations_per_tick", "dataType": "number", "widget": "NUMBER", "defaultValue": "0"}
+    ],
+    "outputs": [
+      {"name": "fire", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "hit", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player", "visibleWhen": {"__flow_branches": "fire,hit"}},
+      {"name": "content_id", "dataType": "string"},
+      {"name": "content_type", "dataType": "string"},
+      {"name": "trigger", "dataType": "string"},
+      {"name": "item", "dataType": "itemstack", "visibleWhen": {"__flow_branches": "fire,hit"}},
+      {"name": "projectile", "dataType": "entity", "visibleWhen": {"__flow_branches": "fire,hit"}},
+      {"name": "projectile_type", "dataType": "string", "visibleWhen": {"__flow_branches": "fire,hit"}},
+      {"name": "velocity", "dataType": "vector", "visibleWhen": {"__flow_branches": "fire,hit"}},
+      {"name": "target", "dataType": "entity", "visibleWhen": {"__flow_branches": "hit"}},
+      {"name": "block", "dataType": "block", "visibleWhen": {"__flow_branches": "hit"}},
+      {"name": "location", "dataType": "location", "visibleWhen": {"__flow_branches": "fire,hit"}}
     ]
   }
 ]

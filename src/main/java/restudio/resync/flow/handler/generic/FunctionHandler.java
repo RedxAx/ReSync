@@ -8,6 +8,7 @@ import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,35 @@ public class FunctionHandler implements NodeHandler {
             }
             throw new FlowHandlerException("FUNCTION_DISPATCH_INVALID", "Function call bypassed executor dispatch",
                 "Reload the Flow runtime and retry the function call", Map.of("functionId", functionName));
+        });
+
+        operations.put("argument", (ctx, node) -> {
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            Map<?, ?> existing = ctx.getInputValue(node, "arguments", Map.class, Map.of());
+            if (existing != null) {
+                existing.forEach((key, value) -> {
+                    if (key != null) {
+                        arguments.put(key.toString(), value);
+                    }
+                });
+            }
+            String name = ctx.getInputValue(node, "name", String.class, "");
+            if (name == null || name.isBlank()) {
+                throw new FlowHandlerException("FUNCTION_ARGUMENT_NAME_REQUIRED", "Argument name is required",
+                    "Enter the matching function input name");
+            }
+            arguments.put(name.trim(), ctx.getInputValue(node, "value", Object.class, null));
+            ctx.setOutput(node, "arguments", arguments);
+        });
+
+        operations.put("result", (ctx, node) -> {
+            Map<?, ?> results = ctx.getInputValue(node, "results", Map.class, Map.of());
+            String name = ctx.getInputValue(node, "name", String.class, "");
+            if (name == null || name.isBlank()) {
+                throw new FlowHandlerException("FUNCTION_RESULT_NAME_REQUIRED", "Result name is required",
+                    "Enter the matching function output name");
+            }
+            ctx.setOutput(node, "value", results != null ? results.get(name.trim()) : null);
         });
 
         operations.put("return_value", (ctx, node) -> {

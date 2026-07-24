@@ -315,6 +315,32 @@ class FlowGraphValidatorTest {
     }
 
     @Test
+    void minecraftCatalogValidationAcceptsLegacyValuesWithoutNamespace() {
+        definitions.register(action("test.particle", FlowDataType.STRING, "server:minecraft:particle"));
+        catalogs.register(new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "server:minecraft:particle";
+            }
+
+            @Override
+            public String revision() {
+                return "1";
+            }
+
+            @Override
+            public List<String> values() {
+                return List.of("minecraft:flame", "minecraft:electric_spark");
+            }
+        });
+        FlowGraph graph = graph(Map.of("target", new FlowNode("test.particle", 0, 0, Map.of("value", "FLAME"))), List.of());
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
     void effectiveLiteralOverridesCatalogDefault() {
         NodeDefinition.PinDefinition input = new NodeDefinition.PinBuilder(
             "value",
@@ -403,6 +429,45 @@ class FlowGraphValidatorTest {
         assertTrue(validator.validate(dynamicMode).valid());
         assertTrue(hasCode(validator.validate(activeMissing), "REQUIRED_INPUT_MISSING"));
         assertTrue(hasCode(validator.validate(activeUnknown), "CATALOG_VALUE_UNRESOLVED"));
+    }
+
+    @Test
+    void visiblePinsSupportPropertyPrefixPatterns() {
+        NodeDefinition.PinDefinition property = new NodeDefinition.PinBuilder(
+            "property",
+            NodeDefinition.PinType.DATA,
+            NodeDefinition.PinDirection.INPUT,
+            FlowDataType.STRING
+        ).defaultValue("custom_name").build();
+        NodeDefinition.PinDefinition text = new NodeDefinition.PinBuilder(
+            "text",
+            NodeDefinition.PinType.DATA,
+            NodeDefinition.PinDirection.INPUT,
+            FlowDataType.STRING
+        ).visibleWhen("property", "custom_name").build();
+        NodeDefinition.PinDefinition number = new NodeDefinition.PinBuilder(
+            "number",
+            NodeDefinition.PinType.DATA,
+            NodeDefinition.PinDirection.INPUT,
+            FlowDataType.NUMBER
+        ).visibleWhen("property", "attribute:*").build();
+        definitions.register(new NodeDefinition.Builder("test.property_visibility", "Property Visibility", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .schemaVersion(2)
+            .input(property)
+            .input(text)
+            .input(number)
+            .build());
+        FlowGraph textValue = graph(Map.of("target", new FlowNode("test.property_visibility", 0, 0,
+            Map.of("property", "custom_name", "text", "Name"))), List.of());
+        FlowGraph attributeValue = graph(Map.of("target", new FlowNode("test.property_visibility", 0, 0,
+            Map.of("property", "attribute:minecraft:max_health", "number", 20))), List.of());
+        FlowGraph missingAttributeValue = graph(Map.of("target", new FlowNode("test.property_visibility", 0, 0,
+            Map.of("property", "attribute:minecraft:max_health", "text", "Hidden"))), List.of());
+
+        assertTrue(validator.validate(textValue).valid());
+        assertTrue(validator.validate(attributeValue).valid());
+        assertTrue(hasCode(validator.validate(missingAttributeValue), "REQUIRED_INPUT_MISSING"));
     }
 
     @Test
@@ -687,6 +752,127 @@ class FlowGraphValidatorTest {
         FlowGraphValidationResult result = validator.validate(graph);
 
         assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
+    void literalFunctionCallsUseTheSelectedFunctionsTypedPins() {
+        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        definitions.register(new NodeDefinition.Builder("custom_function:reward", "Reward", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("amount", NodeDefinition.PinType.DATA, FlowDataType.NUMBER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .output("granted", NodeDefinition.PinType.DATA, FlowDataType.BOOLEAN)
+            .build());
+        definitions.register(query("test.number", FlowDataType.NUMBER));
+        definitions.register(action("test.boolean", FlowDataType.BOOLEAN, null));
+        FlowNode call = new FlowNode("call.function", 0, 0, Map.of("function", "reward"));
+        FlowGraph graph = graph(Map.of(
+            "amount", node("test.number"),
+            "call", call,
+            "target", node("test.boolean")
+        ), List.of(
+            new FlowConnection("amount", "value", "call", "amount"),
+            new FlowConnection("call", "granted", "target", "value")
+        ));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
+    void wiredFunctionSelectionKeepsTheDynamicMapContract() {
+        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
+            .input("arguments", NodeDefinition.PinType.DATA, FlowDataType.MAP)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        definitions.register(new NodeDefinition.Builder("custom_function:reward", "Reward", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("amount", NodeDefinition.PinType.DATA, FlowDataType.NUMBER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        definitions.register(query("test.function", FlowDataType.FUNCTION));
+        definitions.register(query("test.number", FlowDataType.NUMBER));
+        FlowNode call = new FlowNode("call.function", 0, 0, Map.of("function", "reward"));
+        FlowGraph graph = graph(Map.of(
+            "function", node("test.function"),
+            "amount", node("test.number"),
+            "call", call
+        ), List.of(
+            new FlowConnection("function", "value", "call", "function"),
+            new FlowConnection("amount", "value", "call", "amount")
+        ));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "TARGET_PIN_UNKNOWN"));
+    }
+
+    @Test
+    void wiredFunctionSelectionAcceptsADeclaredNamedContract() {
+        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
+            .input("arguments", NodeDefinition.PinType.DATA, FlowDataType.MAP)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        definitions.register(query("test.function", FlowDataType.FUNCTION));
+        definitions.register(query("test.number", FlowDataType.NUMBER));
+        FlowNode call = new FlowNode("call.function", 0, 0, Map.of(
+            "__call_parameters", List.of(Map.of("name", "amount", "type", "number"))
+        ));
+        FlowGraph graph = graph(Map.of(
+            "function", node("test.function"),
+            "amount", node("test.number"),
+            "call", call
+        ), List.of(
+            new FlowConnection("function", "value", "call", "function"),
+            new FlowConnection("amount", "value", "call", "amount")
+        ));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
+    void literalFunctionSelectionRejectsAMismatchedDeclaredContract() {
+        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
+            .input("arguments", NodeDefinition.PinType.DATA, FlowDataType.MAP)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        definitions.register(new NodeDefinition.Builder("custom_function:reward", "Reward", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("amount", NodeDefinition.PinType.DATA, FlowDataType.NUMBER)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        FlowNode call = new FlowNode("call.function", 0, 0, Map.of(
+            "function", "reward",
+            "__call_parameters", List.of(Map.of("name", "amount", "type", "string")),
+            "amount", "wrong"
+        ));
+        FlowGraph graph = graph(Map.of("call", call), List.of());
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "FUNCTION_CALL_ARGUMENT_TYPE_MISMATCH"));
     }
 
     @Test

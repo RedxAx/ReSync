@@ -537,8 +537,15 @@ public class EntityActionHandler implements NodeHandler {
                     if (entry.getKey() != null) data.put(entry.getKey().toString(), entry.getValue());
                 }
             }
-            String valuePin = node.getHandlerConfig().getString("valuePin", "value");
-            data.put(typedProperty(ctx, node), ctx.getInputValue(node, valuePin, Object.class, null));
+            String valuePin = node.getHandlerConfig().getString("valuePin", "");
+            String property;
+            if (valuePin.isBlank()) {
+                property = ctx.getInputValue(node, "property", String.class, "");
+                valuePin = EntityDataAccess.valuePin(property);
+            } else {
+                property = typedProperty(ctx, node);
+            }
+            data.put(property, ctx.getInputValue(node, valuePin, Object.class, null));
             ctx.setOutput(node, "data", data);
         });
 

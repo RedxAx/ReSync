@@ -1,5 +1,6 @@
 package restudio.resync.modules.flow;
 
+import com.google.gson.Gson;
 import restudio.resync.core.Session;
 import restudio.resync.resources.ReSyncManagedResource;
 
@@ -14,6 +15,10 @@ public interface FlowResourceAdapter<T> {
     List<String> listIds();
 
     T deserialize(String json);
+
+    default String serialize(T value) {
+        return new Gson().toJson(value);
+    }
 
     String id(T value);
 

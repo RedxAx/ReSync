@@ -57,9 +57,52 @@ public class CustomContentHandler implements NodeHandler {
             ctx.setOutput(node, "target", ctx.getRuntime().getEventVariables().get("event.target"));
             ctx.setOutput(node, "location", ctx.getRuntime().getEventVariables().get("event.location"));
             ctx.setOutput(node, "damage", ctx.getRuntime().getEventVariables().get("event.damage"));
+            ctx.setOutput(node, "projectile", ctx.getRuntime().getEventVariables().get("event.projectile"));
+            ctx.setOutput(node, "projectile_type", ctx.getRuntime().getEventVariables().get("event.projectile_type"));
+            ctx.setOutput(node, "velocity", ctx.getRuntime().getEventVariables().get("event.velocity"));
             String trigger = String.valueOf(ctx.getRuntime().getEventVariables().get("event.trigger"));
             String pin = CustomContentGraphAdapter.pinForTrigger(trigger);
             ctx.triggerOutput(pin != null ? pin : "flow");
+        });
+        operations.put("content_cooldown_state", (ctx, node) -> {
+            CustomContentService service = CustomContentAccess.getService();
+            if (service == null) {
+                ctx.setOutput(node, "supported", false);
+                ctx.setOutput(node, "is_ready", true);
+                ctx.setOutput(node, "remaining_ticks", 0L);
+                ctx.setOutput(node, "remaining_seconds", 0.0);
+                ctx.setOutput(node, "elapsed_ticks", 0L);
+                ctx.setOutput(node, "cooldown_ticks", 0);
+                ctx.setOutput(node, "progress", 1.0);
+                ctx.setOutput(node, "progress_percent", 100.0);
+                ctx.setOutput(node, "current_tick", 0L);
+                ctx.setOutput(node, "ready_tick", 0L);
+                ctx.setOutput(node, "scope", "");
+                ctx.setOutput(node, "key", "");
+                ctx.setOutput(node, "trigger", "");
+                ctx.triggerOutput("ready");
+                return;
+            }
+            Player player = ctx.getInputValue(node, "player", Player.class, ctx.getPlayer());
+            String contentId = ctx.getInputValue(node, "content_id", String.class, String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.content_id", "")));
+            String trigger = ctx.getInputValue(node, "trigger", String.class, String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.trigger", "")));
+            String instanceId = ctx.getInputValue(node, "instance_id", String.class, String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.instance_id", "")));
+            CustomContentService.CooldownState state = service.cooldownState(contentId, trigger, player, instanceId);
+            long remainingTicks = Math.max(0L, state.readyTick() - state.currentTick());
+            ctx.setOutput(node, "supported", state.supported());
+            ctx.setOutput(node, "is_ready", state.ready());
+            ctx.setOutput(node, "remaining_ticks", remainingTicks);
+            ctx.setOutput(node, "remaining_seconds", remainingTicks / 20.0);
+            ctx.setOutput(node, "elapsed_ticks", Math.max(0, state.cooldownTicks()) - remainingTicks);
+            ctx.setOutput(node, "cooldown_ticks", state.cooldownTicks());
+            ctx.setOutput(node, "progress", state.progress());
+            ctx.setOutput(node, "progress_percent", state.progress() * 100.0);
+            ctx.setOutput(node, "current_tick", state.currentTick());
+            ctx.setOutput(node, "ready_tick", state.readyTick());
+            ctx.setOutput(node, "scope", state.scope());
+            ctx.setOutput(node, "key", state.key());
+            ctx.setOutput(node, "trigger", state.trigger());
+            ctx.triggerOutput(state.ready() ? "ready" : "cooldown");
         });
     }
 
@@ -68,6 +111,7 @@ public class CustomContentHandler implements NodeHandler {
         registry.register(CustomContentGraphAdapter.ITEM_NODE, this);
         registry.register(CustomContentGraphAdapter.BLOCK_NODE, this);
         registry.register(CustomContentGraphAdapter.ARMOR_NODE, this);
+        registry.register(CustomContentGraphAdapter.PROJECTILE_NODE, this);
     }
 
     @Override

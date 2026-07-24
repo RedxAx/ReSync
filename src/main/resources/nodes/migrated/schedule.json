@@ -140,7 +140,7 @@
       },
       {
         "name": "flow_id",
-        "dataType": "resource_reference<flow>",
+        "dataType": "flow_id",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:resync:flow",
         "description": "Stored Flow to execute"
@@ -196,7 +196,7 @@
       },
       {
         "name": "flow_id",
-        "dataType": "resource_reference<flow>",
+        "dataType": "flow_id",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:resync:flow",
         "description": "Stored Flow to execute"
@@ -260,7 +260,7 @@
       },
       {
         "name": "flow_id",
-        "dataType": "resource_reference<flow>",
+        "dataType": "flow_id",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:resync:flow",
         "description": "Stored Flow to execute"
@@ -323,7 +323,7 @@
       },
       {
         "name": "flow_id",
-        "dataType": "resource_reference<flow>",
+        "dataType": "flow_id",
         "widget": "SEARCHABLE_LIST",
         "optionsSource": "server:resync:flow",
         "description": "Stored Flow to execute"

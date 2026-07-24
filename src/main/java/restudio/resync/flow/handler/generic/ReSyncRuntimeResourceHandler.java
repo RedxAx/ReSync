@@ -31,7 +31,8 @@ import java.util.function.Supplier;
 
 public class ReSyncRuntimeResourceHandler implements NodeHandler {
     private static final Set<String> RESOURCE_OPERATIONS = Set.of("resource_discover", "resource_query", "resource_reference", "resource_get",
-        "resource_validate", "resource_create", "resource_save", "resource_update", "resource_duplicate", "resource_delete", "resource_reload", "resource_apply");
+        "resource_validate", "resource_create", "resource_save", "resource_update", "resource_duplicate", "resource_delete", "resource_reload",
+        "resource_apply", "resource_apply_value");
     private static final Set<String> DOMAIN_ACTION_OPERATIONS = Set.of("loot_generate", "loot_give", "loot_fill_container", "trade_apply_trade_profile",
         "trade_open_trades", "trade_open_virtual_trades", "npc_spawn", "npc_despawn", "npc_open", "npc_set_profile", "npc_teleport");
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
@@ -220,6 +221,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         operations.put("resource_delete", this::deleteResource);
         operations.put("resource_reload", this::reloadResource);
         operations.put("resource_apply", this::applyResource);
+        operations.put("resource_apply_value", this::applyResourceValue);
     }
 
     public void registerTo(HandlerRegistry registry) {
@@ -283,7 +285,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         FlowOperationResult<Object> result = resourceRegistry != null
             ? resourceRegistry.get(identity.type(), identity.id())
             : FlowOperationResult.failure("RESOURCE_AUTHORITY_UNAVAILABLE", "Resource authority is unavailable", Map.of("resourceType", identity.type()));
-        ctx.setOutput(node, "value", result.value());
+        setResourceValue(ctx, node, result.value());
         ctx.setOutput(node, "reference", reference(identity, result.success()));
         setResult(ctx, node, result);
     }
@@ -357,7 +359,7 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         FlowOperationResult<Object> result = resourceRegistry != null
             ? resourceRegistry.reload(identity.type(), identity.id(), mutationContext(ctx, node))
             : FlowOperationResult.failure("RESOURCE_AUTHORITY_UNAVAILABLE", "Resource authority is unavailable", Map.of("resourceType", identity.type()));
-        ctx.setOutput(node, "value", result.value());
+        setResourceValue(ctx, node, result.value());
         setResult(ctx, node, result);
     }
 
@@ -366,7 +368,17 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         FlowOperationResult<Object> result = resourceRegistry != null
             ? resourceRegistry.apply(identity.type(), identity.id(), ctx, mutationContext(ctx, node))
             : FlowOperationResult.failure("RESOURCE_AUTHORITY_UNAVAILABLE", "Resource authority is unavailable", Map.of("resourceType", identity.type()));
-        ctx.setOutput(node, "value", result.value());
+        setResourceValue(ctx, node, result.value());
+        setResult(ctx, node, result);
+    }
+
+    private void applyResourceValue(FlowContext ctx, FlowNode node) {
+        String type = node.getHandlerConfig().getString("resource_type", "");
+        Object value = ctx.getInputValue(node, "value", Object.class, null);
+        FlowOperationResult<Object> result = resourceRegistry != null
+            ? resourceRegistry.applyValue(type, value, ctx, mutationContext(ctx, node))
+            : FlowOperationResult.failure("RESOURCE_AUTHORITY_UNAVAILABLE", "Resource authority is unavailable", Map.of("resourceType", type));
+        setResourceValue(ctx, node, result.value());
         setResult(ctx, node, result);
     }
 
@@ -381,6 +393,14 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
         ctx.setOutput(node, "deleted", Boolean.TRUE.equals(result.details().get("deleted")));
         ctx.setOutput(node, "reloaded", Boolean.TRUE.equals(result.details().get("reloaded")));
         ctx.setOutput(node, "refresh_succeeded", !result.details().containsKey("refreshSucceeded") || Boolean.TRUE.equals(result.details().get("refreshSucceeded")));
+    }
+
+    private void setResourceValue(FlowContext ctx, FlowNode node, Object value) {
+        ctx.setOutput(node, "value", value);
+        String valuePin = node.getHandlerConfig().getString("value_pin");
+        if (valuePin != null && !valuePin.isBlank()) {
+            ctx.setOutput(node, valuePin, value);
+        }
     }
 
     private FlowOperationResult<Boolean> tradeResult(TradeProfileService service, String id, boolean validContext, BooleanSupplier operation) {
@@ -517,8 +537,10 @@ public class ReSyncRuntimeResourceHandler implements NodeHandler {
             Object id = map.get("id");
             return new ResourceIdentity(kind != null ? kind.toString() : "", id != null ? id.toString() : "");
         }
-        String type = ctx.getInputValue(node, "resource_type", String.class, "");
-        String id = ctx.getInputValue(node, "resource_id", String.class, rawReference != null ? rawReference.toString() : "");
+        String configuredType = node.getHandlerConfig().getString("resource_type");
+        String type = configuredType != null && !configuredType.isBlank() ? configuredType : ctx.getInputValue(node, "resource_type", String.class, "");
+        String resourcePin = node.getHandlerConfig().getString("resource_pin");
+        String id = ctx.getInputValue(node, resourcePin != null && !resourcePin.isBlank() ? resourcePin : "resource_id", String.class, rawReference != null ? rawReference.toString() : "");
         return new ResourceIdentity(type, id);
     }
 

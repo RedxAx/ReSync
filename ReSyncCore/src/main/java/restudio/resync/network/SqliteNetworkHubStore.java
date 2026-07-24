@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class SqliteNetworkHubStore implements NetworkHubStore {
-    private static final int SCHEMA_VERSION = 2;
+    private static final int SCHEMA_VERSION = 3;
     private static final Set<NetworkTransferStatus> TERMINAL_TRANSFERS = Set.of(NetworkTransferStatus.COMMITTED, NetworkTransferStatus.ABORTED, NetworkTransferStatus.TIMED_OUT);
     private final Path databasePath;
     private final ThreadPoolExecutor executor;
@@ -75,8 +76,11 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
                     statement.execute("PRAGMA journal_mode = WAL");
                     statement.execute("PRAGMA synchronous = NORMAL");
                     statement.execute("PRAGMA busy_timeout = 5000");
+                    statement.execute("PRAGMA wal_autocheckpoint = 1000");
+                    statement.execute("PRAGMA journal_size_limit = 67108864");
                 }
                 migrate();
+                verifyIntegrity();
                 return null;
             } catch (Exception exception) {
                 if (connection != null) {
@@ -456,6 +460,83 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
                 statement.setLong(2, now);
                 return statement.executeUpdate();
             }
+        });
+    }
+
+    @Override
+    public CompletableFuture<NetworkResource> compareAndSetResource(String networkId, String originNodeId, NetworkResourceMutation mutation, long updatedAt) {
+        if (mutation == null) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Network Resource Mutation Is Required"));
+        }
+        return submit("Set Network Resource", () -> transaction(() -> {
+            requireOpen();
+            String requiredNetworkId = required(networkId, "Network ID");
+            String requiredOriginNodeId = required(originNodeId, "Resource Origin Node ID");
+            byte[] payload = mutation.payload();
+            NetworkPayloads.requireLimit(payload, NetworkResourceCodec.MAXIMUM_RESOURCE_BYTES);
+            long currentRevision = resourceRevision(requiredNetworkId, mutation.type(), mutation.resourceId());
+            if (currentRevision != mutation.expectedRevision()) {
+                throw new NetworkResourceConflictException(mutation.expectedRevision(), currentRevision);
+            }
+            long revision = currentRevision + 1;
+            String payloadHash = NetworkPayloads.sha256(payload);
+            try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO network_resources(network_id, resource_type, resource_id, revision, payload_hash, payload, deleted, origin_node_id, updated_at)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(network_id, resource_type, resource_id) DO UPDATE SET revision = excluded.revision, payload_hash = excluded.payload_hash,
+                    payload = excluded.payload, deleted = excluded.deleted, origin_node_id = excluded.origin_node_id, updated_at = excluded.updated_at
+                """)) {
+                statement.setString(1, requiredNetworkId);
+                statement.setString(2, mutation.type());
+                statement.setString(3, mutation.resourceId());
+                statement.setLong(4, revision);
+                statement.setString(5, payloadHash);
+                statement.setBytes(6, payload);
+                statement.setInt(7, mutation.deleted() ? 1 : 0);
+                statement.setString(8, requiredOriginNodeId);
+                statement.setLong(9, updatedAt);
+                statement.executeUpdate();
+            }
+            audit(requiredNetworkId, requiredOriginNodeId, mutation.deleted() ? "resource.deleted" : "resource.saved", mutation.type() + ":" + mutation.resourceId(), Long.toString(revision), updatedAt);
+            return requireResource(requiredNetworkId, mutation.type(), mutation.resourceId());
+        }));
+    }
+
+    @Override
+    public CompletableFuture<Optional<NetworkResource>> getResource(String networkId, String type, String resourceId) {
+        return submit("Read Network Resource", () -> resource(required(networkId, "Network ID"), required(type, "Resource Type").toLowerCase(Locale.ROOT), required(resourceId, "Resource ID")));
+    }
+
+    @Override
+    public CompletableFuture<NetworkResourcePage> listResources(String networkId, NetworkResourceQuery query) {
+        NetworkResourceQuery requested = query == null ? NetworkResourceQuery.firstPage() : query;
+        return submit("List Network Resources", () -> {
+            requireOpen();
+            List<NetworkResourceMetadata> resources = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT resource_type, resource_id, revision, payload_hash, deleted, origin_node_id, updated_at
+                FROM network_resources
+                WHERE network_id = ? AND (resource_type > ? OR (resource_type = ? AND resource_id > ?))
+                ORDER BY resource_type, resource_id
+                LIMIT ?
+                """)) {
+                statement.setString(1, required(networkId, "Network ID"));
+                statement.setString(2, requested.afterType());
+                statement.setString(3, requested.afterType());
+                statement.setString(4, requested.afterResourceId());
+                statement.setInt(5, requested.limit() + 1);
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        resources.add(resourceMetadata(result));
+                    }
+                }
+            }
+            boolean hasNext = resources.size() > requested.limit();
+            if (hasNext) {
+                resources.removeLast();
+            }
+            NetworkResourceMetadata cursor = hasNext && !resources.isEmpty() ? resources.getLast() : null;
+            return new NetworkResourcePage(resources, cursor == null ? "" : cursor.type(), cursor == null ? "" : cursor.resourceId());
         });
     }
 
@@ -979,8 +1060,25 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             executor.execute(() -> {
                 try {
                     if (connection != null) {
-                        connection.close();
+                        SQLException failure = null;
+                        try (Statement statement = connection.createStatement()) {
+                            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+                        } catch (SQLException exception) {
+                            failure = exception;
+                        }
+                        try {
+                            connection.close();
+                        } catch (SQLException exception) {
+                            if (failure == null) {
+                                failure = exception;
+                            } else {
+                                failure.addSuppressed(exception);
+                            }
+                        }
                         connection = null;
+                        if (failure != null) {
+                            throw failure;
+                        }
                     }
                     closed.complete(null);
                 } catch (SQLException exception) {
@@ -1035,6 +1133,13 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
                 return null;
             });
         }
+        if (version < 3) {
+            transaction(() -> {
+                applySchemaVersion3();
+                setSchemaVersion(3);
+                return null;
+            });
+        }
     }
 
     private void applySchema() throws SQLException {
@@ -1053,6 +1158,8 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
             "CREATE TABLE durable_events(event_id TEXT PRIMARY KEY, network_id TEXT NOT NULL, channel TEXT NOT NULL, subject TEXT NOT NULL, payload BLOB NOT NULL, origin_node_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)",
             "CREATE INDEX durable_events_delivery ON durable_events(network_id, created_at)",
             "CREATE TABLE event_acknowledgements(event_id TEXT NOT NULL REFERENCES durable_events(event_id) ON DELETE CASCADE, consumer_id TEXT NOT NULL, acknowledged_at INTEGER NOT NULL, PRIMARY KEY(event_id, consumer_id))",
+            "CREATE TABLE network_resources(network_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL, revision INTEGER NOT NULL, payload_hash TEXT NOT NULL, payload BLOB NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, origin_node_id TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(network_id, resource_type, resource_id))",
+            "CREATE INDEX network_resources_updated ON network_resources(network_id, updated_at)",
             "CREATE TABLE audit_records(audit_id INTEGER PRIMARY KEY AUTOINCREMENT, network_id TEXT NOT NULL, actor_node_id TEXT NOT NULL, action TEXT NOT NULL, subject TEXT NOT NULL, detail TEXT NOT NULL, created_at INTEGER NOT NULL)",
             "CREATE INDEX audit_records_network ON audit_records(network_id, created_at DESC)"
         );
@@ -1076,9 +1183,29 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
         }
     }
 
+    private void applySchemaVersion3() throws SQLException {
+        List<String> statements = List.of(
+            "CREATE TABLE IF NOT EXISTS network_resources(network_id TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL, revision INTEGER NOT NULL, payload_hash TEXT NOT NULL, payload BLOB NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, origin_node_id TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(network_id, resource_type, resource_id))",
+            "CREATE INDEX IF NOT EXISTS network_resources_updated ON network_resources(network_id, updated_at)"
+        );
+        try (Statement statement = connection.createStatement()) {
+            for (String sql : statements) {
+                statement.executeUpdate(sql);
+            }
+        }
+    }
+
     private void setSchemaVersion(int version) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA user_version = " + version);
+        }
+    }
+
+    private void verifyIntegrity() throws SQLException {
+        try (Statement statement = connection.createStatement(); ResultSet result = statement.executeQuery("PRAGMA quick_check")) {
+            if (!result.next() || !"ok".equalsIgnoreCase(result.getString(1))) {
+                throw new NetworkStoreException("Network Store Integrity Check Failed");
+            }
         }
     }
 
@@ -1166,6 +1293,41 @@ public class SqliteNetworkHubStore implements NetworkHubStore {
 
     private NetworkEvent requireEvent(String eventId) throws SQLException {
         return eventById(eventId).orElseThrow(() -> new NetworkStoreException("Network Event Was Not Stored"));
+    }
+
+    private long resourceRevision(String networkId, String type, String resourceId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT revision FROM network_resources WHERE network_id = ? AND resource_type = ? AND resource_id = ?")) {
+            statement.setString(1, networkId);
+            statement.setString(2, type);
+            statement.setString(3, resourceId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getLong(1) : 0;
+            }
+        }
+    }
+
+    private Optional<NetworkResource> resource(String networkId, String type, String resourceId) throws SQLException {
+        requireOpen();
+        try (PreparedStatement statement = connection.prepareStatement("SELECT * FROM network_resources WHERE network_id = ? AND resource_type = ? AND resource_id = ?")) {
+            statement.setString(1, networkId);
+            statement.setString(2, type);
+            statement.setString(3, resourceId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? Optional.of(resource(result)) : Optional.empty();
+            }
+        }
+    }
+
+    private NetworkResource requireResource(String networkId, String type, String resourceId) throws SQLException {
+        return resource(networkId, type, resourceId).orElseThrow(() -> new NetworkStoreException("Network Resource Was Not Stored"));
+    }
+
+    private NetworkResource resource(ResultSet result) throws SQLException {
+        return new NetworkResource(result.getString("network_id"), result.getString("resource_type"), result.getString("resource_id"), result.getLong("revision"), result.getString("payload_hash"), result.getBytes("payload"), result.getInt("deleted") != 0, result.getString("origin_node_id"), result.getLong("updated_at"));
+    }
+
+    private NetworkResourceMetadata resourceMetadata(ResultSet result) throws SQLException {
+        return new NetworkResourceMetadata(result.getString("resource_type"), result.getString("resource_id"), result.getLong("revision"), result.getString("payload_hash"), result.getInt("deleted") != 0, result.getString("origin_node_id"), result.getLong("updated_at"));
     }
 
     private void insertTransfer(PlayerTransfer transfer) throws SQLException {

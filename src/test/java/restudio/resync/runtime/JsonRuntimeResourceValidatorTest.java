@@ -69,21 +69,9 @@ class JsonRuntimeResourceValidatorTest {
     }
 
     @Test
-    void npcLifecycleAndHookContractsAreValidatedBeforePersistence() {
-        JsonObject startup = npc();
-        startup.addProperty("spawnMode", "startup");
-        JsonObject location = new JsonObject();
-        location.addProperty("world", "world");
-        location.addProperty("x", 0);
-        location.addProperty("y", 70);
-        location.addProperty("z", 0);
-        startup.add("location", location);
-        startup.getAsJsonObject("hooks").addProperty("rightClickAction", "npc-click");
-
-        JsonObject missingStartupWorld = startup.deepCopy();
-        missingStartupWorld.getAsJsonObject("location").addProperty("world", "");
-        JsonObject invalidMode = npc();
-        invalidMode.addProperty("spawnMode", "sometimes");
+    void npcHookAndEntityContractsAreValidatedBeforePersistence() {
+        JsonObject valid = npc();
+        valid.getAsJsonObject("hooks").addProperty("rightClickAction", "npc-click");
         JsonObject invalidHook = npc();
         invalidHook.getAsJsonObject("hooks").addProperty("damageAction", true);
         JsonObject damageablePlayer = npc();
@@ -112,9 +100,7 @@ class JsonRuntimeResourceValidatorTest {
         ambiguousInteraction.addProperty("dialog", "welcome");
         ambiguousInteraction.addProperty("tradeProfile", "merchant");
 
-        assertDoesNotThrow(() -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, startup));
-        assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, missingStartupWorld));
-        assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, invalidMode));
+        assertDoesNotThrow(() -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, valid));
         assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, invalidHook));
         assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, damageablePlayer));
         assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.NPC_DEFINITION, aiPlayer));
@@ -128,14 +114,21 @@ class JsonRuntimeResourceValidatorTest {
     void npcLegacyHooksAndSkinFieldsMigrateBeforeSave() {
         JsonObject definition = npc();
         definition.addProperty("entityType", "player");
+        definition.addProperty("spawnMode", "startup");
+        definition.add("location", new JsonObject());
         definition.addProperty("skinUsername", "Notch");
+        definition.addProperty("skinTexture", "legacy-texture");
         definition.getAsJsonObject("hooks").addProperty("interactFlow", "legacy-interact");
 
         validator.beforeSave(ReSyncResourceCatalog.NPC_DEFINITION, definition);
 
         assertEquals("Notch", definition.getAsJsonObject("skin").get("username").getAsString());
+        assertFalse(definition.getAsJsonObject("skin").has("texture"));
         assertEquals("legacy-interact", definition.getAsJsonObject("hooks").get("interactAction").getAsString());
         assertFalse(definition.has("skinUsername"));
+        assertFalse(definition.has("skinTexture"));
+        assertFalse(definition.has("spawnMode"));
+        assertFalse(definition.has("location"));
         assertFalse(definition.getAsJsonObject("hooks").has("interactFlow"));
     }
 

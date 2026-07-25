@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.EntityType;
@@ -191,28 +190,13 @@ public final class ResourceDefinitionHandler implements NodeHandler {
         npc.addProperty("enabled", bool(context, node, "enabled", true));
         npc.addProperty("displayName", text(context, node, "display_name", requiredId(context, node)));
         npc.addProperty("entityType", entityTypeId(context.getInputValue(node, "entity_type")));
-        npc.addProperty("spawnMode", text(context, node, "spawn_mode", "manual").toLowerCase(Locale.ROOT));
         npc.addProperty("ai", bool(context, node, "ai", false));
         npc.addProperty("gravity", bool(context, node, "gravity", true));
         npc.addProperty("invulnerable", bool(context, node, "invulnerable", true));
         npc.addProperty("followPlayer", bool(context, node, "follow_player", false));
         npc.addProperty("followRange", decimal(context, node, "follow_range", 12.0));
-        Location location = context.getInputValue(node, "location", Location.class, null);
-        if (location != null && location.getWorld() != null) {
-            JsonObject serializedLocation = new JsonObject();
-            serializedLocation.addProperty("world", location.getWorld().getName());
-            serializedLocation.addProperty("x", location.getX());
-            serializedLocation.addProperty("y", location.getY());
-            serializedLocation.addProperty("z", location.getZ());
-            serializedLocation.addProperty("yaw", location.getYaw());
-            serializedLocation.addProperty("pitch", location.getPitch());
-            npc.add("location", serializedLocation);
-        }
         JsonObject skin = new JsonObject();
         addOptionalProperty(skin, "username", text(context, node, "skin_username", ""));
-        addOptionalProperty(skin, "uuid", text(context, node, "skin_uuid", ""));
-        addOptionalProperty(skin, "texture", text(context, node, "skin_texture", ""));
-        addOptionalProperty(skin, "signature", text(context, node, "skin_signature", ""));
         if (!skin.isEmpty()) {
             npc.add("skin", skin);
         }

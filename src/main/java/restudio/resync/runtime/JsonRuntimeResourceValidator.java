@@ -95,6 +95,8 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
         if (definition == null) {
             return;
         }
+        definition.remove("spawnMode");
+        definition.remove("location");
         if (definition.has("hooks") && definition.get("hooks").isJsonObject()) {
             JsonObject hooks = definition.getAsJsonObject("hooks");
             Map<String, String> legacyHooks = Map.of(
@@ -114,20 +116,20 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             });
         }
         JsonObject skin = definition.has("skin") && definition.get("skin").isJsonObject() ? definition.getAsJsonObject("skin") : new JsonObject();
-        Map<String, String> legacySkinFields = Map.of(
-            "skinUsername", "username",
-            "skinUuid", "uuid",
-            "skinTexture", "texture",
-            "skinSignature", "signature"
-        );
-        legacySkinFields.forEach((legacy, current) -> {
-            if (!skin.has(current) && definition.has(legacy)) {
-                skin.add(current, definition.get(legacy).deepCopy());
-            }
-            definition.remove(legacy);
-        });
+        if (!skin.has("username") && definition.has("skinUsername")) {
+            skin.add("username", definition.get("skinUsername").deepCopy());
+        }
+        skin.remove("uuid");
+        skin.remove("texture");
+        skin.remove("signature");
+        definition.remove("skinUsername");
+        definition.remove("skinUuid");
+        definition.remove("skinTexture");
+        definition.remove("skinSignature");
         if (!skin.isEmpty()) {
             definition.add("skin", skin);
+        } else {
+            definition.remove("skin");
         }
     }
 
@@ -253,7 +255,6 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
         }
         validateObjectField(definition, "hooks");
         validateObjectField(definition, "equipment");
-        validateObjectField(definition, "location");
         validateObjectField(definition, "skin");
         validateObjectField(definition, "links");
         double followRange = decimal(definition, "followRange", 12.0);
@@ -264,25 +265,6 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             JsonObject equipment = definition.getAsJsonObject("equipment");
             for (String slot : Set.of("mainHand", "offHand", "helmet", "chestplate", "leggings", "boots")) {
                 validateAvailableItem(text(equipment, slot), "NPC equipment " + slot, false);
-            }
-        }
-        if (definition.has("location") && definition.get("location").isJsonObject()) {
-            JsonObject location = definition.getAsJsonObject("location");
-            for (String coordinate : Set.of("x", "y", "z", "yaw", "pitch")) {
-                double coordinateValue = decimal(location, coordinate, 0.0);
-                if (!Double.isFinite(coordinateValue)) {
-                    throw new IllegalArgumentException("NPC location " + coordinate + " must be finite");
-                }
-            }
-        }
-        String spawnMode = text(definition, "spawnMode").replace('-', '_').toLowerCase(Locale.ROOT);
-        if (!Set.of("", "none", "manual", "startup", "automatic", "auto", "server_start").contains(spawnMode)) {
-            throw new IllegalArgumentException("Unknown NPC spawnMode: " + spawnMode);
-        }
-        if (Set.of("startup", "automatic", "auto", "server_start").contains(spawnMode)) {
-            JsonObject location = definition.has("location") && definition.get("location").isJsonObject() ? definition.getAsJsonObject("location") : null;
-            if (location == null || text(location, "world").isBlank()) {
-                throw new IllegalArgumentException("Startup NPC location.world is required");
             }
         }
         if (definition.has("hooks") && definition.get("hooks").isJsonObject()) {

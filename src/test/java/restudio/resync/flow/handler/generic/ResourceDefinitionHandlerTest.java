@@ -37,11 +37,10 @@ class ResourceDefinitionHandlerTest {
     }
 
     @Test
-    void npcBuilderPublishesLifecycleAndHookConfiguration() {
+    void npcBuilderPublishesDefinitionAndHookConfiguration() {
         TestFlowContext context = execute("build_npc", Map.of(
             "id", "guide",
             "entity_type", EntityType.PLAYER,
-            "spawn_mode", "startup",
             "skin_username", "Notch",
             "main_hand", "minecraft:diamond_sword",
             "interact_flow", "interact-flow",
@@ -51,7 +50,8 @@ class ResourceDefinitionHandlerTest {
         ));
 
         JsonObject definition = assertInstanceOf(JsonObject.class, context.outputs.get("definition"));
-        assertEquals("startup", definition.get("spawnMode").getAsString());
+        assertFalse(definition.has("spawnMode"));
+        assertFalse(definition.has("location"));
         assertEquals("Notch", definition.getAsJsonObject("skin").get("username").getAsString());
         assertEquals("minecraft:diamond_sword", definition.getAsJsonObject("equipment").get("mainHand").getAsString());
         assertEquals("interact-flow", definition.getAsJsonObject("hooks").get("interactAction").getAsString());

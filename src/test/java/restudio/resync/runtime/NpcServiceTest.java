@@ -53,21 +53,9 @@ class NpcServiceTest {
     }
 
     @Test
-    void startupModeSpawnsAnInactivePlayerNpcWhenDefinitionReloads() {
-        JsonObject definition = playerNpcDefinition("startup");
-        TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
-        TestNpcService service = service(definition, runtime, new RecordingDispatcher());
-
-        service.reload("guide", definition, false);
-
-        assertTrue(runtime.isActive("guide"));
-        assertEquals(1, runtime.spawnCount);
-        service.shutdown();
-    }
-
-    @Test
-    void manualModeDoesNotTurnSavingADefinitionIntoAWorldMutation() {
-        JsonObject definition = playerNpcDefinition("manual");
+    void definitionReloadDoesNotSpawnAnInactiveNpc() {
+        JsonObject definition = playerNpcDefinition();
+        definition.addProperty("spawnMode", "startup");
         TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
         TestNpcService service = service(definition, runtime, new RecordingDispatcher());
 
@@ -80,7 +68,7 @@ class NpcServiceTest {
 
     @Test
     void repeatedPlayerNpcSpawnIsIdempotentAndDoesNotRepeatSpawnHook() {
-        JsonObject definition = playerNpcDefinition("manual");
+        JsonObject definition = playerNpcDefinition();
         definition.getAsJsonObject("hooks").addProperty("spawnAction", "spawn-flow");
         TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
         RecordingDispatcher dispatcher = new RecordingDispatcher();
@@ -96,29 +84,34 @@ class NpcServiceTest {
     }
 
     @Test
-    void reloadingAnActivePlayerNpcUpdatesItWithoutRepeatingSpawn() {
-        JsonObject definition = playerNpcDefinition("manual");
+    void reloadingAnActivePlayerNpcKeepsItsRuntimePositionWithoutRepeatingSpawn() {
+        JsonObject definition = playerNpcDefinition();
         definition.getAsJsonObject("hooks").addProperty("spawnAction", "spawn-flow");
         TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
         RecordingDispatcher dispatcher = new RecordingDispatcher();
         TestNpcService service = service(definition, runtime, dispatcher);
         service.spawn("guide", location());
-        JsonObject updated = playerNpcDefinition("manual");
-        updated.getAsJsonObject("location").addProperty("x", 8);
+        JsonObject updated = playerNpcDefinition();
+        JsonObject legacyLocation = new JsonObject();
+        legacyLocation.addProperty("world", "world");
+        legacyLocation.addProperty("x", 8);
+        legacyLocation.addProperty("y", 70);
+        legacyLocation.addProperty("z", 2);
+        updated.add("location", legacyLocation);
         service.definition(updated);
 
         service.reload("guide", updated, false);
 
         assertEquals(1, runtime.spawnCount);
         assertEquals(1, runtime.reloadCount);
-        assertEquals(8, runtime.location("guide").getX());
+        assertEquals(1, runtime.location("guide").getX());
         assertEquals(List.of("spawn-flow"), dispatcher.flowIds);
         service.shutdown();
     }
 
     @Test
     void deletingAnActiveNpcUsesItsSnapshotAndDispatchesDespawnOnce() {
-        JsonObject definition = playerNpcDefinition("manual");
+        JsonObject definition = playerNpcDefinition();
         definition.getAsJsonObject("hooks").addProperty("despawnAction", "despawn-flow");
         TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
         RecordingDispatcher dispatcher = new RecordingDispatcher();
@@ -137,7 +130,7 @@ class NpcServiceTest {
 
     @Test
     void interactionDispatchesGenericAndButtonSpecificHooks() {
-        JsonObject definition = playerNpcDefinition("manual");
+        JsonObject definition = playerNpcDefinition();
         JsonObject hooks = definition.getAsJsonObject("hooks");
         hooks.addProperty("interactAction", "interact-flow");
         hooks.addProperty("rightClickAction", "right-flow");
@@ -156,17 +149,10 @@ class NpcServiceTest {
         return new TestNpcService(plugin, definition, runtime, dispatcher);
     }
 
-    private JsonObject playerNpcDefinition(String spawnMode) {
+    private JsonObject playerNpcDefinition() {
         JsonObject definition = new JsonObject();
         definition.addProperty("enabled", true);
         definition.addProperty("entityType", "player");
-        definition.addProperty("spawnMode", spawnMode);
-        JsonObject location = new JsonObject();
-        location.addProperty("world", "world");
-        location.addProperty("x", 1);
-        location.addProperty("y", 70);
-        location.addProperty("z", 2);
-        definition.add("location", location);
         definition.add("hooks", new JsonObject());
         return definition;
     }

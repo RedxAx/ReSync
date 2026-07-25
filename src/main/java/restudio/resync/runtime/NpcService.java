@@ -58,9 +58,10 @@ public class NpcService implements Listener {
     private final Map<String, JsonObject> activeDefinitions = new ConcurrentHashMap<>();
     private final BoundedDiagnosticDeduplicator reportedLifecycleFailures = new BoundedDiagnosticDeduplicator(512);
     private final PlayerNpcRuntime playerNpcRuntime;
+    private final PlayerNpcInstanceStorage playerNpcInstances;
     private final NamespacedKey npcIdKey;
     private BukkitTask followTask;
-    private BukkitTask startupTask;
+    private BukkitTask restoreTask;
 
     public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService) {
         this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null);
@@ -83,6 +84,9 @@ public class NpcService implements Listener {
         this.lootTableService = lootTableService;
         this.dialogService = dialogService;
         this.playerNpcRuntime = playerNpcRuntime;
+        this.playerNpcInstances = plugin != null
+            ? new PlayerNpcInstanceStorage(plugin.getDataFolder().toPath().resolve("runtime").resolve("player-npcs.json"))
+            : null;
         this.npcIdKey = npcIdKey;
         if (plugin != null) {
             followTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickFollowPlayers, 2L, 2L);
@@ -116,6 +120,7 @@ public class NpcService implements Listener {
             boolean spawned = playerNpcRuntime.spawn(id, definition, location);
             if (spawned) {
                 activeDefinitions.put(id, definition.deepCopy());
+                savePlayerNpcPosition(id, location);
                 dispatch(id, "spawnAction", null, null, location, null);
             }
             return null;
@@ -133,6 +138,7 @@ public class NpcService implements Listener {
             applyDefinition(entity, definition);
             activeNpcs.put(id, entity.getUniqueId());
             activeDefinitions.put(id, definition.deepCopy());
+            removePlayerNpcPosition(id);
         } catch (RuntimeException exception) {
             entity.remove();
             activeNpcs.remove(id, entity.getUniqueId());
@@ -151,7 +157,8 @@ public class NpcService implements Listener {
             entity.remove();
         }
         boolean packetDespawned = playerNpcRuntime != null && playerNpcRuntime.despawn(id);
-        if (entityDespawned || packetDespawned) {
+        boolean persistedDespawned = removePlayerNpcPosition(id);
+        if (entityDespawned || packetDespawned || persistedDespawned) {
             dispatch(id, "despawnAction", null, entity, location, null);
             activeDefinitions.remove(id);
             return true;
@@ -187,54 +194,32 @@ public class NpcService implements Listener {
         return false;
     }
 
-    public void spawnStartupNpcs() {
+    public void restorePersistentNpcs() {
         if (plugin == null || storage == null) {
             return;
         }
-        if (startupTask != null) {
-            startupTask.cancel();
+        if (restoreTask != null) {
+            restoreTask.cancel();
         }
-        startupTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            startupTask = null;
+        restoreTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            restoreTask = null;
             try {
                 restorePersistedNpcEntities();
             } catch (RuntimeException exception) {
                 reportLifecycleFailure("restore persisted NPC entities", "startup", exception);
             }
-            List<String> ids;
             try {
-                ids = storage.listIds(ReSyncResourceCatalog.NPC_DEFINITION);
+                restorePersistedPlayerNpcs();
             } catch (RuntimeException exception) {
-                reportLifecycleFailure("list startup NPC definitions", "startup", exception);
-                return;
-            }
-            for (String id : ids) {
-                try {
-                    JsonObject definition = get(id);
-                    if (definition == null || !bool(definition, "enabled", true) || !spawnsOnStartup(definition)) {
-                        continue;
-                    }
-                    Location spawnLocation = location(definition);
-                    if (spawnLocation == null) {
-                        reportLifecycleWarning("spawn startup NPC", id, "Configured startup location is unavailable");
-                    } else if (!isActive(id)) {
-                        spawn(id, spawnLocation);
-                        if (!isActive(id)) {
-                            String detail = playerEntityType(definition) ? playerNpcUnavailableReason() : "Server rejected the configured entity type";
-                            reportLifecycleWarning("spawn startup NPC", id, detail);
-                        }
-                    }
-                } catch (RuntimeException exception) {
-                    reportLifecycleFailure("spawn startup NPC", id, exception);
-                }
+                reportLifecycleFailure("restore persisted Player NPC instances", "startup", exception);
             }
         }, 1L);
     }
 
     public void shutdown() {
-        if (startupTask != null) {
-            startupTask.cancel();
-            startupTask = null;
+        if (restoreTask != null) {
+            restoreTask.cancel();
+            restoreTask = null;
         }
         if (followTask != null) {
             followTask.cancel();
@@ -264,9 +249,8 @@ public class NpcService implements Listener {
             }
             if (playerEntityType(definition)) {
                 Entity entity = activeEntity(id);
-                Location configured = location(definition);
                 if (entity != null && !entity.isDead()) {
-                    Location spawnLocation = configured != null ? configured : entity.getLocation();
+                    Location spawnLocation = entity.getLocation();
                     entity.remove();
                     activeNpcs.remove(id);
                     boolean activated = false;
@@ -278,6 +262,7 @@ public class NpcService implements Listener {
                     }
                     if (activated) {
                         activeDefinitions.put(id, definition.deepCopy());
+                        savePlayerNpcPosition(id, playerNpcRuntime.location(id));
                     } else {
                         activeDefinitions.remove(id);
                         reportLifecycleWarning("reload Player NPC", id, playerNpcUnavailableReason());
@@ -285,28 +270,22 @@ public class NpcService implements Listener {
                     return;
                 }
                 if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
-                    if (playerNpcRuntime.reload(id, definition, false, configured)) {
+                    Location currentLocation = playerNpcRuntime.location(id);
+                    if (playerNpcRuntime.reload(id, definition, false, currentLocation)) {
                         activeDefinitions.put(id, definition.deepCopy());
+                        savePlayerNpcPosition(id, playerNpcRuntime.location(id));
                     } else {
                         reportLifecycleWarning("reload Player NPC", id, "Packet runtime rejected the updated definition");
                     }
                     return;
-                }
-                if (spawnsOnStartup(definition) && configured != null) {
-                    spawn(id, configured);
-                    if (!isActive(id)) {
-                        reportLifecycleWarning("activate reloaded startup NPC", id, playerNpcUnavailableReason());
-                    }
                 }
                 return;
             }
             if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
                 Location packetLocation = playerNpcRuntime.location(id);
                 playerNpcRuntime.despawn(id);
-                Location configured = location(definition);
-                Location spawnLocation = configured != null ? configured : packetLocation;
-                if (spawnLocation != null) {
-                    spawn(id, spawnLocation);
+                if (packetLocation != null) {
+                    spawn(id, packetLocation);
                     if (!isActive(id)) {
                         activeDefinitions.remove(id);
                         reportLifecycleWarning("replace Player NPC entity type", id, spawnFailureReason(id));
@@ -316,13 +295,6 @@ public class NpcService implements Listener {
             }
             Entity entity = activeEntity(id);
             if (entity == null || entity.isDead()) {
-                Location configured = location(definition);
-                if (spawnsOnStartup(definition) && configured != null) {
-                    spawn(id, configured);
-                    if (!isActive(id)) {
-                        reportLifecycleWarning("activate reloaded startup NPC", id, "Server rejected the configured entity type");
-                    }
-                }
                 return;
             }
             EntityType nextType = spawnEntityType(definition);
@@ -330,9 +302,8 @@ public class NpcService implements Listener {
                 despawn(id);
                 return;
             }
-            Location location = location(definition);
             if (entity.getType() != nextType) {
-                Location spawnLocation = location != null ? location : entity.getLocation();
+                Location spawnLocation = entity.getLocation();
                 entity.remove();
                 activeNpcs.remove(id);
                 spawn(id, spawnLocation);
@@ -341,9 +312,6 @@ public class NpcService implements Listener {
                     reportLifecycleWarning("replace NPC entity type", id, spawnFailureReason(id));
                 }
                 return;
-            }
-            if (location != null) {
-                entity.teleport(location);
             }
             applyDefinition(entity, definition);
             activeDefinitions.put(id, definition.deepCopy());
@@ -402,8 +370,12 @@ public class NpcService implements Listener {
         if (entity != null && !entity.isDead()) {
             return entity.teleport(location);
         }
-        return playerNpcRuntime != null && playerNpcRuntime.teleport(id, location.getWorld().getName(), location.getX(), location.getY(), location.getZ(),
+        boolean teleported = playerNpcRuntime != null && playerNpcRuntime.teleport(id, location.getWorld().getName(), location.getX(), location.getY(), location.getZ(),
             location.getYaw(), location.getPitch());
+        if (teleported) {
+            savePlayerNpcPosition(id, location);
+        }
+        return teleported;
     }
 
     public String playerNpcUnavailableReason() {
@@ -457,12 +429,35 @@ public class NpcService implements Listener {
         }
         for (World world : plugin.getServer().getWorlds()) {
             for (Entity entity : world.getEntities()) {
-                reconcilePersistedEntity(entity, true);
+                reconcilePersistedEntity(entity);
             }
         }
     }
 
-    private void reconcilePersistedEntity(Entity entity, boolean applyConfiguredLocation) {
+    private void restorePersistedPlayerNpcs() {
+        if (plugin == null || playerNpcInstances == null || playerNpcRuntime == null || !playerNpcRuntime.available()) {
+            return;
+        }
+        for (Map.Entry<String, PlayerNpcInstanceStorage.Position> entry : playerNpcInstances.snapshot().entrySet()) {
+            String id = entry.getKey();
+            JsonObject definition = get(id);
+            if (definition == null || !bool(definition, "enabled", true) || !playerEntityType(definition)) {
+                removePlayerNpcPosition(id);
+                continue;
+            }
+            Location location = entry.getValue().resolve(plugin.getServer());
+            if (location == null || isActive(id)) {
+                continue;
+            }
+            if (playerNpcRuntime.spawn(id, definition, location)) {
+                activeDefinitions.put(id, definition.deepCopy());
+            } else {
+                reportLifecycleWarning("restore persistent Player NPC", id, playerNpcUnavailableReason());
+            }
+        }
+    }
+
+    private void reconcilePersistedEntity(Entity entity) {
         String id = npcId(entity);
         if (id.isBlank()) {
             return;
@@ -483,10 +478,7 @@ public class NpcService implements Listener {
             if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
                 playerNpcRuntime.despawn(id);
             }
-            Location configured = applyConfiguredLocation ? location(definition) : null;
-            if (configured != null) {
-                entity.teleport(configured);
-            }
+            removePlayerNpcPosition(id);
             activeNpcs.put(id, entity.getUniqueId());
             applyDefinition(entity, definition);
             activeDefinitions.put(id, definition.deepCopy());
@@ -498,24 +490,14 @@ public class NpcService implements Listener {
         }
     }
 
-    private Location location(JsonObject definition) {
-        if (definition == null || !definition.has("location") || !definition.get("location").isJsonObject()) {
-            return null;
+    private void savePlayerNpcPosition(String id, Location location) {
+        if (playerNpcInstances != null) {
+            playerNpcInstances.save(id, location);
         }
-        JsonObject location = definition.getAsJsonObject("location");
-        String worldName = text(location, "world");
-        World world = !worldName.isBlank() ? plugin.getServer().getWorld(worldName) : null;
-        if (world == null) {
-            return null;
-        }
-        return new Location(
-            world,
-            decimal(location, "x", 0.0),
-            decimal(location, "y", world.getSpawnLocation().getY()),
-            decimal(location, "z", 0.0),
-            (float) decimal(location, "yaw", 0.0),
-            (float) decimal(location, "pitch", 0.0)
-        );
+    }
+
+    private boolean removePlayerNpcPosition(String id) {
+        return playerNpcInstances != null && playerNpcInstances.remove(id);
     }
 
     private void applyDefinition(Entity entity, JsonObject definition) {
@@ -731,7 +713,7 @@ public class NpcService implements Listener {
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         for (Entity entity : event.getChunk().getEntities()) {
-            reconcilePersistedEntity(entity, false);
+            reconcilePersistedEntity(entity);
         }
     }
 
@@ -874,11 +856,6 @@ public class NpcService implements Listener {
             return player;
         }
         return damager instanceof Projectile projectile && projectile.getShooter() instanceof Player player ? player : null;
-    }
-
-    private boolean spawnsOnStartup(JsonObject definition) {
-        String mode = text(definition, "spawnMode").replace('-', '_').toLowerCase(Locale.ROOT);
-        return "startup".equals(mode) || "automatic".equals(mode) || "auto".equals(mode) || "server_start".equals(mode);
     }
 
     private void reportLifecycleFailure(String action, String id, RuntimeException exception) {

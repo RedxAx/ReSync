@@ -946,7 +946,7 @@ public class FlowRuntimeModule implements Module {
         if (customContentService != null) {
             customContentService.reconcileAllItems();
         }
-        npcService.spawnStartupNpcs();
+        npcService.restorePersistentNpcs();
         TabListService.startUpdater();
         tickTask = Bukkit.getScheduler().runTaskTimer(context.getPlugin(), () -> {
             systemEventListener.tick();

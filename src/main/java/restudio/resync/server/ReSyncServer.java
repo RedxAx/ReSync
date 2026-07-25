@@ -36,6 +36,7 @@ import restudio.resync.modules.FlowJobModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.MessageRewriteModule;
+import restudio.resync.modules.LuckPermsManagementModule;
 import restudio.resync.modules.Module;
 import restudio.resync.modules.ModuleContext;
 import restudio.resync.modules.ModuleRegistry;
@@ -194,7 +195,7 @@ public class ReSyncServer {
     }
 
     static List<Module> coreModules() {
-        return List.of(
+        List<Module> modules = new ArrayList<>(List.of(
             new ChunkTransportModule(),
             new PlayerNpcPacketModule(),
             new FlowJobModule(),
@@ -207,7 +208,11 @@ public class ReSyncServer {
             new PlayerTrackingModule(),
             new WorldManagementModule(),
             new WorldGenModule()
-        );
+        ));
+        if (Bukkit.getServer() != null && Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
+            modules.add(new LuckPermsManagementModule());
+        }
+        return List.copyOf(modules);
     }
 
     private void startScheduler() {

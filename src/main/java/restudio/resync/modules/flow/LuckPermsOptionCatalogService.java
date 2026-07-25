@@ -4,6 +4,7 @@ import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.track.Track;
 import org.bukkit.Bukkit;
+import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
@@ -13,16 +14,19 @@ import restudio.resync.api.OptionCatalogRegistry;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class LuckPermsOptionCatalogService {
     public static final String GROUP_SOURCE = "server:luckperms:group";
     public static final String TRACK_SOURCE = "server:luckperms:track";
+    public static final String PERMISSION_SOURCE = "server:luckperms:permission";
 
     public void registerProviders(OptionCatalogRegistry registry) {
         registry.register(provider(GROUP_SOURCE, this::groups, this::groupItem));
         registry.register(provider(TRACK_SOURCE, this::tracks, this::trackItem));
+        registry.register(provider(PERMISSION_SOURCE, this::permissions, this::permissionItem));
     }
 
     private OptionCatalogProvider provider(String sourceId, Supplier<List<String>> values, Function<String, OptionCatalogItem> itemFactory) {
@@ -78,6 +82,17 @@ public final class LuckPermsOptionCatalogService {
             .sorted(String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder())).toList();
     }
 
+    private List<String> permissions() {
+        TreeSet<String> permissions = new TreeSet<>(String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder()));
+        Bukkit.getPluginManager().getPermissions().stream().map(Permission::getName).forEach(permissions::add);
+        LuckPerms luckPerms = luckPerms();
+        if (luckPerms != null) {
+            luckPerms.getGroupManager().getLoadedGroups().forEach(group -> group.getNodes().forEach(node -> permissions.add(node.getKey())));
+            luckPerms.getUserManager().getLoadedUsers().forEach(user -> user.getNodes().forEach(node -> permissions.add(node.getKey())));
+        }
+        return List.copyOf(permissions);
+    }
+
     private OptionCatalogItem groupItem(String name) {
         LuckPerms luckPerms = luckPerms();
         Group group = luckPerms != null ? luckPerms.getGroupManager().getGroup(name) : null;
@@ -99,6 +114,15 @@ public final class LuckPermsOptionCatalogService {
             "provider", "LuckPerms",
             "groups", groups,
             "available", track != null
+        ));
+    }
+
+    private OptionCatalogItem permissionItem(String name) {
+        Permission permission = Bukkit.getPluginManager().getPermission(name);
+        String description = permission == null || permission.getDescription().isBlank() ? "Permission Used By Installed Plugins" : permission.getDescription();
+        return new OptionCatalogItem(name, name, description, "permission", "Permissions", Map.of(
+            "provider", permission == null ? "LuckPerms" : "Bukkit",
+            "available", true
         ));
     }
 

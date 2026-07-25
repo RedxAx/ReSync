@@ -799,7 +799,7 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> List.of("displayName", "enabled", "nodes");
             case ReSyncResourceCatalog.DIALOG -> List.of("displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape", "after_action", "columns", "body", "inputs", "actions");
             case ReSyncResourceCatalog.TRADE_PROFILE -> List.of("displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks", "lootTable", "offers", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
-            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "spawnMode", "location.world", "location.x", "location.y", "location.z", "location.yaw", "location.pitch", "skin.username", "skin.uuid", "skin.texture", "skin.signature", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "dialog", "tradeProfile", "lootTable", "equipment.mainHand", "equipment.offHand", "equipment.helmet", "equipment.chestplate", "equipment.leggings", "equipment.boots", "hooks.spawnAction", "hooks.interactAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.damageAction", "hooks.deathAction", "hooks.despawnAction");
+            case ReSyncResourceCatalog.NPC_DEFINITION -> List.of("displayName", "enabled", "entityType", "skin.username", "ai", "gravity", "invulnerable", "followPlayer", "followRange", "dialog", "tradeProfile", "lootTable", "equipment.mainHand", "equipment.offHand", "equipment.helmet", "equipment.chestplate", "equipment.leggings", "equipment.boots", "hooks.spawnAction", "hooks.interactAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.damageAction", "hooks.deathAction", "hooks.despawnAction");
             case ReSyncResourceCatalog.LOOT_TABLE -> List.of("displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool", "trigger.overrideDrops", "pools", "pools.0.rolls", "pools.0.entries.0.item", "pools.0.entries.0.minAmount", "pools.0.entries.0.maxAmount", "pools.0.entries.0.weight", "pools.0.entries.0.chance", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
             default -> List.of("enabled", "priority", "displayName", "template", "prefix", "format");
         };
@@ -838,9 +838,6 @@ public class ReSyncCommand implements TabExecutor {
         }
         if (ReSyncResourceCatalog.TRADE_PROFILE.equals(type) && "villagerType".equalsIgnoreCase(field)) {
             return List.of("plains", "desert", "jungle", "savanna", "snow", "swamp", "taiga");
-        }
-        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && "spawnMode".equalsIgnoreCase(field)) {
-            return List.of("manual", "startup");
         }
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && ("ai".equalsIgnoreCase(field) || "gravity".equalsIgnoreCase(field) || "invulnerable".equalsIgnoreCase(field) || "followPlayer".equalsIgnoreCase(field))) {
             return booleanOptions();
@@ -967,7 +964,6 @@ public class ReSyncCommand implements TabExecutor {
             case ReSyncResourceCatalog.NPC_DEFINITION -> {
                 resource.addProperty("displayName", id);
                 resource.addProperty("entityType", "villager");
-                resource.addProperty("spawnMode", "manual");
                 resource.addProperty("ai", false);
                 resource.addProperty("gravity", true);
                 resource.addProperty("invulnerable", true);

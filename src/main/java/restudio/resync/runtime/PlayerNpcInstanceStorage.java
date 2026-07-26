@@ -20,10 +20,16 @@ import java.util.Map;
 final class PlayerNpcInstanceStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path file;
+    private final StorageWriter writer;
     private final Map<String, Position> positions = new LinkedHashMap<>();
 
     PlayerNpcInstanceStorage(Path file) {
+        this(file, StorageSafety::writeUtf8Atomic);
+    }
+
+    PlayerNpcInstanceStorage(Path file, StorageWriter writer) {
         this.file = file;
+        this.writer = writer;
         load();
     }
 
@@ -31,20 +37,29 @@ final class PlayerNpcInstanceStorage {
         return Map.copyOf(positions);
     }
 
-    synchronized void save(String id, Location location) {
+    synchronized boolean save(String id, Location location) {
         if (id == null || id.isBlank() || location == null || location.getWorld() == null) {
-            return;
+            return false;
         }
-        positions.put(id, Position.from(location));
-        write();
+        Map<String, Position> next = new LinkedHashMap<>(positions);
+        next.put(id, Position.from(location));
+        return commit(next);
     }
 
     synchronized boolean remove(String id) {
-        if (id == null || positions.remove(id) == null) {
+        if (id == null || id.isBlank()) {
             return false;
         }
-        write();
-        return true;
+        if (!positions.containsKey(id)) {
+            return true;
+        }
+        Map<String, Position> next = new LinkedHashMap<>(positions);
+        next.remove(id);
+        return commit(next);
+    }
+
+    synchronized boolean contains(String id) {
+        return id != null && positions.containsKey(id);
     }
 
     private void load() {
@@ -68,17 +83,26 @@ final class PlayerNpcInstanceStorage {
         }
     }
 
-    private void write() {
+    private boolean commit(Map<String, Position> next) {
         if (file == null) {
-            return;
+            return false;
         }
         JsonObject root = new JsonObject();
-        positions.forEach((id, position) -> root.add(id, position.toJson()));
+        next.forEach((id, position) -> root.add(id, position.toJson()));
         try {
-            StorageSafety.writeUtf8Atomic(file, GSON.toJson(root));
+            writer.write(file, GSON.toJson(root));
+            positions.clear();
+            positions.putAll(next);
+            return true;
         } catch (IOException exception) {
             Log.warn("Failed to save persistent Player NPC instances: " + exception.getMessage());
+            return false;
         }
+    }
+
+    @FunctionalInterface
+    interface StorageWriter {
+        void write(Path file, String content) throws IOException;
     }
 
     record Position(String world, double x, double y, double z, float yaw, float pitch) {

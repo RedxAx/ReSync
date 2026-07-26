@@ -2,10 +2,18 @@ package restudio.resync.permissions;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LuckPermsManagementServiceTest {
     @Test
@@ -16,5 +24,53 @@ class LuckPermsManagementServiceTest {
         List<UUID> users = LuckPermsManagementService.mergeUserIds(List.of(second), List.of(first, second));
 
         assertEquals(List.of(first, second), users);
+    }
+
+    @Test
+    void rollsBackCompletedPermissionMutationsInReverseOrder() {
+        List<String> events = new ArrayList<>();
+        List<Supplier<CompletableFuture<LuckPermsManagementService.Compensated<String>>>> mutations = List.of(
+            mutation(events, "first"),
+            mutation(events, "second"),
+            () -> {
+                events.add("apply third");
+                return CompletableFuture.failedFuture(new IllegalStateException("failed"));
+            }
+        );
+
+        CompletionException failure = assertThrows(CompletionException.class,
+            () -> LuckPermsManagementService.runCompensating(mutations).join());
+
+        LuckPermsManagementService.CompensationFailure transaction = assertInstanceOf(
+            LuckPermsManagementService.CompensationFailure.class, failure.getCause());
+        assertFalse(transaction.rollbackFailed());
+        assertEquals(List.of("apply first", "apply second", "apply third", "rollback second", "rollback first"), events);
+    }
+
+    @Test
+    void reportsIncompleteRecoveryWhenCompensationFails() {
+        List<Supplier<CompletableFuture<LuckPermsManagementService.Compensated<String>>>> mutations = List.of(
+            () -> CompletableFuture.completedFuture(new LuckPermsManagementService.Compensated<>("first",
+                () -> CompletableFuture.failedFuture(new IllegalStateException("rollback failed")))),
+            () -> CompletableFuture.failedFuture(new IllegalStateException("save failed"))
+        );
+
+        CompletionException failure = assertThrows(CompletionException.class,
+            () -> LuckPermsManagementService.runCompensating(mutations).join());
+
+        LuckPermsManagementService.CompensationFailure transaction = assertInstanceOf(
+            LuckPermsManagementService.CompensationFailure.class, failure.getCause());
+        assertTrue(transaction.rollbackFailed());
+        assertEquals(List.of("first"), transaction.<String>applied());
+    }
+
+    private Supplier<CompletableFuture<LuckPermsManagementService.Compensated<String>>> mutation(List<String> events, String name) {
+        return () -> {
+            events.add("apply " + name);
+            return CompletableFuture.completedFuture(new LuckPermsManagementService.Compensated<>(name, () -> {
+                events.add("rollback " + name);
+                return CompletableFuture.completedFuture(null);
+            }));
+        };
     }
 }

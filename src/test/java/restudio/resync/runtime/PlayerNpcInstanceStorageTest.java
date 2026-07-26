@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,5 +47,24 @@ class PlayerNpcInstanceStorageTest {
         assertEquals(10, position.pitch());
         assertTrue(restored.remove("guide"));
         assertFalse(new PlayerNpcInstanceStorage(file).snapshot().containsKey("guide"));
+    }
+
+    @Test
+    void keepsCommittedStateWhenRemovalCannotBeWritten() throws Exception {
+        Path file = directory.resolve("player-npcs.json");
+        Location location = new Location(MockBukkit.getMock().getWorld("world"), 12.5, 70, -4.25, 90, 10);
+        AtomicBoolean fail = new AtomicBoolean();
+        PlayerNpcInstanceStorage storage = new PlayerNpcInstanceStorage(file, (target, content) -> {
+            if (fail.get()) {
+                throw new java.io.IOException("Unavailable");
+            }
+            Files.writeString(target, content);
+        });
+        assertTrue(storage.save("guide", location));
+        fail.set(true);
+
+        assertFalse(storage.remove("guide"));
+        assertTrue(storage.contains("guide"));
+        assertTrue(storage.snapshot().containsKey("guide"));
     }
 }

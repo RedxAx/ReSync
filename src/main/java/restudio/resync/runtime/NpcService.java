@@ -119,8 +119,12 @@ public class NpcService implements Listener {
             }
             boolean spawned = playerNpcRuntime.spawn(id, definition, location);
             if (spawned) {
+                if (!savePlayerNpcPosition(id, location)) {
+                    playerNpcRuntime.despawn(id);
+                    reportLifecycleWarning("persist Player NPC", id, "The NPC position could not be saved");
+                    return null;
+                }
                 activeDefinitions.put(id, definition.deepCopy());
-                savePlayerNpcPosition(id, location);
                 dispatch(id, "spawnAction", null, null, location, null);
             }
             return null;
@@ -138,7 +142,9 @@ public class NpcService implements Listener {
             applyDefinition(entity, definition);
             activeNpcs.put(id, entity.getUniqueId());
             activeDefinitions.put(id, definition.deepCopy());
-            removePlayerNpcPosition(id);
+            if (!removePlayerNpcPosition(id)) {
+                throw new IllegalStateException("The previous Player NPC instance could not be removed");
+            }
         } catch (RuntimeException exception) {
             entity.remove();
             activeNpcs.remove(id, entity.getUniqueId());
@@ -153,12 +159,19 @@ public class NpcService implements Listener {
         Entity entity = uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
         Location location = entity != null ? entity.getLocation() : playerNpcRuntime != null ? playerNpcRuntime.location(id) : null;
         boolean entityDespawned = entity != null;
+        boolean persisted = playerNpcInstances != null && playerNpcInstances.contains(id);
+        if (persisted && !removePlayerNpcPosition(id)) {
+            reportLifecycleWarning("persist Player NPC despawn", id, "The saved NPC instance could not be removed");
+            if (uuid != null) {
+                activeNpcs.put(id, uuid);
+            }
+            return false;
+        }
         if (entity != null) {
             entity.remove();
         }
         boolean packetDespawned = playerNpcRuntime != null && playerNpcRuntime.despawn(id);
-        boolean persistedDespawned = removePlayerNpcPosition(id);
-        if (entityDespawned || packetDespawned || persistedDespawned) {
+        if (entityDespawned || packetDespawned || persisted) {
             dispatch(id, "despawnAction", null, entity, location, null);
             activeDefinitions.remove(id);
             return true;
@@ -370,10 +383,16 @@ public class NpcService implements Listener {
         if (entity != null && !entity.isDead()) {
             return entity.teleport(location);
         }
+        Location previousLocation = playerNpcRuntime != null ? playerNpcRuntime.location(id) : null;
         boolean teleported = playerNpcRuntime != null && playerNpcRuntime.teleport(id, location.getWorld().getName(), location.getX(), location.getY(), location.getZ(),
             location.getYaw(), location.getPitch());
-        if (teleported) {
-            savePlayerNpcPosition(id, location);
+        if (teleported && !savePlayerNpcPosition(id, location)) {
+            if (previousLocation != null && previousLocation.getWorld() != null) {
+                playerNpcRuntime.teleport(id, previousLocation.getWorld().getName(), previousLocation.getX(), previousLocation.getY(), previousLocation.getZ(),
+                    previousLocation.getYaw(), previousLocation.getPitch());
+            }
+            reportLifecycleWarning("persist Player NPC teleport", id, "The new NPC position could not be saved");
+            return false;
         }
         return teleported;
     }
@@ -490,14 +509,12 @@ public class NpcService implements Listener {
         }
     }
 
-    private void savePlayerNpcPosition(String id, Location location) {
-        if (playerNpcInstances != null) {
-            playerNpcInstances.save(id, location);
-        }
+    private boolean savePlayerNpcPosition(String id, Location location) {
+        return playerNpcInstances == null || playerNpcInstances.save(id, location);
     }
 
     private boolean removePlayerNpcPosition(String id) {
-        return playerNpcInstances != null && playerNpcInstances.remove(id);
+        return playerNpcInstances == null || playerNpcInstances.remove(id);
     }
 
     private void applyDefinition(Entity entity, JsonObject definition) {

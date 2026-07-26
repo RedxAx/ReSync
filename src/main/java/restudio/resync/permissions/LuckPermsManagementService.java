@@ -1,5 +1,8 @@
 package restudio.resync.permissions;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.context.ImmutableContextSet;
 import net.luckperms.api.event.EventSubscription;
@@ -57,8 +60,12 @@ import restudio.resync.permissions.LuckPermsManagementContract.TrackChange;
 import restudio.resync.permissions.LuckPermsManagementContract.TrackDetail;
 import restudio.resync.permissions.LuckPermsManagementContract.UserPage;
 import restudio.resync.permissions.LuckPermsManagementContract.UserSummary;
+import restudio.resync.storage.StorageSafety;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -70,22 +77,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class LuckPermsManagementService implements AutoCloseable {
     private static final int AUDIT_LIMIT = 50;
     private static final int COMPLETED_SAVE_LIMIT = 256;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final JavaPlugin plugin;
+    private final Path operationJournal;
     private final AtomicLong revision = new AtomicLong(1);
     private final Map<String, Long> entityRevisions = new ConcurrentHashMap<>();
     private final Deque<AuditEntry> audit = new ArrayDeque<>();
@@ -93,13 +105,46 @@ public final class LuckPermsManagementService implements AutoCloseable {
     private final Map<String, SaveResult> completedSaves = new ConcurrentHashMap<>();
     private final List<Consumer<Invalidation>> listeners = new CopyOnWriteArrayList<>();
     private final List<EventSubscription<?>> subscriptions = new ArrayList<>();
+    private final Object saveLock = new Object();
+    private CompletableFuture<Void> saveTail = CompletableFuture.completedFuture(null);
     private volatile long lastChangedAt = System.currentTimeMillis();
 
     private record PermissionSource(SubjectRef source, List<String> path, String explanation) {
     }
 
+    private record SubjectState(SubjectRef subject, UUID uniqueId, String username, String primaryGroup, List<Node> nodes, List<Node> transientNodes) {
+    }
+
+    private record TrackState(String name, boolean existed, List<String> groups) {
+    }
+
+    static record Compensated<T>(T result, Supplier<CompletableFuture<Void>> rollback) {
+    }
+
+    static final class CompensationFailure extends RuntimeException {
+        private final boolean rollbackFailed;
+        private final List<?> applied;
+
+        private CompensationFailure(Throwable cause, boolean rollbackFailed, List<?> applied) {
+            super(cause);
+            this.rollbackFailed = rollbackFailed;
+            this.applied = List.copyOf(applied);
+        }
+
+        boolean rollbackFailed() {
+            return rollbackFailed;
+        }
+
+        @SuppressWarnings("unchecked")
+        <T> List<T> applied() {
+            return (List<T>) applied;
+        }
+    }
+
     public LuckPermsManagementService(JavaPlugin plugin) {
         this.plugin = plugin;
+        operationJournal = plugin.getDataFolder().toPath().resolve("runtime").resolve("luckperms-operations.json");
+        loadCompleted();
         subscribeEvents();
     }
 
@@ -328,10 +373,20 @@ public final class LuckPermsManagementService implements AutoCloseable {
     }
 
     private CompletableFuture<Response> save(Request request, String actor) {
+        synchronized (saveLock) {
+            CompletableFuture<Response> result = saveTail.handle((ignored, failure) -> null)
+                .thenCompose(ignored -> performSave(request, actor));
+            saveTail = result.handle((ignored, failure) -> null);
+            return result;
+        }
+    }
+
+    private CompletableFuture<Response> performSave(Request request, String actor) {
         ChangeSet changes = request.changes() == null ? ChangeSet.empty() : request.changes();
         SaveResult completed = completedSaves.get(changes.operationId());
         if (completed != null) {
-            return CompletableFuture.completedFuture(response(request, "Permissions Already Saved", null, null, null, null, null, null, completed));
+            String message = completed.applied() ? "Permissions Already Saved" : "Permission Save Was Already Processed";
+            return CompletableFuture.completedFuture(response(request, message, null, null, null, null, null, null, completed));
         }
         List<Conflict> conflicts = conflicts(changes);
         if (!conflicts.isEmpty()) {
@@ -339,29 +394,227 @@ public final class LuckPermsManagementService implements AutoCloseable {
             remember("Save", "Permissions", actor, false, "Review Changes Before Saving");
             return CompletableFuture.completedFuture(response(request, "Permissions Changed On The Server", null, null, null, null, null, null, result));
         }
-        List<AppliedEntity> applied = new ArrayList<>();
-        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        List<Supplier<CompletableFuture<Compensated<AppliedEntity>>>> mutations = new ArrayList<>();
         for (EntityCreate create : changes.creates()) {
-            chain = chain.thenCompose(ignored -> create(create).thenRun(() -> applied.add(applied(create.type(), create.id(), true, "Created"))));
+            mutations.add(() -> createMutation(create));
         }
         for (SubjectChange change : changes.subjects()) {
-            chain = chain.thenCompose(ignored -> apply(change).thenRun(() -> applied.add(applied(entityType(change.subject()), change.subject().id(), true, "Saved"))));
+            mutations.add(() -> subjectMutation(change));
         }
         for (TrackChange change : changes.tracks()) {
-            chain = chain.thenCompose(ignored -> apply(change).thenRun(() -> applied.add(applied(EntityType.TRACK, change.name(), true, "Saved"))));
+            mutations.add(() -> trackMutation(change));
         }
         for (EntityDelete delete : changes.deletes()) {
-            chain = chain.thenCompose(ignored -> delete(delete).thenRun(() -> applied.add(applied(delete.type(), delete.id(), true, "Deleted"))));
+            mutations.add(() -> deleteMutation(delete));
         }
-        return chain.thenApply(ignored -> {
-            long current = changed(Set.of(EntityType.USER, EntityType.GROUP, EntityType.TRACK), applied.stream().map(AppliedEntity::id).toList(), actor);
+        return runCompensating(mutations).thenApply(applied -> {
+            long current = changed(applied, actor);
             remember("Save", "Permissions", actor, true, applied.size() + " Changes Applied");
             SaveResult result = new SaveResult(changes.operationId(), true, current, List.of(), applied);
             rememberCompleted(result);
             return response(request, "Permissions Saved", null, null, null, null, null, null, result);
         }).exceptionally(exception -> {
-            remember("Save", "Permissions", actor, false, message(exception));
-            return error(request, message(exception));
+            Throwable failure = unwrap(exception);
+            boolean rollbackFailed = failure instanceof CompensationFailure compensation && compensation.rollbackFailed();
+            List<AppliedEntity> applied = failure instanceof CompensationFailure compensation ? compensation.applied() : List.of();
+            String detail = rollbackFailed ? message(failure) + ". Recovery Was Incomplete" : message(failure);
+            remember("Save", "Permissions", actor, false, detail);
+            SaveResult result = new SaveResult(changes.operationId(), false, revision.get(), List.of(), applied);
+            if (rollbackFailed) {
+                rememberCompleted(result);
+            }
+            return response(request, rollbackFailed ? "Permissions Need Recovery" : "Permissions Were Not Saved",
+                null, null, null, null, null, null, result);
+        });
+    }
+
+    static <T> CompletableFuture<List<T>> runCompensating(List<Supplier<CompletableFuture<Compensated<T>>>> mutations) {
+        List<Compensated<T>> completed = new ArrayList<>();
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        for (Supplier<CompletableFuture<Compensated<T>>> mutation : mutations) {
+            chain = chain.thenCompose(ignored -> invoke(mutation).thenAccept(completed::add));
+        }
+        CompletableFuture<List<T>> result = new CompletableFuture<>();
+        chain.whenComplete((ignored, failure) -> {
+            if (failure == null) {
+                result.complete(completed.stream().map(Compensated::result).toList());
+                return;
+            }
+            Throwable cause = unwrap(failure);
+            CompensationFailure nested = cause instanceof CompensationFailure compensation ? compensation : null;
+            List<T> applied = new ArrayList<>(completed.stream().map(Compensated::result).toList());
+            if (nested != null) {
+                applied.addAll(nested.applied());
+            }
+            rollback(completed).whenComplete((rolledBack, rollbackFailure) -> {
+                boolean rollbackFailed = rollbackFailure != null || nested != null && nested.rollbackFailed();
+                result.completeExceptionally(new CompensationFailure(nested != null ? nested.getCause() : cause, rollbackFailed, applied));
+            });
+        });
+        return result;
+    }
+
+    private static <T> CompletableFuture<T> invoke(Supplier<CompletableFuture<T>> action) {
+        try {
+            return action.get();
+        } catch (RuntimeException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    private static CompletableFuture<Void> rollback(List<? extends Compensated<?>> completed) {
+        List<Throwable> failures = new ArrayList<>();
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        for (int index = completed.size() - 1; index >= 0; index--) {
+            Compensated<?> mutation = completed.get(index);
+            chain = chain.thenCompose(ignored -> invoke(mutation.rollback()).handle((rolledBack, failure) -> {
+                if (failure != null) {
+                    failures.add(unwrap(failure));
+                }
+                return null;
+            }));
+        }
+        return chain.thenCompose(ignored -> failures.isEmpty()
+            ? CompletableFuture.completedFuture(null)
+            : CompletableFuture.failedFuture(failures.getFirst()));
+    }
+
+    private <T> CompletableFuture<Compensated<T>> compensateOnFailure(CompletableFuture<Void> mutation, Supplier<CompletableFuture<Void>> rollback, T result) {
+        CompletableFuture<Compensated<T>> compensated = new CompletableFuture<>();
+        mutation.whenComplete((ignored, failure) -> {
+            if (failure == null) {
+                compensated.complete(new Compensated<>(result, rollback));
+                return;
+            }
+            Throwable cause = unwrap(failure);
+            invoke(rollback).whenComplete((rolledBack, rollbackFailure) -> {
+                compensated.completeExceptionally(new CompensationFailure(cause, rollbackFailure != null, List.of(result)));
+            });
+        });
+        return compensated;
+    }
+
+    private CompletableFuture<Compensated<AppliedEntity>> createMutation(EntityCreate create) {
+        AppliedEntity result = applied(create.type(), create.id(), true, "Created");
+        return ensureCreateAvailable(create).thenCompose(ignored -> compensateOnFailure(create(create),
+            () -> delete(new EntityDelete(create.type(), create.id())), result));
+    }
+
+    private CompletableFuture<Compensated<AppliedEntity>> subjectMutation(SubjectChange change) {
+        AppliedEntity result = applied(entityType(change.subject()), change.subject().id(), true, "Saved");
+        return captureSubject(change.subject()).thenCompose(state -> compensateOnFailure(apply(change), () -> restoreSubject(state), result));
+    }
+
+    private CompletableFuture<Compensated<AppliedEntity>> trackMutation(TrackChange change) {
+        AppliedEntity result = applied(EntityType.TRACK, change.name(), true, "Saved");
+        return captureTrack(change.name(), false).thenCompose(state -> compensateOnFailure(apply(change), () -> restoreTrack(state), result));
+    }
+
+    private CompletableFuture<Compensated<AppliedEntity>> deleteMutation(EntityDelete delete) {
+        AppliedEntity result = applied(delete.type(), delete.id(), true, "Deleted");
+        return switch (delete.type()) {
+            case USER -> captureSubject(new SubjectRef(SubjectType.USER, delete.id()))
+                .thenCompose(state -> compensateOnFailure(delete(delete), () -> restoreSubject(state), result));
+            case GROUP -> captureSubject(new SubjectRef(SubjectType.GROUP, delete.id()))
+                .thenCompose(state -> compensateOnFailure(delete(delete), () -> restoreSubject(state), result));
+            case TRACK -> captureTrack(delete.id(), true)
+                .thenCompose(state -> compensateOnFailure(delete(delete), () -> restoreTrack(state), result));
+        };
+    }
+
+    private CompletableFuture<Void> ensureCreateAvailable(EntityCreate create) {
+        LuckPerms luckPerms = requireLuckPerms();
+        return switch (create.type()) {
+            case USER -> resolveUserId(create.id()).thenCompose(uniqueId -> luckPerms.getUserManager().getUniqueUsers().thenCompose(users ->
+                users.contains(uniqueId) ? CompletableFuture.failedFuture(new IllegalArgumentException("User Already Exists")) : CompletableFuture.completedFuture(null)));
+            case GROUP -> luckPerms.getGroupManager().loadGroup(create.id()).thenCompose(group ->
+                group.isPresent() ? CompletableFuture.failedFuture(new IllegalArgumentException("Group Already Exists")) : CompletableFuture.completedFuture(null));
+            case TRACK -> luckPerms.getTrackManager().loadTrack(create.id()).thenCompose(track ->
+                track.isPresent() ? CompletableFuture.failedFuture(new IllegalArgumentException("Track Already Exists")) : CompletableFuture.completedFuture(null));
+        };
+    }
+
+    private CompletableFuture<UUID> resolveUserId(String id) {
+        try {
+            return CompletableFuture.completedFuture(UUID.fromString(id));
+        } catch (IllegalArgumentException exception) {
+            return requireLuckPerms().getUserManager().lookupUniqueId(id).thenCompose(uniqueId -> uniqueId != null
+                ? CompletableFuture.completedFuture(uniqueId)
+                : CompletableFuture.failedFuture(new IllegalArgumentException("Player Was Not Found")));
+        }
+    }
+
+    private CompletableFuture<SubjectState> captureSubject(SubjectRef subject) {
+        return loadSubject(subject).thenCompose(holder -> {
+            if (holder == null) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("Permission Holder Was Not Found"));
+            }
+            UUID uniqueId = holder instanceof User user ? user.getUniqueId() : null;
+            String username = holder instanceof User user ? Optional.ofNullable(user.getUsername()).orElse(subject.id()) : "";
+            String primaryGroup = holder instanceof User user ? user.getPrimaryGroup() : "";
+            return CompletableFuture.completedFuture(new SubjectState(subject, uniqueId, username, primaryGroup,
+                List.copyOf(holder.data().toCollection()), List.copyOf(holder.transientData().toCollection())));
+        });
+    }
+
+    private CompletableFuture<Void> restoreSubject(SubjectState state) {
+        LuckPerms luckPerms = requireLuckPerms();
+        if (state.subject().type() == SubjectType.GROUP) {
+            return luckPerms.getGroupManager().loadGroup(state.subject().id())
+                .thenCompose(group -> group.map(CompletableFuture::completedFuture)
+                    .orElseGet(() -> luckPerms.getGroupManager().createAndLoadGroup(state.subject().id())))
+                .thenCompose(group -> {
+                    group.data().clear();
+                    group.transientData().clear();
+                    state.nodes().forEach(group.data()::add);
+                    state.transientNodes().forEach(group.transientData()::add);
+                    return luckPerms.getGroupManager().saveGroup(group);
+                });
+        }
+        UUID uniqueId = state.uniqueId();
+        if (uniqueId == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("User identity is unavailable"));
+        }
+        return luckPerms.getUserManager().savePlayerData(uniqueId, state.username())
+            .thenCompose(ignored -> luckPerms.getUserManager().loadUser(uniqueId))
+            .thenCompose(user -> {
+                user.data().clear();
+                user.transientData().clear();
+                state.nodes().forEach(user.data()::add);
+                state.transientNodes().forEach(user.transientData()::add);
+                if (!state.primaryGroup().isBlank()) {
+                    user.setPrimaryGroup(state.primaryGroup());
+                }
+                return luckPerms.getUserManager().saveUser(user);
+            });
+    }
+
+    private CompletableFuture<TrackState> captureTrack(String name, boolean required) {
+        return requireLuckPerms().getTrackManager().loadTrack(name).thenCompose(track -> {
+            if (track.isEmpty()) {
+                return required
+                    ? CompletableFuture.failedFuture(new IllegalArgumentException("Track Was Not Found"))
+                    : CompletableFuture.completedFuture(new TrackState(name, false, List.of()));
+            }
+            return CompletableFuture.completedFuture(new TrackState(name, true, List.copyOf(track.get().getGroups())));
+        });
+    }
+
+    private CompletableFuture<Void> restoreTrack(TrackState state) {
+        LuckPerms luckPerms = requireLuckPerms();
+        if (!state.existed()) {
+            return luckPerms.getTrackManager().loadTrack(state.name()).thenCompose(track -> track
+                .map(luckPerms.getTrackManager()::deleteTrack)
+                .orElseGet(() -> CompletableFuture.completedFuture(null)));
+        }
+        return luckPerms.getTrackManager().createAndLoadTrack(state.name()).thenCompose(track -> {
+            track.clearGroups();
+            CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+            for (String groupName : state.groups()) {
+                chain = chain.thenCompose(ignored -> luckPerms.getGroupManager().loadGroup(groupName).thenAccept(group ->
+                    track.appendGroup(group.orElseThrow(() -> new IllegalArgumentException("Group Was Not Found: " + groupName)))));
+            }
+            return chain.thenCompose(ignored -> luckPerms.getTrackManager().saveTrack(track));
         });
     }
 
@@ -623,10 +876,29 @@ public final class LuckPermsManagementService implements AutoCloseable {
             }
         }
         Invalidation invalidation = new Invalidation(current, scopes, List.copyOf(ids), source);
-        for (Consumer<Invalidation> listener : listeners) {
-            listener.accept(invalidation);
-        }
+        notifyInvalidation(invalidation);
         return current;
+    }
+
+    private long changed(Collection<AppliedEntity> applied, String source) {
+        long current = revision.incrementAndGet();
+        lastChangedAt = System.currentTimeMillis();
+        Set<EntityType> scopes = applied.stream().map(AppliedEntity::type).collect(Collectors.toSet());
+        List<String> ids = applied.stream().map(AppliedEntity::id).distinct().toList();
+        applied.forEach(entity -> entityRevisions.put(entity.type() + ":" + entity.id().toLowerCase(Locale.ROOT), current));
+        Invalidation invalidation = new Invalidation(current, scopes, ids, source);
+        notifyInvalidation(invalidation);
+        return current;
+    }
+
+    private void notifyInvalidation(Invalidation invalidation) {
+        for (Consumer<Invalidation> listener : listeners) {
+            try {
+                listener.accept(invalidation);
+            } catch (RuntimeException exception) {
+                plugin.getLogger().warning("LuckPerms invalidation listener failed: " + message(exception));
+            }
+        }
     }
 
     private void subscribeEvents() {
@@ -681,6 +953,36 @@ public final class LuckPermsManagementService implements AutoCloseable {
         while (completedSaveOrder.size() > COMPLETED_SAVE_LIMIT) {
             completedSaves.remove(completedSaveOrder.removeFirst());
         }
+        saveCompleted();
+    }
+
+    private void loadCompleted() {
+        if (Files.notExists(operationJournal)) {
+            return;
+        }
+        try {
+            List<SaveResult> saved = GSON.fromJson(StorageSafety.readUtf8(operationJournal), new TypeToken<List<SaveResult>>() {}.getType());
+            if (saved == null) {
+                return;
+            }
+            saved.stream().filter(Objects::nonNull).skip(Math.max(0, saved.size() - COMPLETED_SAVE_LIMIT)).forEach(result -> {
+                if (!result.operationId().isBlank()) {
+                    completedSaves.put(result.operationId(), result);
+                    completedSaveOrder.addLast(result.operationId());
+                }
+            });
+        } catch (IOException | RuntimeException exception) {
+            plugin.getLogger().warning("LuckPerms operation journal could not be loaded: " + message(exception));
+        }
+    }
+
+    private void saveCompleted() {
+        try {
+            List<SaveResult> saved = completedSaveOrder.stream().map(completedSaves::get).filter(Objects::nonNull).toList();
+            StorageSafety.writeUtf8Atomic(operationJournal, GSON.toJson(saved));
+        } catch (IOException exception) {
+            plugin.getLogger().warning("LuckPerms operation journal could not be saved: " + message(exception));
+        }
     }
 
     private String pluginVersion() {
@@ -688,11 +990,19 @@ public final class LuckPermsManagementService implements AutoCloseable {
     }
 
     private String message(Throwable throwable) {
-        Throwable cause = throwable;
-        while (cause.getCause() != null) {
+        Throwable cause = unwrap(throwable);
+        if (cause instanceof CompensationFailure && cause.getCause() != null) {
             cause = cause.getCause();
         }
         return cause.getMessage() == null || cause.getMessage().isBlank() ? "Permissions Could Not Be Saved" : cause.getMessage();
+    }
+
+    private static Throwable unwrap(Throwable throwable) {
+        Throwable cause = throwable;
+        while ((cause instanceof CompletionException || cause instanceof java.util.concurrent.ExecutionException) && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 
     private LuckPerms requireLuckPerms() {

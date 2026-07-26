@@ -88,6 +88,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -383,6 +384,9 @@ public final class LuckPermsManagementService implements AutoCloseable {
 
     private CompletableFuture<Response> performSave(Request request, String actor) {
         ChangeSet changes = request.changes() == null ? ChangeSet.empty() : request.changes();
+        if (changes.operationId().isBlank()) {
+            return CompletableFuture.completedFuture(error(request, "Permission Save Operation Is Missing"));
+        }
         SaveResult completed = completedSaves.get(changes.operationId());
         if (completed != null) {
             String message = completed.applied() ? "Permissions Already Saved" : "Permission Save Was Already Processed";
@@ -407,37 +411,51 @@ public final class LuckPermsManagementService implements AutoCloseable {
         for (EntityDelete delete : changes.deletes()) {
             mutations.add(() -> deleteMutation(delete));
         }
-        return runCompensating(mutations).thenApply(applied -> {
-            long current = changed(applied, actor);
-            remember("Save", "Permissions", actor, true, applied.size() + " Changes Applied");
-            SaveResult result = new SaveResult(changes.operationId(), true, current, List.of(), applied);
+        return runCompensating(mutations, applied -> {
+            Invalidation invalidation = recordChange(applied, actor);
+            SaveResult result = new SaveResult(changes.operationId(), true, invalidation.revision(), List.of(), applied);
             rememberCompleted(result);
+            notifyInvalidation(invalidation);
+            return CompletableFuture.completedFuture(result);
+        }).thenApply(result -> {
+            remember("Save", "Permissions", actor, true, result.entities().size() + " Changes Applied");
             return response(request, "Permissions Saved", null, null, null, null, null, null, result);
         }).exceptionally(exception -> {
             Throwable failure = unwrap(exception);
             boolean rollbackFailed = failure instanceof CompensationFailure compensation && compensation.rollbackFailed();
             List<AppliedEntity> applied = failure instanceof CompensationFailure compensation ? compensation.applied() : List.of();
             String detail = rollbackFailed ? message(failure) + ". Recovery Was Incomplete" : message(failure);
-            remember("Save", "Permissions", actor, false, detail);
             SaveResult result = new SaveResult(changes.operationId(), false, revision.get(), List.of(), applied);
             if (rollbackFailed) {
-                rememberCompleted(result);
+                try {
+                    rememberCompleted(result);
+                } catch (RuntimeException journalFailure) {
+                    detail += ". Recovery Journal Could Not Be Saved: " + message(journalFailure);
+                }
             }
+            remember("Save", "Permissions", actor, false, detail);
             return response(request, rollbackFailed ? "Permissions Need Recovery" : "Permissions Were Not Saved",
                 null, null, null, null, null, null, result);
         });
     }
 
     static <T> CompletableFuture<List<T>> runCompensating(List<Supplier<CompletableFuture<Compensated<T>>>> mutations) {
+        return runCompensating(mutations, CompletableFuture::completedFuture);
+    }
+
+    static <T, R> CompletableFuture<R> runCompensating(
+        List<Supplier<CompletableFuture<Compensated<T>>>> mutations,
+        Function<List<T>, CompletableFuture<R>> commit
+    ) {
         List<Compensated<T>> completed = new ArrayList<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (Supplier<CompletableFuture<Compensated<T>>> mutation : mutations) {
             chain = chain.thenCompose(ignored -> invoke(mutation).thenAccept(completed::add));
         }
-        CompletableFuture<List<T>> result = new CompletableFuture<>();
-        chain.whenComplete((ignored, failure) -> {
+        CompletableFuture<R> result = new CompletableFuture<>();
+        chain.thenCompose(ignored -> invoke(() -> commit.apply(completed.stream().map(Compensated::result).toList()))).whenComplete((committed, failure) -> {
             if (failure == null) {
-                result.complete(completed.stream().map(Compensated::result).toList());
+                result.complete(committed);
                 return;
             }
             Throwable cause = unwrap(failure);
@@ -880,15 +898,13 @@ public final class LuckPermsManagementService implements AutoCloseable {
         return current;
     }
 
-    private long changed(Collection<AppliedEntity> applied, String source) {
+    private Invalidation recordChange(Collection<AppliedEntity> applied, String source) {
         long current = revision.incrementAndGet();
         lastChangedAt = System.currentTimeMillis();
         Set<EntityType> scopes = applied.stream().map(AppliedEntity::type).collect(Collectors.toSet());
         List<String> ids = applied.stream().map(AppliedEntity::id).distinct().toList();
         applied.forEach(entity -> entityRevisions.put(entity.type() + ":" + entity.id().toLowerCase(Locale.ROOT), current));
-        Invalidation invalidation = new Invalidation(current, scopes, ids, source);
-        notifyInvalidation(invalidation);
-        return current;
+        return new Invalidation(current, scopes, ids, source);
     }
 
     private void notifyInvalidation(Invalidation invalidation) {
@@ -946,14 +962,21 @@ public final class LuckPermsManagementService implements AutoCloseable {
     }
 
     private synchronized void rememberCompleted(SaveResult result) {
-        if (result.operationId().isBlank() || completedSaves.putIfAbsent(result.operationId(), result) != null) {
+        if (result.operationId().isBlank() || completedSaves.containsKey(result.operationId())) {
             return;
         }
+        List<SaveResult> saved = Stream.concat(
+                completedSaveOrder.stream().map(completedSaves::get).filter(Objects::nonNull),
+                Stream.of(result)
+            )
+            .skip(Math.max(0, completedSaveOrder.size() + 1L - COMPLETED_SAVE_LIMIT))
+            .toList();
+        saveCompleted(saved);
+        completedSaves.put(result.operationId(), result);
         completedSaveOrder.addLast(result.operationId());
         while (completedSaveOrder.size() > COMPLETED_SAVE_LIMIT) {
             completedSaves.remove(completedSaveOrder.removeFirst());
         }
-        saveCompleted();
     }
 
     private void loadCompleted() {
@@ -976,12 +999,11 @@ public final class LuckPermsManagementService implements AutoCloseable {
         }
     }
 
-    private void saveCompleted() {
+    private void saveCompleted(List<SaveResult> saved) {
         try {
-            List<SaveResult> saved = completedSaveOrder.stream().map(completedSaves::get).filter(Objects::nonNull).toList();
             StorageSafety.writeUtf8Atomic(operationJournal, GSON.toJson(saved));
         } catch (IOException exception) {
-            plugin.getLogger().warning("LuckPerms operation journal could not be saved: " + message(exception));
+            throw new IllegalStateException("LuckPerms operation journal could not be saved", exception);
         }
     }
 

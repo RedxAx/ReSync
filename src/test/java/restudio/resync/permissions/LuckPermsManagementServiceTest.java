@@ -64,6 +64,27 @@ class LuckPermsManagementServiceTest {
         assertEquals(List.of("first"), transaction.<String>applied());
     }
 
+    @Test
+    void rollsBackPermissionMutationsWhenTheCommitFails() {
+        List<String> events = new ArrayList<>();
+        List<Supplier<CompletableFuture<LuckPermsManagementService.Compensated<String>>>> mutations = List.of(
+            mutation(events, "first"),
+            mutation(events, "second")
+        );
+
+        CompletionException failure = assertThrows(CompletionException.class, () ->
+            LuckPermsManagementService.runCompensating(mutations, applied -> {
+                events.add("commit " + String.join(",", applied));
+                return CompletableFuture.failedFuture(new IllegalStateException("journal failed"));
+            }).join());
+
+        LuckPermsManagementService.CompensationFailure transaction = assertInstanceOf(
+            LuckPermsManagementService.CompensationFailure.class, failure.getCause());
+        assertFalse(transaction.rollbackFailed());
+        assertEquals(List.of("first", "second"), transaction.<String>applied());
+        assertEquals(List.of("apply first", "apply second", "commit first,second", "rollback second", "rollback first"), events);
+    }
+
     private Supplier<CompletableFuture<LuckPermsManagementService.Compensated<String>>> mutation(List<String> events, String name) {
         return () -> {
             events.add("apply " + name);

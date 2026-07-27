@@ -21,7 +21,11 @@ final class NetworkResourceManifestStore {
     private final Map<String, Entry> entries = new LinkedHashMap<>();
 
     NetworkResourceManifestStore(Path dataDirectory) {
-        file = dataDirectory.toAbsolutePath().normalize().resolve("network/resource-manifest.json");
+        this(dataDirectory, "resource-manifest.json");
+    }
+
+    NetworkResourceManifestStore(Path dataDirectory, String fileName) {
+        file = dataDirectory.toAbsolutePath().normalize().resolve("network").resolve(fileName);
         try {
             load();
         } catch (RuntimeException | IOException exception) {

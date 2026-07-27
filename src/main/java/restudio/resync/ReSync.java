@@ -11,9 +11,10 @@ import restudio.resync.flow.network.NetworkFlowBridge;
 import restudio.resync.modules.ChatModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.modules.flow.FlowResourceRegistry;
+import restudio.resync.network.paper.NetworkPathSynchronizer;
+import restudio.resync.network.paper.NetworkResourceSynchronizer;
 import restudio.resync.network.paper.ReSyncNetworkAgent;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig;
-import restudio.resync.network.paper.NetworkResourceSynchronizer;
 import restudio.resync.network.paper.state.NetworkPlayerStateConfig;
 import restudio.resync.network.paper.state.NetworkPlayerStateCoordinator;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -25,6 +26,9 @@ import restudio.resync.server.ReSyncConfig;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ReSync extends JavaPlugin {
     private static ReSync instance;
@@ -32,6 +36,7 @@ public class ReSync extends JavaPlugin {
     private ReSyncServer server;
     private ReSyncPluginMessageBridge pluginMessageBridge;
     private ReSyncNetworkAgent networkAgent;
+    private List<NetworkPathSynchronizer> networkPathSynchronizers = List.of();
     private NetworkResourceSynchronizer networkResourceSynchronizer;
     private NetworkPlayerStateCoordinator networkPlayerStateCoordinator;
     private boolean networkStateReloadScheduled;
@@ -79,6 +84,20 @@ public class ReSync extends JavaPlugin {
                         }
                     });
                     networkResourceSynchronizer.start();
+                }
+                if (networkConfig.pathsEnabled()) {
+                    Path dataDirectory = getDataFolder().toPath().toAbsolutePath().normalize();
+                    Path serverDirectory = dataDirectory.getParent().getParent();
+                    List<NetworkPathSynchronizer> synchronizers = new ArrayList<>();
+                    for (ReSyncNetworkAgentConfig.PathPolicy policy : networkConfig.pathSyncs()) {
+                        if (!policy.enabled()) {
+                            continue;
+                        }
+                        NetworkPathSynchronizer synchronizer = new NetworkPathSynchronizer(this, networkAgent, networkConfig, policy, serverDirectory, dataDirectory);
+                        synchronizer.start();
+                        synchronizers.add(synchronizer);
+                    }
+                    networkPathSynchronizers = List.copyOf(synchronizers);
                 }
                 NetworkPlayerStateConfig playerStateConfig = NetworkPlayerStateConfig.load(getDataFolder().toPath());
                 if (playerStateConfig.enabled()) {
@@ -143,6 +162,8 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        networkPathSynchronizers.forEach(NetworkPathSynchronizer::shutdown);
+        networkPathSynchronizers = List.of();
         if (networkResourceSynchronizer != null) {
             networkResourceSynchronizer.shutdown();
             networkResourceSynchronizer = null;

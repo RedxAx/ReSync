@@ -146,7 +146,7 @@ class FlowGraphValidatorTest {
     }
 
     @Test
-    void incompatibleConnectionsAndDataCyclesAreRejected() {
+    void compatibleNumberAndStringConnectionsStillRejectDataCycles() {
         definitions.register(queryWithInput("test.string", FlowDataType.STRING));
         definitions.register(queryWithInput("test.number", FlowDataType.NUMBER));
         FlowGraph graph = graph(Map.of(
@@ -160,8 +160,23 @@ class FlowGraphValidatorTest {
         FlowGraphValidationResult result = validator.validate(graph);
 
         assertFalse(result.valid());
-        assertTrue(hasCode(result, "CONNECTION_TYPE_INCOMPATIBLE"));
+        assertFalse(hasCode(result, "CONNECTION_TYPE_INCOMPATIBLE"));
         assertTrue(hasCode(result, "DATA_DEPENDENCY_CYCLE"));
+    }
+
+    @Test
+    void incompatibleConnectionsAreRejected() {
+        definitions.register(queryWithInput("test.string", FlowDataType.STRING));
+        definitions.register(queryWithInput("test.player", FlowDataType.PLAYER));
+        FlowGraph graph = graph(Map.of(
+            "string", node("test.string"),
+            "player", node("test.player")
+        ), List.of(new FlowConnection("string", "value", "player", "input")));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "CONNECTION_TYPE_INCOMPATIBLE"));
     }
 
     @Test

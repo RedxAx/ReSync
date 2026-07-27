@@ -147,10 +147,7 @@ public class TypeAdapterRegistry {
         register(Number.class, Float.class, Number::floatValue);
 
         register(Boolean.class, String.class, Object::toString);
-        register(Integer.class, String.class, Object::toString);
-        register(Long.class, String.class, Object::toString);
-        register(Double.class, String.class, Object::toString);
-        register(Float.class, String.class, Object::toString);
+        register(Number.class, String.class, Object::toString);
         register(Enum.class, String.class, Enum::name);
         register(Map.class, String.class, map -> {
             Object id = map.get("id");

@@ -731,32 +731,28 @@ public class PlayerActionHandler implements NodeHandler, Listener {
         operations.put("player_give_item_stack", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack stack = requireItem(ctx, node, "item").clone();
+            int itemAmount = stack.getAmount();
             boolean forceStackSize = ctx.getInputValue(node, "force_stack_size", Boolean.class, false);
             int forcedStackSize = ctx.getInputValue(node, "forced_stack_size", Integer.class, 64);
             if (forceStackSize) {
                 if (forcedStackSize < 1 || forcedStackSize > 99) throw new IllegalArgumentException("Forced stack size must be between 1 and 99");
+                stack.setAmount(1);
                 stack = itemComponents.applyComponents(stack, Map.of("minecraft:max_stack_size", forcedStackSize));
             }
             int stackLimit = Math.max(1, stack.getMaxStackSize());
-            String sizeMode = ctx.getInputValue(node, "size_mode", String.class, "Item Amount").trim().replace(' ', '_').toUpperCase(Locale.ROOT);
+            String configuredMode = ctx.getInputValue(node, "size_mode", String.class, "Item Amount");
+            String sizeMode = configuredMode == null ? "ITEM_AMOUNT" : configuredMode.trim().replace(' ', '_').toUpperCase(Locale.ROOT);
             int amount = switch (sizeMode) {
-                case "ITEM_AMOUNT" -> stack.getAmount();
+                case "ITEM_AMOUNT" -> itemAmount;
                 case "MAX_STACK" -> stackLimit;
                 case "CUSTOM" -> ctx.getInputValue(node, "amount", Integer.class, 1);
-                case "RANDOM" -> {
-                    int minimum = ctx.getInputValue(node, "min_size", Integer.class, 1);
-                    int maximum = ctx.getInputValue(node, "max_size", Integer.class, stackLimit);
-                    if (minimum < 1 || maximum < minimum || maximum > stackLimit) {
-                        throw new IllegalArgumentException("Random stack range must be between 1 and " + stackLimit);
-                    }
-                    yield ThreadLocalRandom.current().nextInt(minimum, maximum + 1);
-                }
+                case "RANDOM" -> randomStackAmount(ctx.getInputValue(node, "min_size", Integer.class, 1), ctx.getInputValue(node, "max_size", Integer.class, stackLimit), stackLimit);
                 default -> throw new IllegalArgumentException("Unknown stack size mode: " + sizeMode);
             };
             if (amount < 1 || amount > stackLimit) throw new IllegalArgumentException("Stack amount must be between 1 and " + stackLimit);
             stack.setAmount(amount);
             ItemStack given = stack;
-            runSync(() -> addItemFully(target, given));
+            runSync(() -> addItemFully(target, given.clone()));
             ctx.setOutput(node, "item", given);
             ctx.setOutput(node, "amount", amount);
             ctx.setOutput(node, "max_stack_size", stackLimit);
@@ -1134,6 +1130,14 @@ public class PlayerActionHandler implements NodeHandler, Listener {
 
     private void requireRgb(int red, int green, int blue) {
         if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) throw new IllegalArgumentException("RGB values must be between 0 and 255");
+    }
+
+    static int randomStackAmount(int minimum, int configuredMaximum, int stackLimit) {
+        int maximum = Math.min(configuredMaximum, stackLimit);
+        if (minimum < 1 || minimum > stackLimit || configuredMaximum < 1 || maximum < minimum) {
+            throw new IllegalArgumentException("Random stack range must fit between 1 and " + stackLimit);
+        }
+        return ThreadLocalRandom.current().nextInt(minimum, maximum + 1);
     }
 
     private void addItemFully(Player player, ItemStack item) {

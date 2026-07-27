@@ -1475,7 +1475,8 @@
         "name": "max_size",
         "dataType": "number",
         "widget": "NUMBER",
-        "defaultValue": 64,
+        "defaultValue": 99,
+        "description": "The largest random amount. Values above the item's maximum stack size automatically use the item's maximum.",
         "visibleWhen": {"size_mode": "Random"}
       },
       {

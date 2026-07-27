@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,6 +28,16 @@ class ReSyncNetworkAgentConfigTest {
             network.resources.type-mode=DENY_LIST
             network.resources.types=world, CUSTOM_CONTENT
             network.resources.conflict-policy=LOCAL_WINS
+            network.path-sync.ids=luckperms,server-settings
+            network.path-sync.luckperms.enabled=true
+            network.path-sync.luckperms.name=LuckPerms
+            network.path-sync.luckperms.paths=plugins/LuckPerms
+            network.path-sync.luckperms.conflict-policy=LOCAL_WINS
+            network.path-sync.luckperms.command-count=1
+            network.path-sync.luckperms.command.0=lp reload
+            network.path-sync.server-settings.enabled=false
+            network.path-sync.server-settings.name=Server Settings
+            network.path-sync.server-settings.paths=server.properties
             network.id=network-one
             network.node-id=lobby-one
             network.display-name=Lobby
@@ -57,6 +68,12 @@ class ReSyncNetworkAgentConfigTest {
         assertFalse(config.resources().includes("world"));
         assertFalse(config.resources().includes("custom_content"));
         assertTrue(config.resources().includes("chat"));
+        assertTrue(config.pathsEnabled());
+        assertEquals(2, config.pathSyncs().size());
+        assertEquals(Set.of("plugins/LuckPerms"), config.pathSyncs().getFirst().entries());
+        assertEquals(ReSyncNetworkAgentConfig.ResourceConflictPolicy.LOCAL_WINS, config.pathSyncs().getFirst().conflictPolicy());
+        assertEquals("lp reload", config.pathSyncs().getFirst().commands().getFirst());
+        assertFalse(config.pathSyncs().get(1).enabled());
         assertEquals("ws://127.0.0.1:12442", config.hubUrl());
         assertEquals(100, config.capacity());
         assertEquals("issued-credential", reloaded.credential());
@@ -73,6 +90,7 @@ class ReSyncNetworkAgentConfigTest {
         assertFalse(config.enabled());
         assertFalse(config.chatEnabled());
         assertFalse(config.resourcesEnabled());
+        assertFalse(config.pathsEnabled());
         assertEquals(ReSyncNetworkAgentConfig.SelectionMode.ALL, config.chat().channelMode());
         assertEquals(120000, config.chat().retentionMillis());
         assertEquals(ReSyncNetworkAgentConfig.SelectionMode.ALL, config.resources().typeMode());
@@ -100,6 +118,36 @@ class ReSyncNetworkAgentConfigTest {
     @Test
     void rejectsInvalidNetworkPolicies() throws Exception {
         Files.writeString(directory.resolve("resync.properties"), "network.chat.channel-mode=SOME_CHANNELS");
+
+        assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+
+        Files.writeString(directory.resolve("resync.properties"), """
+            network.path-sync.ids=unsafe
+            network.path-sync.unsafe.enabled=true
+            network.path-sync.unsafe.name=Unsafe
+            network.path-sync.unsafe.paths=../secrets
+            """);
+
+        assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+
+        Files.writeString(directory.resolve("resync.properties"), """
+            network.path-sync.ids=everything
+            network.path-sync.everything.enabled=true
+            network.path-sync.everything.name=Everything
+            network.path-sync.everything.paths=.
+            """);
+
+        assertEquals(Set.of("."), ReSyncNetworkAgentConfig.load(directory).pathSyncs().getFirst().entries());
+
+        Files.writeString(directory.resolve("resync.properties"), """
+            network.path-sync.ids=everything,plugin
+            network.path-sync.everything.enabled=true
+            network.path-sync.everything.name=Everything
+            network.path-sync.everything.paths=.
+            network.path-sync.plugin.enabled=true
+            network.path-sync.plugin.name=Plugin
+            network.path-sync.plugin.paths=plugins/LuckPerms
+            """);
 
         assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
 

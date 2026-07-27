@@ -8,15 +8,19 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.IntStream;
 
-public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, ResourcePolicy resources, String networkId, String nodeId, String displayName, String hubUrl, String enrollmentToken, String credential, int capacity, int maximumFrameBytes, int maximumPayloadBytes, long heartbeatIntervalTicks, long reconnectDelayTicks, Tls tls, Path credentialFile) {
+public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, ResourcePolicy resources, List<PathPolicy> pathSyncs, String networkId, String nodeId, String displayName, String hubUrl, String enrollmentToken, String credential, int capacity, int maximumFrameBytes, int maximumPayloadBytes, long heartbeatIntervalTicks, long reconnectDelayTicks, Tls tls, Path credentialFile) {
     public ReSyncNetworkAgentConfig {
         chat = chat == null ? ChatPolicy.disabled() : chat;
         resources = resources == null ? ResourcePolicy.disabled() : resources;
+        pathSyncs = normalizedPathPolicies(pathSyncs);
         networkId = normalize(networkId);
         nodeId = normalize(nodeId);
         displayName = normalize(displayName);
@@ -87,7 +91,7 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
             values(properties, "network.resources.types"),
             enumValue(properties, "network.resources.conflict-policy", ResourceConflictPolicy.class, ResourceConflictPolicy.NETWORK_WINS)
         );
-        return new ReSyncNetworkAgentConfig(Boolean.parseBoolean(properties.getProperty("network.enabled", "false")), chat, resources, properties.getProperty("network.id", ""), properties.getProperty("network.node-id", ""), properties.getProperty("network.display-name", "Backend"), properties.getProperty("network.hub-url", ""), properties.getProperty("network.enrollment-token", ""), credential, integer(properties, "network.capacity", 0), integer(properties, "network.maximum-frame-bytes", 1_048_576), integer(properties, "network.maximum-payload-bytes", 524_288), longValue(properties, "network.heartbeat-interval-ticks", 100), longValue(properties, "network.reconnect-delay-ticks", 100), tls, credentialFile);
+        return new ReSyncNetworkAgentConfig(Boolean.parseBoolean(properties.getProperty("network.enabled", "false")), chat, resources, pathPolicies(properties), properties.getProperty("network.id", ""), properties.getProperty("network.node-id", ""), properties.getProperty("network.display-name", "Backend"), properties.getProperty("network.hub-url", ""), properties.getProperty("network.enrollment-token", ""), credential, integer(properties, "network.capacity", 0), integer(properties, "network.maximum-frame-bytes", 1_048_576), integer(properties, "network.maximum-payload-bytes", 500_000), longValue(properties, "network.heartbeat-interval-ticks", 100), longValue(properties, "network.reconnect-delay-ticks", 100), tls, credentialFile);
     }
 
     public boolean chatEnabled() {
@@ -96,6 +100,10 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
 
     public boolean resourcesEnabled() {
         return resources.enabled();
+    }
+
+    public boolean pathsEnabled() {
+        return pathSyncs.stream().anyMatch(PathPolicy::enabled);
     }
 
     public void saveCredential(String value) throws IOException {
@@ -191,6 +199,25 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
         }
     }
 
+    public record PathPolicy(String id, String name, boolean enabled, Set<String> entries, ResourceConflictPolicy conflictPolicy, List<String> commands) {
+        public PathPolicy {
+            id = normalize(id).toLowerCase(Locale.ROOT);
+            name = normalize(name);
+            entries = normalizedPaths(entries);
+            conflictPolicy = conflictPolicy == null ? ResourceConflictPolicy.NETWORK_WINS : conflictPolicy;
+            commands = normalizedCommands(commands);
+            if (!id.matches("[a-z0-9][a-z0-9_-]{0,47}")) {
+                throw new IllegalArgumentException("ReSync Path Sync ID Must Use Lowercase Letters, Numbers, Dashes, Or Underscores");
+            }
+            if (name.isBlank() || name.length() > 64) {
+                throw new IllegalArgumentException("ReSync Path Sync Name Must Be Between 1 And 64 Characters");
+            }
+            if (enabled && entries.isEmpty()) {
+                throw new IllegalArgumentException("ReSync Path Sync Requires At Least One File Or Folder");
+            }
+        }
+    }
+
     public enum SelectionMode {
         ALL,
         ALLOW_LIST,
@@ -228,6 +255,26 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
         return normalizedValues(new LinkedHashSet<>(Arrays.asList(properties.getProperty(key, "").split(","))));
     }
 
+    private static Set<String> pathValues(Properties properties, String key) {
+        return normalizedPaths(new LinkedHashSet<>(Arrays.asList(properties.getProperty(key, "").split(","))));
+    }
+
+    private static List<PathPolicy> pathPolicies(Properties properties) {
+        Set<String> ids = values(properties, "network.path-sync.ids");
+        if (ids.isEmpty() && properties.containsKey("network.paths.enabled")) {
+            return List.of(new PathPolicy("default", "Path Sync", Boolean.parseBoolean(properties.getProperty("network.paths.enabled", "false")), pathValues(properties, "network.paths.entries"), enumValue(properties, "network.paths.conflict-policy", ResourceConflictPolicy.class, ResourceConflictPolicy.NETWORK_WINS), List.of()));
+        }
+        return ids.stream().map(id -> {
+            String prefix = "network.path-sync." + id + ".";
+            int commandCount = integer(properties, prefix + "command-count", 0);
+            if (commandCount < 0 || commandCount > 32) {
+                throw new IllegalArgumentException("ReSync Path Sync Commands Must Be Between 0 And 32");
+            }
+            List<String> commands = IntStream.range(0, commandCount).mapToObj(index -> properties.getProperty(prefix + "command." + index, "")).toList();
+            return new PathPolicy(id, properties.getProperty(prefix + "name", id), Boolean.parseBoolean(properties.getProperty(prefix + "enabled", "false")), pathValues(properties, prefix + "paths"), enumValue(properties, prefix + "conflict-policy", ResourceConflictPolicy.class, ResourceConflictPolicy.NETWORK_WINS), commands);
+        }).toList();
+    }
+
     private static Set<String> normalizedValues(Set<String> values) {
         if (values == null || values.isEmpty()) {
             return Set.of();
@@ -239,7 +286,80 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
                 normalized.add(candidate);
             }
         }
-        return Set.copyOf(normalized);
+        return Collections.unmodifiableSet(normalized);
+    }
+
+    private static Set<String> normalizedPaths(Set<String> values) {
+        if (values == null || values.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String value : values) {
+            String candidate = normalize(value).replace('\\', '/');
+            while (candidate.endsWith("/")) {
+                candidate = candidate.substring(0, candidate.length() - 1);
+            }
+            if (candidate.isBlank()) {
+                continue;
+            }
+            Path path = Path.of(candidate).normalize();
+            if (path.isAbsolute() || path.startsWith("..") || path.getNameCount() < 1) {
+                throw new IllegalArgumentException("ReSync Path Sync Entries Must Stay Inside The Server Directory");
+            }
+            candidate = path.toString().replace('\\', '/');
+            if (candidate.isBlank()) {
+                candidate = ".";
+            }
+            normalized.add(candidate);
+        }
+        return Collections.unmodifiableSet(normalized);
+    }
+
+    private static List<PathPolicy> normalizedPathPolicies(List<PathPolicy> policies) {
+        if (policies == null || policies.isEmpty()) {
+            return List.of();
+        }
+        List<PathPolicy> normalized = List.copyOf(policies);
+        Set<String> ids = new LinkedHashSet<>();
+        for (PathPolicy policy : normalized) {
+            if (policy == null) {
+                throw new IllegalArgumentException("ReSync Path Sync Entry Is Required");
+            }
+            if (!ids.add(policy.id())) {
+                throw new IllegalArgumentException("ReSync Path Sync IDs Must Be Unique");
+            }
+        }
+        for (int first = 0; first < normalized.size(); first++) {
+            PathPolicy left = normalized.get(first);
+            if (!left.enabled()) {
+                continue;
+            }
+            for (int second = first + 1; second < normalized.size(); second++) {
+                PathPolicy right = normalized.get(second);
+                if (right.enabled() && overlaps(left.entries(), right.entries())) {
+                    throw new IllegalArgumentException("Enabled ReSync Path Sync Entries Cannot Overlap");
+                }
+            }
+        }
+        return normalized;
+    }
+
+    private static boolean overlaps(Set<String> first, Set<String> second) {
+        if (first.contains(".") || second.contains(".")) {
+            return true;
+        }
+        return first.stream().map(Path::of).anyMatch(left -> second.stream().map(Path::of).anyMatch(right -> left.equals(right) || left.startsWith(right) || right.startsWith(left)));
+    }
+
+    private static List<String> normalizedCommands(List<String> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return List.of();
+        }
+        List<String> normalized = commands.stream().map(ReSyncNetworkAgentConfig::normalize).map(command -> command.startsWith("/") ? command.substring(1).trim() : command).filter(command -> !command.isBlank()).toList();
+        if (normalized.size() > 32 || normalized.stream().anyMatch(command -> command.length() > 2_048 || command.indexOf('\u0000') >= 0)) {
+            throw new IllegalArgumentException("ReSync Path Sync Commands Are Invalid");
+        }
+        return normalized;
     }
 
     private static <E extends Enum<E>> E enumValue(Properties properties, String key, Class<E> type, E fallback) {

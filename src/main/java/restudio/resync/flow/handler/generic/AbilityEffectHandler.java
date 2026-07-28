@@ -50,6 +50,11 @@ import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.automation.AutomationInstanceKey;
+import restudio.resync.flow.automation.AutomationOwner;
+import restudio.resync.flow.automation.AutomationScope;
+import restudio.resync.flow.automation.AutomationTaskService;
+import restudio.resync.flow.automation.TimerDefinition;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
@@ -73,8 +78,14 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private final Map<String, Long> marks = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack> disarmedItems = new ConcurrentHashMap<>();
     private final Map<String, CooldownEntry> cooldowns = new ConcurrentHashMap<>();
+    private final AutomationTaskService automationTasks;
 
     public AbilityEffectHandler() {
+        this(null);
+    }
+
+    public AbilityEffectHandler(AutomationTaskService automationTasks) {
+        this.automationTasks = automationTasks;
         ReSync plugin = ReSync.getInstance();
         if (plugin != null) Bukkit.getPluginManager().registerEvents(this, plugin);
         operations.put("strike_lightning", (ctx, node) -> {
@@ -675,6 +686,25 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ctx.triggerOutput("flow");
         });
         operations.put("cooldown_remaining", (ctx, node) -> {
+            if (automationTasks != null) {
+                LegacyCooldown timer = legacyCooldown(ctx, node);
+                AutomationTaskService.TaskSnapshot snapshot = automationTasks.check(timer.key());
+                long remaining = snapshot.remaining();
+                long duration = snapshot.duration();
+                long elapsed = snapshot.elapsed();
+                int ticks = (int) Math.ceil(remaining / 50D);
+                ctx.setOutput(node, "ticks", ticks);
+                ctx.setOutput(node, "seconds", remaining / 1000D);
+                ctx.setOutput(node, "duration_ticks", (int) Math.ceil(duration / 50D));
+                ctx.setOutput(node, "elapsed_ticks", (int) Math.floor(elapsed / 50D));
+                ctx.setOutput(node, "progress", snapshot.progress());
+                ctx.setOutput(node, "progress_percent", snapshot.progress() * 100D);
+                ctx.setOutput(node, "started_at", snapshot.createdAt());
+                ctx.setOutput(node, "ready_at", snapshot.createdAt() + duration);
+                ctx.setOutput(node, "is_ready", ticks <= 0);
+                ctx.triggerOutput(ticks <= 0 ? "ready" : "cooldown");
+                return;
+            }
             String key = cooldownKey(ctx, node);
             long now = System.currentTimeMillis();
             CooldownEntry entry = cooldowns.get(key);
@@ -697,9 +727,15 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ctx.triggerOutput(ticks <= 0 ? "ready" : "cooldown");
         });
         operations.put("set_cooldown", (ctx, node) -> {
-            String key = cooldownKey(ctx, node);
             int ticks = integer(ctx, node, "ticks", 100);
             if (ticks < 0 || ticks > 72_000) throw new IllegalArgumentException("Cooldown ticks must be between 0 and 72000");
+            if (automationTasks != null) {
+                LegacyCooldown timer = legacyCooldown(ctx, node);
+                automationTasks.startTimer(timer.definition(), timer.owner(), ticks * 50L, 0L);
+                ctx.triggerOutput("flow");
+                return;
+            }
+            String key = cooldownKey(ctx, node);
             long now = System.currentTimeMillis();
             cooldowns.put(key, new CooldownEntry(now, now + ticks * 50L));
             ctx.triggerOutput("flow");
@@ -911,6 +947,17 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         if (ticks == 0) {
             return true;
         }
+        if (automationTasks != null) {
+            LegacyCooldown timer = familyCooldown(ctx, node, fallbackKey);
+            AutomationTaskService.TaskSnapshot snapshot = automationTasks.check(timer.key());
+            if (snapshot.state() == AutomationTaskService.State.ACTIVE || snapshot.state() == AutomationTaskService.State.PAUSED) {
+                ctx.setOutput(node, "cooldown_ticks_left", (int) Math.ceil(snapshot.remaining() / 50D));
+                return false;
+            }
+            automationTasks.startTimer(timer.definition(), timer.owner(), ticks * 50L, 0L);
+            ctx.setOutput(node, "cooldown_ticks_left", 0);
+            return true;
+        }
         String key = familyCooldownKey(ctx, node, fallbackKey);
         long now = System.currentTimeMillis();
         CooldownEntry entry = cooldowns.get(key);
@@ -935,6 +982,39 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             case "player" -> key + ':' + requirePlayer(ctx, node, "player").getUniqueId();
             default -> throw new IllegalArgumentException("Unknown cooldown scope: " + scope);
         };
+    }
+
+    private LegacyCooldown familyCooldown(FlowContext ctx, FlowNode node, String fallbackKey) {
+        String name = string(ctx, node, "cooldown_key", fallbackKey);
+        String scopeName = string(ctx, node, "cooldown_scope", "player").toLowerCase(Locale.ROOT);
+        AutomationScope scope = "global".equals(scopeName) ? AutomationScope.SERVER
+            : "target".equals(scopeName) ? AutomationScope.ENTITY
+            : "player".equals(scopeName) ? AutomationScope.PLAYER : AutomationScope.NETWORK;
+        AutomationOwner owner = switch (scopeName) {
+            case "global" -> new AutomationOwner("server", null);
+            case "target" -> {
+                Entity target = requireTarget(ctx, node);
+                yield new AutomationOwner(target.getUniqueId().toString(), target);
+            }
+            case "player" -> {
+                Player player = requirePlayer(ctx, node, "player");
+                yield new AutomationOwner(player.getUniqueId().toString(), player);
+            }
+            case "content" -> textCooldownOwner(ctx.getRuntime().getEventVariables().get("event.content_id"), "Content ID");
+            case "item", "item instance" -> textCooldownOwner(ctx.getRuntime().getEventVariables().get("event.instance_id"), "Item instance");
+            default -> throw new IllegalArgumentException("Unknown cooldown scope: " + scopeName);
+        };
+        String id = "legacy.cooldown." + name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]+", "_");
+        TimerDefinition definition = new TimerDefinition(id, name, "", scope, false, 0D, TimerDefinition.TimeUnit.TICKS, 0D);
+        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(id, scope, owner.id()));
+    }
+
+    private AutomationOwner textCooldownOwner(Object value, String label) {
+        String owner = value != null ? value.toString() : "";
+        if (owner.isBlank()) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+        return new AutomationOwner(owner, owner);
     }
 
     private List<Entity> queryEntities(FlowContext ctx, FlowNode node) {
@@ -1989,10 +2069,41 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         };
     }
 
+    private LegacyCooldown legacyCooldown(FlowContext ctx, FlowNode node) {
+        String name = string(ctx, node, "key", "ability");
+        String scopeName = string(ctx, node, "scope", "player").toLowerCase(Locale.ROOT);
+        AutomationScope scope = switch (scopeName) {
+            case "global" -> AutomationScope.SERVER;
+            case "content" -> AutomationScope.NETWORK;
+            case "player" -> AutomationScope.PLAYER;
+            default -> throw new IllegalArgumentException("Unknown cooldown scope: " + scopeName);
+        };
+        AutomationOwner owner = switch (scope) {
+            case SERVER -> new AutomationOwner("server", null);
+            case NETWORK -> {
+                String contentId = string(ctx, node, "content_id",
+                    String.valueOf(ctx.getRuntime().getEventVariables().getOrDefault("event.content_id", "")));
+                if (contentId.isBlank()) throw new IllegalArgumentException("Content ID is required");
+                yield new AutomationOwner(contentId, contentId);
+            }
+            case PLAYER -> {
+                Player player = requirePlayer(ctx, node, "player");
+                yield new AutomationOwner(player.getUniqueId().toString(), player);
+            }
+            default -> throw new IllegalArgumentException("Unsupported cooldown scope: " + scopeName);
+        };
+        String id = "legacy.cooldown." + name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]+", "_");
+        TimerDefinition definition = new TimerDefinition(id, name, "", scope, false, 0D, TimerDefinition.TimeUnit.TICKS, 0D);
+        return new LegacyCooldown(definition, owner, new AutomationInstanceKey(id, scope, owner.id()));
+    }
+
     private record CooldownEntry(long startedAt, long readyAt) {
         private long durationMillis() {
             return Math.max(0L, readyAt - startedAt);
         }
+    }
+
+    private record LegacyCooldown(TimerDefinition definition, AutomationOwner owner, AutomationInstanceKey key) {
     }
 
     private double getCharge(ItemStack item, String key) {

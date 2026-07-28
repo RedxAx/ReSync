@@ -1,0 +1,245 @@
+[
+  {
+    "id": "automation.variable",
+    "displayName": "Variable Access",
+    "description": "Read or change a known Variable. Its type, scope, persistence, and default value come from the selected definition.",
+    "category": "VARIABLE",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["variable", "typed", "state"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_access"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "variable", "dataType": "variable_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:variable_definition"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Get", "Set", "Delete", "Exists", "Increment", "Decrement", "Multiply", "Divide", "List"], "defaultValue": "Get"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "value", "dataType": "any", "visibleWhen": {"action": "Set"}},
+      {"name": "amount", "dataType": "number", "defaultValue": 1, "visibleWhen": {"action": "Increment,Decrement,Multiply,Divide"}}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "variable", "dataType": "variable_reference"},
+      {"name": "value", "dataType": "any", "visibleWhen": {"action": "Get,Set,Increment,Decrement,Multiply,Divide"}},
+      {"name": "exists", "dataType": "boolean", "visibleWhen": {"action": "Exists"}},
+      {"name": "variables", "dataType": "list<variable_reference>", "visibleWhen": {"action": "List"}}
+    ]
+  },
+  {
+    "id": "automation.timer",
+    "displayName": "Timer",
+    "description": "Start, stop, pause, resume, or check a known countdown.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["timer", "countdown", "state"],
+    "handler": "TimerHandler",
+    "handlerConfig": {"operation": "timer"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "timer", "dataType": "timer_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:timer_definition"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Start", "Stop", "Pause", "Resume", "Check"], "defaultValue": "Check"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "duration", "dataType": "number", "visibleWhen": {"action": "Start"}},
+      {"name": "unit", "dataType": "string", "widget": "DROPDOWN", "options": ["Ticks", "Seconds", "Minutes"], "defaultValue": "Seconds", "visibleWhen": {"action": "Start"}}
+    ],
+    "outputs": [
+      {"name": "active", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "paused", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "inactive", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "timer", "dataType": "timer_reference"},
+      {"name": "state", "dataType": "string"},
+      {"name": "remaining", "dataType": "duration"},
+      {"name": "elapsed", "dataType": "duration"},
+      {"name": "duration", "dataType": "duration"},
+      {"name": "progress", "dataType": "number"},
+      {"name": "progress_percent", "dataType": "number"}
+    ]
+  },
+  {
+    "id": "automation.schedule",
+    "displayName": "Schedule",
+    "description": "Start a known Schedule and capture its Function arguments now.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["schedule", "function", "flow"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {"operation": "schedule_definition"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "arguments", "dataType": "map<string,any>", "optional": true}
+    ],
+    "outputs": [
+      {"name": "scheduled", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "schedule", "dataType": "schedule_reference"},
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "automation.scheduled_task",
+    "displayName": "Scheduled Task",
+    "description": "Check, cancel, pause, resume, or immediately run one active Schedule.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["schedule", "task", "control"],
+    "handler": "ScheduleHandler",
+    "handlerConfig": {"operation": "scheduled_task"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Check", "Cancel", "Pause", "Resume", "Run Now"], "defaultValue": "Check"},
+      {"name": "task", "dataType": "scheduled_task", "optional": true},
+      {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition", "optional": true},
+      {"name": "owner", "dataType": "any"}
+    ],
+    "outputs": [
+      {"name": "active", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "paused", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "inactive", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "state", "dataType": "string"},
+      {"name": "remaining", "dataType": "duration"},
+      {"name": "next_run", "dataType": "instant"},
+      {"name": "last_run", "dataType": "instant"},
+      {"name": "run_count", "dataType": "number"},
+      {"name": "last_result", "dataType": "any"},
+      {"name": "last_error", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "event.variable.changed",
+    "displayName": "Variable Changed",
+    "description": "Run when the selected Variable changes.",
+    "category": "EVENT",
+    "schemaVersion": 1,
+    "kind": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.automation.event.VariableChangedEvent",
+    "handlerConfig": {"playerEvent": false},
+    "inputs": [
+      {"name": "variable", "dataType": "variable_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:variable_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "variable", "dataType": "variable_reference"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "old_value", "dataType": "any"},
+      {"name": "new_value", "dataType": "any"}
+    ],
+    "outputMappings": [
+      {"source": "event.variable", "target": "variable"},
+      {"source": "event.owner", "target": "owner"},
+      {"source": "event.oldValue", "target": "old_value"},
+      {"source": "event.newValue", "target": "new_value"}
+    ]
+  },
+  {
+    "id": "event.timer",
+    "displayName": "Timer Event",
+    "description": "Run for one lifecycle event from the selected Timer.",
+    "category": "EVENT",
+    "schemaVersion": 1,
+    "kind": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.automation.event.TimerEvent",
+    "handlerConfig": {"playerEvent": false},
+    "inputs": [
+      {"name": "timer", "dataType": "timer_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:timer_definition"},
+      {"name": "event", "dataType": "string", "widget": "DROPDOWN", "options": ["Started", "Tick", "Paused", "Resumed", "Stopped", "Finished"], "defaultValue": "Finished"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "timer", "dataType": "timer_reference"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "state", "dataType": "string"},
+      {"name": "remaining", "dataType": "duration"},
+      {"name": "elapsed", "dataType": "duration"},
+      {"name": "duration", "dataType": "duration"},
+      {"name": "progress", "dataType": "number"}
+    ],
+    "outputMappings": [
+      {"source": "event.timer", "target": "timer"},
+      {"source": "event.owner", "target": "owner"},
+      {"source": "event.state", "target": "state"},
+      {"source": "event.remaining", "target": "remaining"},
+      {"source": "event.elapsed", "target": "elapsed"},
+      {"source": "event.duration", "target": "duration"},
+      {"source": "event.progress", "target": "progress"}
+    ]
+  },
+  {
+    "id": "event.scheduled_task",
+    "displayName": "Scheduled Task Event",
+    "description": "Run for one lifecycle event from the selected Schedule.",
+    "category": "EVENT",
+    "schemaVersion": 1,
+    "kind": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.automation.event.ScheduledTaskEvent",
+    "handlerConfig": {"playerEvent": false},
+    "inputs": [
+      {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition"},
+      {"name": "event", "dataType": "string", "widget": "DROPDOWN", "options": ["Fired", "Completed", "Failed", "Cancelled", "Paused", "Resumed"], "defaultValue": "Completed"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "schedule", "dataType": "schedule_reference"},
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "target_type", "dataType": "string"},
+      {"name": "target", "dataType": "string"},
+      {"name": "fired_at", "dataType": "instant"},
+      {"name": "run_count", "dataType": "number"},
+      {"name": "function_result", "dataType": "any"},
+      {"name": "error", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.schedule", "target": "schedule"},
+      {"source": "event.task", "target": "task"},
+      {"source": "event.owner", "target": "owner"},
+      {"source": "event.targetType", "target": "target_type"},
+      {"source": "event.target", "target": "target"},
+      {"source": "event.firedAt", "target": "fired_at"},
+      {"source": "event.runCount", "target": "run_count"},
+      {"source": "event.functionResult", "target": "function_result"},
+      {"source": "event.error", "target": "error"}
+    ]
+  },
+  {
+    "id": "event.schedule",
+    "displayName": "Schedule Event",
+    "description": "Entry point for a Flow started by the selected Schedule.",
+    "category": "EVENT",
+    "schemaVersion": 1,
+    "kind": "EVENT",
+    "trigger": true,
+    "eventType": "restudio.resync.flow.automation.event.ScheduleFiredEvent",
+    "handlerConfig": {"playerEvent": false},
+    "inputs": [
+      {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "schedule", "dataType": "schedule_reference"},
+      {"name": "task", "dataType": "scheduled_task"},
+      {"name": "owner", "dataType": "any"},
+      {"name": "fired_at", "dataType": "instant"},
+      {"name": "run_count", "dataType": "number"}
+    ],
+    "outputMappings": [
+      {"source": "event.schedule", "target": "schedule"},
+      {"source": "event.task", "target": "task"},
+      {"source": "event.owner", "target": "owner"},
+      {"source": "event.firedAt", "target": "fired_at"},
+      {"source": "event.runCount", "target": "run_count"}
+    ]
+  }
+]

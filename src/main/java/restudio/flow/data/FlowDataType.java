@@ -103,6 +103,9 @@ public final class FlowDataType {
     public static final FlowDataType COMPONENT = new FlowDataType("component", STRING, Component.class, null, 0xE066FF);
     public static final FlowDataType PERMISSION = new FlowDataType("permission", null, FlowPermission.class, null, 0xB96BFF);
     public static final FlowDataType RESOURCE_REFERENCE = new FlowDataType("resource_reference", null, FlowResourceReference.class, null, 0x5CC8FF);
+    public static final FlowDataType VARIABLE_REFERENCE = new FlowDataType("variable_reference", RESOURCE_REFERENCE, FlowResourceReference.class, null, 0x5CC8FF);
+    public static final FlowDataType TIMER_REFERENCE = new FlowDataType("timer_reference", RESOURCE_REFERENCE, FlowResourceReference.class, null, 0x45B7E8);
+    public static final FlowDataType SCHEDULE_REFERENCE = new FlowDataType("schedule_reference", RESOURCE_REFERENCE, FlowResourceReference.class, null, 0x7AA2F7);
     public static final FlowDataType RESULT = new FlowDataType("result", null, FlowOperationResult.class, null, 0x55D68A);
     public static final FlowDataType JOB_REFERENCE = new FlowDataType("job_reference", null, FlowJobReference.class, null, 0xFFB347);
     public static final FlowDataType SCHEDULED_TASK = new FlowDataType("scheduled_task", null, Map.class, null, 0x7AA2F7);

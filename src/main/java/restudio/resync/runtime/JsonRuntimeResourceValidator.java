@@ -13,6 +13,10 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.flow.FlowValueCodecRegistry;
+import restudio.resync.flow.automation.ScheduleDefinition;
+import restudio.resync.flow.automation.TimerDefinition;
+import restudio.resync.flow.automation.VariableDefinition;
 import restudio.resync.storage.StorageSafety;
 
 import java.util.Locale;
@@ -25,9 +29,15 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
         "campfire", "campfire_cooking", "stonecutting", "stonecutter", "smithing", "smithing_transform", "smithing_trim", "trim");
     private final CustomContentService customContentService;
     private final AdvancementTreeValidator advancementTreeValidator = new AdvancementTreeValidator();
+    private final FlowValueCodecRegistry valueCodecs;
 
     public JsonRuntimeResourceValidator(CustomContentService customContentService) {
+        this(customContentService, null);
+    }
+
+    public JsonRuntimeResourceValidator(CustomContentService customContentService, FlowValueCodecRegistry valueCodecs) {
         this.customContentService = customContentService;
+        this.valueCodecs = valueCodecs;
     }
 
     public void validate(String type, JsonObject value) {
@@ -43,7 +53,30 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
             case ReSyncResourceCatalog.DIALOG -> validateDialogDefinition(value);
             case ReSyncResourceCatalog.ADVANCEMENT_TREE -> advancementTreeValidator.validate(Map.of(text(value, "id"), value));
             case ReSyncResourceCatalog.TEXT_TEMPLATE -> validateText(value);
+            case ReSyncResourceCatalog.VARIABLE_DEFINITION -> validateVariableDefinition(value);
+            case ReSyncResourceCatalog.TIMER_DEFINITION -> TimerDefinition.from(value, rawText(value, "id"));
+            case ReSyncResourceCatalog.SCHEDULE_DEFINITION -> validateScheduleDefinition(value);
             default -> validateCommonStructure(value);
+        }
+    }
+
+    private void validateVariableDefinition(JsonObject value) {
+        VariableDefinition definition = VariableDefinition.from(value, rawText(value, "id"));
+        if (definition.persistent() && valueCodecs != null && !valueCodecs.hasCodec(definition.valueType())) {
+            throw new IllegalArgumentException("Persistent Variable type is unsupported: " + definition.valueType());
+        }
+    }
+
+    private void validateScheduleDefinition(JsonObject value) {
+        ScheduleDefinition definition = ScheduleDefinition.from(value, rawText(value, "id"));
+        if (definition.timingMode() == ScheduleDefinition.TimingMode.REPEATING && definition.duration() <= 0D) {
+            throw new IllegalArgumentException("Repeating Schedule interval must be positive");
+        }
+        if (definition.timingMode() == ScheduleDefinition.TimingMode.AT_TIME && definition.dateTime().isBlank()) {
+            throw new IllegalArgumentException("At Time Schedule requires a date and time");
+        }
+        if (definition.timingMode() == ScheduleDefinition.TimingMode.CRON && definition.cron().isBlank()) {
+            throw new IllegalArgumentException("Cron Schedule requires a pattern");
         }
     }
 

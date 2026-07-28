@@ -1,5 +1,6 @@
 package restudio.resync.modules;
 
+import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.scheduler.BukkitTask;
@@ -41,6 +42,12 @@ import restudio.resync.flow.SystemEventListener;
 import restudio.resync.flow.TabListService;
 import restudio.flow.data.TypeRegistry;
 import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.resync.flow.automation.AutomationDefinitionRegistry;
+import restudio.resync.flow.automation.AutomationTaskService;
+import restudio.resync.flow.automation.ScheduleDefinition;
+import restudio.resync.flow.automation.TimerDefinition;
+import restudio.resync.flow.automation.VariableDefinition;
+import restudio.resync.flow.automation.VariableService;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.BlockActionHandler;
 import restudio.resync.flow.handler.generic.AbilityEffectHandler;
@@ -48,6 +55,7 @@ import restudio.resync.flow.handler.generic.ChatHandler;
 import restudio.resync.flow.handler.generic.ColorHandler;
 import restudio.resync.flow.handler.generic.ConversionHandler;
 import restudio.resync.flow.migration.FlowGraphMigrator;
+import restudio.resync.flow.migration.TypedAutomationGraphMigrator;
 import restudio.resync.flow.handler.generic.CustomEventHandler;
 import restudio.resync.flow.handler.generic.CustomContentHandler;
 import restudio.resync.flow.handler.generic.CustomFunctionCallHandler;
@@ -93,6 +101,7 @@ import restudio.resync.flow.handler.generic.TextFormatHandler;
 import restudio.resync.flow.handler.generic.TextResourceHandler;
 import restudio.resync.text.ReTextService;
 import restudio.resync.flow.handler.generic.TimeHandler;
+import restudio.resync.flow.handler.generic.TimerHandler;
 import restudio.resync.flow.handler.generic.TitleHandler;
 import restudio.resync.flow.handler.generic.UuidHandler;
 import restudio.resync.flow.handler.generic.VariableHandler;
@@ -149,7 +158,9 @@ import restudio.resync.network.paper.ReSyncNetworkAgent;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -189,6 +200,10 @@ public class FlowRuntimeModule implements Module {
     private BuiltinOptionCatalogService builtinOptionCatalogs;
     private FlowResourceRegistry resourceRegistry;
     private FlowValueCodecRegistry valueCodecs;
+    private AutomationDefinitionRegistry automationDefinitions;
+    private AutomationTaskService automationTasks;
+    private VariableService automationVariables;
+    private ScheduleHandler scheduleHandler;
     private FlowGraphValidationRegistry graphValidationRegistry;
     private HandlerRegistry handlerRegistry;
     private List<NodeDefinitionDiagnostic> nodeDefinitionDiagnostics = List.of();
@@ -218,6 +233,9 @@ public class FlowRuntimeModule implements Module {
         runtimeDataRegistry = optionCatalogRegistry.runtimeData();
         resourceRegistry = new FlowResourceRegistry();
         valueCodecs = new FlowValueCodecRegistry();
+        automationDefinitions = new AutomationDefinitionRegistry(jsonResourceStorage);
+        automationTasks = new AutomationTaskService(context.getPlugin(), automationDefinitions);
+        automationVariables = new VariableService(automationDefinitions, valueCodecs, context.getPlugin());
         builtinOptionCatalogs = new BuiltinOptionCatalogService(() -> customContentService, itemAttributeSchemaService);
         builtinOptionCatalogs.registerProviders(optionCatalogRegistry);
         runtimeDataRegistry.register(new VanillaItemDataAdapter());
@@ -268,7 +286,7 @@ public class FlowRuntimeModule implements Module {
         customContentService = new CustomContentService(customContentStorage, storage, executor, itemAttributeSchemaService);
         runtimeDataRegistry.register(new CustomContentItemDataAdapter(customContentStorage, customContentService));
         runtimeDataRegistry.register(new ExternalItemDataAdapter(customContentService));
-        jsonResourceValidator = new JsonRuntimeResourceValidator(customContentService);
+        jsonResourceValidator = new JsonRuntimeResourceValidator(customContentService, valueCodecs);
         jsonResourceStorage.addInterceptor(jsonResourceValidator);
         customContentListener = new CustomContentListener(customContentStorage, customContentService);
         FlowResourcePacketRouter resourceBootstrap = new FlowResourcePacketRouter(storage, customContentStorage, customContentService, jsonResourceStorage, null, null, null, resourceRegistry, ignored -> {
@@ -277,6 +295,7 @@ public class FlowRuntimeModule implements Module {
         storage.preloadAll();
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         new FlowGraphMigrator(storage, nodeDefinitionRegistry).migrateStoredFlows();
+        new TypedAutomationGraphMigrator(storage, jsonResourceStorage, nodeDefinitionRegistry).migrateStoredFlows();
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         RuntimeFlowDispatcher runtimeFlowDispatcher = new RuntimeFlowDispatcher(storage, executor);
         lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher);
@@ -286,6 +305,8 @@ public class FlowRuntimeModule implements Module {
         networkFlowBridge = new NetworkFlowBridge(context.getPlugin());
         FlowEventRegistry flowEventRegistry = new FlowEventRegistry(globalTriggers.getTriggerDispatcher(), typeAdapterRegistry);
         flowEventRegistry.registerFromJson(new ArrayList<>(nodeDefinitionRegistry.getAllDefinitions().values()));
+        automationTasks.restorePersistentTimers();
+        scheduleHandler.restorePersistentSchedules(executor);
         systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
         globalTriggers.setSystemEventListener(systemEventListener);
         globalTriggers.refreshBindings();
@@ -322,6 +343,9 @@ public class FlowRuntimeModule implements Module {
         context.registerService(FlowGraphValidationRegistry.class, graphValidationRegistry);
         context.registerService(FlowResourceRegistry.class, resourceRegistry);
         context.registerService(FlowValueCodecRegistry.class, valueCodecs);
+        context.registerService(AutomationDefinitionRegistry.class, automationDefinitions);
+        context.registerService(AutomationTaskService.class, automationTasks);
+        context.registerService(VariableService.class, automationVariables);
         context.registerService(RuntimeDataRegistry.class, runtimeDataRegistry);
         context.registerService(NetworkFlowBridge.class, networkFlowBridge);
         context.registerService(FlowModule.class, delegate);
@@ -865,7 +889,7 @@ public class FlowRuntimeModule implements Module {
     }
 
     private void registerNodeHandlers(HandlerRegistry handlerRegistry) {
-        new AbilityEffectHandler().registerTo(handlerRegistry);
+        new AbilityEffectHandler(automationTasks).registerTo(handlerRegistry);
         new GenericMathHandler().registerTo(handlerRegistry);
         new GenericStringHandler().registerTo(handlerRegistry);
         new GenericListHandler().registerTo(handlerRegistry);
@@ -906,7 +930,9 @@ public class FlowRuntimeModule implements Module {
         new TeamHandler().registerTo(handlerRegistry);
         new TextFormatHandler().registerTo(handlerRegistry);
         new TextResourceHandler(moduleContext.getRequiredService(ReTextService.class)).registerTo(handlerRegistry);
-        new ScheduleHandler(storage).registerTo(handlerRegistry);
+        scheduleHandler = new ScheduleHandler(storage, Clock.systemUTC(), automationDefinitions, automationTasks, valueCodecs);
+        scheduleHandler.registerTo(handlerRegistry);
+        new TimerHandler(automationDefinitions, automationTasks).registerTo(handlerRegistry);
         new TitleHandler().registerTo(handlerRegistry);
         new TimeHandler().registerTo(handlerRegistry);
         new UuidHandler().registerTo(handlerRegistry);
@@ -914,7 +940,7 @@ public class FlowRuntimeModule implements Module {
         new CustomEventHandler().registerTo(handlerRegistry);
         new CustomContentHandler().registerTo(handlerRegistry);
         new CustomFunctionCallHandler().registerTo(handlerRegistry);
-        new VariableScopeHandler().registerTo(handlerRegistry);
+        new VariableScopeHandler(automationVariables).registerTo(handlerRegistry);
         new FunctionCatalogHandler(storage).registerTo(handlerRegistry);
         new FunctionHandler().registerTo(handlerRegistry);
         new PlayerActionHandler().registerTo(handlerRegistry);
@@ -983,6 +1009,11 @@ public class FlowRuntimeModule implements Module {
             if (task != null) task.cancel();
         });
         failure = cleanupFailure(failure, TabListService::stopUpdater);
+        AutomationTaskService taskService = automationTasks;
+        automationTasks = null;
+        failure = cleanupFailure(failure, () -> {
+            if (taskService != null) taskService.shutdown();
+        });
         FlowExecutor runtimeExecutor = executor;
         executor = null;
         failure = cleanupFailure(failure, () -> {
@@ -1058,8 +1089,112 @@ public class FlowRuntimeModule implements Module {
             return;
         }
         for (String type : storage.resourceTypes()) {
-            registerResourceCatalog(registry, type, () -> storage.listIds(type));
+            if (Set.of(ReSyncResourceCatalog.VARIABLE_DEFINITION, ReSyncResourceCatalog.TIMER_DEFINITION,
+                ReSyncResourceCatalog.SCHEDULE_DEFINITION).contains(type)) {
+                registerAutomationCatalog(registry, storage, type);
+            } else {
+                registerResourceCatalog(registry, type, () -> storage.listIds(type));
+            }
         }
+    }
+
+    private void registerAutomationCatalog(OptionCatalogRegistry registry, ReSyncJsonResourceStorage storage, String type) {
+        registry.register(new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "server:resync:" + type;
+            }
+
+            @Override
+            public String revision() {
+                List<String> fingerprints = storage.listIds(type).stream().map(id -> {
+                    JsonObject value = storage.get(type, id);
+                    return id + ":" + (value != null ? value.toString().hashCode() : 0);
+                }).toList();
+                return type + ":" + fingerprints.hashCode();
+            }
+
+            @Override
+            public List<String> values() {
+                return storage.listIds(type);
+            }
+
+            @Override
+            public List<OptionCatalogItem> items() {
+                return values().stream().map(id -> automationCatalogItem(type, id)).toList();
+            }
+        });
+    }
+
+    private OptionCatalogItem automationCatalogItem(String type, String id) {
+        return switch (type) {
+            case ReSyncResourceCatalog.VARIABLE_DEFINITION -> {
+                VariableDefinition definition = automationDefinitions.variable(id);
+                String persistence = definition.persistent() ? "Persistent" : "Runtime";
+                String typeName = displayType(definition.valueType().getTypeId());
+                yield new OptionCatalogItem(id, definition.name(),
+                    typeName + " · " + displayType(definition.scope().name()) + " · " + persistence,
+                    "server", "Variables", Map.of(
+                        "resourceType", type,
+                        "valueType", definition.valueType().toString(),
+                        "scope", definition.scope().name().toLowerCase(),
+                        "persistent", definition.persistent(),
+                        "description", definition.description()
+                    ));
+            }
+            case ReSyncResourceCatalog.TIMER_DEFINITION -> {
+                TimerDefinition definition = automationDefinitions.timer(id);
+                String persistence = definition.persistent() ? "Persistent" : "Runtime";
+                yield new OptionCatalogItem(id, definition.name(),
+                    definition.defaultDuration() + " " + displayType(definition.defaultUnit().name()) + " · "
+                        + displayType(definition.scope().name()) + " · " + persistence,
+                    "server", "Timers", Map.of(
+                        "resourceType", type,
+                        "scope", definition.scope().name().toLowerCase(),
+                        "persistent", definition.persistent(),
+                        "defaultDuration", definition.defaultDuration(),
+                        "defaultUnit", definition.defaultUnit().name().toLowerCase(),
+                        "tickInterval", definition.tickInterval(),
+                        "description", definition.description()
+                    ));
+            }
+            case ReSyncResourceCatalog.SCHEDULE_DEFINITION -> {
+                ScheduleDefinition definition = automationDefinitions.schedule(id);
+                String persistence = definition.persistent() ? "Persistent" : "Runtime";
+                String target = scheduleTimingSummary(definition) + " · " + displayType(definition.targetType().name());
+                yield new OptionCatalogItem(id, definition.name(),
+                    target + " · " + displayType(definition.scope().name()) + " · " + persistence,
+                    "server", "Schedules", Map.of(
+                        "resourceType", type,
+                        "scope", definition.scope().name().toLowerCase(),
+                        "persistent", definition.persistent(),
+                        "targetType", definition.targetType().name().toLowerCase(),
+                        "targetId", definition.targetId(),
+                        "timingMode", definition.timingMode().name().toLowerCase(),
+                        "timingSummary", scheduleTimingSummary(definition),
+                        "description", definition.description()
+                    ));
+            }
+            default -> throw new IllegalArgumentException("Unknown automation catalog: " + type);
+        };
+    }
+
+    private String scheduleTimingSummary(ScheduleDefinition definition) {
+        return switch (definition.timingMode()) {
+            case AFTER_DELAY -> "After " + definition.duration() + " " + displayType(definition.unit().name());
+            case AT_TIME -> definition.dateTime() + " " + definition.timeZone();
+            case REPEATING -> "Every " + definition.duration() + " " + displayType(definition.unit().name());
+            case CRON -> definition.cron() + " " + definition.timeZone();
+        };
+    }
+
+    private String displayType(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String[] parts = value.toLowerCase(Locale.ROOT).split("_");
+        return Arrays.stream(parts).filter(part -> !part.isBlank())
+            .map(part -> Character.toUpperCase(part.charAt(0)) + part.substring(1)).collect(Collectors.joining(" "));
     }
 
     private void registerNetworkCatalog(OptionCatalogRegistry registry, ReSync plugin) {

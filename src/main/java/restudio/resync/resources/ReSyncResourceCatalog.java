@@ -27,6 +27,9 @@ public final class ReSyncResourceCatalog {
     public static final String TRADE_PROFILE = "trade_profile";
     public static final String NPC_DEFINITION = "npc_definition";
     public static final String LOOT_TABLE = "loot_table";
+    public static final String VARIABLE_DEFINITION = "variable_definition";
+    public static final String TIMER_DEFINITION = "timer_definition";
+    public static final String SCHEDULE_DEFINITION = "schedule_definition";
     public static final String WORLDGEN = "worldgen";
     public static final String WORLD = "world";
     private static final Map<String, ReSyncManagedResource> BY_TYPE = new LinkedHashMap<>();

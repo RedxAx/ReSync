@@ -2,8 +2,12 @@ package restudio.resync.flow.handler.generic;
 
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.PersistentVariableStore;
+import restudio.resync.flow.automation.AutomationReferences;
+import restudio.resync.flow.automation.VariableDefinition;
+import restudio.resync.flow.automation.VariableService;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
@@ -16,9 +20,20 @@ import java.util.function.BiConsumer;
 public class VariableScopeHandler implements NodeHandler {
     private static final String GLOBAL_PREFIX = "server.";
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final VariableService variables;
 
     public VariableScopeHandler() {
+        this(null);
+    }
+
+    public VariableScopeHandler(VariableService variables) {
+        this.variables = variables;
         operations.put("variable_access", (ctx, node) -> {
+            String definitionId = AutomationReferences.id(ctx.getInputValue(node, "variable", Object.class, null));
+            if (this.variables != null && !definitionId.isBlank()) {
+                executeDefinedVariable(ctx, node, this.variables.definition(definitionId));
+                return;
+            }
             String mode = ctx.getInputValue(node, "mode", String.class, "get");
             String scope = ctx.getInputValue(node, "scope", String.class, "local");
             Boolean persist = ctx.getInputValue(node, "persist", Boolean.class, false);
@@ -53,6 +68,8 @@ public class VariableScopeHandler implements NodeHandler {
                     if (persistent) {
                         deletePersistentVariable(ctx, normalizedScope, name, player);
                     }
+                }
+                case "exists" -> {
                 }
                 case "list" -> {
                     variablesOutput = persistent
@@ -182,6 +199,52 @@ public class VariableScopeHandler implements NodeHandler {
         operations.put("variable_clear_local", (ctx, node) -> {
             ctx.getLocalVariables().clear();
         });
+    }
+
+    private void executeDefinedVariable(FlowContext context, FlowNode node, VariableDefinition definition) {
+        String action = context.getInputValue(node, "action", String.class,
+            context.getInputValue(node, "mode", String.class, "get")).trim().toLowerCase();
+        Object owner = switch (definition.scope()) {
+            case PLAYER -> context.getInputValue(node, "owner", Object.class,
+                context.getInputValue(node, "player", Object.class, context.getPlayer()));
+            case ENTITY -> context.getInputValue(node, "owner", Object.class,
+                context.getInputValue(node, "entity", Object.class, null));
+            case NETWORK -> context.getInputValue(node, "owner", Object.class,
+                context.getInputValue(node, "network", Object.class, null));
+            default -> null;
+        };
+        Object value = null;
+        boolean exists = false;
+        List<FlowResourceReference> listed = List.of();
+        switch (action) {
+            case "get" -> value = variables.get(context, definition, owner);
+            case "set" -> value = variables.set(context, definition, owner, context.getInputValue(node, "value", Object.class, null));
+            case "delete" -> variables.delete(context, definition, owner);
+            case "exists" -> exists = variables.exists(context, definition, owner);
+            case "list" -> listed = variables.list(context, definition.scope(), owner);
+            case "increment" -> value = variables.updateNumber(context, definition, owner,
+                context.getInputValue(node, "amount", Double.class, 1D), Double::sum);
+            case "decrement" -> value = variables.updateNumber(context, definition, owner,
+                context.getInputValue(node, "amount", Double.class, 1D), (current, amount) -> current - amount);
+            case "multiply" -> value = variables.updateNumber(context, definition, owner,
+                context.getInputValue(node, "amount", Double.class, 1D), (current, amount) -> current * amount);
+            case "divide" -> {
+                double amount = context.getInputValue(node, "amount", Double.class, 1D);
+                if (amount == 0D) {
+                    throw new IllegalArgumentException("Variable division amount cannot be zero");
+                }
+                value = variables.updateNumber(context, definition, owner, amount, (current, divisor) -> current / divisor);
+            }
+            default -> throw new IllegalArgumentException("Unknown Variable action: " + action);
+        }
+        if (!"delete".equals(action) && !"list".equals(action)) {
+            value = value != null || "get".equals(action) ? value : variables.get(context, definition, owner);
+            exists = variables.exists(context, definition, owner);
+        }
+        context.setOutput(node, "variable", variables.reference(definition));
+        context.setOutput(node, "value", value);
+        context.setOutput(node, "exists", exists);
+        context.setOutput(node, "variables", listed);
     }
 
     public void registerTo(HandlerRegistry registry) {

@@ -991,6 +991,8 @@
     "displayName": "Cooldown Remaining",
     "description": "Reads a cooldown as ready state, remaining and elapsed time, normalized progress, percent progress, and timestamps for bars, labels, animations, and other visual feedback.",
     "category": "ABILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "cooldown_remaining" },
     "inputs": [
@@ -1017,6 +1019,8 @@
     "id": "ability.set_cooldown",
     "displayName": "Set Cooldown",
     "category": "ABILITY",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
     "handler": "AbilityEffectHandler",
     "handlerConfig": { "operation": "set_cooldown" },
     "inputs": [

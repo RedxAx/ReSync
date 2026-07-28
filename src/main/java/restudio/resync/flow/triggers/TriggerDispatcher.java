@@ -7,8 +7,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.EventExecutor;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.automation.AutomationReferences;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -100,6 +102,7 @@ public class TriggerDispatcher implements Listener {
         for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
             FlowGraph graph = storage.getGraph(trigger.getKey());
             if (graph == null) continue;
+            if (!matchesAutomationBinding(graph, trigger.getValue(), event)) continue;
 
             Map<String, Object> eventVars = new HashMap<>();
             if (player != null) {
@@ -119,6 +122,49 @@ public class TriggerDispatcher implements Listener {
             }
             executor.execute(graph, trigger.getValue(), player, event, eventVars);
         }
+    }
+
+    private boolean matchesAutomationBinding(FlowGraph graph, String startNodeId, Event event) {
+        if (graph == null || startNodeId == null || event == null || graph.getNodes() == null) {
+            return true;
+        }
+        FlowNode node = graph.getNodes().get(startNodeId);
+        if (node == null || node.getInputValues() == null) {
+            return true;
+        }
+        Method definitionGetter = findMethod(event.getClass(), "getDefinitionId");
+        if (definitionGetter != null) {
+            String selected = "";
+            for (String pin : List.of("variable", "timer", "schedule")) {
+                if (node.getInputValues().containsKey(pin)) {
+                    selected = AutomationReferences.id(node.getInputValues().get(pin));
+                    break;
+                }
+            }
+            Object actual = invoke(definitionGetter, event);
+            if (!selected.isBlank() && (actual == null || !selected.equals(actual.toString()))) {
+                return false;
+            }
+        }
+        Method eventTypeGetter = findMethod(event.getClass(), "getEventType");
+        Object selectedType = "event.schedule".equals(node.getType()) ? "fired" : node.getInputValues().get("event");
+        if (eventTypeGetter != null && selectedType != null && !selectedType.toString().isBlank()) {
+            Object actual = invoke(eventTypeGetter, event);
+            return actual != null && normalizedValue(selectedType).equals(normalizedValue(actual));
+        }
+        return true;
+    }
+
+    private Object invoke(Method method, Object target) {
+        try {
+            return method.invoke(target);
+        } catch (ReflectiveOperationException exception) {
+            return null;
+        }
+    }
+
+    private String normalizedValue(Object value) {
+        return value != null ? value.toString().trim().replace(' ', '_').toLowerCase(Locale.ROOT) : "";
     }
 
     public void registerBinding(String eventType, String flowId, String startNodeId) {

@@ -201,6 +201,8 @@
     "id": "variable.variable_access",
     "displayName": "Variable Access",
     "category": "VARIABLE",
+    "hiddenReason": "migration-only",
+    "deprecated": true,
     "hidden": true,
     "handler": "VariableScopeHandler",
     "handlerConfig": {

@@ -16,7 +16,7 @@ class ConfigLoaderTest {
 
     @Test
     void configGeneratesApiKeyAndPersistsBindHostDefault() throws Exception {
-        Path config = tempDir.resolve("config.properties");
+        Path config = tempDir.resolve("plugins/ReSync/config.properties");
         ReSyncConfig loaded = ConfigLoader.load(config.toString());
         String content = Files.readString(config);
 

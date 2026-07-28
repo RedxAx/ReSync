@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -41,6 +42,8 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     private static final long COMMAND_SETTLE_TICKS = 40;
     private static final int LOCAL_CONFLICT_RETRIES = 3;
     private static final long SCAN_INTERVAL_TICKS = 100;
+    private static final long MINIMUM_SYNC_RETRY_MILLIS = 1_000;
+    private static final long MAXIMUM_SYNC_RETRY_MILLIS = 30_000;
     private final ReSync plugin;
     private final ReSyncNetworkAgent agent;
     private final PathPolicy policy;
@@ -52,11 +55,13 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     private final NetworkResourceManifestStore manifest;
     private final Map<String, CompletableFuture<Void>> work = new ConcurrentHashMap<>();
     private final Map<String, PendingMutation> pending = new ConcurrentHashMap<>();
-    private final Set<String> remoteChanges = ConcurrentHashMap.newKeySet();
+    private final RemoteChangeTracker remoteChanges = new RemoteChangeTracker();
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean scanning = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile boolean ready;
+    private volatile int synchronizationFailures;
+    private volatile long nextSynchronizationAttemptAt;
     private BukkitTask scanTask;
     private BukkitTask commandTask;
 
@@ -118,6 +123,8 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
 
     @Override
     public void onConnected() {
+        synchronizationFailures = 0;
+        nextSynchronizationAttemptAt = 0;
         synchronize();
     }
 
@@ -131,12 +138,12 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             return;
         }
         String key = resource.metadata().key();
-        remoteChanges.add(key);
-        enqueue(key, () -> apply(resource).whenComplete((unused, throwable) -> remoteChanges.remove(key)));
+        remoteChanges.track(key, resource);
+        enqueue(key, () -> applyRemoteChange(key, resource));
     }
 
     private void synchronize() {
-        if (closed.get() || !agent.connected() || !synchronizing.compareAndSet(false, true)) {
+        if (closed.get() || !agent.connected() || System.currentTimeMillis() < nextSynchronizationAttemptAt || !synchronizing.compareAndSet(false, true)) {
             return;
         }
         ready = false;
@@ -146,12 +153,48 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             .whenComplete((unused, throwable) -> {
                 synchronizing.set(false);
                 if (throwable != null) {
+                    scheduleSynchronizationRetry();
                     Log.warn("ReSync path synchronization failed: " + rootMessage(throwable));
                     return;
                 }
+                synchronizationFailures = 0;
+                nextSynchronizationAttemptAt = 0;
+                clearAppliedRemoteChanges();
                 ready = true;
                 flushPending();
             });
+    }
+
+    private CompletableFuture<Void> applyRemoteChange(String key, NetworkResource resource) {
+        if (!remoteChanges.isCurrent(key, resource)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return apply(resource).whenComplete((unused, throwable) -> {
+            if (throwable == null) {
+                remoteChanges.complete(key, resource);
+                return;
+            }
+            ready = false;
+            scheduleSynchronizationRetry();
+        });
+    }
+
+    private void scheduleSynchronizationRetry() {
+        int failures = Math.min(synchronizationFailures + 1, 16);
+        synchronizationFailures = failures;
+        nextSynchronizationAttemptAt = System.currentTimeMillis() + synchronizationRetryDelay(failures);
+    }
+
+    static long synchronizationRetryDelay(int failures) {
+        long multiplier = 1L << Math.clamp(failures - 1, 0, 15);
+        return Math.min(MAXIMUM_SYNC_RETRY_MILLIS, MINIMUM_SYNC_RETRY_MILLIS * multiplier);
+    }
+
+    private void clearAppliedRemoteChanges() {
+        remoteChanges.removeApplied(resource -> {
+            NetworkResourceManifestStore.Entry applied = manifest.get(resource.type(), resource.resourceId());
+            return applied != null && applied.revision() >= resource.revision();
+        });
     }
 
     private CompletableFuture<List<NetworkResourceMetadata>> fetchRemote(NetworkResourceQuery query, List<NetworkResourceMetadata> resources) {
@@ -270,7 +313,14 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private void scan() {
-        if (closed.get() || !ready || !agent.connected() || !scanning.compareAndSet(false, true)) {
+        if (closed.get() || !agent.connected()) {
+            return;
+        }
+        if (!ready) {
+            synchronize();
+            return;
+        }
+        if (!scanning.compareAndSet(false, true)) {
             return;
         }
         try {
@@ -554,5 +604,33 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private record Reconciliation(List<NetworkResourceMetadata> remote, Map<String, LocalFile> local) {
+    }
+
+    static final class RemoteChangeTracker {
+        private final Map<String, NetworkResource> changes = new ConcurrentHashMap<>();
+
+        void track(String key, NetworkResource resource) {
+            changes.compute(key, (ignored, current) -> current == null || resource.revision() > current.revision() ? resource : current);
+        }
+
+        boolean isCurrent(String key, NetworkResource resource) {
+            return changes.get(key) == resource;
+        }
+
+        void complete(String key, NetworkResource resource) {
+            changes.remove(key, resource);
+        }
+
+        boolean contains(String key) {
+            return changes.containsKey(key);
+        }
+
+        void removeApplied(Predicate<NetworkResource> predicate) {
+            changes.entrySet().removeIf(entry -> predicate.test(entry.getValue()));
+        }
+
+        void clear() {
+            changes.clear();
+        }
     }
 }

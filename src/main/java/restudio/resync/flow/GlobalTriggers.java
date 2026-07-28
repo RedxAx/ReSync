@@ -237,6 +237,10 @@ public class GlobalTriggers implements Listener {
         if (normalized.startsWith("/")) {
             normalized = normalized.substring(1);
         }
+        int namespaceSeparator = normalized.indexOf(':');
+        if (namespaceSeparator >= 0 && namespaceSeparator < normalized.length() - 1) {
+            normalized = normalized.substring(namespaceSeparator + 1);
+        }
         if (normalized.isBlank()) {
             return null;
         }

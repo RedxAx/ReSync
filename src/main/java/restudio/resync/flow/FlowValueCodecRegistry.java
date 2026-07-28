@@ -87,7 +87,8 @@ public final class FlowValueCodecRegistry {
         registerAlias("item_component_list", "structured_list");
         registerAlias("http_response", "structured_value");
         registerAliases("resource_reference", "permission_track", "gui_session", "sidebar_session", "tab_application", "merchant",
-            "trade_session", "placed_content", "structure", "worldgen_project", "player_identity", "network_node", "network_route");
+            "trade_session", "placed_content", "structure", "worldgen_project", "player_identity", "network_node", "network_route",
+            "variable_reference", "timer_reference", "schedule_reference");
         registerAliases("string", "permission_group", "region", "network_scope", "flow_id", "function", "command_id", "custom_content_id", "gui_id",
             "scoreboard_id", "tab_id", "chat_id", "motd_profile_id", "message_rule_id", "recipe_id", "text_template_id", "advancement_tree_id",
             "dialog_id", "trade_profile_id", "npc_id", "loot_table_id", "worldgen_id");

@@ -85,6 +85,16 @@ public class ConfigLoader {
     }
 
     private static void saveConfig(Path configFile, Properties props) {
+        try {
+            Path parent = configFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+        } catch (Exception e) {
+            Log.error("Failed to create config directory: " + e.getMessage(), e);
+            return;
+        }
+
         try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
             props.store(fos, "ReSync Configuration");
         } catch (Exception e) {

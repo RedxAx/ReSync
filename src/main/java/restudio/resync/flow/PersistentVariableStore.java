@@ -11,6 +11,7 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,7 +66,7 @@ public class PersistentVariableStore {
         return new LinkedHashMap<>(variables);
     }
 
-    public void set(String key, Object value) {
+    public synchronized void set(String key, Object value) {
         if (key == null || key.isBlank()) {
             return;
         }
@@ -78,7 +79,7 @@ public class PersistentVariableStore {
         save();
     }
 
-    public void remove(String key) {
+    public synchronized void remove(String key) {
         if (key == null || key.isBlank()) {
             return;
         }
@@ -116,7 +117,13 @@ public class PersistentVariableStore {
                 Files.createDirectories(filePath.getParent());
             }
             String json = GSON.toJson(variables);
-            Files.writeString(filePath, json, StandardCharsets.UTF_8);
+            Path temporary = filePath.resolveSibling(filePath.getFileName() + ".tmp");
+            Files.writeString(temporary, json, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException ignored) {
+                Files.move(temporary, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             Log.warn("Failed to save persistent variables: " + e.getMessage());
         }

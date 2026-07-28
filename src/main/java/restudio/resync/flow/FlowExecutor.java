@@ -326,9 +326,14 @@ public class FlowExecutor {
                 "Add a Function Start node"
             ));
         }
+        Map<String, Object> callInputs = new LinkedHashMap<>(inputs != null ? inputs : Map.of());
+        FlowExecutionException inputFailure = validateFunctionInputs(callable, callInputs, startNodeId);
+        if (inputFailure != null) {
+            return CompletableFuture.failedFuture(inputFailure);
+        }
         FlowRuntime runtime = new FlowRuntime(new FlowGraph(), typeAdapter, globalVariables, eventVars, nodeDefinitionRegistry);
         String callerNodeId = "__function_call";
-        runtime.callFunction(callable, callerNodeId, inputs != null ? inputs : Map.of());
+        runtime.callFunction(callable, callerNodeId, callInputs);
         runtime.openEventMutationWindow(event != null);
         CompletableFuture<Void> future;
         try {
@@ -1462,18 +1467,24 @@ public class FlowExecutor {
             if (!conn.getTargetPin().equals(pinName)) {
                 continue;
             }
-            String sourceId = conn.getSourceNodeId();
-            if (!visited.add(sourceId)) {
-                continue;
+            String editorSourceId = conn.getEditorSourceNodeId() != null && !conn.getEditorSourceNodeId().isBlank()
+                && conn.getEditorSourcePin() != null && conn.getEditorSourcePin().startsWith("__passthrough:")
+                ? conn.getEditorSourceNodeId() : null;
+            clearDependencyNode(runtime, graph, editorSourceId, visited);
+            if (editorSourceId == null || !editorSourceId.equals(conn.getSourceNodeId())) {
+                clearDependencyNode(runtime, graph, conn.getSourceNodeId(), visited);
             }
-            if (!shouldClearNodeOutputs(graph, sourceId)) {
-                continue;
-            }
-            runtime.clearNodeOutputs(sourceId);
-            for (FlowConnection sourceConn : graph.getConnectionsToTarget(sourceId)) {
-                if (!"flow".equals(sourceConn.getTargetPin())) {
-                    clearDependencyOutputs(runtime, graph, sourceId, sourceConn.getTargetPin(), visited);
-                }
+        }
+    }
+
+    private void clearDependencyNode(FlowRuntime runtime, FlowGraph graph, String sourceId, Set<String> visited) {
+        if (sourceId == null || !visited.add(sourceId) || !shouldClearNodeOutputs(graph, sourceId)) {
+            return;
+        }
+        runtime.clearNodeOutputs(sourceId);
+        for (FlowConnection sourceConn : graph.getConnectionsToTarget(sourceId)) {
+            if (!"flow".equals(sourceConn.getTargetPin())) {
+                clearDependencyOutputs(runtime, graph, sourceId, sourceConn.getTargetPin(), visited);
             }
         }
     }

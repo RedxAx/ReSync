@@ -36,7 +36,7 @@ public final class CustomFunctionNodeDefinitions {
 
         for (String flowId : sortedFlowIds) {
             try {
-                FlowGraph graph = storage.getGraph(flowId);
+                FlowGraph graph = storage.getGraph("function", flowId);
                 if (graph == null || !graph.isFunction()) {
                     continue;
                 }

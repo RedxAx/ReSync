@@ -5,13 +5,12 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.storage.RecoverableJsonStore;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,11 +23,13 @@ public class PersistentVariableStore {
     private static volatile PersistentVariableStore instance;
 
     private final Path filePath;
+    private final RecoverableJsonStore store;
     private final Map<String, Object> variables = new ConcurrentHashMap<>();
     private volatile boolean loaded;
 
     private PersistentVariableStore(Path filePath) {
         this.filePath = filePath;
+        this.store = new RecoverableJsonStore(filePath, GSON);
     }
 
     public static PersistentVariableStore getInstance() {
@@ -98,12 +99,11 @@ public class PersistentVariableStore {
             }
             if (Files.exists(filePath)) {
                 try {
-                    String json = Files.readString(filePath, StandardCharsets.UTF_8);
-                    Map<String, Object> data = GSON.fromJson(json, MAP_TYPE);
+                    Map<String, Object> data = GSON.fromJson(store.load(), MAP_TYPE);
                     if (data != null) {
                         variables.putAll(data);
                     }
-                } catch (IOException e) {
+                } catch (RuntimeException | IOException e) {
                     Log.warn("Failed to load persistent variables: " + e.getMessage());
                 }
             }
@@ -113,17 +113,7 @@ public class PersistentVariableStore {
 
     private void save() {
         try {
-            if (filePath.getParent() != null) {
-                Files.createDirectories(filePath.getParent());
-            }
-            String json = GSON.toJson(variables);
-            Path temporary = filePath.resolveSibling(filePath.getFileName() + ".tmp");
-            Files.writeString(temporary, json, StandardCharsets.UTF_8);
-            try {
-                Files.move(temporary, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (IOException ignored) {
-                Files.move(temporary, filePath, StandardCopyOption.REPLACE_EXISTING);
-            }
+            store.save(GSON.toJsonTree(new LinkedHashMap<>(variables), MAP_TYPE));
         } catch (IOException e) {
             Log.warn("Failed to save persistent variables: " + e.getMessage());
         }

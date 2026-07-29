@@ -105,7 +105,7 @@ public final class FunctionCallSupport {
             return graph;
         }
         String functionId = requestedFunctionId(call);
-        return storage != null && !functionId.isBlank() && !"none".equalsIgnoreCase(functionId) ? storage.getGraph(functionId) : null;
+        return storage != null && !functionId.isBlank() && !"none".equalsIgnoreCase(functionId) ? storage.getGraph("function", functionId) : null;
     }
 
     private static String requestedFunctionId(JsonObject call) {

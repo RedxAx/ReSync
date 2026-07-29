@@ -11,8 +11,11 @@ import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowResourceReference;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.resources.AssetFileFormat;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.StorageSafety;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TypedAutomationGraphMigratorTest {
     private FlowStorage flows;
@@ -124,6 +128,37 @@ class TypedAutomationGraphMigratorTest {
         assertEquals("automation.scheduled_task", cancel.getType());
         assertEquals("task", graph.getConnections().getFirst().getSourcePin());
         assertEquals("task", graph.getConnections().getFirst().getTargetPin());
+    }
+
+    @Test
+    void preservesEnvelopeClassifiedFunctionsDuringMigration() {
+        FlowGraph graph = graph("legacy-function");
+        graph.setFunction(true);
+        graph.getNodes().put("variable", new FlowNode("variable.access", 0, 0, new HashMap<>(Map.of(
+            "mode", "set", "scope", "global", "persist", false, "name", "Round", "value", 1))));
+        flows.saveGraph(graph);
+        graph.setFunction(false);
+
+        new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
+
+        assertEquals("function", flows.getGraphResourceType(graph.getId()));
+        assertTrue(graph.isFunction());
+        assertEquals("automation.variable", graph.getNodes().get("variable").getType());
+    }
+
+    @Test
+    void repairsFunctionsMisclassifiedByAnEarlierMigration() throws Exception {
+        FlowGraph graph = graph("misclassified-function");
+        graph.getNodes().put("node", new FlowNode("debug.log", 0, 0, new HashMap<>()));
+        flows.saveGraph(graph);
+        Path backup = flows.backupGraphForMigration(graph.getId(), "typed-automation-1");
+        StorageSafety.writeUtf8Atomic(backup, AssetFileFormat.withResourceType(StorageSafety.readUtf8(backup), "function"));
+
+        new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
+
+        assertEquals("function", flows.getGraphResourceType(graph.getId()));
+        assertTrue(graph.isFunction());
+        assertEquals(1, graph.getNodes().size());
     }
 
     private FlowGraph graph(String id) {

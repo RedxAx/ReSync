@@ -3,6 +3,7 @@ package restudio.resync.flow.automation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -11,10 +12,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AutomationTaskServiceTest {
@@ -129,6 +134,64 @@ class AutomationTaskServiceTest {
         restored.shutdown();
     }
 
+    @Test
+    void persistentTimerDoesNotStartWhenItsJournalCannotCommit() throws Exception {
+        Path blockedDirectory = temporaryDirectory.resolve("blocked");
+        Files.writeString(blockedDirectory, "file");
+        AutomationTaskService service = service(Instant.parse("2026-07-28T12:00:00Z"), blockedDirectory.resolve("automation.json"));
+        TimerDefinition definition = timer("durable", true);
+        AutomationOwner owner = new AutomationOwner("server", null);
+
+        assertThrows(IllegalStateException.class, () -> service.startTimer(definition, owner, 60_000L, 0L));
+        assertTrue(service.snapshots().isEmpty());
+
+        assertThrows(IllegalStateException.class, service::shutdown);
+    }
+
+    @Test
+    void persistentResumeDoesNotScheduleBeforeItsJournalCommits() throws Exception {
+        Path file = temporaryDirectory.resolve("automation.json");
+        CountingScheduler scheduler = new CountingScheduler();
+        AutomationTaskService service = new AutomationTaskService(null, null, Clock.fixed(Instant.parse("2026-07-28T12:00:00Z"), ZoneOffset.UTC),
+            scheduler, new AutomationTaskStore(file));
+        TimerDefinition definition = timer("durable-resume", true);
+        AutomationOwner owner = new AutomationOwner("server", null);
+        AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+        service.startTimer(definition, owner, 60_000L, 0L);
+        service.pause(key);
+        assertEquals(1, scheduler.schedules.get());
+        Files.delete(file);
+        Files.createDirectory(file);
+        Files.writeString(file.resolve("block"), "file");
+
+        assertThrows(IllegalStateException.class, () -> service.resume(key));
+
+        assertEquals(1, scheduler.schedules.get());
+        assertEquals(AutomationTaskService.State.PAUSED, service.check(key).state());
+        assertThrows(IllegalStateException.class, service::shutdown);
+    }
+
+    @Test
+    void failedTerminalPersistenceUsesABoundedRetryDelay() throws Exception {
+        Path file = temporaryDirectory.resolve("automation.json");
+        CountingScheduler scheduler = new CountingScheduler();
+        AutomationTaskService service = new AutomationTaskService(null, null, Clock.fixed(Instant.parse("2026-07-28T12:00:00Z"), ZoneOffset.UTC),
+            scheduler, new AutomationTaskStore(file));
+        TimerDefinition definition = timer("durable-terminal", true);
+        AutomationOwner owner = new AutomationOwner("server", null);
+        service.startTimer(definition, owner, 0L, 0L);
+        Runnable due = scheduler.command;
+        Files.delete(file);
+        Files.createDirectory(file);
+        Files.writeString(file.resolve("block"), "file");
+
+        assertThrows(IllegalStateException.class, due::run);
+
+        assertEquals(2, scheduler.schedules.get());
+        assertEquals(1_000L, scheduler.requestedDelay);
+        assertThrows(IllegalStateException.class, service::shutdown);
+    }
+
     private AutomationTaskService service(Instant instant, Path file) {
         return new AutomationTaskService(null, null, Clock.fixed(instant, ZoneOffset.UTC),
             Executors.newSingleThreadScheduledExecutor(), file != null ? new AutomationTaskStore(file) : null);
@@ -148,5 +211,23 @@ class AutomationTaskServiceTest {
             timingMode, 60D, TimerDefinition.TimeUnit.SECONDS, 0D, "", "UTC", "",
             AutomationScope.SERVER, true, ScheduleDefinition.OverlapPolicy.SKIP, ScheduleDefinition.ExistingTaskPolicy.REPLACE,
             ScheduleDefinition.FailurePolicy.CONTINUE, ScheduleDefinition.OfflinePolicy.WAIT, missedRunPolicy);
+    }
+
+    private static final class CountingScheduler extends ScheduledThreadPoolExecutor {
+        private final AtomicInteger schedules = new AtomicInteger();
+        private Runnable command;
+        private long requestedDelay;
+
+        private CountingScheduler() {
+            super(1);
+        }
+
+        @Override
+        public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
+            schedules.incrementAndGet();
+            this.command = command;
+            requestedDelay = unit.toMillis(delay);
+            return super.schedule(command, 1L, TimeUnit.DAYS);
+        }
     }
 }

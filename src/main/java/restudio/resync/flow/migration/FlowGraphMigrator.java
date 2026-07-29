@@ -10,7 +10,10 @@ import restudio.resync.Log;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.storage.MigrationLedger;
+import restudio.resync.storage.StorageSafety;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,35 +73,56 @@ public class FlowGraphMigrator {
         if (storage == null) {
             return;
         }
-        String migrationId = "flow-v" + FlowGraph.CURRENT_VERSION + "-" + System.currentTimeMillis();
+        String migrationId = "flow-v" + FlowGraph.CURRENT_VERSION;
         int scanned = 0;
         int migrated = 0;
         int failed = 0;
         int changedNodes = 0;
         ArrayList<String> changedGraphIds = new ArrayList<>();
         ArrayList<String> failedGraphIds = new ArrayList<>();
-        for (String flowId : storage.listFlowIds()) {
-            scanned++;
-            boolean legacyGraphFile = !storage.hasStoredGraphVersion(flowId);
-            FlowGraph graph = storage.getGraph(flowId);
-            if (graph == null) {
-                continue;
-            }
-            try {
-                FlowGraph candidate = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
-                GraphMigrationResult result = migrateGraphDetailed(candidate, legacyGraphFile);
-                if (result.changed()) {
-                    storage.backupGraphForMigration(flowId, migrationId);
-                    storage.saveGraph(candidate);
-                    migrated++;
-                    changedNodes += result.changedNodes();
-                    changedGraphIds.add(flowId);
+        try (MigrationLedger.Fence fence = MigrationLedger.acquireFence(storage.getAssetsPath())) {
+            MigrationLedger ledger = new MigrationLedger(storage.getAssetsPath());
+            for (String flowId : storage.listFlowIds()) {
+                scanned++;
+                boolean legacyGraphFile = !storage.hasStoredGraphVersion(flowId);
+                String storedType = storage.getGraphResourceType(flowId);
+                FlowGraph graph = storedType.isBlank() ? storage.getGraph(flowId) : storage.getGraph(storedType, flowId);
+                if (graph == null) {
+                    continue;
                 }
-            } catch (RuntimeException exception) {
-                failed++;
-                failedGraphIds.add(flowId);
-                Log.warn("[FlowGraphMigrator] Failed to migrate " + flowId + ": " + exception.getMessage());
+                String sourceHash = StorageSafety.sha256(FlowSerializer.serialize(graph));
+                if (ledger.isCommitted(migrationId, flowId, sourceHash)) {
+                    continue;
+                }
+                try {
+                    FlowGraph candidate = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
+                    GraphMigrationResult result = migrateGraphDetailed(candidate, legacyGraphFile);
+                    if (result.changed()) {
+                        ledger.prepare(migrationId, flowId, graph.getResourceType(), graph.getResourceRevision(), sourceHash, FlowGraph.CURRENT_VERSION, fence.epoch());
+                        storage.backupGraphForMigration(flowId, migrationId + "-" + sourceHash.substring(0, 12));
+                        storage.saveGraph(candidate);
+                        ledger.commit(migrationId, flowId, sourceHash);
+                        migrated++;
+                        changedNodes += result.changedNodes();
+                        changedGraphIds.add(flowId);
+                    } else {
+                        ledger.prepare(migrationId, flowId, graph.getResourceType(), graph.getResourceRevision(), sourceHash, FlowGraph.CURRENT_VERSION, fence.epoch());
+                        ledger.commit(migrationId, flowId, sourceHash);
+                    }
+                } catch (RuntimeException | IOException exception) {
+                    try {
+                        ledger.fail(migrationId, flowId, sourceHash, exception.getMessage());
+                    } catch (IOException ledgerFailure) {
+                        exception.addSuppressed(ledgerFailure);
+                    }
+                    failed++;
+                    failedGraphIds.add(flowId);
+                    Log.warn("[FlowGraphMigrator] Failed to migrate " + flowId + ": " + exception.getMessage());
+                }
             }
+        } catch (IOException exception) {
+            failed++;
+            Log.warn("[FlowGraphMigrator] Migration fence unavailable: " + exception.getMessage());
         }
         lastReport = new FlowMigrationReport(migrationId, scanned, migrated, failed, changedNodes, changedGraphIds, failedGraphIds);
         if (migrated > 0 || failed > 0) {

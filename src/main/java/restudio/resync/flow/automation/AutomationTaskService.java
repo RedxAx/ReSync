@@ -7,6 +7,7 @@ import restudio.resync.Log;
 import restudio.resync.flow.automation.event.ScheduledTaskEvent;
 import restudio.resync.flow.automation.event.TimerEvent;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -141,9 +142,14 @@ public final class AutomationTaskService {
         entry.tickInterval = Math.max(0L, tickInterval);
         entry.deadline = deadline;
         entry.nextRun = entry.tickInterval > 0L ? Math.min(entry.deadline, Math.addExact(now, entry.tickInterval)) : entry.deadline;
-        schedule(entry, Math.max(0L, entry.nextRun - now));
+        try {
+            persist();
+            schedule(entry, Math.max(0L, entry.nextRun - now));
+        } catch (RuntimeException failure) {
+            rollbackStart(entry, failure);
+            throw failure;
+        }
         publishTimer(entry, TimerEvent.Type.STARTED);
-        persist();
         return snapshot(entry);
     }
 
@@ -167,10 +173,15 @@ public final class AutomationTaskService {
             request.interval(), definition, request.nextDelay(), request.invocation());
         entry.deadline = deadline;
         entry.nextRun = entry.deadline;
-        schedule(entry, request.firstDelay());
         entry.arguments = request.arguments();
         entry.signatureVersion = request.signatureVersion();
-        persist();
+        try {
+            persist();
+            schedule(entry, request.firstDelay());
+        } catch (RuntimeException failure) {
+            rollbackStart(entry, failure);
+            throw failure;
+        }
         return new StartResult(true, false, snapshot(entry));
     }
 
@@ -189,19 +200,26 @@ public final class AutomationTaskService {
         if (entry == null) {
             return inactive(key);
         }
+        TaskRuntimeState previous;
         synchronized (entry) {
             if (entry.state != State.ACTIVE) {
                 return snapshot(entry);
             }
+            previous = runtimeState(entry);
             entry.remainingAtPause = entry.kind == Kind.TIMER ? remainingTimer(entry) : Math.max(0L, entry.nextRun - clock.millis());
             cancelFuture(entry);
             entry.state = State.PAUSED;
+        }
+        try {
+            persist();
+        } catch (RuntimeException failure) {
+            restoreRuntimeState(entry, previous);
+            throw failure;
         }
         publishLifecycle(entry, ScheduledTaskEvent.Type.PAUSED);
         if (entry.kind == Kind.TIMER) {
             publishTimer(entry, TimerEvent.Type.PAUSED);
         }
-        persist();
         return snapshot(entry);
     }
 
@@ -210,26 +228,37 @@ public final class AutomationTaskService {
         if (entry == null) {
             return inactive(key);
         }
+        TaskRuntimeState previous;
         synchronized (entry) {
             if (entry.state != State.PAUSED) {
                 return snapshot(entry);
             }
+            previous = runtimeState(entry);
             entry.state = State.ACTIVE;
             if (entry.kind == Kind.TIMER) {
                 entry.deadline = Math.addExact(clock.millis(), entry.remainingAtPause);
                 long delay = entry.tickInterval > 0L ? Math.min(entry.tickInterval, entry.remainingAtPause) : entry.remainingAtPause;
                 entry.nextRun = Math.addExact(clock.millis(), delay);
-                schedule(entry, delay);
             } else {
                 entry.nextRun = Math.addExact(clock.millis(), entry.remainingAtPause);
-                schedule(entry, entry.remainingAtPause);
             }
+        }
+        try {
+            persist();
+            schedule(entry, Math.max(0L, entry.nextRun - clock.millis()));
+        } catch (RuntimeException failure) {
+            restoreRuntimeState(entry, previous);
+            try {
+                persist();
+            } catch (RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
+            throw failure;
         }
         publishLifecycle(entry, ScheduledTaskEvent.Type.RESUMED);
         if (entry.kind == Kind.TIMER) {
             publishTimer(entry, TimerEvent.Type.RESUMED);
         }
-        persist();
         return snapshot(entry);
     }
 
@@ -244,7 +273,6 @@ public final class AutomationTaskService {
         } else {
             publishLifecycle(entry, ScheduledTaskEvent.Type.CANCELLED);
         }
-        persist();
         return snapshot(entry);
     }
 
@@ -350,11 +378,20 @@ public final class AutomationTaskService {
     }
 
     public void shutdown() {
-        persist();
-        for (TaskEntry entry : new ArrayList<>(instances.values())) {
-            cancelFuture(entry);
+        RuntimeException persistenceFailure = null;
+        try {
+            persist();
+        } catch (RuntimeException failure) {
+            persistenceFailure = failure;
+        } finally {
+            for (TaskEntry entry : new ArrayList<>(instances.values())) {
+                cancelFuture(entry);
+            }
+            scheduler.shutdownNow();
         }
-        scheduler.shutdownNow();
+        if (persistenceFailure != null) {
+            throw persistenceFailure;
+        }
     }
 
     private TaskEntry replace(AutomationInstanceKey key, Kind kind, boolean persistent, AutomationOwner owner, long duration,
@@ -416,7 +453,6 @@ public final class AutomationTaskService {
         if (now >= entry.deadline) {
             terminate(entry, State.FINISHED);
             publishTimer(entry, TimerEvent.Type.FINISHED);
-            persist();
             return;
         }
         publishTimer(entry, TimerEvent.Type.TICK);
@@ -514,15 +550,58 @@ public final class AutomationTaskService {
     }
 
     private void terminate(TaskEntry entry, State state) {
+        TaskRuntimeState previous;
         synchronized (entry) {
+            previous = runtimeState(entry);
             cancelFuture(entry);
             entry.state = state;
             entry.nextRun = 0L;
             instances.remove(entry.key, entry);
         }
-        persist();
+        try {
+            persist();
+        } catch (RuntimeException failure) {
+            restoreRuntimeState(entry, previous);
+            throw failure;
+        }
         if (!scheduler.isShutdown()) {
             scheduler.schedule(() -> tasks.remove(entry.taskId, entry), 5L, TimeUnit.MINUTES);
+        }
+    }
+
+    private TaskRuntimeState runtimeState(TaskEntry entry) {
+        return new TaskRuntimeState(entry.state, entry.deadline, entry.nextRun, entry.remainingAtPause);
+    }
+
+    private void restoreRuntimeState(TaskEntry entry, TaskRuntimeState state) {
+        synchronized (entry) {
+            cancelFuture(entry);
+            entry.state = state.state();
+            entry.deadline = state.deadline();
+            entry.nextRun = state.nextRun();
+            entry.remainingAtPause = state.remainingAtPause();
+            tasks.put(entry.taskId, entry);
+            if (active(entry)) {
+                instances.put(entry.key, entry);
+            }
+            if (entry.state == State.ACTIVE) {
+                schedule(entry, Math.max(1_000L, entry.nextRun - clock.millis()));
+            }
+        }
+    }
+
+    private void rollbackStart(TaskEntry entry, RuntimeException failure) {
+        synchronized (entry) {
+            cancelFuture(entry);
+            entry.state = State.FAILED;
+            entry.nextRun = 0L;
+            instances.remove(entry.key, entry);
+            tasks.remove(entry.taskId, entry);
+        }
+        try {
+            persist();
+        } catch (RuntimeException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
         }
     }
 
@@ -609,7 +688,11 @@ public final class AutomationTaskService {
         }
         List<PersistentTask> states = tasks.values().stream().filter(entry -> entry.persistent && active(entry))
             .map(this::persistentState).sorted(Comparator.comparing(PersistentTask::taskId)).toList();
-        store.save(states);
+        try {
+            store.save(states);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Failed to save persistent automation tasks", failure);
+        }
     }
 
     private PersistentTask persistentState(TaskEntry entry) {
@@ -625,6 +708,9 @@ public final class AutomationTaskService {
             current = current.getCause();
         }
         return current.getMessage() != null && !current.getMessage().isBlank() ? current.getMessage() : current.getClass().getSimpleName();
+    }
+
+    private record TaskRuntimeState(State state, long deadline, long nextRun, long remainingAtPause) {
     }
 
     private static final class TaskEntry {

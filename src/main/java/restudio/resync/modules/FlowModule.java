@@ -47,12 +47,15 @@ import restudio.resync.messages.MessageLogService;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
 import restudio.resync.modules.flow.BuiltinOptionCatalogService;
+import restudio.resync.modules.flow.FlowCollaborationService;
 import restudio.resync.modules.flow.FlowNodeRegistryPacketHandler;
 import restudio.resync.modules.flow.FlowOptionCatalogPacketHandler;
 import restudio.resync.modules.flow.FlowPacketSender;
 import restudio.resync.modules.flow.FlowPlaceholderPreviewHandler;
 import restudio.resync.modules.flow.FlowResourcePacketRouter;
+import restudio.resync.modules.flow.FlowResourceCommitListener;
 import restudio.resync.modules.flow.FlowResourceRegistry;
+import restudio.resync.modules.flow.FlowWorkspaceService;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
@@ -65,7 +68,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +88,8 @@ public class FlowModule implements Module {
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
     private final FlowOptionCatalogPacketHandler optionCatalogHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
+    private final FlowCollaborationService collaboration;
+    private final FlowWorkspaceService workspaces;
     private final NodeDefinitionRegistry definitionRegistry;
     private final CustomContentStorage customContentStorage;
     private final PlayerSessionLinkService sessionLinkService;
@@ -184,7 +188,24 @@ public class FlowModule implements Module {
         this.customContentStorage = customContentStorage;
         this.sessionLinkService = sessionLinkService;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions, flowJobs);
+        this.collaboration = new FlowCollaborationService(subscribedSessions, sender);
+        this.workspaces = new FlowWorkspaceService(storage, customContentStorage, sender, collaboration);
         FlowResourceRegistry resources = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
+        resources.setCommitListener(new FlowResourceCommitListener() {
+            @Override
+            public void saved(String type, String resourceId, String payload) {
+                workspaces.resourceSaved(type, resourceId, payload);
+                collaboration.saved(type, resourceId, payload);
+                refreshSharedResource(type, resourceId, false);
+            }
+
+            @Override
+            public void deleted(String type, String resourceId) {
+                collaboration.deleted(type, resourceId);
+                workspaces.resourceDeleted(type, resourceId);
+                refreshSharedResource(type, resourceId, true);
+            }
+        });
         this.blueprintHandler = new FlowBlueprintPacketHandler(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, resources);
         this.placeholderPreviewHandler = new FlowPlaceholderPreviewHandler(sender);
         this.optionCatalogHandler = new FlowOptionCatalogPacketHandler(sender, optionCatalogRegistry, catalogs);
@@ -212,15 +233,19 @@ public class FlowModule implements Module {
     public void onSubscribe(Session session, SubscribeRequest req) {
         Log.fine(session.getClientId() + " subscribed to flow channel");
         subscribedSessions.add(session);
+        collaboration.subscribe(session);
     }
 
     @Override
     public void cleanup(Session session) {
         subscribedSessions.remove(session);
+        collaboration.cleanup(session);
+        workspaces.cleanup(session);
     }
 
     @Override
     public void onTick() {
+        workspaces.checkpoint();
         if (subscribedSessions.isEmpty()) {
             return;
         }
@@ -248,6 +273,28 @@ public class FlowModule implements Module {
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         byte packetId = buffer.get();
 
+        if (packetId == ReSyncProtocolContract.FLOW_PACKET_PRESENCE_UPDATE || packetId == ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_JOIN
+            || packetId == ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_LEAVE || packetId == ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_OPERATION
+            || packetId == ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_AWARENESS || packetId == ReSyncProtocolContract.FLOW_PACKET_COLLABORATION_CHAT) {
+            try {
+                switch (packetId) {
+                    case ReSyncProtocolContract.FLOW_PACKET_PRESENCE_UPDATE -> collaboration.handleUpdate(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_JOIN -> workspaces.handleJoin(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_LEAVE -> workspaces.handleLeave(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_OPERATION -> workspaces.handleOperation(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_AWARENESS -> workspaces.handleAwareness(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_COLLABORATION_CHAT -> collaboration.handleMessage(session, buffer);
+                    default -> {
+                    }
+                }
+            } catch (RuntimeException exception) {
+                Log.error("Error handling collaboration packet 0x" + String.format("%02X", packetId) + ": " + exception.getMessage());
+                sender.sendError(session, "PROCESSING_ERROR", "Collaboration packet could not be processed");
+            }
+            return;
+        }
+
+        collaboration.enter(session);
         try {
             if (!resourceRouter.handle(session, packetId, buffer)) {
                 switch (packetId) {
@@ -281,11 +328,10 @@ public class FlowModule implements Module {
         } catch (Exception e) {
             Log.error("Error handling flow packet 0x" + String.format("%02X", packetId) + ": " + e.getMessage());
             sender.sendError(session, "PROCESSING_ERROR", e.getMessage());
+        } finally {
+            collaboration.exit();
         }
 
-        if (packetId == ReSyncProtocolContract.FLOW_PACKET_SAVE || packetId == ReSyncProtocolContract.FLOW_PACKET_DELETE) {
-            refreshCustomFunctionDefinitions();
-        }
     }
 
     public void refreshCustomFunctionDefinitions() {

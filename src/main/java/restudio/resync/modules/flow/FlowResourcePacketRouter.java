@@ -98,8 +98,8 @@ public class FlowResourcePacketRouter {
         this.jsonResourceValidator = new JsonRuntimeResourceValidator(customContentService);
         if (storage != null) {
             registerLifecycle(graphAdapter(storage, ReSyncResourceCatalog.FLOW));
-            registerLifecycle(graphAdapter(storage, ReSyncResourceCatalog.FUNCTION));
-            registerLifecycle(graphAdapter(storage, ReSyncResourceCatalog.COMMAND));
+            register(graphAdapter(storage, ReSyncResourceCatalog.FUNCTION));
+            register(graphAdapter(storage, ReSyncResourceCatalog.COMMAND));
         }
         register(guiAdapter(storage, sender));
         register(scoreboardAdapter(storage, sender));
@@ -152,8 +152,12 @@ public class FlowResourcePacketRouter {
 
             @Override
             public FlowGraph get(String id) {
-                FlowGraph graph = storage.getGraph(id);
-                return graph != null && resourceType.equals(storage.getGraphResourceType(id)) ? graph : null;
+                return storage.getGraph(resourceType, id);
+            }
+
+            @Override
+            public boolean conflicts(String id) {
+                return !storage.getGraphResourceType(id).isBlank();
             }
 
             @Override
@@ -163,7 +167,9 @@ public class FlowResourcePacketRouter {
 
             @Override
             public FlowGraph deserialize(String json) {
-                return FlowSerializer.deserialize(json);
+                FlowGraph graph = FlowSerializer.deserialize(json);
+                applyGraphIdentity(graph, resourceType);
+                return graph;
             }
 
             @Override
@@ -178,19 +184,21 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void save(FlowGraph value) {
+                applyGraphIdentity(value, resourceType);
                 storage.saveGraph(value);
             }
 
             @Override
             public void delete(String id) {
-                if (!resourceType.equals(storage.getGraphResourceType(id))) {
+                if (storage.getGraph(resourceType, id) == null) {
                     throw new IllegalArgumentException(descriptor.displayName() + " not found: " + id);
                 }
-                storage.deleteGraph(id);
+                storage.deleteGraph(resourceType, id);
             }
 
             @Override
             public void validate(FlowGraph value) {
+                applyGraphIdentity(value, resourceType);
                 storage.requireValidGraph(value);
                 String actualType = storage.graphResourceType(value);
                 if (!resourceType.equals(actualType)) {
@@ -207,8 +215,33 @@ public class FlowResourcePacketRouter {
 
             @Override
             public FlowGraph reload(String id) {
-                FlowGraph graph = storage.reloadGraph(id);
-                return graph != null && resourceType.equals(storage.getGraphResourceType(id)) ? graph : null;
+                return storage.reloadGraph(resourceType, id);
+            }
+
+            @Override
+            public void sendData(Session session, FlowGraph value) {
+                sender.sendJsonResourceData(session, descriptor.flowPackets().data(), serialize(value), descriptor.displayName());
+            }
+
+            @Override
+            public void sendList(Session session, List<String> ids) {
+                sender.sendJsonResourceList(session, descriptor.flowPackets().list(), ids);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id) {
+                sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id);
+            }
+
+            @Override
+            public void sendSaveAck(Session session, String id, String requestId) {
+                FlowGraph saved = storage.getGraph(resourceType, id);
+                if (saved == null) {
+                    sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id, requestId);
+                    return;
+                }
+                sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id, requestId,
+                    saved.getResourceRevision(), saved.getResourceHash());
             }
 
             @Override
@@ -236,6 +269,14 @@ public class FlowResourcePacketRouter {
                 return true;
             }
         };
+    }
+
+    private void applyGraphIdentity(FlowGraph graph, String resourceType) {
+        if (graph == null) {
+            return;
+        }
+        graph.setResourceType(resourceType);
+        graph.setFunction(ReSyncResourceCatalog.FUNCTION.equals(resourceType));
     }
 
     private FlowResourceAdapter<WorldGenProject> worldGenAdapter(WorldGenProjectStorage storage) {

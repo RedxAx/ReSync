@@ -111,6 +111,10 @@ public class FlowPacketSender {
         sendIdAck(session, resourcePackets("flow").saveAck(), flowId, requestId);
     }
 
+    public void sendFlowSaveAck(Session session, String flowId, String requestId, long revision, String hash) {
+        sendIdAck(session, resourcePackets("flow").saveAck(), flowId, requestId, revision, hash);
+    }
+
     public void sendGuiSaveAck(Session session, String guiId) {
         sendIdAck(session, resourcePackets("gui").saveAck(), guiId);
     }
@@ -157,6 +161,10 @@ public class FlowPacketSender {
 
     public void sendJsonResourceSaveAck(Session session, byte packetId, String id, String requestId) {
         sendIdAck(session, packetId, id, requestId);
+    }
+
+    public void sendJsonResourceSaveAck(Session session, byte packetId, String id, String requestId, long revision, String hash) {
+        sendIdAck(session, packetId, id, requestId, revision, hash);
     }
 
     public JobRecord<String> beginJob(Session session, String action, String target) {
@@ -406,6 +414,38 @@ public class FlowPacketSender {
         Log.warn("Error sent to " + session.getClientId() + ": " + errorCode + " - " + message);
     }
 
+    public void sendPresenceSnapshot(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_PRESENCE_SNAPSHOT, json, "PRESENCE_TOO_LARGE", "Presence snapshot exceeds maximum size");
+    }
+
+    public void sendCollaborationMessage(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_COLLABORATION_CHAT, json, "CHAT_TOO_LARGE", "Chat message exceeds maximum size");
+    }
+
+    public void sendResourceChanged(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_RESOURCE_CHANGED, json, "RESOURCE_EVENT_TOO_LARGE", "Resource event exceeds maximum size");
+    }
+
+    public void sendResourceDeleted(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_RESOURCE_DELETED, json, "RESOURCE_EVENT_TOO_LARGE", "Resource event exceeds maximum size");
+    }
+
+    public void sendWorkspaceSnapshot(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_SNAPSHOT, json, "WORKSPACE_TOO_LARGE", "Workspace snapshot exceeds maximum size");
+    }
+
+    public void sendWorkspaceOperation(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_OPERATION, json, "WORKSPACE_TOO_LARGE", "Workspace operation exceeds maximum size");
+    }
+
+    public void sendWorkspaceAwareness(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_AWARENESS, json, "WORKSPACE_TOO_LARGE", "Workspace awareness exceeds maximum size");
+    }
+
+    public void sendWorkspaceResync(Session session, String json) {
+        sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_WORKSPACE_RESYNC, json, "WORKSPACE_TOO_LARGE", "Workspace resync exceeds maximum size");
+    }
+
     private void sendJsonPacket(Session session, byte packetId, String json, String errorCode, String errorMessage) {
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         if (jsonBytes.length > MAX_PACKET_SIZE) {
@@ -454,6 +494,25 @@ public class FlowPacketSender {
         buffer.put(idBytes);
         buffer.putInt(requestIdBytes.length);
         buffer.put(requestIdBytes);
+        sendRaw(session, buffer.array(), false);
+    }
+
+    private void sendIdAck(Session session, byte packetId, String id, String requestId, long revision, String hash) {
+        if (id == null) {
+            return;
+        }
+        byte[] idBytes = id.getBytes(StandardCharsets.UTF_8);
+        byte[] requestIdBytes = requestId != null ? requestId.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        byte[] hashBytes = hash != null ? hash.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + idBytes.length + 4 + requestIdBytes.length + Long.BYTES + 4 + hashBytes.length);
+        buffer.put(packetId);
+        buffer.putInt(idBytes.length);
+        buffer.put(idBytes);
+        buffer.putInt(requestIdBytes.length);
+        buffer.put(requestIdBytes);
+        buffer.putLong(Math.max(0L, revision));
+        buffer.putInt(hashBytes.length);
+        buffer.put(hashBytes);
         sendRaw(session, buffer.array(), false);
     }
 

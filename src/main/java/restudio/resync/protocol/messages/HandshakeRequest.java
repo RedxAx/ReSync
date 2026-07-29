@@ -13,6 +13,7 @@ public class HandshakeRequest extends Message {
     private int protocolVersion = 2;
     private String clientVersion;
     private String capabilitiesJson = "";
+    private String collaborationProfileJson = "";
 
     @Override
     public MessageType getType() {
@@ -25,8 +26,10 @@ public class HandshakeRequest extends Message {
         byte[] clientIdBytes = clientId != null ? clientId.getBytes(StandardCharsets.UTF_8) : new byte[0];
         byte[] clientVersionBytes = clientVersion != null ? clientVersion.getBytes(StandardCharsets.UTF_8) : new byte[0];
         byte[] capabilitiesBytes = capabilitiesJson != null ? capabilitiesJson.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        byte[] collaborationProfileBytes = collaborationProfileJson != null ? collaborationProfileJson.getBytes(StandardCharsets.UTF_8) : new byte[0];
 
-        ByteBuffer buffer = ByteBuffer.allocate(4 + apiKeyBytes.length + 4 + clientIdBytes.length + 4 + 4 + clientVersionBytes.length + 4 + capabilitiesBytes.length);
+        ByteBuffer buffer = ByteBuffer.allocate(4 + apiKeyBytes.length + 4 + clientIdBytes.length + 4 + 4 + clientVersionBytes.length
+            + 4 + capabilitiesBytes.length + 4 + collaborationProfileBytes.length);
 
         buffer.putInt(apiKeyBytes.length);
         buffer.put(apiKeyBytes);
@@ -40,6 +43,8 @@ public class HandshakeRequest extends Message {
         buffer.put(clientVersionBytes);
         buffer.putInt(capabilitiesBytes.length);
         buffer.put(capabilitiesBytes);
+        buffer.putInt(collaborationProfileBytes.length);
+        buffer.put(collaborationProfileBytes);
 
         return buffer.array();
     }
@@ -58,6 +63,9 @@ public class HandshakeRequest extends Message {
         }
         if (buffer.remaining() >= 4) {
             capabilitiesJson = readSizedString(buffer, "capabilities");
+        }
+        if (buffer.remaining() >= 4) {
+            collaborationProfileJson = readSizedString(buffer, "collaboration profile");
         }
     }
 
@@ -112,5 +120,13 @@ public class HandshakeRequest extends Message {
 
     public void setCapabilitiesJson(String capabilitiesJson) {
         this.capabilitiesJson = capabilitiesJson != null ? capabilitiesJson : "";
+    }
+
+    public String getCollaborationProfileJson() {
+        return collaborationProfileJson;
+    }
+
+    public void setCollaborationProfileJson(String collaborationProfileJson) {
+        this.collaborationProfileJson = collaborationProfileJson != null ? collaborationProfileJson : "";
     }
 }

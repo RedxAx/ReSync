@@ -11,6 +11,7 @@ public class Session {
     private final String clientId;
     private final ConnectionInfo connection;
     private final ClientIdentity identity;
+    private volatile CollaborationIdentity collaborationIdentity;
     private final Set<String> subscribedChannels;
     private final ConcurrentHashMap<String, Module> activeModules;
     private final long creationTime;
@@ -26,6 +27,7 @@ public class Session {
         this.clientId = clientId;
         this.connection = connection;
         this.identity = identity;
+        this.collaborationIdentity = CollaborationIdentity.client(clientId);
         this.subscribedChannels = ConcurrentHashMap.newKeySet();
         this.activeModules = new ConcurrentHashMap<>();
         this.creationTime = System.currentTimeMillis();
@@ -47,6 +49,14 @@ public class Session {
 
     public ClientIdentity getIdentity() {
         return identity;
+    }
+
+    public CollaborationIdentity getCollaborationIdentity() {
+        return collaborationIdentity;
+    }
+
+    public void setCollaborationIdentity(CollaborationIdentity collaborationIdentity) {
+        this.collaborationIdentity = collaborationIdentity != null ? collaborationIdentity : CollaborationIdentity.client(clientId);
     }
 
     public Set<String> getSubscribedChannels() {

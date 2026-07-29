@@ -12,6 +12,10 @@ public interface FlowResourceAdapter<T> {
 
     T get(String id);
 
+    default boolean conflicts(String id) {
+        return get(id) != null;
+    }
+
     List<String> listIds();
 
     T deserialize(String json);

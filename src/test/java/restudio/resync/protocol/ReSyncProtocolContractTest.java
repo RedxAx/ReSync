@@ -54,6 +54,12 @@ class ReSyncProtocolContractTest {
         assertEquals(ReSyncProtocolContract.FLOW_PACKET_SAVE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().save());
         assertEquals(ReSyncProtocolContract.FLOW_PACKET_DELETE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().delete());
         assertEquals(ReSyncProtocolContract.FLOW_PACKET_LIST_REQUEST, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FLOW).flowPackets().listRequest());
+        assertEquals((byte) 231, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FUNCTION).flowPackets().request());
+        assertEquals((byte) 235, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FUNCTION).flowPackets().save());
+        assertEquals((byte) 236, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.FUNCTION).flowPackets().delete());
+        assertEquals((byte) 238, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.COMMAND).flowPackets().request());
+        assertEquals((byte) 242, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.COMMAND).flowPackets().save());
+        assertEquals((byte) 243, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.COMMAND).flowPackets().delete());
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_LIST_RESPONSE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().list());
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_DATA, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().data());
         assertEquals(ReSyncProtocolContract.CUSTOM_CONTENT_PACKET_SAVE, ReSyncResourceCatalog.byType(ReSyncResourceCatalog.CUSTOM_CONTENT).flowPackets().save());

@@ -15,6 +15,7 @@ import restudio.resync.api.ReSyncExtensionData;
 import restudio.resync.api.ReSyncExtensionManager;
 import restudio.resync.compression.CompressionPool;
 import restudio.resync.core.ChannelMuxer;
+import restudio.resync.core.CollaborationIdentity;
 import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.ConnectionManager;
 import restudio.resync.core.ConnectionState;
@@ -86,7 +87,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReSyncServer {
-    private static final List<String> FLOW_CONTRACT_CAPABILITIES = List.of("nodes", "types", "categories", "properties", "resources", "catalogs", "conversions", "extensions", "deltas", "diagnostics", "contextual_catalogs", "authorization", "destructive_safety", "function_tests", "jobs", "job_events");
+    private static final List<String> FLOW_CONTRACT_CAPABILITIES = List.of("nodes", "types", "categories", "properties", "resources", "catalogs", "conversions", "extensions", "deltas", "diagnostics", "contextual_catalogs", "authorization", "destructive_safety", "function_tests", "jobs", "job_events", "resource_revisions", "asset_integrity", "transaction_recovery", "migration_fencing", "opaque_resources", "collaboration_presence", "collaboration_chat", "resource_events", "live_workspace");
     private static final Gson GSON = new Gson();
     private final ReSync plugin;
     private final ReSyncConfig config;
@@ -388,13 +389,12 @@ public class ReSyncServer {
             info.getFrameSender().close(1003, "Unsupported protocol version");
             return;
         }
-        String clientId = req.getClientId();
-        if (clientId == null || clientId.isBlank()) {
-            clientId = "bridge:" + player.getUniqueId();
-            req.setClientId(clientId);
-        }
+        String requestedClientId = req.getClientId();
+        String clientId = "bridge:" + player.getUniqueId() + ':' + (requestedClientId != null && !requestedClientId.isBlank() ? requestedClientId : "remotely");
+        req.setClientId(clientId);
         completeHandshake(info, req, new ClientIdentity(clientId, req.getClientVersion()));
         Session session = sessionManager.getSession(info);
+        session.setCollaborationIdentity(new CollaborationIdentity(player.getUniqueId().toString(), player.getName(), player.getUniqueId().toString(), "minecraft"));
         sessionManager.linkPlayerToSession(player.getUniqueId(), session);
         PlayerSessionLinkService linkService = getPlayerSessionLinkService();
         if (linkService != null) {
@@ -427,7 +427,8 @@ public class ReSyncServer {
         info.setClientVersion(req.getClientVersion());
         info.setClientCapabilities(clientCapabilities(req.getCapabilitiesJson()));
         info.setState(ConnectionState.AUTHENTICATED);
-        sessionManager.createSession(info, identity);
+        Session session = sessionManager.createSession(info, identity);
+        session.setCollaborationIdentity(collaborationIdentity(req, identity.clientId()));
 
         HandshakeResponse response = new HandshakeResponse();
         response.setSuccess(true);
@@ -448,11 +449,45 @@ public class ReSyncServer {
             "supported", FLOW_CONTRACT_CAPABILITIES,
             "negotiated", negotiatedFlowCapabilities
         ));
+        FlowStorage flowStorage = getFlowStorage();
+        if (flowStorage != null) {
+            capabilities.put("durabilityHealth", flowStorage.getDurabilityHealth());
+        }
         response.setCapabilitiesJson(GSON.toJson(capabilities));
 
         codec.sendMessage(info.getFrameSender(), response, 0, false);
         publishChannelSnapshot(info);
         Log.fine("Client authenticated: " + req.getClientId());
+    }
+
+    private CollaborationIdentity collaborationIdentity(HandshakeRequest request, String clientId) {
+        String json = request.getCollaborationProfileJson();
+        if (json == null || json.isBlank()) {
+            return CollaborationIdentity.client(clientId);
+        }
+        try {
+            CollaborationIdentity profile = GSON.fromJson(json, CollaborationIdentity.class);
+            if (profile == null || profile.displayName().isBlank()) {
+                return CollaborationIdentity.client(clientId);
+            }
+            String subjectId = safeIdentityId(profile.subjectId().isBlank() ? clientId : profile.subjectId());
+            String avatar = safeIdentityText(profile.avatar(), 2048);
+            if (!avatar.isBlank() && !avatar.startsWith("https://") && !avatar.startsWith("http://")) {
+                avatar = "";
+            }
+            return new CollaborationIdentity(subjectId, safeIdentityText(profile.displayName(), 64), avatar, "restudio");
+        } catch (RuntimeException exception) {
+            return CollaborationIdentity.client(clientId);
+        }
+    }
+
+    private String safeIdentityText(String value, int limit) {
+        String safe = value != null ? value.trim() : "";
+        return safe.length() <= limit ? safe : safe.substring(0, limit);
+    }
+
+    private String safeIdentityId(String value) {
+        return safeIdentityText(value, 128).replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
     private Set<String> clientCapabilities(String json) {

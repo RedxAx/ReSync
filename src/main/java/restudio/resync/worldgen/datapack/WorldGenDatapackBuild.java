@@ -9,7 +9,9 @@ public class WorldGenDatapackBuild {
     private String namespace = "resync_worldgen";
     private String packName = "";
     private String minecraftVersion = "";
+    private String datapackVersion = "";
     private int packFormat;
+    private int packFormatMinor;
     private long revision;
     private Path folder;
     private int fileCount;
@@ -23,8 +25,12 @@ public class WorldGenDatapackBuild {
     public void setPackName(String packName) { this.packName = packName; }
     public String getMinecraftVersion() { return minecraftVersion; }
     public void setMinecraftVersion(String minecraftVersion) { this.minecraftVersion = minecraftVersion; }
+    public String getDatapackVersion() { return datapackVersion; }
+    public void setDatapackVersion(String datapackVersion) { this.datapackVersion = datapackVersion; }
     public int getPackFormat() { return packFormat; }
     public void setPackFormat(int packFormat) { this.packFormat = packFormat; }
+    public int getPackFormatMinor() { return packFormatMinor; }
+    public void setPackFormatMinor(int packFormatMinor) { this.packFormatMinor = packFormatMinor; }
     public long getRevision() { return revision; }
     public void setRevision(long revision) { this.revision = revision; }
     public Path getFolder() { return folder; }

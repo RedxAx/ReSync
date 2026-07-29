@@ -161,7 +161,10 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
         TerrainPipeline pipeline = pipelineHolder.get();
         long seed = worldInfo != null ? worldInfo.getSeed() : 0L;
         int y = worldInfo != null ? Math.max(worldInfo.getMinHeight(), Math.min(worldInfo.getMaxHeight() - 1, 64)) : 64;
-        return pipeline.isVanillaStructuresEnabled((chunkX << 4) + 8, y, (chunkZ << 4) + 8, seed, worldInfo);
+        int x = (chunkX << 4) + 8;
+        int z = (chunkZ << 4) + 8;
+        return pipeline.isVanillaStructuresEnabled(x, y, z, seed, worldInfo)
+            && pipeline.isVanillaStructureTerrainSuitable(x, z, seed, worldInfo);
     }
 
     @Override

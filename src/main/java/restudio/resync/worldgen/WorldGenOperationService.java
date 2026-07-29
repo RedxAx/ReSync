@@ -225,6 +225,8 @@ public final class WorldGenOperationService {
         result.put("packName", value(build.getPackName()));
         result.put("minecraftVersion", value(build.getMinecraftVersion()));
         result.put("packFormat", build.getPackFormat());
+        result.put("packFormatMinor", build.getPackFormatMinor());
+        result.put("datapackVersion", build.getDatapackVersion());
         result.put("revision", build.getRevision());
         result.put("fileCount", build.getFileCount());
         result.put("warnings", List.copyOf(build.getWarnings()));

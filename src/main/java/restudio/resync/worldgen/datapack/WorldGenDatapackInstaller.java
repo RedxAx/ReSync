@@ -2,6 +2,7 @@ package restudio.resync.worldgen.datapack;
 
 import io.papermc.paper.datapack.Datapack;
 import org.bukkit.Bukkit;
+import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +15,11 @@ public class WorldGenDatapackInstaller {
             return new InstallResult(false, false, "Datapack Build Missing");
         }
         try {
+            WorldGenTargetVersion target = WorldGenTargetVersion.require(build.getMinecraftVersion());
+            WorldGenTargetVersion runtime = WorldGenTargetVersion.require(Bukkit.getMinecraftVersion());
+            if (!target.isDatapackCompatibleWith(runtime)) {
+                return new InstallResult(false, false, "Minecraft Version Mismatch: Pack " + target.id() + ", Server " + runtime.id());
+            }
             Path serverPack = serverDatapackFolder(build.getPackName());
             copyDirectory(build.getFolder(), serverPack);
             if (worldName != null && !worldName.isBlank()) {
@@ -22,7 +28,7 @@ public class WorldGenDatapackInstaller {
             }
             boolean enabled = enableKnownPack(build.getPackName());
             return new InstallResult(true, enabled, enabled ? "Datapack Enabled" : "Datapack Installed");
-        } catch (IOException exception) {
+        } catch (IOException | IllegalArgumentException exception) {
             return new InstallResult(false, false, exception.getMessage());
         }
     }

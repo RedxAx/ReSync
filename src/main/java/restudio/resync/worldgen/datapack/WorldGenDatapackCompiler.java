@@ -2,11 +2,12 @@ package restudio.resync.worldgen.datapack;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
-import org.bukkit.block.Biome;
-import org.bukkit.entity.EntityType;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.bukkit.plugin.Plugin;
+import restudio.resync.worldgen.contract.WorldGenDatapackCapability;
+import restudio.resync.worldgen.contract.WorldGenPackMetadata;
+import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenBiomeProfile;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
@@ -45,6 +46,9 @@ public class WorldGenDatapackCompiler {
         project.rebuildIndices();
         TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
         WorldGenProjectSettings settings = project.getSettings() == null ? new WorldGenProjectSettings() : project.getSettings();
+        WorldGenTargetVersion target = WorldGenTargetVersion.require(settings.getTargetVersion());
+        WorldGenVanillaCatalog catalog = WorldGenVanillaCatalog.load(target);
+        validateVanillaReferences(project, settings, catalog);
         String namespace = namespace(settings.getDatapackNamespace());
         String projectId = safeId(project.getId() == null || project.getId().isBlank() ? "project" : project.getId());
         String packName = "resync_worldgen_" + projectId + "_" + revision;
@@ -55,21 +59,24 @@ public class WorldGenDatapackCompiler {
             Files.createDirectories(folder);
             Files.createDirectories(folder.resolve("data").resolve(namespace).resolve("worldgen"));
             int count = 0;
-            count += writeJson(folder.resolve("pack.mcmeta"), packMeta(project, packFormat(), minecraftVersion()));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("dimension_type").resolve("worldgen.json"), dimensionType(settings));
+            count += writeJson(folder.resolve("pack.mcmeta"), packMeta(project, target));
+            count += writeJson(folder.resolve("data").resolve(namespace).resolve("dimension_type").resolve("worldgen.json"), dimensionType(settings, target));
             count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("noise_settings").resolve("worldgen.json"), noiseSettings(project, settings));
             count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("world_preset").resolve("worldgen.json"), worldPreset(namespace));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("multi_noise_biome_source_parameter_list").resolve("worldgen.json"), biomeParameters(namespace));
-            count += writeBiomes(folder, namespace, project, pipeline, warnings);
-            count += writeFeatures(folder, namespace, project, warnings);
+            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("multi_noise_biome_source_parameter_list").resolve("worldgen.json"),
+                biomeParameters(namespace, project, catalog));
+            count += writeBiomes(folder, namespace, project, pipeline, warnings, target, catalog);
+            count += writeFeatures(folder, namespace, project, warnings, settings, catalog);
             count += writeStructures(folder, namespace, project, warnings);
-            count += writeJson(folder.resolve("resync-manifest.json"), manifest(project, namespace, packName, revision, count, warnings));
+            count += writeJson(folder.resolve("resync-manifest.json"), manifest(project, namespace, packName, revision, count, warnings, target, catalog));
             WorldGenDatapackBuild build = new WorldGenDatapackBuild();
             build.setProjectId(project.getId());
             build.setNamespace(namespace);
             build.setPackName(packName);
-            build.setMinecraftVersion(minecraftVersion());
-            build.setPackFormat(packFormat());
+            build.setMinecraftVersion(target.id());
+            build.setDatapackVersion(target.datapackVersion());
+            build.setPackFormat(target.datapackMajor());
+            build.setPackFormatMinor(target.datapackMinor());
             build.setRevision(revision);
             build.setFolder(folder);
             build.setFileCount(count);
@@ -84,36 +91,57 @@ public class WorldGenDatapackCompiler {
         return plugin.getDataFolder().toPath().resolve("worldgen").resolve("generated").toAbsolutePath().normalize();
     }
 
-    private int writeBiomes(Path folder, String namespace, WorldGenProject project, TerrainPipeline pipeline, List<String> warnings) throws IOException {
+    private int writeBiomes(Path folder, String namespace, WorldGenProject project, TerrainPipeline pipeline, List<String> warnings,
+                            WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) throws IOException {
         Set<String> biomes = collectBiomeIds(project);
         if (biomes.isEmpty()) {
             biomes.add("minecraft:plains");
         }
+        Map<Integer, List<String>> customFeatures = new LinkedHashMap<>();
+        List<String> placements = collectFeaturePlacements(project.getFeatureGraph());
+        for (int index = 0; index < placements.size(); index++) {
+            String placement = placements.get(index);
+            if (supportsFeaturePlacement(placement)) {
+                customFeatures.computeIfAbsent(featureStage(placement), ignored -> new ArrayList<>()).add(namespace + ":feature_" + index);
+            }
+        }
         int count = 0;
         for (String biomeId : biomes) {
             String local = localId(biomeId);
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("biome").resolve(local + ".json"), biome(project, pipeline, biomeId, namespace));
+            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("biome").resolve(local + ".json"),
+                biome(project, pipeline, biomeId, namespace, customFeatures, target, catalog));
         }
         return count;
     }
 
-    private int writeFeatures(Path folder, String namespace, WorldGenProject project, List<String> warnings) throws IOException {
+    private int writeFeatures(Path folder, String namespace, WorldGenProject project, List<String> warnings, WorldGenProjectSettings settings,
+                              WorldGenVanillaCatalog catalog) throws IOException {
         int count = 0;
         List<String> placements = collectFeaturePlacements(project.getFeatureGraph());
+        int minY = settings.getMinY();
+        int maxY = settings.getMaxY() - 1;
         if (placements.isEmpty()) {
             count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("configured_feature").resolve("short_grass.json"), configuredPatch("minecraft:short_grass"));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("placed_feature").resolve("short_grass.json"), placedFeature(namespace + ":short_grass", 18, 0, 320));
+            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("placed_feature").resolve("short_grass.json"),
+                placedFeature(namespace + ":short_grass", 18, minY, maxY));
             return count;
         }
         int index = 0;
         for (String placement : placements) {
             String id = "feature_" + index++;
+            String configuredId = namespace + ":" + id;
+            if (placement.startsWith("tree:")) {
+                configuredId = catalog.treeFeature(placement.substring("tree:".length()));
+            }
             Object configured = configuredFeature(placement, warnings);
-            if (configured == null) {
+            if (configured == null && !placement.startsWith("tree:")) {
                 continue;
             }
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("configured_feature").resolve(id + ".json"), configured);
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("placed_feature").resolve(id + ".json"), placedFeature(namespace + ":" + id, 8, 0, 320));
+            if (configured != null) {
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("configured_feature").resolve(id + ".json"), configured);
+            }
+            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("placed_feature").resolve(id + ".json"),
+                placedFeature(configuredId, 8, minY, maxY));
         }
         return count;
     }
@@ -137,26 +165,23 @@ public class WorldGenDatapackCompiler {
         return count;
     }
 
-    private Map<String, Object> packMeta(WorldGenProject project, int format, String version) {
-        Map<String, Object> pack = new LinkedHashMap<>();
-        Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("pack_format", format);
-        meta.put("description", "ReSync WorldGen " + project.getId() + " for Minecraft " + version);
-        pack.put("pack", meta);
-        return pack;
+    private Map<String, Object> packMeta(WorldGenProject project, WorldGenTargetVersion target) {
+        return WorldGenPackMetadata.create(target, "ReSync WorldGen " + project.getId() + " for Minecraft " + target.id());
     }
 
-    private Map<String, Object> manifest(WorldGenProject project, String namespace, String packName, long revision, int files, List<String> warnings) {
+    private Map<String, Object> manifest(WorldGenProject project, String namespace, String packName, long revision, int files, List<String> warnings,
+                                         WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("projectId", project.getId());
         manifest.put("namespace", namespace);
         manifest.put("packName", packName);
         manifest.put("revision", revision);
-        manifest.put("minecraftVersion", minecraftVersion());
-        manifest.put("packFormat", packFormat());
+        manifest.put("minecraftVersion", target.id());
+        manifest.put("datapackVersion", target.datapackVersion());
+        manifest.put("vanillaServerSha1", catalog.serverSha1());
         manifest.put("fileCount", files);
         manifest.put("warnings", warnings);
-        manifest.put("fingerprint", fingerprint(project.getId() + ":" + revision + ":" + namespace));
+        manifest.put("fingerprint", fingerprint(project.getId() + ":" + revision + ":" + namespace + ":" + target.id()));
         return manifest;
     }
 
@@ -176,26 +201,50 @@ public class WorldGenDatapackCompiler {
         return value;
     }
 
-    private Map<String, Object> dimensionType(WorldGenProjectSettings settings) {
+    private Map<String, Object> dimensionType(WorldGenProjectSettings settings, WorldGenTargetVersion target) {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("ultrawarm", false);
-        value.put("natural", true);
         value.put("coordinate_scale", 1.0);
         value.put("has_skylight", true);
         value.put("has_ceiling", false);
         value.put("ambient_light", 0.0);
-        value.put("fixed_time", null);
-        value.put("piglin_safe", false);
-        value.put("bed_works", true);
-        value.put("respawn_anchor_works", false);
-        value.put("has_raids", true);
         value.put("logical_height", Math.max(384, settings.getMaxY()));
         value.put("min_y", settings.getMinY());
         value.put("height", Math.max(384, settings.getMaxY() - settings.getMinY()));
         value.put("infiniburn", "#minecraft:infiniburn_overworld");
         value.put("effects", "minecraft:overworld");
-        value.put("monster_spawn_light_level", Map.of("type", "minecraft:uniform", "value", Map.of("min_inclusive", 0, "max_inclusive", 7)));
+        value.put("monster_spawn_light_level", Map.of("type", "minecraft:uniform", "min_inclusive", 0, "max_inclusive", 7));
         value.put("monster_spawn_block_light_limit", 0);
+        if (!target.supports(WorldGenDatapackCapability.ENVIRONMENT_ATTRIBUTES)) {
+            value.put("ultrawarm", false);
+            value.put("natural", true);
+            value.put("piglin_safe", false);
+            value.put("bed_works", true);
+            value.put("respawn_anchor_works", false);
+            value.put("has_raids", true);
+            return value;
+        }
+        value.remove("effects");
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("minecraft:audio/ambient_sounds", Map.of("mood", Map.of("block_search_extent", 8, "offset", 2.0,
+            "sound", "minecraft:ambient.cave", "tick_delay", 6000)));
+        attributes.put("minecraft:audio/background_music", Map.of(
+            "creative", Map.of("max_delay", 24000, "min_delay", 12000, "sound", "minecraft:music.creative"),
+            "default", Map.of("max_delay", 24000, "min_delay", 12000, "sound", "minecraft:music.game")));
+        attributes.put("minecraft:gameplay/bed_rule", Map.of("can_set_spawn", "always", "can_sleep", "when_dark",
+            "error_message", Map.of("translate", "block.minecraft.bed.no_sleep")));
+        attributes.put("minecraft:gameplay/nether_portal_spawns_piglin", true);
+        attributes.put("minecraft:gameplay/respawn_anchor_works", false);
+        attributes.put("minecraft:visual/cloud_color", "#ccffffff");
+        attributes.put("minecraft:visual/cloud_height", 192.33);
+        attributes.put("minecraft:visual/fog_color", "#c0d8ff");
+        attributes.put("minecraft:visual/sky_color", "#78a7ff");
+        if (target.supports(WorldGenDatapackCapability.WORLD_CLOCKS)) {
+            attributes.put("minecraft:visual/ambient_light_color", "#0a0a0a");
+            value.put("default_clock", "minecraft:overworld");
+            value.put("has_ender_dragon_fight", false);
+        }
+        value.put("attributes", attributes);
+        value.put("timelines", "#minecraft:in_overworld");
         return value;
     }
 
@@ -206,13 +255,22 @@ public class WorldGenDatapackCompiler {
         return Map.of("dimensions", Map.of("minecraft:overworld", overworld));
     }
 
-    private Map<String, Object> biomeParameters(String namespace) {
+    private Map<String, Object> biomeParameters(String namespace, WorldGenProject project, WorldGenVanillaCatalog catalog) {
         List<Object> values = new ArrayList<>();
-        values.add(parameter(namespace + ":plains", 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0L));
-        values.add(parameter(namespace + ":forest", 0.7, 0.8, 0.1, 0.0, 0.0, 0.0, 0L));
-        values.add(parameter(namespace + ":desert", 1.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0L));
-        values.add(parameter(namespace + ":savanna", 0.9, 0.25, 0.15, 0.0, 0.0, 0.0, 0L));
-        values.add(parameter(namespace + ":snowy_plains", 0.0, 0.5, 0.1, 0.0, 0.0, 0.0, 0L));
+        Set<String> biomeIds = collectBiomeIds(project);
+        if (biomeIds.isEmpty()) {
+            biomeIds.add("minecraft:plains");
+        }
+        for (String biomeId : biomeIds) {
+            WorldGenBiomeProfile profile = profile(project, biomeId);
+            JsonObject template = catalog.biome(sourceBiomeId(project, biomeId));
+            double temperature = profile == null ? template.get("temperature").getAsDouble() : profile.getTemperature();
+            double downfall = profile == null ? template.get("downfall").getAsDouble() : profile.getHumidity();
+            double continentalness = profile == null ? 0.0 : profile.getContinentalness();
+            double erosion = profile == null ? 0.0 : profile.getErosion();
+            double weirdness = profile == null ? 0.0 : profile.getWeirdness();
+            values.add(parameter(namespace + ":" + localId(biomeId), temperature, downfall, continentalness, erosion, weirdness, 0.0, 0L));
+        }
         return Map.of("values", values);
     }
 
@@ -228,69 +286,52 @@ public class WorldGenDatapackCompiler {
         return Map.of("biome", biome, "parameters", parameters);
     }
 
-    private Map<String, Object> biome(WorldGenProject project, TerrainPipeline pipeline, String biomeId, String namespace) {
-        Biome biome = TerrainPipeline.biome(biomeId, Biome.PLAINS);
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("temperature", temperature(project, biomeId, biome));
-        value.put("downfall", downfall(project, biomeId, biome));
-        value.put("has_precipitation", biome != Biome.DESERT && biome != Biome.SAVANNA);
-        value.put("effects", effects(biome));
-        value.put("spawners", spawners(project, biomeId, pipeline.isVanillaSpawnsEnabled(biome)));
-        value.put("spawn_costs", Map.of());
-        value.put("carvers", Map.of("air", List.of()));
-        value.put("features", features(namespace, pipeline.isVanillaFeaturesEnabled(biome), biome));
+    private JsonObject biome(WorldGenProject project, TerrainPipeline pipeline, String biomeId, String namespace,
+                             Map<Integer, List<String>> customFeatures,
+                             WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) {
+        JsonObject value = catalog.biome(sourceBiomeId(project, biomeId));
+        WorldGenBiomeProfile profile = profile(project, biomeId);
+        if (profile != null) {
+            value.addProperty("temperature", profile.getTemperature());
+            value.addProperty("downfall", profile.getHumidity());
+        }
+        if (!pipeline.isVanillaSpawnsEnabled(biomeId)) {
+            value.add("spawners", GSON.toJsonTree(spawners(project)));
+            value.add("spawn_costs", new JsonObject());
+        }
+        if (!pipeline.isVanillaFeaturesEnabled(biomeId)) {
+            value.add("carvers", GSON.toJsonTree(target.supports(WorldGenDatapackCapability.FLAT_BIOME_CARVERS) ? List.of() : Map.of("air", List.of())));
+            value.add("features", emptyFeatureStages());
+        }
+        JsonArray features = value.getAsJsonArray("features");
+        if (customFeatures != null && !customFeatures.isEmpty()) {
+            customFeatures.forEach((stage, ids) -> ids.forEach(featureStage(features, stage)::add));
+        } else if (!pipeline.isVanillaFeaturesEnabled(biomeId)) {
+            featureStage(features, 9).add(namespace + ":short_grass");
+        }
         return value;
     }
 
-    private List<Object> features(String namespace, boolean keepVanilla, Biome biome) {
-        List<Object> stages = new ArrayList<>();
+    private JsonArray emptyFeatureStages() {
+        JsonArray stages = new JsonArray();
         for (int i = 0; i < 11; i++) {
-            stages.add(new ArrayList<>());
-        }
-        if (keepVanilla) {
-            ((List<Object>) stages.get(8)).addAll(vanillaVegetalFeatures(biome));
-            ((List<Object>) stages.get(4)).add("minecraft:ore_dirt");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_gravel");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_coal_upper");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_iron_upper");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_copper");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_gold");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_redstone");
-            ((List<Object>) stages.get(4)).add("minecraft:ore_diamond");
-        } else {
-            ((List<Object>) stages.get(8)).add(namespace + ":short_grass");
+            stages.add(new JsonArray());
         }
         return stages;
     }
 
-    private List<String> vanillaVegetalFeatures(Biome biome) {
-        if (biome == Biome.FOREST || biome == Biome.BIRCH_FOREST || biome == Biome.DARK_FOREST) {
-            return List.of("minecraft:forest_flowers", "minecraft:trees_plains", "minecraft:flower_default", "minecraft:patch_grass_forest");
+    private JsonArray featureStage(JsonArray features, int stage) {
+        while (features.size() <= stage) {
+            features.add(new JsonArray());
         }
-        if (biome == Biome.DESERT) {
-            return List.of("minecraft:patch_dead_bush", "minecraft:patch_cactus_desert");
+        if (!features.get(stage).isJsonArray()) {
+            throw new IllegalArgumentException("Invalid Vanilla Feature Stage " + stage);
         }
-        if (biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
-            return List.of("minecraft:trees_savanna", "minecraft:patch_grass_savanna");
-        }
-        if (biome == Biome.SNOWY_PLAINS || biome == Biome.ICE_SPIKES) {
-            return List.of("minecraft:patch_grass_plain");
-        }
-        return List.of("minecraft:trees_plains", "minecraft:flower_plain", "minecraft:patch_grass_plain");
+        return features.get(stage).getAsJsonArray();
     }
 
-    private Map<String, Object> effects(Biome biome) {
-        Map<String, Object> effects = new LinkedHashMap<>();
-        effects.put("sky_color", biome == Biome.DESERT ? 7907327 : 7972607);
-        effects.put("water_fog_color", 329011);
-        effects.put("fog_color", 12638463);
-        effects.put("water_color", biome == Biome.SWAMP ? 6388580 : 4159204);
-        effects.put("grass_color_modifier", biome == Biome.DARK_FOREST ? "dark_forest" : "none");
-        return effects;
-    }
-
-    private Map<String, Object> spawners(WorldGenProject project, String biomeId, boolean keepVanilla) {
-        Map<String, Object> spawners = new LinkedHashMap<>();
+    private Map<String, List<Object>> spawners(WorldGenProject project) {
+        Map<String, List<Object>> spawners = new LinkedHashMap<>();
         spawners.put("monster", new ArrayList<>());
         spawners.put("creature", new ArrayList<>());
         spawners.put("ambient", new ArrayList<>());
@@ -299,17 +340,9 @@ public class WorldGenDatapackCompiler {
         spawners.put("water_creature", new ArrayList<>());
         spawners.put("water_ambient", new ArrayList<>());
         spawners.put("misc", new ArrayList<>());
-        if (keepVanilla) {
-            ((List<Object>) spawners.get("monster")).add(spawn("minecraft:zombie", 95, 4, 4));
-            ((List<Object>) spawners.get("monster")).add(spawn("minecraft:skeleton", 100, 4, 4));
-            ((List<Object>) spawners.get("monster")).add(spawn("minecraft:creeper", 100, 4, 4));
-            ((List<Object>) spawners.get("creature")).add(spawn("minecraft:sheep", 12, 4, 4));
-            ((List<Object>) spawners.get("creature")).add(spawn("minecraft:pig", 10, 4, 4));
-            return spawners;
-        }
         for (WorldGenSpawnRule rule : collectSpawnRules(project)) {
             String category = safeCategory(rule.getCategory());
-            ((List<Object>) spawners.computeIfAbsent(category, ignored -> new ArrayList<>())).add(spawn(rule.getEntityType(), rule.getWeight(), rule.getMinGroup(), rule.getMaxGroup()));
+            spawners.computeIfAbsent(category, ignored -> new ArrayList<>()).add(spawn(rule.getEntityType(), rule.getWeight(), rule.getMinGroup(), rule.getMaxGroup()));
         }
         return spawners;
     }
@@ -320,15 +353,16 @@ public class WorldGenDatapackCompiler {
 
     private Map<String, Object> configuredFeature(String placement, List<String> warnings) {
         if (placement.startsWith("tree:")) {
-            return Map.of("type", "minecraft:tree", "config", Map.of("trunk_provider", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", "minecraft:oak_log")), "foliage_provider", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", "minecraft:oak_leaves")), "minimum_size", Map.of("type", "minecraft:two_layers_feature_size", "limit", 1, "lower_size", 0, "upper_size", 1), "trunk_placer", Map.of("type", "minecraft:straight_trunk_placer", "base_height", 4, "height_rand_a", 2, "height_rand_b", 0), "foliage_placer", Map.of("type", "minecraft:blob_foliage_placer", "radius", 2, "offset", 0, "height", 3), "dirt_provider", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", "minecraft:dirt")), "force_dirt", false, "ignore_vines", true, "decorators", List.of()));
+            return null;
         }
         if (placement.startsWith("patch:")) {
             return configuredPatch(placement.substring("patch:".length()).split("\\|")[0]);
         }
         if (placement.startsWith("ore:")) {
-            String[] parts = placement.split(":");
-            String block = parts.length >= 3 ? parts[1] + ":" + parts[2] : "minecraft:coal_ore";
-            return Map.of("type", "minecraft:ore", "config", Map.of("size", 8, "discard_chance_on_air_exposure", 0.0, "targets", List.of(Map.of("target", Map.of("predicate_type", "minecraft:tag_match", "tag", "minecraft:stone_ore_replaceables"), "state", Map.of("Name", block(block, "minecraft:coal_ore"))))));
+            String oreBlock = placement.substring("ore:".length());
+            return Map.of("type", "minecraft:ore", "config", Map.of("size", 8, "discard_chance_on_air_exposure", 0.0, "targets", List.of(Map.of(
+                "target", Map.of("predicate_type", "minecraft:tag_match", "tag", "minecraft:stone_ore_replaceables"),
+                "state", Map.of("Name", block(oreBlock, "minecraft:coal_ore"))))));
         }
         warnings.add("Unsupported feature placement " + placement);
         return null;
@@ -368,7 +402,7 @@ public class WorldGenDatapackCompiler {
         router.put("erosion", "minecraft:overworld/erosion");
         router.put("depth", "minecraft:overworld/depth");
         router.put("ridges", "minecraft:overworld/ridges");
-        router.put("initial_density_without_jaggedness", density);
+        router.put("preliminary_surface_level", density);
         router.put("final_density", density);
         router.put("vein_toggle", 0);
         router.put("vein_ridged", 0);
@@ -380,6 +414,48 @@ public class WorldGenDatapackCompiler {
         return Map.of("type", "minecraft:sequence", "sequence", List.of(Map.of("type", "minecraft:condition", "if_true", Map.of("type", "minecraft:water", "offset", 0, "surface_depth_multiplier", 0, "add_stone_depth", false), "then_run", Map.of("type", "minecraft:block", "result_state", Map.of("Name", "minecraft:sand"))), Map.of("type", "minecraft:block", "result_state", Map.of("Name", block(settings.getDefaultBlock(), "minecraft:stone")))));
     }
 
+    private void validateVanillaReferences(WorldGenProject project, WorldGenProjectSettings settings, WorldGenVanillaCatalog catalog) {
+        if (settings.getMaxY() <= settings.getMinY()) {
+            throw new IllegalArgumentException("World Max Y Must Be Greater Than Min Y");
+        }
+        catalog.requireBlock(block(settings.getDefaultBlock(), "minecraft:stone"));
+        catalog.requireBlock(block(settings.getDefaultFluid(), "minecraft:water"));
+        Set<String> biomeIds = collectBiomeIds(project);
+        if (biomeIds.isEmpty()) {
+            biomeIds.add("minecraft:plains");
+        }
+        for (String biomeId : biomeIds) {
+            catalog.requireBiome(biomeId);
+            catalog.biome(sourceBiomeId(project, biomeId));
+        }
+        for (String placement : collectFeaturePlacements(project.getFeatureGraph())) {
+            if (placement.startsWith("tree:")) {
+                catalog.treeFeature(placement.substring("tree:".length()));
+            } else if (placement.startsWith("patch:")) {
+                catalog.requireBlock(placement.substring("patch:".length()).split("\\|")[0]);
+            } else if (placement.startsWith("ore:")) {
+                catalog.requireBlock(placement.substring("ore:".length()));
+            }
+        }
+        for (WorldGenSpawnRule rule : collectSpawnRules(project)) {
+            catalog.requireEntity(entityId(rule.getEntityType()));
+        }
+        for (String placement : collectStructurePlacements(project.getStructureGraph())) {
+            StructureData data = structureData(placement);
+            if (!data.id().isBlank()) {
+                catalog.requireStructure(data.id());
+            }
+        }
+    }
+
+    private boolean supportsFeaturePlacement(String placement) {
+        return placement.startsWith("tree:") || placement.startsWith("patch:") || placement.startsWith("ore:");
+    }
+
+    private int featureStage(String placement) {
+        return placement.startsWith("ore:") ? 6 : 9;
+    }
+
     private Set<String> collectBiomeIds(WorldGenProject project) {
         Set<String> ids = new LinkedHashSet<>();
         collectBiomeIds(project.getBiomeGraph(), ids);
@@ -387,9 +463,6 @@ public class WorldGenDatapackCompiler {
             for (WorldGenBiomeProfile profile : project.getBiomeProfiles()) {
                 if (profile.getId() != null && !profile.getId().isBlank()) {
                     ids.add(normalizeId(profile.getId()));
-                }
-                if (profile.getVanillaBaseBiome() != null && !profile.getVanillaBaseBiome().isBlank()) {
-                    ids.add(normalizeId(profile.getVanillaBaseBiome()));
                 }
             }
         }
@@ -482,37 +555,6 @@ public class WorldGenDatapackCompiler {
         return new StructureData(id, spacing, separation, salt);
     }
 
-    private float temperature(WorldGenProject project, String biomeId, Biome biome) {
-        WorldGenBiomeProfile profile = profile(project, biomeId);
-        if (profile != null) {
-            return profile.getTemperature();
-        }
-        if (biome == Biome.DESERT) {
-            return 2.0f;
-        }
-        if (biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
-            return 1.2f;
-        }
-        if (biome == Biome.SNOWY_PLAINS || biome == Biome.ICE_SPIKES) {
-            return 0.0f;
-        }
-        return 0.8f;
-    }
-
-    private float downfall(WorldGenProject project, String biomeId, Biome biome) {
-        WorldGenBiomeProfile profile = profile(project, biomeId);
-        if (profile != null) {
-            return profile.getHumidity();
-        }
-        if (biome == Biome.DESERT || biome == Biome.SAVANNA || biome == Biome.SAVANNA_PLATEAU) {
-            return 0.0f;
-        }
-        if (biome == Biome.FOREST || biome == Biome.BIRCH_FOREST || biome == Biome.DARK_FOREST) {
-            return 0.8f;
-        }
-        return 0.4f;
-    }
-
     private WorldGenBiomeProfile profile(WorldGenProject project, String biomeId) {
         if (project.getBiomeProfiles() == null) {
             return null;
@@ -525,28 +567,18 @@ public class WorldGenDatapackCompiler {
         return null;
     }
 
+    private String sourceBiomeId(WorldGenProject project, String biomeId) {
+        WorldGenBiomeProfile profile = profile(project, biomeId);
+        if (profile == null || profile.getVanillaBaseBiome() == null || profile.getVanillaBaseBiome().isBlank()) {
+            return normalizeId(biomeId);
+        }
+        return normalizeId(profile.getVanillaBaseBiome());
+    }
+
     private int writeJson(Path path, Object value) throws IOException {
         Files.createDirectories(path.getParent());
         Files.writeString(path, GSON.toJson(value), StandardCharsets.UTF_8);
         return 1;
-    }
-
-    private int packFormat() {
-        String version = minecraftVersion();
-        if (version.startsWith("1.21.8") || version.startsWith("1.21.7")) return 81;
-        if (version.startsWith("1.21.6")) return 80;
-        if (version.startsWith("1.21.5")) return 71;
-        if (version.startsWith("1.21.4")) return 61;
-        if (version.startsWith("1.21.3") || version.startsWith("1.21.2")) return 57;
-        return 48;
-    }
-
-    private String minecraftVersion() {
-        try {
-            return Bukkit.getMinecraftVersion();
-        } catch (Exception ignored) {
-            return "1.21";
-        }
     }
 
     private String namespace(String value) {
@@ -568,20 +600,11 @@ public class WorldGenDatapackCompiler {
     }
 
     private String block(String value, String fallback) {
-        String id = normalizeId(value == null || value.isBlank() ? fallback : value);
-        String local = id.substring(id.indexOf(':') + 1).toUpperCase(Locale.ROOT);
-        return Material.matchMaterial(local) == null ? fallback : id;
+        return normalizeId(value == null || value.isBlank() ? fallback : value);
     }
 
     private String entityId(String value) {
-        String id = normalizeId(value == null || value.isBlank() ? "minecraft:zombie" : value);
-        String local = id.substring(id.indexOf(':') + 1).toUpperCase(Locale.ROOT);
-        try {
-            EntityType.valueOf(local);
-            return id;
-        } catch (Exception ignored) {
-            return "minecraft:zombie";
-        }
+        return normalizeId(value == null || value.isBlank() ? "minecraft:zombie" : value);
     }
 
     private String safeCategory(String category) {

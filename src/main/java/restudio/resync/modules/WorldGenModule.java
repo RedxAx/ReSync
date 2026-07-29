@@ -9,6 +9,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import restudio.flow.data.FlowDataType;
 import restudio.resync.Log;
+import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.core.Session;
 import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.jobs.JobManager;
@@ -21,11 +22,13 @@ import restudio.resync.worldgen.WorldGenOperationService;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenSerializer;
+import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.preview.WorldGenPreviewManager;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.WorldGenCompileDiagnostics;
 import restudio.resync.worldgen.registry.WorldGenNodeDefinitions;
 import restudio.resync.worldgen.registry.WorldGenNodeRegistry;
+import restudio.resync.worldgen.registry.WorldGenOptionCatalogs;
 import restudio.resync.worldgen.runtime.WorldGenRuntimeListener;
 
 import java.io.IOException;
@@ -78,6 +81,7 @@ public class WorldGenModule implements Module {
         this.jobManager = new JobManager(flowJobs, job -> broadcastJob("jobStatus", job.snapshot()));
         this.runtimeListener.start();
         WorldGenNodeDefinitions.registerDefaults(WorldGenNodeRegistry.getInstance());
+        WorldGenOptionCatalogs.register(context.getRequiredService(OptionCatalogRegistry.class));
         previewManager.cleanupOrphanedPreviews();
     }
 
@@ -304,12 +308,13 @@ public class WorldGenModule implements Module {
                 "backend", "bukkit",
                 "datapackBackend", "compile_only",
                 "datapackBiomes", true,
-                "datapackFeatures", false,
-                "datapackStructures", false,
+                "datapackFeatures", true,
+                "datapackStructures", true,
                 "datapackSpawns", true,
                 "liveDatapackActivation", false,
                 "previewDatapackCompile", true,
-                "minecraftVersion", Bukkit.getMinecraftVersion()
+                "minecraftVersion", Bukkit.getMinecraftVersion(),
+                "targetVersions", WorldGenTargetVersion.supportedIds()
             )
         )));
     }

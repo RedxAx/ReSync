@@ -33,6 +33,7 @@ public class TerrainPipeline {
     private final PipelineNode spawnOutput;
     private final CompiledBiomePolicy biomePolicy;
     private final List<WorldGenSpawnRule> spawnRules;
+    private final StructureTerrainPolicy structureTerrainPolicy;
 
     public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
                            PipelineNode heightOutput, PipelineNode biomeOutput, PipelineNode blockOutput) {
@@ -80,6 +81,18 @@ public class TerrainPipeline {
                            PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
                            CompiledBiomePolicy biomePolicy, int seaLevel, Material defaultBlock, Material defaultFluid,
                            List<WorldGenSpawnRule> spawnRules) {
+        this(nodes, upstreams, outputNodes, heightOutput, densityOutput, continentalnessOutput, erosionOutput, weirdnessOutput, depthOutput,
+            temperatureOutput, humidityOutput, biomeOutput, blockOutput, caveOutput, featureOutput, structureOutput, spawnOutput, biomePolicy,
+            seaLevel, defaultBlock, defaultFluid, spawnRules, StructureTerrainPolicy.DEFAULT);
+    }
+
+    public TerrainPipeline(Map<String, PipelineNode> nodes, Map<String, Map<String, PipelineNode>> upstreams, List<PipelineNode> outputNodes,
+                           PipelineNode heightOutput, PipelineNode densityOutput, PipelineNode continentalnessOutput, PipelineNode erosionOutput,
+                           PipelineNode weirdnessOutput, PipelineNode depthOutput, PipelineNode temperatureOutput, PipelineNode humidityOutput,
+                           PipelineNode biomeOutput, PipelineNode blockOutput, PipelineNode caveOutput,
+                           PipelineNode featureOutput, PipelineNode structureOutput, PipelineNode spawnOutput,
+                           CompiledBiomePolicy biomePolicy, int seaLevel, Material defaultBlock, Material defaultFluid,
+                           List<WorldGenSpawnRule> spawnRules, StructureTerrainPolicy structureTerrainPolicy) {
         this.nodes = Map.copyOf(nodes);
         this.nodeIds = indexNodeIds(this.nodes);
         this.upstreams = copyUpstreams(upstreams);
@@ -99,6 +112,7 @@ public class TerrainPipeline {
         this.structureOutput = structureOutput;
         this.spawnOutput = spawnOutput;
         this.biomePolicy = biomePolicy != null ? biomePolicy : new CompiledBiomePolicy(false, false, false, Map.of(), Map.of(), Map.of());
+        this.structureTerrainPolicy = structureTerrainPolicy != null ? structureTerrainPolicy : StructureTerrainPolicy.DEFAULT;
         this.seaLevel = seaLevel;
         this.defaultBlock = defaultBlock == null ? Material.STONE : defaultBlock;
         this.defaultFluid = defaultFluid == null ? Material.WATER : defaultFluid;
@@ -268,6 +282,10 @@ public class TerrainPipeline {
         return biomePolicy.features(biome);
     }
 
+    public boolean isVanillaFeaturesEnabled(String biomeId) {
+        return biomePolicy.features(biomeId);
+    }
+
     public boolean isVanillaFeaturesEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {
         return getBiomeChoice(x, y, z, seed, worldInfo).keepVanillaFeatures();
     }
@@ -284,8 +302,29 @@ public class TerrainPipeline {
         return biomePolicy.structures(biome);
     }
 
+    public boolean isVanillaStructuresEnabled(String biomeId) {
+        return biomePolicy.structures(biomeId);
+    }
+
     public boolean isVanillaStructuresEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {
         return getBiomeChoice(x, y, z, seed, worldInfo).keepVanillaStructures();
+    }
+
+    public boolean isVanillaStructureTerrainSuitable(float x, float z, long seed, WorldInfo worldInfo) {
+        if (!structureTerrainPolicy.enabled() || structureTerrainPolicy.sampleRadius() == 0) {
+            return true;
+        }
+        int radius = structureTerrainPolicy.sampleRadius();
+        float minimum = Float.POSITIVE_INFINITY;
+        float maximum = Float.NEGATIVE_INFINITY;
+        for (int offsetX = -radius; offsetX <= radius; offsetX += radius) {
+            for (int offsetZ = -radius; offsetZ <= radius; offsetZ += radius) {
+                float height = getHeight(x + offsetX, z + offsetZ, seed, worldInfo);
+                minimum = Math.min(minimum, height);
+                maximum = Math.max(maximum, height);
+            }
+        }
+        return maximum - minimum <= structureTerrainPolicy.maxHeightDelta();
     }
 
     public boolean isVanillaSpawnsEnabled() {
@@ -298,6 +337,10 @@ public class TerrainPipeline {
 
     public boolean isVanillaSpawnsEnabled(Biome biome) {
         return biomePolicy.spawns(biome);
+    }
+
+    public boolean isVanillaSpawnsEnabled(String biomeId) {
+        return biomePolicy.spawns(biomeId);
     }
 
     public boolean isVanillaSpawnsEnabled(float x, float y, float z, long seed, WorldInfo worldInfo) {

@@ -1,6 +1,7 @@
 package restudio.resync.worldgen.pipeline;
 
 import restudio.flow.data.FlowDataType;
+import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
@@ -70,6 +71,7 @@ public class PipelineCompiler {
 
     public static TerrainPipeline compileProject(WorldGenProject project) {
         if (project == null) throw new CompilationException("Project Missing");
+        if (project.getSettings() != null) WorldGenTargetVersion.require(project.getSettings().getTargetVersion());
         WorldGenNodeRegistry registry = WorldGenNodeRegistry.getInstance();
         if (!registry.hasDefinitions()) {
             WorldGenNodeDefinitions.registerDefaults(registry);
@@ -99,7 +101,9 @@ public class PipelineCompiler {
             biomePolicy.policy(), settings == null ? 63 : settings.getSeaLevel(),
             TerrainPipeline.material(settings == null ? "minecraft:stone" : settings.getDefaultBlock(), Material.STONE),
             TerrainPipeline.material(settings == null ? "minecraft:water" : settings.getDefaultFluid(), Material.WATER),
-            biomePolicy.spawnRules());
+            biomePolicy.spawnRules(), settings == null ? StructureTerrainPolicy.DEFAULT
+                : new StructureTerrainPolicy(settings.isVanillaStructureTerrainSafety(), settings.getVanillaStructureSampleRadius(),
+                    settings.getVanillaStructureMaxHeightDelta()));
     }
 
     public static TerrainPipeline compile(WorldGenGraph graph) {

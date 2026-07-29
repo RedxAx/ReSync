@@ -1,6 +1,7 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
 import restudio.flow.data.CustomContentDefinition;
@@ -14,6 +15,7 @@ import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.core.Session;
 import restudio.resync.flow.FlowFunctionInUseException;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.migration.FlowGraphMigrator;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
@@ -104,6 +106,7 @@ public class FlowBlueprintPacketHandler {
         Map<String, CustomContentDefinition> previousContent = Map.of();
         List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
         String rollbackFlowId = null;
+        boolean graphPersisted = false;
         try {
             FlowGraph graph = FlowSerializer.deserialize(json);
             if (graph == null) {
@@ -113,9 +116,16 @@ public class FlowBlueprintPacketHandler {
             if (graph.getId() == null) {
                 graph.setId(UUID.randomUUID().toString());
             }
+            graph.setResourceMutationId(payload.requestId());
+            String flowId = graph.getId().toString();
+            String storedType = storage.getGraphResourceType(flowId);
+            if (storage.getGraph(ReSyncResourceCatalog.FLOW, flowId) == null
+                && (ReSyncResourceCatalog.FUNCTION.equals(storedType) || ReSyncResourceCatalog.COMMAND.equals(storedType))) {
+                graph.setResourceType(storedType);
+                graph.setFunction(ReSyncResourceCatalog.FUNCTION.equals(storedType));
+            }
             new FlowGraphMigrator(storage, definitionRegistry).migrateGraph(graph);
             storage.requireValidGraph(graph);
-            String flowId = graph.getId().toString();
             rollbackFlowId = flowId;
             previousGraph = storage.getGraph(flowId);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
@@ -151,6 +161,7 @@ public class FlowBlueprintPacketHandler {
                 return;
             }
             storage.saveGraph(graph);
+            graphPersisted = true;
             if (customContentStorage != null) {
                 previousContent = customContentStorage.getByFlow(flowId).stream()
                     .collect(Collectors.toMap(CustomContentDefinition::getId, Function.identity(), (left, right) -> left));
@@ -158,15 +169,17 @@ public class FlowBlueprintPacketHandler {
             updateGraphBindings(graph);
             Log.fine("Flow saved: " + flowId);
             notifySaved(storage.getGraphResourceType(flowId), graph);
-            sender.sendFlowSaveAck(session, flowId, payload.requestId());
+            sender.sendFlowSaveAck(session, flowId, payload.requestId(), graph.getResourceRevision(), graph.getResourceHash());
             sender.succeedJob(job, flowId, "Saved");
         } catch (FlowGraphValidationException e) {
-            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);
             String diagnostics = gson.toJson(e.getResult().errors());
             sender.failJob(job, diagnostics, null);
             Log.error("Flow validation error: " + e.getMessage());
+        } catch (ResourceRevisionConflictException e) {
+            sender.failJob(job, "Reload this resource before saving your changes", e);
+            Log.warn("Flow save conflict: " + e.getMessage());
         } catch (Exception e) {
-            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers, graphPersisted);
             sender.failJob(job, "Failed to save flow: " + e.getMessage(), e);
             Log.error("Flow save error: " + e.getMessage());
         }
@@ -182,18 +195,29 @@ public class FlowBlueprintPacketHandler {
         Map<String, CustomContentDefinition> previousContent = Map.of();
         List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
         String rollbackFlowId = null;
+        boolean graphDeleted = false;
 
         try {
             FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
             String flowId = payload.payload();
+            long expectedRevision = 0L;
+            if (flowId.startsWith("{")) {
+                JsonObject deleteRequest = gson.fromJson(flowId, JsonObject.class);
+                flowId = deleteRequest != null && deleteRequest.has("id") ? deleteRequest.get("id").getAsString() : "";
+                expectedRevision = deleteRequest != null && deleteRequest.has("expectedRevision") ? deleteRequest.get("expectedRevision").getAsLong() : 0L;
+            }
             rollbackFlowId = flowId;
             job = sender.beginJob(session, "deleteFlow", flowId, payload.requestId());
             if (job == null) {
                 return;
             }
             previousGraph = storage.getGraph(flowId);
+            if (previousGraph != null && expectedRevision > 0L && previousGraph.getResourceRevision() != expectedRevision) {
+                throw new ResourceRevisionConflictException(flowId, expectedRevision, previousGraph.getResourceRevision());
+            }
             String resourceType = storage.getGraphResourceType(flowId);
             storage.deleteGraph(flowId);
+            graphDeleted = true;
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             if (customContentStorage != null) {
                 previousContent = customContentStorage.getByFlow(flowId).stream()
@@ -220,8 +244,11 @@ public class FlowBlueprintPacketHandler {
             sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "FUNCTION_IN_USE", gson.toJson(e.getReferences()));
             Log.warn("Function delete blocked: " + e.getMessage());
+        } catch (ResourceRevisionConflictException e) {
+            sender.failJob(job, "Reload this resource before deleting it", e);
+            Log.warn("Flow delete conflict: " + e.getMessage());
         } catch (Exception e) {
-            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers);
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers, graphDeleted);
             sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "DELETE_FAILED", "Failed to delete flow: " + e.getMessage());
             Log.error("Flow delete error: " + e.getMessage());
@@ -432,12 +459,14 @@ public class FlowBlueprintPacketHandler {
         return List.of();
     }
 
-    private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousTriggers) {
+    private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousTriggers, boolean graphPersisted) {
         try {
-            if (previousGraph != null && previousGraph.getId() != null) {
-                storage.saveGraph(previousGraph);
-            } else if (flowId != null && !flowId.isBlank()) {
-                storage.forceDeleteGraph(flowId);
+            if (graphPersisted) {
+                if (previousGraph != null && previousGraph.getId() != null) {
+                    storage.restoreGraph(previousGraph);
+                } else if (flowId != null && !flowId.isBlank()) {
+                    storage.forceDeleteGraph(flowId);
+                }
             }
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             if (customContentStorage != null && previousContent != null) {

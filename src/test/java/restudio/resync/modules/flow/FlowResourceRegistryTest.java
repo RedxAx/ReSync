@@ -123,6 +123,41 @@ class FlowResourceRegistryTest {
     }
 
     @Test
+    void broadcastsCommittedResourceMutationsWithoutReplacingDurabilityPublishing() {
+        FlowResourceRegistry registry = new FlowResourceRegistry();
+        registry.register(new TestAdapter());
+        List<String> durable = new ArrayList<>();
+        List<String> collaboration = new ArrayList<>();
+        registry.setMutationListener(new FlowResourceMutationListener() {
+            @Override
+            public void saved(String type, String resourceId, String payload) {
+                durable.add("save:" + resourceId);
+            }
+
+            @Override
+            public void deleted(String type, String resourceId) {
+                durable.add("delete:" + resourceId);
+            }
+        });
+        registry.setCommitListener(new FlowResourceCommitListener() {
+            @Override
+            public void saved(String type, String resourceId, String payload) {
+                collaboration.add("save:" + resourceId + ":" + payload);
+            }
+
+            @Override
+            public void deleted(String type, String resourceId) {
+                collaboration.add("delete:" + resourceId);
+            }
+        });
+
+        assertTrue(registry.save("gui", "main").success());
+        assertTrue(registry.delete("gui", "main").success());
+        assertEquals(List.of("save:main", "delete:main"), durable);
+        assertEquals(List.of("save:main:\"main\"", "delete:main"), collaboration);
+    }
+
+    @Test
     void authorizationFailuresAreStructuredAndAudited() {
         FlowResourceRegistry registry = new FlowResourceRegistry();
         registry.register(new TestAdapter());

@@ -29,6 +29,7 @@ public final class FlowResourceRegistry {
     private Consumer<String> changeListener = ignored -> {
     };
     private FlowResourceMutationListener mutationListener = FlowResourceMutationListener.NONE;
+    private FlowResourceCommitListener commitListener = FlowResourceCommitListener.NONE;
     private FlowResourceAuthorizationPolicy authorizationPolicy = (context, operation, resourceType, resourceId) ->
         "system".equals(context.source()) || "flow".equals(context.source());
 
@@ -44,6 +45,10 @@ public final class FlowResourceRegistry {
 
     public void setMutationListener(FlowResourceMutationListener mutationListener) {
         this.mutationListener = mutationListener != null ? mutationListener : FlowResourceMutationListener.NONE;
+    }
+
+    public void setCommitListener(FlowResourceCommitListener commitListener) {
+        this.commitListener = commitListener != null ? commitListener : FlowResourceCommitListener.NONE;
     }
 
     public void setAuthorizationPolicy(FlowResourceAuthorizationPolicy authorizationPolicy) {
@@ -200,7 +205,7 @@ public final class FlowResourceRegistry {
                 return FlowOperationResult.failure("RESOURCE_ID_REQUIRED", "Resource ID is required", Map.of("resourceType", typeId));
             }
             boolean existed = adapter.get(id) != null;
-            if (existencePolicy == ExistencePolicy.MISSING && existed) {
+            if (existencePolicy == ExistencePolicy.MISSING && adapter.conflicts(id)) {
                 return FlowOperationResult.failure("RESOURCE_ALREADY_EXISTS", "Resource already exists: " + id,
                     Map.of("resourceType", typeId, "resourceId", id, "operation", operation));
             }
@@ -248,7 +253,7 @@ public final class FlowResourceRegistry {
                 return FlowOperationResult.failure("RESOURCE_NOT_FOUND", "Resource not found: " + sourceId,
                     Map.of("resourceType", typeId, "resourceId", sourceId));
             }
-            if (adapter.get(targetId) != null) {
+            if (adapter.conflicts(targetId)) {
                 return FlowOperationResult.failure("RESOURCE_ALREADY_EXISTS", "Resource already exists: " + targetId,
                     Map.of("resourceType", typeId, "resourceId", targetId));
             }
@@ -653,10 +658,26 @@ public final class FlowResourceRegistry {
         if (adapter == null || value == null) {
             return;
         }
+        String type;
+        String resourceId;
+        String payload;
         try {
-            mutationListener.saved(adapter.descriptor().typeId(), adapter.id(value), adapter.serialize(value));
+            type = adapter.descriptor().typeId();
+            resourceId = adapter.id(value);
+            payload = adapter.serialize(value);
+        } catch (RuntimeException exception) {
+            Log.warn("Serialize ReSync resource change failed: " + failureMessage(exception));
+            return;
+        }
+        try {
+            mutationListener.saved(type, resourceId, payload);
         } catch (RuntimeException exception) {
             Log.warn("Publish ReSync resource change failed: " + failureMessage(exception));
+        }
+        try {
+            commitListener.saved(type, resourceId, payload);
+        } catch (RuntimeException exception) {
+            Log.warn("Broadcast ReSync resource change failed: " + failureMessage(exception));
         }
     }
 
@@ -665,6 +686,11 @@ public final class FlowResourceRegistry {
             mutationListener.deleted(typeId, resourceId);
         } catch (RuntimeException exception) {
             Log.warn("Publish ReSync resource deletion failed: " + failureMessage(exception));
+        }
+        try {
+            commitListener.deleted(typeId, resourceId);
+        } catch (RuntimeException exception) {
+            Log.warn("Broadcast ReSync resource deletion failed: " + failureMessage(exception));
         }
     }
 

@@ -7,6 +7,7 @@ import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowResourceReference;
+import restudio.flow.data.FlowSerializer;
 import restudio.resync.Log;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowStorage;
@@ -14,7 +15,10 @@ import restudio.resync.flow.automation.AutomationReferences;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.MigrationLedger;
+import restudio.resync.storage.StorageSafety;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -46,42 +50,75 @@ public final class TypedAutomationGraphMigrator {
         if (flows == null || resources == null) {
             return;
         }
-        String migrationId = "typed-automation-" + System.currentTimeMillis();
+        String migrationId = "typed-automation-v1";
         indexVariableTypes();
         int migratedGraphs = 0;
         int migratedNodes = 0;
         int skippedNodes = 0;
-        for (String flowId : flows.listFlowIds()) {
-            FlowGraph graph = flows.getGraph(flowId);
-            if (graph == null || graph.getNodes() == null) {
-                continue;
-            }
-            int changed = 0;
-            for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
-                FlowNode node = entry.getValue();
-                if (node == null) {
+        try (MigrationLedger.Fence fence = MigrationLedger.acquireFence(flows.getAssetsPath())) {
+            MigrationLedger ledger = new MigrationLedger(flows.getAssetsPath());
+            for (String flowId : flows.listFlowIds()) {
+                String storedType = flows.getGraphResourceType(flowId);
+                String backupType = flows.getTypedAutomationBackupGraphResourceType(flowId);
+                boolean recoveringFunction = "flow".equals(storedType) && "function".equals(backupType);
+                FlowGraph graph = storedType.isBlank() ? flows.getGraph(flowId) : flows.getGraph(storedType, flowId);
+                if (graph == null || graph.getNodes() == null) {
                     continue;
                 }
-                MigrationResult result;
+                String sourceHash = StorageSafety.sha256(FlowSerializer.serialize(graph));
+                if (ledger.isCommitted(migrationId, flowId, sourceHash)) {
+                    continue;
+                }
                 try {
-                    result = migrateNode(graph, flowId, entry.getKey(), node);
-                } catch (RuntimeException failure) {
-                    Log.warn("[TypedAutomationMigrator] Kept " + flowId + "/" + entry.getKey()
-                        + " on its compatibility handler: " + failure.getMessage());
-                    result = MigrationResult.SKIPPED;
-                }
-                if (result == MigrationResult.MIGRATED) {
-                    changed++;
-                } else if (result == MigrationResult.SKIPPED) {
-                    skippedNodes++;
+                    boolean normalizedType = ("function".equals(storedType) || recoveringFunction) && !graph.isFunction();
+                    if (normalizedType) {
+                        graph.setFunction(true);
+                    }
+                    int changed = 0;
+                    for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
+                        FlowNode node = entry.getValue();
+                        if (node == null) {
+                            continue;
+                        }
+                        MigrationResult result;
+                        try {
+                            result = migrateNode(graph, flowId, entry.getKey(), node);
+                        } catch (RuntimeException failure) {
+                            Log.warn("[TypedAutomationMigrator] Kept " + flowId + "/" + entry.getKey()
+                                + " on its compatibility handler: " + failure.getMessage());
+                            result = MigrationResult.SKIPPED;
+                        }
+                        if (result == MigrationResult.MIGRATED) {
+                            changed++;
+                        } else if (result == MigrationResult.SKIPPED) {
+                            skippedNodes++;
+                        }
+                    }
+                    ledger.prepare(migrationId, flowId, storedType, graph.getResourceRevision(), sourceHash, 1, fence.epoch());
+                    if (changed > 0 || normalizedType) {
+                        if (changed > 0 && !recoveringFunction) {
+                            flows.backupGraphForMigration(flowId, migrationId + "-" + sourceHash.substring(0, 12));
+                        }
+                        if (recoveringFunction) {
+                            flows.reclassifyGraph(graph, "function");
+                        } else {
+                            flows.saveGraph(graph);
+                        }
+                        migratedGraphs++;
+                        migratedNodes += changed;
+                    }
+                    ledger.commit(migrationId, flowId, sourceHash);
+                } catch (RuntimeException | IOException failure) {
+                    try {
+                        ledger.fail(migrationId, flowId, sourceHash, failure.getMessage());
+                    } catch (IOException ledgerFailure) {
+                        failure.addSuppressed(ledgerFailure);
+                    }
+                    Log.warn("[TypedAutomationMigrator] Failed to migrate " + flowId + ": " + failure.getMessage());
                 }
             }
-            if (changed > 0) {
-                flows.backupGraphForMigration(flowId, migrationId);
-                flows.saveGraph(graph);
-                migratedGraphs++;
-                migratedNodes += changed;
-            }
+        } catch (IOException failure) {
+            Log.warn("[TypedAutomationMigrator] Migration fence unavailable: " + failure.getMessage());
         }
         if (migratedNodes > 0 || skippedNodes > 0) {
             Log.info("[TypedAutomationMigrator] Migrated " + migratedNodes + " nodes across " + migratedGraphs
@@ -152,7 +189,8 @@ public final class TypedAutomationGraphMigrator {
     private void indexVariableTypes() {
         variableTypes.clear();
         for (String flowId : flows.listFlowIds()) {
-            FlowGraph graph = flows.getGraph(flowId);
+            String storedType = flows.getGraphResourceType(flowId);
+            FlowGraph graph = storedType.isBlank() ? flows.getGraph(flowId) : flows.getGraph(storedType, flowId);
             if (graph == null || graph.getNodes() == null) {
                 continue;
             }

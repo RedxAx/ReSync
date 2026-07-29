@@ -136,7 +136,7 @@ public class FunctionCatalogHandler implements NodeHandler {
         if (storage == null || id == null || id.isBlank()) {
             return null;
         }
-        FlowGraph graph = storage.getGraph(id);
+        FlowGraph graph = storage.getGraph("function", id);
         return graph != null && graph.isFunction() ? graph : null;
     }
 

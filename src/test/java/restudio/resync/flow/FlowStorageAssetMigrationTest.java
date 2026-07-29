@@ -9,6 +9,8 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.modules.flow.FlowResourcePacketRouter;
 import restudio.resync.modules.flow.FlowResourceRegistry;
+import restudio.resync.modules.flow.FlowPacketSender;
+import restudio.resync.core.Session;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -20,13 +22,17 @@ import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
 
 import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowStorageAssetMigrationTest {
@@ -103,6 +109,23 @@ class FlowStorageAssetMigrationTest {
     }
 
     @Test
+    void graphStorageRejectsCrossTypeDuplicateIds() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph command = FlowSerializer.deserialize("""
+            {"id":"shared","version":2,"resourceType":"command","nodes":{},"connections":[],"localVariables":[]}
+            """);
+        FlowGraph function = FlowSerializer.deserialize("""
+            {"id":"shared","version":2,"function":true,"resourceType":"function","nodes":{},"connections":[],"localVariables":[]}
+            """);
+
+        storage.saveGraph(command);
+
+        assertThrows(IllegalArgumentException.class, () -> storage.saveGraph(function));
+        assertEquals(List.of("shared"), storage.listGraphIds("command"));
+        assertTrue(storage.listGraphIds("function").isEmpty());
+    }
+
+    @Test
     void graphReclassificationMovesOneStableAssetWithoutLeavingShadowCopies() throws Exception {
         FlowStorage storage = new FlowStorage(tempDir.toFile());
         FlowGraph graph = FlowSerializer.deserialize("""
@@ -114,11 +137,12 @@ class FlowStorageAssetMigrationTest {
             {"id":"temporary","version":2,"nodes":{"start":{"type":"event.resync.command","version":1,"x":0,"y":0,"inputValues":{}}},"connections":[],"localVariables":[]}
             """).getNodes().get("start"));
 
-        storage.saveGraph(graph);
+        storage.reclassifyGraph(graph, "command");
 
         assertEquals("command", storage.getGraphResourceType("convertible"));
         try (var paths = Files.walk(tempDir.resolve("assets"))) {
             List<Path> matching = paths.filter(Files::isRegularFile)
+                .filter(path -> !path.toString().contains(".quarantine"))
                 .filter(path -> path.getFileName().toString().equals("convertible.json"))
                 .toList();
             assertEquals(1, matching.size());
@@ -127,6 +151,96 @@ class FlowStorageAssetMigrationTest {
         String project = Files.readString(tempDir.resolve("assets").resolve("project.json"));
         assertTrue(project.contains("\"type\":\"command\",\"id\":\"convertible\""));
         assertFalse(project.contains("\"type\":\"function\",\"id\":\"convertible\""));
+    }
+
+    @Test
+    void migrationQuarantinesResourceCopiesOutsideTheirManagedPath() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path canonical = assets.resolve("Content").resolve("NPCs").resolve("guide.json");
+        Path stale = assets.resolve("Customization").resolve("guide.json");
+        Files.createDirectories(canonical.getParent());
+        Files.createDirectories(stale.getParent());
+        Files.writeString(canonical, """
+            {"resourceType":"npc_definition","id":"guide","name":"Guide"}
+            """);
+        Files.writeString(stale, """
+            {"resourceType":"npc_definition","id":"guide","name":"Old Guide"}
+            """);
+        Files.writeString(assets.resolve("project.json"), """
+            {
+              "serverId": "project",
+              "folders": [],
+              "resources": [
+                {"type":"npc_definition","id":"guide","displayName":"Guide","path":"Content/NPCs","sortOrder":0}
+              ]
+            }
+            """);
+
+        new FlowStorage(tempDir.toFile());
+
+        assertTrue(Files.isRegularFile(canonical));
+        assertFalse(Files.exists(stale));
+        try (var paths = Files.walk(assets.resolve(".quarantine").resolve("duplicates"))) {
+            List<Path> quarantined = paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().equals("guide.json"))
+                .toList();
+            assertEquals(1, quarantined.size());
+            assertTrue(Files.readString(quarantined.getFirst()).contains("Old Guide"));
+        }
+    }
+
+    @Test
+    void migrationPrunesMetadataWhenOnlyDurabilityCopiesRemain() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path snapshot = assets.resolve(".snapshots").resolve("old").resolve("Blueprints").resolve("Functions").resolve("missing.json");
+        Files.createDirectories(snapshot.getParent());
+        Files.writeString(snapshot, """
+            {"resourceType":"function","id":"missing","version":2,"function":true,"nodes":{},"connections":[]}
+            """);
+        Files.createDirectories(assets);
+        Files.writeString(assets.resolve("project.json"), """
+            {
+              "serverId": "project",
+              "folders": [],
+              "resources": [
+                {"type":"function","id":"missing","displayName":"Missing","path":"Blueprints/Functions","sortOrder":0}
+              ]
+            }
+            """);
+
+        new FlowStorage(tempDir.toFile());
+
+        assertFalse(Files.readString(assets.resolve("project.json")).contains("\"id\":\"missing\""));
+        assertTrue(Files.isRegularFile(snapshot));
+    }
+
+    @Test
+    void migrationPrunesDurabilityFoldersAndResourcesFromProjectMetadata() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path transaction = assets.resolve(".transactions").resolve("old").resolve("content-0.json");
+        Files.createDirectories(transaction.getParent());
+        Files.writeString(transaction, """
+            {"resourceType":"command","id":"content-0","version":2,"nodes":{},"connections":[]}
+            """);
+        Files.writeString(assets.resolve("project.json"), """
+            {
+              "serverId": "project",
+              "folders": [
+                {"path":".transactions","parentPath":"","name":".transactions","sortOrder":0,"collapsed":false},
+                {"path":".transactions/old","parentPath":".transactions","name":"old","sortOrder":1,"collapsed":false}
+              ],
+              "resources": [
+                {"type":"command","id":"content-0","displayName":"content-0","path":".transactions/old","sortOrder":0}
+              ]
+            }
+            """);
+
+        new FlowStorage(tempDir.toFile());
+
+        String metadata = Files.readString(assets.resolve("project.json"));
+        assertFalse(metadata.contains(".transactions"));
+        assertFalse(metadata.contains("\"id\":\"content-0\""));
+        assertTrue(Files.isRegularFile(transaction));
     }
 
     @Test
@@ -147,6 +261,32 @@ class FlowStorageAssetMigrationTest {
         assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.FLOW.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
         assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.FUNCTION.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
         assertTrue(registry.metadata().stream().filter(value -> ReSyncResourceCatalog.COMMAND.equals(value.getTypeId())).findFirst().orElseThrow().isAvailable());
+    }
+
+    @Test
+    void graphResourcePacketsRouteByTheirExactType() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph function = FlowSerializer.deserialize("""
+            {"id":"lookup","version":2,"function":true,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        FlowGraph command = FlowSerializer.deserialize("""
+            {"id":"restart","version":2,"resourceType":"command","nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(function);
+        storage.saveGraph(command);
+        RecordingFlowPacketSender sender = new RecordingFlowPacketSender();
+        FlowResourcePacketRouter router = new FlowResourcePacketRouter(storage, null, null, null, sender, null, null);
+        Session session = new Session("session", "client", null);
+
+        assertTrue(router.handle(session, (byte) 231, ByteBuffer.wrap("lookup".getBytes(StandardCharsets.UTF_8))));
+        assertEquals((byte) 233, sender.packetId);
+        assertEquals("function", FlowSerializer.deserialize(sender.payload).getResourceType());
+        assertTrue(router.handle(session, (byte) 238, ByteBuffer.wrap("restart".getBytes(StandardCharsets.UTF_8))));
+        assertEquals((byte) 240, sender.packetId);
+        assertEquals("command", FlowSerializer.deserialize(sender.payload).getResourceType());
+        assertTrue(router.handle(session, (byte) 232, ByteBuffer.allocate(0)));
+        assertEquals((byte) 234, sender.packetId);
+        assertEquals(List.of("lookup"), sender.ids);
     }
 
     @Test
@@ -261,6 +401,28 @@ class FlowStorageAssetMigrationTest {
         assertTrue(project.contains("\"type\":\"command\",\"id\":\"thisisacommandoriginally\""));
         assertTrue(project.contains("\"path\":\"Blueprints/Commands\""));
         assertFalse(project.contains("\"type\":\"flow\",\"id\":\"thisisacommandoriginally\""));
+    }
+
+    private static final class RecordingFlowPacketSender extends FlowPacketSender {
+        private byte packetId;
+        private String payload = "";
+        private List<String> ids = List.of();
+
+        private RecordingFlowPacketSender() {
+            super(null, 0, Set.of());
+        }
+
+        @Override
+        public void sendJsonResourceData(Session session, byte packetId, String json, String typeName) {
+            this.packetId = packetId;
+            this.payload = json;
+        }
+
+        @Override
+        public void sendJsonResourceList(Session session, byte packetId, List<String> ids) {
+            this.packetId = packetId;
+            this.ids = List.copyOf(ids);
+        }
     }
 
     @Test

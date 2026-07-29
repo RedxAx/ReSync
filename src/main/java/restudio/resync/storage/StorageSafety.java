@@ -1,11 +1,17 @@
 package restudio.resync.storage;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.regex.Pattern;
 
 public final class StorageSafety {
@@ -49,6 +55,10 @@ public final class StorageSafety {
     }
 
     public static void writeUtf8Atomic(Path file, String content) throws IOException {
+        writeBytesAtomic(file, (content == null ? "" : content).getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static void writeBytesAtomic(Path file, byte[] content) throws IOException {
         Path parent = file.getParent();
         if (parent == null) {
             throw new IOException("File has no parent: " + file);
@@ -61,14 +71,44 @@ public final class StorageSafety {
         }
         Path temp = Files.createTempFile(root, target.getFileName().toString(), ".tmp");
         try {
-            Files.writeString(temp, content == null ? "" : content, StandardCharsets.UTF_8);
+            byte[] bytes = content != null ? content : new byte[0];
+            try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                ByteBuffer buffer = ByteBuffer.wrap(bytes);
+                while (buffer.hasRemaining()) {
+                    channel.write(buffer);
+                }
+                channel.force(true);
+            }
             try {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (IOException atomicException) {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
             }
+            forceDirectory(root);
+            if (!sha256(bytes).equals(sha256(Files.readAllBytes(target)))) {
+                throw new IOException("Write verification failed: " + file);
+            }
         } finally {
             Files.deleteIfExists(temp);
+        }
+    }
+
+    public static String sha256(String content) {
+        return sha256((content == null ? "" : content).getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static String sha256(byte[] content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content != null ? content : new byte[0]));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    public static void forceDirectory(Path directory) {
+        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException | UnsupportedOperationException ignored) {
         }
     }
 
@@ -83,6 +123,8 @@ public final class StorageSafety {
         if (!target.startsWith(root) || target.getParent() == null || !target.getParent().equals(root)) {
             throw new IOException("Unsafe delete target: " + file);
         }
-        Files.deleteIfExists(target);
+        if (Files.deleteIfExists(target)) {
+            forceDirectory(root);
+        }
     }
 }

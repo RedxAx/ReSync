@@ -829,7 +829,7 @@ public class FlowExecutor {
                 "Restore the Flow storage service before executing this graph"));
         }
 
-        FlowGraph functionGraph = storage.getGraph(functionId);
+        FlowGraph functionGraph = storage.getGraph("function", functionId);
         if (functionGraph == null || !functionGraph.isFunction()) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_NOT_FOUND", "Function not found: " + functionId, null, startNodeId,

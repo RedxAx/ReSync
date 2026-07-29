@@ -231,6 +231,7 @@
       {"name": "schedule", "dataType": "schedule_reference"},
       {"name": "task", "dataType": "scheduled_task"},
       {"name": "owner", "dataType": "any"},
+      {"name": "arguments", "dataType": "map<string,any>"},
       {"name": "fired_at", "dataType": "instant"},
       {"name": "run_count", "dataType": "number"}
     ],
@@ -238,6 +239,7 @@
       {"source": "event.schedule", "target": "schedule"},
       {"source": "event.task", "target": "task"},
       {"source": "event.owner", "target": "owner"},
+      {"source": "event.arguments", "target": "arguments"},
       {"source": "event.firedAt", "target": "fired_at"},
       {"source": "event.runCount", "target": "run_count"}
     ]

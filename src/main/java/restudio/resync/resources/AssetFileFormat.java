@@ -13,7 +13,10 @@ import java.nio.file.Path;
 public final class AssetFileFormat {
     public static final String RESOURCE_TYPE = "resourceType";
     public static final String FORMAT_VERSION = "assetFormatVersion";
-    public static final int CURRENT_FORMAT_VERSION = 2;
+    public static final String REVISION = "assetRevision";
+    public static final String CONTENT_HASH = "assetHash";
+    public static final String MUTATION_ID = "assetMutationId";
+    public static final int CURRENT_FORMAT_VERSION = 3;
     private static final Gson GSON = new Gson();
 
     private AssetFileFormat() {
@@ -24,8 +27,26 @@ public final class AssetFileFormat {
         if (object == null) {
             return json;
         }
+        long revision = number(object, REVISION, 0L);
+        String mutationId = text(object, MUTATION_ID);
+        return withResourceIdentity(object, type, revision, mutationId);
+    }
+
+    public static String withResourceIdentity(String json, String type, long revision, String mutationId) {
+        JsonObject object = object(json);
+        if (object == null) {
+            return json;
+        }
+        return withResourceIdentity(object, type, revision, mutationId);
+    }
+
+    private static String withResourceIdentity(JsonObject object, String type, long revision, String mutationId) {
         object.addProperty(RESOURCE_TYPE, type);
         object.addProperty(FORMAT_VERSION, CURRENT_FORMAT_VERSION);
+        object.addProperty(REVISION, Math.max(0L, revision));
+        object.addProperty(MUTATION_ID, mutationId != null ? mutationId : "");
+        object.remove(CONTENT_HASH);
+        object.addProperty(CONTENT_HASH, StorageSafety.sha256(GSON.toJson(object)));
         return GSON.toJson(object);
     }
 
@@ -40,6 +61,36 @@ public final class AssetFileFormat {
     public static boolean declaresResourceType(Path file, String type) {
         String resourceType = readResourceType(file);
         return type != null && type.equals(resourceType);
+    }
+
+    public static long readRevision(Path file) {
+        JsonObject object = readObject(file);
+        return number(object, REVISION, 0L);
+    }
+
+    public static String readContentHash(Path file) {
+        return text(readObject(file), CONTENT_HASH);
+    }
+
+    public static String readMutationId(Path file) {
+        return text(readObject(file), MUTATION_ID);
+    }
+
+    public static String contentHash(String json) {
+        return text(object(json), CONTENT_HASH);
+    }
+
+    public static boolean verify(Path file) {
+        JsonObject object = readObject(file);
+        if (object == null) {
+            return false;
+        }
+        String expected = text(object, CONTENT_HASH);
+        if (expected.isBlank()) {
+            return true;
+        }
+        object.remove(CONTENT_HASH);
+        return expected.equals(StorageSafety.sha256(GSON.toJson(object)));
     }
 
     public static String idOnlyFileName(String id) {
@@ -114,5 +165,16 @@ public final class AssetFileFormat {
             return "";
         }
         return object.get(key).getAsString();
+    }
+
+    private static long number(JsonObject object, String key, long fallback) {
+        if (object == null || key == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsLong();
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
     }
 }

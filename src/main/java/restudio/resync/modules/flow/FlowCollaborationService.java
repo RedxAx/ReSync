@@ -118,10 +118,11 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
 
     private Presence presence(Session session, Update update) {
         CollaborationIdentity identity = session.getCollaborationIdentity();
-        int color = COLORS[Math.floorMod(identity.subjectId().hashCode(), COLORS.length)];
+        boolean customColor = update.color() != null;
+        int color = customColor ? 0xFF000000 | update.color() & 0x00FFFFFF : COLORS[Math.floorMod(identity.subjectId().hashCode(), COLORS.length)];
         return new Presence(session.getSessionId(), session.getClientId(), identity, safe(update.resourceType(), 64), safe(update.resourceId(), 256),
             safe(update.viewId(), 128), coordinate(update.x()), coordinate(update.y()),
-            update.active(), update.typing(), color, System.currentTimeMillis());
+            update.active(), update.typing(), color, customColor, System.currentTimeMillis());
     }
 
     private void publishPresence() {
@@ -168,14 +169,14 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
         return Double.isFinite(value) ? Math.clamp(value, 0.0, 1.0) : 0.0;
     }
 
-    private record Update(String resourceType, String resourceId, String viewId, double x, double y, boolean active, boolean typing) {
+    private record Update(String resourceType, String resourceId, String viewId, double x, double y, boolean active, boolean typing, Integer color) {
         private static Update inactive() {
-            return new Update("", "", "", 0.0, 0.0, false, false);
+            return new Update("", "", "", 0.0, 0.0, false, false, null);
         }
     }
 
     private record Presence(String sessionId, String clientId, CollaborationIdentity identity, String resourceType, String resourceId, String viewId,
-                            double x, double y, boolean active, boolean typing, int color, long updatedAt) {
+                            double x, double y, boolean active, boolean typing, int color, boolean customColor, long updatedAt) {
     }
 
     private record Snapshot(String selfSessionId, List<Presence> collaborators) {

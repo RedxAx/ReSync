@@ -343,7 +343,7 @@ public class FlowModule implements Module {
         if (!Set.of(ReSyncResourceCatalog.FLOW, ReSyncResourceCatalog.FUNCTION, ReSyncResourceCatalog.COMMAND).contains(type)) {
             return;
         }
-        blueprintHandler.refreshGraphBinding(resourceId, deleted);
+        blueprintHandler.refreshGraphBinding(type, resourceId, deleted);
         if (ReSyncResourceCatalog.FUNCTION.equals(type)) {
             refreshCustomFunctionDefinitions();
         }

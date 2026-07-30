@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TriggerRegistry {
@@ -28,7 +29,7 @@ public class TriggerRegistry {
         load();
     }
 
-    TriggerRegistry(File file) {
+    public TriggerRegistry(File file) {
         this.plugin = null;
         this.file = file;
         load();
@@ -65,16 +66,21 @@ public class TriggerRegistry {
     }
 
     public synchronized void setBindingsPreservingType(List<TriggerBinding> newBindings, TriggerType preservedType) {
-        List<TriggerBinding> preserved = getBindings(preservedType);
+        setBindingsPreservingTypes(newBindings, Set.of(preservedType));
+    }
+
+    public synchronized void setBindingsPreservingTypes(List<TriggerBinding> newBindings, Set<TriggerType> preservedTypes) {
+        Set<TriggerType> preserved = preservedTypes != null ? Set.copyOf(preservedTypes) : Set.of();
+        List<TriggerBinding> preservedBindings = bindings.values().stream().filter(binding -> preserved.contains(binding.getType())).toList();
         bindings.clear();
         if (newBindings != null) {
             for (TriggerBinding binding : newBindings) {
-                if (binding.getId() != null && binding.getType() != preservedType) {
+                if (binding.getId() != null && !preserved.contains(binding.getType())) {
                     bindings.put(binding.getId(), binding);
                 }
             }
         }
-        for (TriggerBinding binding : preserved) {
+        for (TriggerBinding binding : preservedBindings) {
             if (binding.getId() != null) {
                 bindings.put(binding.getId(), binding);
             }

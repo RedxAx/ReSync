@@ -100,7 +100,7 @@ public class TriggerDispatcher implements Listener {
         Player player = entry.playerExtractor != null ? entry.playerExtractor.apply(event) : null;
 
         for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
-            FlowGraph graph = storage.getGraph(trigger.getKey());
+            FlowGraph graph = storage.getGraph("flow", trigger.getKey());
             if (graph == null) continue;
             if (!matchesAutomationBinding(graph, trigger.getValue(), event)) continue;
 

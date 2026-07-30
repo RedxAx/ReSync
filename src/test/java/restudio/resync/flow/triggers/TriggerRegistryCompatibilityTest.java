@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,5 +55,21 @@ class TriggerRegistryCompatibilityTest {
 
         assertEquals(1, registry.getBindings().size());
         assertEquals("other:command", registry.getBindings().getFirst().getId());
+    }
+
+    @Test
+    void clientTriggerUpdateCannotReplaceGraphOwnedCommands() {
+        TriggerRegistry registry = new TriggerRegistry(tempDir.resolve("triggers.json").toFile());
+        TriggerBinding eventBinding = new TriggerBinding("flow:event", "flow", TriggerType.EVENT, "player_join");
+        TriggerBinding commandBinding = new TriggerBinding("flow:command", "flow", TriggerType.COMMAND, "{\"command\":\"hello\",\"subcommands\":[\"world\"],\"structured\":true}");
+        TriggerBinding systemBinding = new TriggerBinding("flow:system", "flow", TriggerType.SYSTEM, "startup");
+        registry.setBindings(List.of(eventBinding, commandBinding, systemBinding));
+
+        TriggerBinding replacementSystem = new TriggerBinding("other:system", "other", TriggerType.SYSTEM, "shutdown");
+        registry.setBindingsPreservingTypes(List.of(replacementSystem), Set.of(TriggerType.EVENT, TriggerType.COMMAND));
+
+        assertEquals(List.of("flow:event"), registry.getBindings(TriggerType.EVENT).stream().map(TriggerBinding::getId).toList());
+        assertEquals(List.of("flow:command"), registry.getBindings(TriggerType.COMMAND).stream().map(TriggerBinding::getId).toList());
+        assertEquals(List.of("other:system"), registry.getBindings(TriggerType.SYSTEM).stream().map(TriggerBinding::getId).toList());
     }
 }

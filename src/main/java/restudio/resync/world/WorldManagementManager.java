@@ -6,6 +6,7 @@ import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.block.Block;
@@ -50,6 +51,7 @@ import restudio.resync.ReSync;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.storage.AsyncStorageExecutor;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
 import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
@@ -782,13 +784,27 @@ public class WorldManagementManager implements WorldManagementService, Listener 
                 .withData("errorCode", "WORLDGEN_PREPARATION_FAILED")
                 .withData("details", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
         }
-        ChunkGenerator chunkGenerator = worldGenPipeline != null ? new NodeGraphChunkGenerator(worldGenPipeline) : createGenerator(generator, generatorConfig);
+        boolean vanillaWorldGen = worldGenDatapack != null
+            && WorldGenGenerationMode.resolve(worldGenDatapack.getGenerationMode()) == WorldGenGenerationMode.VANILLA;
+        if (vanillaWorldGen) {
+            NamespacedKey dimensionKey = NamespacedKey.fromString(worldGenDatapack.getDimensionKey());
+            if (dimensionKey == null) {
+                return WorldOperationResult.failure("createWorld", normalizedName, "WorldGenDimensionMissing");
+            }
+            creator = WorldCreator.ofNameAndKey(normalizedName, dimensionKey);
+            if (parsedSeed != null) {
+                creator.seed(parsedSeed);
+            }
+        }
+        ChunkGenerator chunkGenerator = worldGenPipeline != null
+            ? new NodeGraphChunkGenerator(worldGenPipeline)
+            : vanillaWorldGen ? null : createGenerator(generator, generatorConfig);
         if (worldGenPipeline != null) {
             creator.generator(chunkGenerator);
             creator.biomeProvider(new NodeGraphBiomeProvider(worldGenPipeline));
         } else if (chunkGenerator != null) {
             creator.generator(chunkGenerator);
-        } else if (generator != null && !generator.isBlank()) {
+        } else if (!vanillaWorldGen && generator != null && !generator.isBlank()) {
             creator.generator(generator);
         }
         World world = creator.createWorld();
@@ -2111,6 +2127,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         WorldGenProject project = worldGenProjectStorage.getProject(generatorConfig);
         if (project == null) {
             throw new IllegalArgumentException("WorldGen Project Missing");
+        }
+        if (WorldGenGenerationMode.resolve(project.getSettings().getGenerationMode()) == WorldGenGenerationMode.VANILLA) {
+            return null;
         }
         TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
         return new TerrainPipelineHolder(pipeline);

@@ -2,6 +2,7 @@ package restudio.resync.worldgen.datapack;
 
 import io.papermc.paper.datapack.Datapack;
 import org.bukkit.Bukkit;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 
 import java.io.IOException;
@@ -27,6 +28,9 @@ public class WorldGenDatapackInstaller {
                 copyDirectory(build.getFolder(), worldPack);
             }
             boolean enabled = enableKnownPack(build.getPackName());
+            if (WorldGenGenerationMode.resolve(build.getGenerationMode()) == WorldGenGenerationMode.VANILLA && !enabled) {
+                return new InstallResult(false, false, "Vanilla Worldgen Datapack Couldn't Be Enabled");
+            }
             return new InstallResult(true, enabled, enabled ? "Datapack Enabled" : "Datapack Installed");
         } catch (IOException | IllegalArgumentException exception) {
             return new InstallResult(false, false, exception.getMessage());
@@ -54,6 +58,7 @@ public class WorldGenDatapackInstaller {
 
     private boolean enableKnownPack(String packName) {
         try {
+            Bukkit.getDatapackManager().refreshPacks();
             for (Datapack pack : Bukkit.getDatapackManager().getPacks()) {
                 if (pack.getName().equals(packName) || pack.getName().equals("file/" + packName)) {
                     pack.setEnabled(true);

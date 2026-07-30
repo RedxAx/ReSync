@@ -59,4 +59,12 @@ class WorldGenTargetVersionTest {
         assertFalse(WorldGenTargetVersion.MINECRAFT_1_21_10.isDatapackCompatibleWith(WorldGenTargetVersion.MINECRAFT_1_21_11));
         assertFalse(WorldGenTargetVersion.MINECRAFT_26_1_2.isDatapackCompatibleWith(WorldGenTargetVersion.MINECRAFT_26_2));
     }
+
+    @Test
+    void resolvesAutomaticTargetsFromTheServer() {
+        assertEquals(WorldGenTargetVersion.MINECRAFT_1_21_4, WorldGenTargetVersion.resolve(WorldGenTargetVersion.AUTOMATIC, "1.21.4"));
+        assertEquals(WorldGenTargetVersion.MINECRAFT_26_2, WorldGenTargetVersion.resolve("", "26.2"));
+        assertThrows(IllegalArgumentException.class, () -> WorldGenTargetVersion.resolve(WorldGenTargetVersion.AUTOMATIC, "1.20.6"));
+        assertThrows(IllegalArgumentException.class, () -> WorldGenTargetVersion.resolve(WorldGenTargetVersion.AUTOMATIC, ""));
+    }
 }

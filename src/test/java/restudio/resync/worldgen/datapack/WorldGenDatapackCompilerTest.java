@@ -5,8 +5,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenBiomeProfile;
+import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
 
@@ -104,6 +106,60 @@ class WorldGenDatapackCompilerTest {
 
         assertTrue(features.get(6).getAsJsonArray().asList().stream().anyMatch(value -> "resync_worldgen:feature_0".equals(value.getAsString())));
         assertFalse(features.get(9).getAsJsonArray().asList().stream().anyMatch(value -> "resync_worldgen:feature_0".equals(value.getAsString())));
+    }
+
+    @Test
+    void compilesConnectedFeaturePlacementControls() throws IOException {
+        WorldGenProject project = project("26.2", false);
+        LinkedHashMap<String, WorldGenNode> nodes = new LinkedHashMap<>();
+        nodes.put("ore", new WorldGenNode("ore_vein", 0, 0, Map.of("block", "minecraft:diamond_ore", "size", 5)));
+        nodes.put("scatter", new WorldGenNode("scatter", 0, 0, Map.of(
+            "count", 2, "chance", 0.5f, "min_y", -32, "max_y", 48, "biome", "minecraft:plains", "generation_step", "underground_ores")));
+        nodes.put("output", new WorldGenNode("output_features", 0, 0, Map.of()));
+        project.getFeatureGraph().setNodes(nodes);
+        project.getFeatureGraph().setConnections(List.of(
+            new WorldGenConnection("ore", "feature", "scatter", "feature"),
+            new WorldGenConnection("scatter", "placement", "output", "placements")));
+
+        WorldGenDatapackBuild build = compile(project);
+        JsonObject configured = json(build.getFolder().resolve("data").resolve("resync_worldgen").resolve("worldgen").resolve("configured_feature").resolve("feature_0.json"));
+        JsonObject placed = json(build.getFolder().resolve("data").resolve("resync_worldgen").resolve("worldgen").resolve("placed_feature").resolve("feature_0.json"));
+        JsonArray placement = placed.getAsJsonArray("placement");
+
+        assertEquals(5, configured.getAsJsonObject("config").get("size").getAsInt());
+        assertEquals(2, placement.get(0).getAsJsonObject().get("chance").getAsInt());
+        assertEquals(2, placement.get(1).getAsJsonObject().get("count").getAsInt());
+        JsonObject range = placement.get(3).getAsJsonObject().getAsJsonObject("height");
+        assertEquals(-32, range.getAsJsonObject("min_inclusive").get("absolute").getAsInt());
+        assertEquals(48, range.getAsJsonObject("max_inclusive").get("absolute").getAsInt());
+    }
+
+    @Test
+    void compilesVanillaProjectsAsGameOwnedDimensions() throws IOException {
+        WorldGenProject project = project("26.2", false);
+        project.getSettings().setGenerationMode(WorldGenGenerationMode.VANILLA.id());
+        project.getSettings().setTerrainTemplate("amplified");
+        project.getTerrainGraph().getNodes().clear();
+
+        WorldGenDatapackBuild build = compile(project);
+        Path data = build.getFolder().resolve("data");
+        JsonObject dimension = json(data.resolve("resync_worldgen").resolve("dimension").resolve("worldgen_test_1.json"));
+
+        assertEquals(WorldGenGenerationMode.VANILLA.id(), build.getGenerationMode());
+        assertEquals("resync_worldgen:worldgen_test_1", build.getDimensionKey());
+        assertEquals("minecraft:amplified", dimension.getAsJsonObject("generator").get("settings").getAsString());
+        assertTrue(Files.exists(data.resolve("minecraft").resolve("worldgen").resolve("biome").resolve("plains.json")));
+        assertFalse(Files.exists(data.resolve("resync_worldgen").resolve("worldgen").resolve("noise_settings").resolve("worldgen.json")));
+    }
+
+    @Test
+    void rejectsRuntimeTerrainGraphsInVanillaProjects() {
+        WorldGenProject project = project("26.2", false);
+        project.getSettings().setGenerationMode(WorldGenGenerationMode.VANILLA.id());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> compile(project));
+
+        assertTrue(exception.getMessage().contains("Terrain Graph Isn't Available In Vanilla Mode"));
     }
 
     @Test

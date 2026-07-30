@@ -1,5 +1,6 @@
 package restudio.resync.worldgen.data;
 
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 
 import java.util.HashMap;
@@ -14,13 +15,14 @@ public class WorldGenProjectSettings {
     private String defaultFluid = "minecraft:water";
     private String datapackNamespace = "resync_worldgen";
     private String generatorBackend = "datapack";
-    private String targetVersion = WorldGenTargetVersion.DEFAULT.id();
+    private String generationMode = WorldGenGenerationMode.HYBRID.id();
+    private String targetVersion = WorldGenTargetVersion.AUTOMATIC;
     private String worldPreset = "overworld";
     private String terrainTemplate = "continental";
-    private boolean vanillaBiomesEnabled;
-    private boolean vanillaFeaturesEnabled;
-    private boolean vanillaStructuresEnabled;
-    private boolean vanillaSpawnsEnabled;
+    private boolean vanillaBiomesEnabled = true;
+    private boolean vanillaFeaturesEnabled = true;
+    private boolean vanillaStructuresEnabled = true;
+    private boolean vanillaSpawnsEnabled = true;
     private boolean vanillaStructureTerrainSafety = true;
     private int vanillaStructureSampleRadius = 48;
     private int vanillaStructureMaxHeightDelta = 12;
@@ -44,8 +46,10 @@ public class WorldGenProjectSettings {
     public void setDatapackNamespace(String datapackNamespace) { this.datapackNamespace = datapackNamespace; }
     public String getGeneratorBackend() { return generatorBackend; }
     public void setGeneratorBackend(String generatorBackend) { this.generatorBackend = generatorBackend; }
-    public String getTargetVersion() { return targetVersion == null || targetVersion.isBlank() ? WorldGenTargetVersion.DEFAULT.id() : targetVersion; }
-    public void setTargetVersion(String targetVersion) { this.targetVersion = WorldGenTargetVersion.resolve(targetVersion).id(); }
+    public String getGenerationMode() { return WorldGenGenerationMode.resolve(generationMode).id(); }
+    public void setGenerationMode(String generationMode) { this.generationMode = WorldGenGenerationMode.resolve(generationMode).id(); }
+    public String getTargetVersion() { return targetVersion == null || targetVersion.isBlank() ? WorldGenTargetVersion.AUTOMATIC : targetVersion; }
+    public void setTargetVersion(String targetVersion) { this.targetVersion = targetVersion == null || targetVersion.isBlank() || WorldGenTargetVersion.AUTOMATIC.equalsIgnoreCase(targetVersion) ? WorldGenTargetVersion.AUTOMATIC : WorldGenTargetVersion.require(targetVersion).id(); }
     public String getWorldPreset() { return worldPreset; }
     public void setWorldPreset(String worldPreset) { this.worldPreset = worldPreset; }
     public String getTerrainTemplate() { return terrainTemplate; }

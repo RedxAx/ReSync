@@ -2,10 +2,15 @@ package restudio.resync.worldgen.runtime;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
+import org.bukkit.entity.Ambient;
+import org.bukkit.entity.Animals;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
+import org.bukkit.entity.WaterMob;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
@@ -54,7 +59,7 @@ public class WorldGenRuntimeListener implements Listener {
         if (pipeline.getSpawnRules().isEmpty() || !canAttemptSpawn(event.getLocation())) {
             return;
         }
-        WorldGenSpawnRule rule = selectRule(pipeline.getSpawnRules(), biome, event.getLocation());
+        WorldGenSpawnRule rule = selectRule(pipeline.getSpawnRules(), biome, event.getLocation(), event.getEntity());
         if (rule == null) {
             return;
         }
@@ -71,13 +76,13 @@ public class WorldGenRuntimeListener implements Listener {
         return previous == null || now - previous >= SPAWN_COOLDOWN_MILLIS;
     }
 
-    private WorldGenSpawnRule selectRule(List<WorldGenSpawnRule> rules, Biome biome, Location location) {
+    private WorldGenSpawnRule selectRule(List<WorldGenSpawnRule> rules, Biome biome, Location location, LivingEntity original) {
         if (rules == null || rules.isEmpty() || location == null) {
             return null;
         }
         int total = 0;
         for (WorldGenSpawnRule rule : rules) {
-            if (matches(rule, biome, location)) {
+            if (matches(rule, biome, location) && matchesCategory(rule, original)) {
                 total += Math.max(1, rule.getWeight());
             }
         }
@@ -86,7 +91,7 @@ public class WorldGenRuntimeListener implements Listener {
         }
         int pick = ThreadLocalRandom.current().nextInt(total);
         for (WorldGenSpawnRule rule : rules) {
-            if (!matches(rule, biome, location)) {
+            if (!matches(rule, biome, location) || !matchesCategory(rule, original)) {
                 continue;
             }
             pick -= Math.max(1, rule.getWeight());
@@ -97,6 +102,20 @@ public class WorldGenRuntimeListener implements Listener {
         return null;
     }
 
+    private boolean matchesCategory(WorldGenSpawnRule rule, LivingEntity original) {
+        if (rule == null || original == null) {
+            return false;
+        }
+        return switch (rule.getCategory().toLowerCase(Locale.ROOT)) {
+            case "monster" -> original instanceof Monster;
+            case "creature" -> original instanceof Animals;
+            case "ambient" -> original instanceof Ambient;
+            case "axolotls" -> original.getType() == EntityType.AXOLOTL;
+            case "underground_water_creature", "water_creature", "water_ambient" -> original instanceof WaterMob;
+            default -> true;
+        };
+    }
+
     private boolean matches(WorldGenSpawnRule rule, Biome biome, Location location) {
         if (rule == null || location == null || location.getY() < rule.getMinY() || location.getY() > rule.getMaxY()) {
             return false;
@@ -104,11 +123,33 @@ public class WorldGenRuntimeListener implements Listener {
         if (location.getBlock().getLightLevel() < rule.getMinLight() || location.getBlock().getLightLevel() > rule.getMaxLight()) {
             return false;
         }
-        if (rule.getBiomeFilters() == null || rule.getBiomeFilters().isEmpty()) {
-            return true;
+        if (rule.getBlockBelow() != null && !rule.getBlockBelow().isBlank()) {
+            Material required = Material.matchMaterial(rule.getBlockBelow());
+            if (required == null || location.clone().subtract(0, 1, 0).getBlock().getType() != required) {
+                return false;
+            }
         }
-        String biomeId = "minecraft:" + biome.name().toLowerCase(Locale.ROOT);
-        return rule.getBiomeFilters().stream().anyMatch(filter -> filter != null && filter.equalsIgnoreCase(biomeId));
+        long time = location.getWorld().getTime();
+        if ("day".equalsIgnoreCase(rule.getTime()) && time >= 12300 && time <= 23850) {
+            return false;
+        }
+        if ("night".equalsIgnoreCase(rule.getTime()) && (time < 12300 || time > 23850)) {
+            return false;
+        }
+        if ("clear".equalsIgnoreCase(rule.getWeather()) && location.getWorld().hasStorm()) {
+            return false;
+        }
+        if ("rain".equalsIgnoreCase(rule.getWeather()) && (!location.getWorld().hasStorm() || location.getWorld().isThundering())) {
+            return false;
+        }
+        if ("thunder".equalsIgnoreCase(rule.getWeather()) && !location.getWorld().isThundering()) {
+            return false;
+        }
+        if (rule.getBiomeFilters() != null && !rule.getBiomeFilters().isEmpty()) {
+            String biomeId = "minecraft:" + biome.name().toLowerCase(Locale.ROOT);
+            return rule.getBiomeFilters().stream().anyMatch(filter -> filter != null && filter.equalsIgnoreCase(biomeId));
+        }
+        return true;
     }
 
     private void spawnRule(TerrainPipeline pipeline, WorldGenSpawnRule rule, Location location) {

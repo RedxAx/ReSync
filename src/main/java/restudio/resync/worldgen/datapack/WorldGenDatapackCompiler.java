@@ -4,18 +4,22 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import restudio.resync.worldgen.contract.WorldGenDatapackCapability;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.contract.WorldGenPackMetadata;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenBiomeProfile;
+import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenProjectSettings;
 import restudio.resync.worldgen.data.WorldGenSpawnRule;
+import restudio.resync.worldgen.pipeline.BiomePolicyCompiler;
+import restudio.resync.worldgen.pipeline.CompiledBiomePolicy;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
-import restudio.resync.worldgen.pipeline.TerrainPipeline;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,13 +48,24 @@ public class WorldGenDatapackCompiler {
             throw new IllegalArgumentException("WorldGen Project Missing");
         }
         project.rebuildIndices();
-        TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
         WorldGenProjectSettings settings = project.getSettings() == null ? new WorldGenProjectSettings() : project.getSettings();
-        WorldGenTargetVersion target = WorldGenTargetVersion.require(settings.getTargetVersion());
+        WorldGenGenerationMode generationMode = WorldGenGenerationMode.resolve(settings.getGenerationMode());
+        if (generationMode == WorldGenGenerationMode.VANILLA) {
+            VanillaWorldGenValidator.validate(project);
+        } else {
+            PipelineCompiler.compileProject(project);
+        }
+        BiomePolicyCompiler.Result biomePolicy = BiomePolicyCompiler.compile(project);
+        String configuredVersion = settings.getTargetVersion();
+        WorldGenTargetVersion target = WorldGenTargetVersion.AUTOMATIC.equalsIgnoreCase(configuredVersion)
+            ? WorldGenTargetVersion.resolve(configuredVersion, Bukkit.getMinecraftVersion())
+            : WorldGenTargetVersion.require(configuredVersion);
         WorldGenVanillaCatalog catalog = WorldGenVanillaCatalog.load(target);
         validateVanillaReferences(project, settings, catalog);
         String namespace = namespace(settings.getDatapackNamespace());
         String projectId = safeId(project.getId() == null || project.getId().isBlank() ? "project" : project.getId());
+        String dimensionId = safeId("worldgen_" + projectId + "_" + revision);
+        String dimensionKey = generationMode == WorldGenGenerationMode.VANILLA ? namespace + ":" + dimensionId : "";
         String packName = "resync_worldgen_" + projectId + "_" + revision;
         Path folder = outputRoot.resolve(projectId).resolve(String.valueOf(revision)).resolve(packName).normalize();
         List<String> warnings = new ArrayList<>();
@@ -60,19 +75,29 @@ public class WorldGenDatapackCompiler {
             Files.createDirectories(folder.resolve("data").resolve(namespace).resolve("worldgen"));
             int count = 0;
             count += writeJson(folder.resolve("pack.mcmeta"), packMeta(project, target));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("dimension_type").resolve("worldgen.json"), dimensionType(settings, target));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("noise_settings").resolve("worldgen.json"), noiseSettings(project, settings));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("world_preset").resolve("worldgen.json"), worldPreset(namespace));
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("multi_noise_biome_source_parameter_list").resolve("worldgen.json"),
-                biomeParameters(namespace, project, catalog));
-            count += writeBiomes(folder, namespace, project, pipeline, warnings, target, catalog);
+            if (generationMode == WorldGenGenerationMode.VANILLA) {
+                Map<String, Object> dimension = vanillaDimension(settings);
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("dimension").resolve(dimensionId + ".json"), dimension);
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("world_preset").resolve(projectId + ".json"),
+                    Map.of("dimensions", Map.of("minecraft:overworld", dimension)));
+            } else {
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("dimension_type").resolve("worldgen.json"), dimensionType(settings, target));
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("noise_settings").resolve("worldgen.json"), noiseSettings(project, settings));
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("world_preset").resolve("worldgen.json"), worldPreset(namespace));
+                count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("multi_noise_biome_source_parameter_list").resolve("worldgen.json"),
+                    biomeParameters(namespace, project, catalog));
+            }
+            count += writeBiomes(folder, namespace, project, biomePolicy.policy(), generationMode, warnings, target, catalog);
             count += writeFeatures(folder, namespace, project, warnings, settings, catalog);
             count += writeStructures(folder, namespace, project, warnings);
-            count += writeJson(folder.resolve("resync-manifest.json"), manifest(project, namespace, packName, revision, count, warnings, target, catalog));
+            count += writeJson(folder.resolve("resync-manifest.json"),
+                manifest(project, namespace, packName, revision, count, warnings, target, catalog, generationMode, dimensionKey));
             WorldGenDatapackBuild build = new WorldGenDatapackBuild();
             build.setProjectId(project.getId());
             build.setNamespace(namespace);
             build.setPackName(packName);
+            build.setGenerationMode(generationMode.id());
+            build.setDimensionKey(dimensionKey);
             build.setMinecraftVersion(target.id());
             build.setDatapackVersion(target.datapackVersion());
             build.setPackFormat(target.datapackMajor());
@@ -91,25 +116,31 @@ public class WorldGenDatapackCompiler {
         return plugin.getDataFolder().toPath().resolve("worldgen").resolve("generated").toAbsolutePath().normalize();
     }
 
-    private int writeBiomes(Path folder, String namespace, WorldGenProject project, TerrainPipeline pipeline, List<String> warnings,
-                            WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) throws IOException {
-        Set<String> biomes = collectBiomeIds(project);
+    private int writeBiomes(Path folder, String namespace, WorldGenProject project, CompiledBiomePolicy biomePolicy,
+                            WorldGenGenerationMode generationMode, List<String> warnings, WorldGenTargetVersion target,
+                            WorldGenVanillaCatalog catalog) throws IOException {
+        Set<String> biomes = generationMode == WorldGenGenerationMode.VANILLA
+            ? new LinkedHashSet<>(catalog.biomes())
+            : collectBiomeIds(project);
         if (biomes.isEmpty()) {
             biomes.add("minecraft:plains");
         }
-        Map<Integer, List<String>> customFeatures = new LinkedHashMap<>();
-        List<String> placements = collectFeaturePlacements(project.getFeatureGraph());
-        for (int index = 0; index < placements.size(); index++) {
-            String placement = placements.get(index);
-            if (supportsFeaturePlacement(placement)) {
-                customFeatures.computeIfAbsent(featureStage(placement), ignored -> new ArrayList<>()).add(namespace + ":feature_" + index);
-            }
-        }
+        List<FeatureData> placements = collectFeaturePlacements(project.getFeatureGraph());
         int count = 0;
         for (String biomeId : biomes) {
+            Map<Integer, List<String>> customFeatures = new LinkedHashMap<>();
+            for (int index = 0; index < placements.size(); index++) {
+                FeatureData placement = placements.get(index);
+                if (placement.biome().isBlank() || placement.biome().equalsIgnoreCase(biomeId)) {
+                    customFeatures.computeIfAbsent(placement.stage(), ignored -> new ArrayList<>()).add(placement.outputId(namespace, index));
+                }
+            }
             String local = localId(biomeId);
-            count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("biome").resolve(local + ".json"),
-                biome(project, pipeline, biomeId, namespace, customFeatures, target, catalog));
+            String biomeNamespace = generationMode == WorldGenGenerationMode.VANILLA && biomeId.contains(":")
+                ? biomeId.substring(0, biomeId.indexOf(':'))
+                : namespace;
+            count += writeJson(folder.resolve("data").resolve(biomeNamespace).resolve("worldgen").resolve("biome").resolve(local + ".json"),
+                biome(project, biomePolicy, biomeId, namespace, customFeatures, target, catalog));
         }
         return count;
     }
@@ -117,7 +148,7 @@ public class WorldGenDatapackCompiler {
     private int writeFeatures(Path folder, String namespace, WorldGenProject project, List<String> warnings, WorldGenProjectSettings settings,
                               WorldGenVanillaCatalog catalog) throws IOException {
         int count = 0;
-        List<String> placements = collectFeaturePlacements(project.getFeatureGraph());
+        List<FeatureData> placements = collectFeaturePlacements(project.getFeatureGraph());
         int minY = settings.getMinY();
         int maxY = settings.getMaxY() - 1;
         if (placements.isEmpty()) {
@@ -127,21 +158,25 @@ public class WorldGenDatapackCompiler {
             return count;
         }
         int index = 0;
-        for (String placement : placements) {
+        for (FeatureData placement : placements) {
+            if (placement.direct()) {
+                index++;
+                continue;
+            }
             String id = "feature_" + index++;
             String configuredId = namespace + ":" + id;
-            if (placement.startsWith("tree:")) {
-                configuredId = catalog.treeFeature(placement.substring("tree:".length()));
+            if (placement.specification().startsWith("tree:")) {
+                configuredId = catalog.treeFeature(placement.specification().substring("tree:".length()));
             }
-            Object configured = configuredFeature(placement, warnings);
-            if (configured == null && !placement.startsWith("tree:")) {
+            Object configured = configuredFeature(placement.specification(), warnings);
+            if (configured == null && !placement.specification().startsWith("tree:")) {
                 continue;
             }
             if (configured != null) {
                 count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("configured_feature").resolve(id + ".json"), configured);
             }
             count += writeJson(folder.resolve("data").resolve(namespace).resolve("worldgen").resolve("placed_feature").resolve(id + ".json"),
-                placedFeature(configuredId, 8, minY, maxY));
+                placedFeature(configuredId, placement.count(), Math.max(minY, placement.minY()), Math.min(maxY, placement.maxY()), placement.chance()));
         }
         return count;
     }
@@ -170,7 +205,8 @@ public class WorldGenDatapackCompiler {
     }
 
     private Map<String, Object> manifest(WorldGenProject project, String namespace, String packName, long revision, int files, List<String> warnings,
-                                         WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) {
+                                         WorldGenTargetVersion target, WorldGenVanillaCatalog catalog, WorldGenGenerationMode generationMode,
+                                         String dimensionKey) {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("projectId", project.getId());
         manifest.put("namespace", namespace);
@@ -178,6 +214,8 @@ public class WorldGenDatapackCompiler {
         manifest.put("revision", revision);
         manifest.put("minecraftVersion", target.id());
         manifest.put("datapackVersion", target.datapackVersion());
+        manifest.put("generationMode", generationMode.id());
+        manifest.put("dimensionKey", dimensionKey);
         manifest.put("vanillaServerSha1", catalog.serverSha1());
         manifest.put("fileCount", files);
         manifest.put("warnings", warnings);
@@ -255,6 +293,28 @@ public class WorldGenDatapackCompiler {
         return Map.of("dimensions", Map.of("minecraft:overworld", overworld));
     }
 
+    private Map<String, Object> vanillaDimension(WorldGenProjectSettings settings) {
+        String template = safeId(settings.getTerrainTemplate());
+        String dimensionType = switch (template) {
+            case "nether" -> "minecraft:the_nether";
+            case "end" -> "minecraft:the_end";
+            default -> "minecraft:overworld";
+        };
+        String noiseSettings = switch (template) {
+            case "amplified" -> "minecraft:amplified";
+            case "large_biomes" -> "minecraft:large_biomes";
+            case "nether" -> "minecraft:nether";
+            case "end" -> "minecraft:end";
+            default -> "minecraft:overworld";
+        };
+        Map<String, Object> biomeSource = switch (template) {
+            case "nether" -> Map.of("type", "minecraft:multi_noise", "preset", "minecraft:nether");
+            case "end" -> Map.of("type", "minecraft:the_end");
+            default -> Map.of("type", "minecraft:multi_noise", "preset", "minecraft:overworld");
+        };
+        return Map.of("type", dimensionType, "generator", Map.of("type", "minecraft:noise", "settings", noiseSettings, "biome_source", biomeSource));
+    }
+
     private Map<String, Object> biomeParameters(String namespace, WorldGenProject project, WorldGenVanillaCatalog catalog) {
         List<Object> values = new ArrayList<>();
         Set<String> biomeIds = collectBiomeIds(project);
@@ -286,7 +346,7 @@ public class WorldGenDatapackCompiler {
         return Map.of("biome", biome, "parameters", parameters);
     }
 
-    private JsonObject biome(WorldGenProject project, TerrainPipeline pipeline, String biomeId, String namespace,
+    private JsonObject biome(WorldGenProject project, CompiledBiomePolicy biomePolicy, String biomeId, String namespace,
                              Map<Integer, List<String>> customFeatures,
                              WorldGenTargetVersion target, WorldGenVanillaCatalog catalog) {
         JsonObject value = catalog.biome(sourceBiomeId(project, biomeId));
@@ -295,18 +355,18 @@ public class WorldGenDatapackCompiler {
             value.addProperty("temperature", profile.getTemperature());
             value.addProperty("downfall", profile.getHumidity());
         }
-        if (!pipeline.isVanillaSpawnsEnabled(biomeId)) {
-            value.add("spawners", GSON.toJsonTree(spawners(project)));
+        if (!biomePolicy.spawns(biomeId)) {
+            value.add("spawners", GSON.toJsonTree(spawners(project, biomeId)));
             value.add("spawn_costs", new JsonObject());
         }
-        if (!pipeline.isVanillaFeaturesEnabled(biomeId)) {
+        if (!biomePolicy.features(biomeId)) {
             value.add("carvers", GSON.toJsonTree(target.supports(WorldGenDatapackCapability.FLAT_BIOME_CARVERS) ? List.of() : Map.of("air", List.of())));
             value.add("features", emptyFeatureStages());
         }
         JsonArray features = value.getAsJsonArray("features");
         if (customFeatures != null && !customFeatures.isEmpty()) {
             customFeatures.forEach((stage, ids) -> ids.forEach(featureStage(features, stage)::add));
-        } else if (!pipeline.isVanillaFeaturesEnabled(biomeId)) {
+        } else if (!biomePolicy.features(biomeId)) {
             featureStage(features, 9).add(namespace + ":short_grass");
         }
         return value;
@@ -330,7 +390,7 @@ public class WorldGenDatapackCompiler {
         return features.get(stage).getAsJsonArray();
     }
 
-    private Map<String, List<Object>> spawners(WorldGenProject project) {
+    private Map<String, List<Object>> spawners(WorldGenProject project, String biomeId) {
         Map<String, List<Object>> spawners = new LinkedHashMap<>();
         spawners.put("monster", new ArrayList<>());
         spawners.put("creature", new ArrayList<>());
@@ -341,6 +401,9 @@ public class WorldGenDatapackCompiler {
         spawners.put("water_ambient", new ArrayList<>());
         spawners.put("misc", new ArrayList<>());
         for (WorldGenSpawnRule rule : collectSpawnRules(project)) {
+            if (rule.getBiomeFilters() != null && !rule.getBiomeFilters().isEmpty() && rule.getBiomeFilters().stream().noneMatch(biomeId::equalsIgnoreCase)) {
+                continue;
+            }
             String category = safeCategory(rule.getCategory());
             spawners.computeIfAbsent(category, ignored -> new ArrayList<>()).add(spawn(rule.getEntityType(), rule.getWeight(), rule.getMinGroup(), rule.getMaxGroup()));
         }
@@ -359,10 +422,34 @@ public class WorldGenDatapackCompiler {
             return configuredPatch(placement.substring("patch:".length()).split("\\|")[0]);
         }
         if (placement.startsWith("ore:")) {
-            String oreBlock = placement.substring("ore:".length());
-            return Map.of("type", "minecraft:ore", "config", Map.of("size", 8, "discard_chance_on_air_exposure", 0.0, "targets", List.of(Map.of(
+            String ore = placement.substring("ore:".length());
+            int separator = ore.lastIndexOf(':');
+            int size = separator > 0 ? parseInt(ore.substring(separator + 1), 8) : 8;
+            String oreBlock = separator > 0 && isInteger(ore.substring(separator + 1)) ? ore.substring(0, separator) : ore;
+            return Map.of("type", "minecraft:ore", "config", Map.of("size", Math.clamp(size, 1, 64), "discard_chance_on_air_exposure", 0.0, "targets", List.of(Map.of(
                 "target", Map.of("predicate_type", "minecraft:tag_match", "tag", "minecraft:stone_ore_replaceables"),
                 "state", Map.of("Name", block(oreBlock, "minecraft:coal_ore"))))));
+        }
+        if (placement.startsWith("lake:")) {
+            String fluid = block(placement.substring("lake:".length()), "minecraft:water");
+            return Map.of("type", "minecraft:lake", "config", Map.of(
+                "fluid", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", fluid)),
+                "barrier", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", "minecraft:stone"))));
+        }
+        if (placement.startsWith("disk:")) {
+            String disk = placement.substring("disk:".length());
+            int separator = disk.lastIndexOf(':');
+            int radius = separator > 0 ? parseInt(disk.substring(separator + 1), 4) : 4;
+            String diskBlock = separator > 0 && isInteger(disk.substring(separator + 1)) ? disk.substring(0, separator) : disk;
+            return Map.of("type", "minecraft:disk", "config", Map.of(
+                "state_provider", Map.of("type", "minecraft:simple_state_provider", "state", Map.of("Name", block(diskBlock, "minecraft:clay"))),
+                "target", Map.of("type", "minecraft:matching_blocks", "blocks", List.of("minecraft:dirt", "minecraft:clay", "minecraft:sand", "minecraft:gravel")),
+                "radius", Map.of("type", "minecraft:uniform", "value", Map.of("min_inclusive", 2, "max_inclusive", Math.clamp(radius, 2, 16))),
+                "half_height", 1));
+        }
+        if (placement.startsWith("boulder:")) {
+            return Map.of("type", "minecraft:block_pile", "config", Map.of("state_provider", Map.of(
+                "type", "minecraft:simple_state_provider", "state", Map.of("Name", block(placement.substring("boulder:".length()), "minecraft:mossy_cobblestone")))));
         }
         warnings.add("Unsupported feature placement " + placement);
         return null;
@@ -373,7 +460,19 @@ public class WorldGenDatapackCompiler {
     }
 
     private Map<String, Object> placedFeature(String feature, int count, int minY, int maxY) {
-        return Map.of("feature", feature, "placement", List.of(Map.of("type", "minecraft:count", "count", count), Map.of("type", "minecraft:in_square"), Map.of("type", "minecraft:height_range", "height", Map.of("type", "minecraft:uniform", "min_inclusive", Map.of("absolute", minY), "max_inclusive", Map.of("absolute", maxY))), Map.of("type", "minecraft:biome")));
+        return placedFeature(feature, count, minY, maxY, 1f);
+    }
+
+    private Map<String, Object> placedFeature(String feature, int count, int minY, int maxY, float chance) {
+        List<Object> placement = new ArrayList<>();
+        if (chance > 0f && chance < 1f) {
+            placement.add(Map.of("type", "minecraft:rarity_filter", "chance", Math.max(1, Math.round(1f / chance))));
+        }
+        placement.add(Map.of("type", "minecraft:count", "count", Math.max(1, count)));
+        placement.add(Map.of("type", "minecraft:in_square"));
+        placement.add(Map.of("type", "minecraft:height_range", "height", Map.of("type", "minecraft:uniform", "min_inclusive", Map.of("absolute", minY), "max_inclusive", Map.of("absolute", maxY))));
+        placement.add(Map.of("type", "minecraft:biome"));
+        return Map.of("feature", feature, "placement", placement);
     }
 
     private Map<String, Object> structureSet(StructureData data) {
@@ -428,13 +527,26 @@ public class WorldGenDatapackCompiler {
             catalog.requireBiome(biomeId);
             catalog.biome(sourceBiomeId(project, biomeId));
         }
-        for (String placement : collectFeaturePlacements(project.getFeatureGraph())) {
+        for (FeatureData feature : collectFeaturePlacements(project.getFeatureGraph())) {
+            String placement = feature.specification();
             if (placement.startsWith("tree:")) {
                 catalog.treeFeature(placement.substring("tree:".length()));
             } else if (placement.startsWith("patch:")) {
                 catalog.requireBlock(placement.substring("patch:".length()).split("\\|")[0]);
             } else if (placement.startsWith("ore:")) {
-                catalog.requireBlock(placement.substring("ore:".length()));
+                String ore = placement.substring("ore:".length());
+                int separator = ore.lastIndexOf(':');
+                catalog.requireBlock(separator > 0 && isInteger(ore.substring(separator + 1)) ? ore.substring(0, separator) : ore);
+            } else if (placement.startsWith("lake:")) {
+                catalog.requireBlock(placement.substring("lake:".length()));
+            } else if (placement.startsWith("disk:")) {
+                String disk = placement.substring("disk:".length());
+                int separator = disk.lastIndexOf(':');
+                catalog.requireBlock(separator > 0 && isInteger(disk.substring(separator + 1)) ? disk.substring(0, separator) : disk);
+            } else if (placement.startsWith("boulder:")) {
+                catalog.requireBlock(placement.substring("boulder:".length()));
+            } else if (placement.startsWith("placed:") && !catalog.placedFeatures().contains(placement.substring("placed:".length()))) {
+                throw new IllegalArgumentException("Unknown Placed Feature " + placement.substring("placed:".length()));
             }
         }
         for (WorldGenSpawnRule rule : collectSpawnRules(project)) {
@@ -446,14 +558,6 @@ public class WorldGenDatapackCompiler {
                 catalog.requireStructure(data.id());
             }
         }
-    }
-
-    private boolean supportsFeaturePlacement(String placement) {
-        return placement.startsWith("tree:") || placement.startsWith("patch:") || placement.startsWith("ore:");
-    }
-
-    private int featureStage(String placement) {
-        return placement.startsWith("ore:") ? 6 : 9;
     }
 
     private Set<String> collectBiomeIds(WorldGenProject project) {
@@ -489,24 +593,124 @@ public class WorldGenDatapackCompiler {
         }
     }
 
-    private List<String> collectFeaturePlacements(WorldGenGraph graph) {
-        List<String> placements = new ArrayList<>();
+    private List<FeatureData> collectFeaturePlacements(WorldGenGraph graph) {
+        List<FeatureData> placements = new ArrayList<>();
         if (graph == null || graph.getNodes() == null) {
             return placements;
         }
-        for (WorldGenNode node : graph.getNodes().values()) {
-            if (node == null) {
+        Set<String> active = activeNodes(graph, "output_features");
+        Map<String, String> featureSources = new LinkedHashMap<>();
+        for (WorldGenConnection connection : graph.getConnections()) {
+            if ("feature".equals(connection.getTargetPin())) {
+                featureSources.put(connection.getTargetNodeId(), connection.getSourceNodeId());
+            }
+        }
+        boolean hasPlacementNodes = false;
+        for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
+            WorldGenNode node = entry.getValue();
+            if (node == null || !active.contains(entry.getKey()) || (!"scatter".equals(node.getType()) && !"poisson_scatter".equals(node.getType()))) {
                 continue;
             }
-            if ("tree_feature".equals(node.getType())) {
-                placements.add("tree:" + node.getInputValues().getOrDefault("tree", "TREE"));
-            } else if ("vegetation_patch".equals(node.getType())) {
-                placements.add("patch:" + node.getInputValues().getOrDefault("block", "minecraft:short_grass"));
-            } else if ("ore_vein".equals(node.getType())) {
-                placements.add("ore:" + node.getInputValues().getOrDefault("block", "minecraft:coal_ore"));
+            hasPlacementNodes = true;
+            WorldGenNode source = graph.getNodes().get(featureSources.get(entry.getKey()));
+            String specification = featureSpecification(source, node.getInputValues().get("feature"));
+            if (specification.isBlank()) {
+                continue;
+            }
+            boolean poisson = "poisson_scatter".equals(node.getType());
+            float spacing = number(node.getInputValues().get("spacing"), 12);
+            int count = poisson ? Math.max(1, Math.round(256f / Math.max(1f, spacing * spacing))) : Math.max(1, Math.round(number(node.getInputValues().get("count"), 8)));
+            float chance = poisson ? 1f : Math.clamp(number(node.getInputValues().get("chance"), 1), 0f, 1f);
+            int minY = Math.round(number(node.getInputValues().get("min_y"), -64));
+            int maxY = Math.round(number(node.getInputValues().get("max_y"), 319));
+            int stage = featureStage(String.valueOf(node.getInputValues().getOrDefault("generation_step", defaultFeatureStage(specification))));
+            String biome = String.valueOf(node.getInputValues().getOrDefault("biome", "")).trim();
+            placements.add(new FeatureData(specification, count, minY, maxY, chance, stage, biome));
+        }
+        if (hasPlacementNodes) {
+            return placements;
+        }
+        for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
+            WorldGenNode node = entry.getValue();
+            if (node == null || !active.contains(entry.getKey())) {
+                continue;
+            }
+            String specification = featureSpecification(node, null);
+            if (!specification.isBlank()) {
+                placements.add(new FeatureData(specification, 8, -64, 319, 1f, featureStage(defaultFeatureStage(specification)), ""));
             }
         }
         return placements;
+    }
+
+    private String featureSpecification(WorldGenNode node, Object fallback) {
+        if (node == null) {
+            String value = fallback == null ? "" : String.valueOf(fallback).trim();
+            return value.isBlank() || value.contains(":") && value.substring(value.indexOf(':') + 1).contains(":") ? value : "placed:" + value;
+        }
+        return switch (node.getType()) {
+            case "tree_feature" -> "tree:" + node.getInputValues().getOrDefault("tree", "TREE");
+            case "vegetation_patch" -> "patch:" + node.getInputValues().getOrDefault("block", "minecraft:short_grass");
+            case "ore_vein" -> "ore:" + node.getInputValues().getOrDefault("block", "minecraft:coal_ore") + ":" + Math.round(number(node.getInputValues().get("size"), 8));
+            case "liquid_lake" -> "lake:" + node.getInputValues().getOrDefault("fluid", "minecraft:water");
+            case "disk" -> "disk:" + node.getInputValues().getOrDefault("block", "minecraft:clay") + ":" + Math.round(number(node.getInputValues().get("radius"), 4));
+            case "boulder" -> "boulder:" + node.getInputValues().getOrDefault("block", "minecraft:mossy_cobblestone");
+            case "placed_feature" -> "placed:" + node.getInputValues().getOrDefault("feature", "minecraft:patch_grass");
+            default -> "";
+        };
+    }
+
+    private String defaultFeatureStage(String specification) {
+        return specification.startsWith("ore:") ? "underground_ores" : specification.startsWith("lake:") ? "lakes" : "vegetal_decoration";
+    }
+
+    private int featureStage(String stage) {
+        return switch (stage) {
+            case "raw_generation" -> 0;
+            case "lakes" -> 1;
+            case "local_modifications" -> 2;
+            case "underground_structures" -> 3;
+            case "surface_structures" -> 4;
+            case "strongholds" -> 5;
+            case "underground_ores" -> 6;
+            case "underground_decoration" -> 7;
+            case "fluid_springs" -> 8;
+            case "top_layer_modification" -> 10;
+            default -> 9;
+        };
+    }
+
+    private Set<String> activeNodes(WorldGenGraph graph, String outputType) {
+        Set<String> active = new LinkedHashSet<>();
+        List<String> pending = new ArrayList<>();
+        graph.getNodes().forEach((id, node) -> {
+            if (node != null && outputType.equals(node.getType())) {
+                active.add(id);
+                pending.add(id);
+            }
+        });
+        if (pending.isEmpty()) {
+            return new LinkedHashSet<>(graph.getNodes().keySet());
+        }
+        for (int index = 0; index < pending.size(); index++) {
+            String target = pending.get(index);
+            for (WorldGenConnection connection : graph.getConnections()) {
+                if (target.equals(connection.getTargetNodeId()) && active.add(connection.getSourceNodeId())) {
+                    pending.add(connection.getSourceNodeId());
+                }
+            }
+        }
+        return active;
+    }
+
+    private record FeatureData(String specification, int count, int minY, int maxY, float chance, int stage, String biome) {
+        private boolean direct() {
+            return specification.startsWith("placed:");
+        }
+
+        private String outputId(String namespace, int index) {
+            return direct() ? specification.substring("placed:".length()) : namespace + ":feature_" + index;
+        }
     }
 
     private List<String> collectStructurePlacements(WorldGenGraph graph) {
@@ -514,8 +718,10 @@ public class WorldGenDatapackCompiler {
         if (graph == null || graph.getNodes() == null) {
             return placements;
         }
-        for (WorldGenNode node : graph.getNodes().values()) {
-            if (node != null && "structure_placement".equals(node.getType())) {
+        Set<String> active = activeNodes(graph, "output_structures");
+        for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
+            WorldGenNode node = entry.getValue();
+            if (node != null && active.contains(entry.getKey()) && "structure_placement".equals(node.getType())) {
                 placements.add("structure:" + node.getInputValues().getOrDefault("structure_id", "") + ":" + Math.round(number(node.getInputValues().get("spacing"), 32)) + ":" + Math.round(number(node.getInputValues().get("separation"), 8)) + ":" + Math.round(number(node.getInputValues().get("salt"), 0)));
             }
         }
@@ -532,13 +738,25 @@ public class WorldGenDatapackCompiler {
             }
         }
         if (project.getSpawnGraph() != null && project.getSpawnGraph().getNodes() != null) {
-            for (WorldGenNode node : project.getSpawnGraph().getNodes().values()) {
-                if (node != null && "spawn_rule".equals(node.getType())) {
+            Set<String> active = activeNodes(project.getSpawnGraph(), "output_spawns");
+            for (Map.Entry<String, WorldGenNode> entry : project.getSpawnGraph().getNodes().entrySet()) {
+                WorldGenNode node = entry.getValue();
+                if (node != null && active.contains(entry.getKey()) && "spawn_rule".equals(node.getType())) {
                     WorldGenSpawnRule rule = new WorldGenSpawnRule();
                     rule.setEntityType(String.valueOf(node.getInputValues().getOrDefault("entity", "minecraft:zombie")));
                     rule.setWeight(Math.round(number(node.getInputValues().get("weight"), 10)));
                     rule.setMinGroup(Math.round(number(node.getInputValues().get("min_group"), 1)));
                     rule.setMaxGroup(Math.round(number(node.getInputValues().get("max_group"), 4)));
+                    rule.setCategory(String.valueOf(node.getInputValues().getOrDefault("category", "monster")));
+                    String biome = String.valueOf(node.getInputValues().getOrDefault("biome", "")).trim();
+                    rule.setBiomeFilters(biome.isBlank() ? List.of() : List.of(biome));
+                    rule.setMinY(Math.round(number(node.getInputValues().get("min_y"), -64)));
+                    rule.setMaxY(Math.round(number(node.getInputValues().get("max_y"), 319)));
+                    rule.setBlockBelow(String.valueOf(node.getInputValues().getOrDefault("block_below", "")));
+                    rule.setMinLight(Math.round(number(node.getInputValues().get("min_light"), 0)));
+                    rule.setMaxLight(Math.round(number(node.getInputValues().get("max_light"), 15)));
+                    rule.setTime(String.valueOf(node.getInputValues().getOrDefault("time", "any")));
+                    rule.setWeather(String.valueOf(node.getInputValues().getOrDefault("weather", "any")));
                     rules.add(rule);
                 }
             }
@@ -644,6 +862,15 @@ public class WorldGenDatapackCompiler {
             return Integer.parseInt(value);
         } catch (Exception ignored) {
             return fallback;
+        }
+    }
+
+    private boolean isInteger(String value) {
+        try {
+            Integer.parseInt(value);
+            return true;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 

@@ -36,6 +36,7 @@ public enum WorldGenTargetVersion {
         WorldGenDatapackCapability.JAVA_25_RUNTIME);
 
     public static final String OPTION_CONTEXT_KEY = "minecraft_version";
+    public static final String AUTOMATIC = "auto";
     public static final WorldGenTargetVersion DEFAULT = MINECRAFT_26_2;
     private static final List<String> SUPPORTED_IDS = Arrays.stream(values()).map(WorldGenTargetVersion::id).toList();
     private final String id;
@@ -95,6 +96,20 @@ public enum WorldGenTargetVersion {
     public static WorldGenTargetVersion resolve(String value) {
         if (value == null || value.isBlank()) {
             return DEFAULT;
+        }
+        return require(value);
+    }
+
+    public static WorldGenTargetVersion resolve(String value, String detectedVersion) {
+        if (value == null || value.isBlank() || AUTOMATIC.equalsIgnoreCase(value.trim())) {
+            if (detectedVersion == null || detectedVersion.isBlank()) {
+                throw new IllegalArgumentException("Minecraft Server Version Is Unavailable");
+            }
+            try {
+                return require(detectedVersion);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Minecraft Server Version " + detectedVersion + " Isn't Supported", exception);
+            }
         }
         return require(value);
     }

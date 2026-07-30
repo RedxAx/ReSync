@@ -2,6 +2,7 @@ package restudio.resync.worldgen.preview;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
@@ -9,8 +10,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
 import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
+import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
@@ -37,10 +40,12 @@ public class WorldGenPreviewManager {
     private final Map<String, Long> activeRequests = new ConcurrentHashMap<>();
     private final AtomicLong previewRevision = new AtomicLong();
     private final WorldGenDatapackCompiler datapackCompiler;
+    private final WorldGenDatapackInstaller datapackInstaller;
 
     public WorldGenPreviewManager(Plugin plugin) {
         this.plugin = plugin;
         this.datapackCompiler = new WorldGenDatapackCompiler(plugin);
+        this.datapackInstaller = new WorldGenDatapackInstaller();
     }
 
     public void createPreview(String previewId, String playerUuid, WorldGenGraph graph, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
@@ -49,7 +54,8 @@ public class WorldGenPreviewManager {
     }
 
     public void createPreview(String previewId, String playerUuid, WorldGenProject project, World.Environment environment, long seed, Consumer<PreviewWorld> onSuccess, Consumer<Throwable> onError) {
-        TerrainPipeline pipeline = PipelineCompiler.compileProject(project);
+        WorldGenGenerationMode generationMode = WorldGenGenerationMode.resolve(project.getSettings().getGenerationMode());
+        TerrainPipeline pipeline = generationMode == WorldGenGenerationMode.HYBRID ? PipelineCompiler.compileProject(project) : null;
         createPreview(previewId, playerUuid, project, pipeline, environment, seed, onSuccess, onError);
     }
 
@@ -156,18 +162,35 @@ public class WorldGenPreviewManager {
     }
 
     private PreviewWorld createWorldSync(String playerUuid, TerrainPipeline pipeline, WorldGenDatapackBuild datapackBuild, String worldName, World.Environment environment, long seed, Map<String, Location> previousLocations) {
-        TerrainPipelineHolder pipelineHolder = new TerrainPipelineHolder(pipeline);
-        WorldCreator creator = new WorldCreator(worldName);
-        creator.generator(new NodeGraphChunkGenerator(pipelineHolder));
-        creator.biomeProvider(new NodeGraphBiomeProvider(pipelineHolder));
-        creator.environment(environment);
+        boolean vanilla = datapackBuild != null
+            && WorldGenGenerationMode.resolve(datapackBuild.getGenerationMode()) == WorldGenGenerationMode.VANILLA;
+        TerrainPipelineHolder pipelineHolder = pipeline == null ? null : new TerrainPipelineHolder(pipeline);
+        WorldCreator creator;
+        if (vanilla) {
+            WorldGenDatapackInstaller.InstallResult install = datapackInstaller.install(datapackBuild, "");
+            if (!install.installed() || !install.enabled()) {
+                throw new IllegalStateException(install.message());
+            }
+            NamespacedKey dimensionKey = NamespacedKey.fromString(datapackBuild.getDimensionKey());
+            if (dimensionKey == null) {
+                throw new IllegalStateException("Vanilla Preview Dimension Missing");
+            }
+            creator = WorldCreator.ofNameAndKey(worldName, dimensionKey);
+        } else {
+            creator = new WorldCreator(worldName);
+            creator.generator(new NodeGraphChunkGenerator(pipelineHolder));
+            creator.biomeProvider(new NodeGraphBiomeProvider(pipelineHolder));
+            creator.environment(environment);
+        }
         creator.seed(seed);
         creator.type(WorldType.NORMAL);
-        creator.generateStructures(pipeline.hasAnyVanillaStructuresEnabled());
+        creator.generateStructures(vanilla || pipeline.hasAnyVanillaStructuresEnabled());
         World world = creator.createWorld();
         if (world == null) throw new IllegalStateException("Preview World Failed");
         configurePreviewWorld(world);
-        WorldGenRuntimeRegistry.register(world, pipelineHolder);
+        if (pipelineHolder != null) {
+            WorldGenRuntimeRegistry.register(world, pipelineHolder);
+        }
         Player player = resolvePreviewPlayer(playerUuid);
         restorePreviewPlayers(world, previousLocations, player);
         if (player != null && !previousLocations.containsKey(player.getUniqueId().toString())) {

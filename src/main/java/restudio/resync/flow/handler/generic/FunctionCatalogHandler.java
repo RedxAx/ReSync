@@ -126,7 +126,7 @@ public class FunctionCatalogHandler implements NodeHandler {
         if (storage == null) {
             return List.of();
         }
-        return storage.listFlowIds().stream()
+        return storage.listGraphIds("function").stream()
             .filter(id -> function(id) != null)
             .sorted(String.CASE_INSENSITIVE_ORDER)
             .toList();

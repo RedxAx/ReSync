@@ -227,7 +227,8 @@ public final class AssetIntegrityService {
             return false;
         }
         String first = relative.getName(0).toString();
-        return first.equals(".transactions") || first.equals(".snapshots") || first.equals(".quarantine") || first.equals(".durability") || first.equals("migration-backups");
+        return first.equals(".transactions") || first.equals(".snapshots") || first.equals(".quarantine") || first.equals(".durability")
+            || first.equals(".tombstones") || first.equals(".migrations") || first.equals("migration-backups");
     }
 
     private String text(JsonObject object, String key) {

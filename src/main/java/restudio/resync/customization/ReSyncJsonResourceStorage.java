@@ -7,6 +7,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.resources.RecipeSchemaNormalizer;
+import restudio.resync.storage.StorageSafety;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -74,6 +76,9 @@ public class ReSyncJsonResourceStorage {
             throw new IllegalArgumentException("Unknown resource type: " + type);
         }
         normalizeAssetId(value, id(value));
+        if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+            RecipeSchemaNormalizer.normalize(value);
+        }
         if (ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
             prepareMotdIcon(value);
         }
@@ -153,6 +158,33 @@ public class ReSyncJsonResourceStorage {
     public void migrateLegacyAssets() {
         for (JsonAssetStore<JsonObject> store : stores.values()) {
             store.migrateLegacyAssets();
+        }
+        Path reportFile = plugin.getDataFolder().toPath().resolve(".migrations").resolve("recipe-schema-v1.json");
+        if (Files.exists(reportFile)) {
+            return;
+        }
+        JsonAssetStore<JsonObject> recipes = stores.get(ReSyncResourceCatalog.RECIPE_DEFINITION);
+        int inspected = 0;
+        int normalized = 0;
+        if (recipes != null) {
+            for (String recipeId : recipes.listIds()) {
+                inspected++;
+                JsonObject recipe = recipes.get(recipeId);
+                if (RecipeSchemaNormalizer.normalize(recipe)) {
+                    recipes.save(recipe);
+                    normalized++;
+                }
+            }
+        }
+        JsonObject report = new JsonObject();
+        report.addProperty("version", 1);
+        report.addProperty("inspected", inspected);
+        report.addProperty("normalized", normalized);
+        report.addProperty("unchanged", inspected - normalized);
+        try {
+            StorageSafety.writeUtf8Atomic(reportFile, gson.toJson(report));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to save recipe migration report", exception);
         }
     }
 

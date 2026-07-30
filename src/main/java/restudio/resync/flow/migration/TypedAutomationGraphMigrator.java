@@ -14,6 +14,7 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.automation.AutomationReferences;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.resource.ReSyncResourceKey;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.storage.MigrationLedger;
 import restudio.resync.storage.StorageSafety;
@@ -50,26 +51,33 @@ public final class TypedAutomationGraphMigrator {
         if (flows == null || resources == null) {
             return;
         }
-        String migrationId = "typed-automation-v1";
+        String migrationId = "typed-automation-v2";
         indexVariableTypes();
         int migratedGraphs = 0;
         int migratedNodes = 0;
         int skippedNodes = 0;
         try (MigrationLedger.Fence fence = MigrationLedger.acquireFence(flows.getAssetsPath())) {
             MigrationLedger ledger = new MigrationLedger(flows.getAssetsPath());
-            for (String flowId : flows.listFlowIds()) {
-                String storedType = flows.getGraphResourceType(flowId);
+            List<ReSyncResourceKey> graphs = List.of("flow", "function", "command").stream()
+                .flatMap(type -> flows.listGraphIds(type).stream().map(id -> new ReSyncResourceKey(type, id)))
+                .toList();
+            for (ReSyncResourceKey graphKey : graphs) {
+                String flowId = graphKey.id();
+                String storedType = graphKey.type();
+                String ledgerId = storedType + ":" + flowId;
                 String backupType = flows.getTypedAutomationBackupGraphResourceType(flowId);
                 boolean recoveringFunction = "flow".equals(storedType) && "function".equals(backupType);
-                FlowGraph graph = storedType.isBlank() ? flows.getGraph(flowId) : flows.getGraph(storedType, flowId);
-                if (graph == null || graph.getNodes() == null) {
+                FlowGraph storedGraph = flows.getGraph(storedType, flowId);
+                if (storedGraph == null || storedGraph.getNodes() == null) {
                     continue;
                 }
-                String sourceHash = StorageSafety.sha256(FlowSerializer.serialize(graph));
-                if (ledger.isCommitted(migrationId, flowId, sourceHash)) {
+                String sourceHash = StorageSafety.sha256(FlowSerializer.serialize(storedGraph));
+                if (ledger.isCommitted(migrationId, ledgerId, sourceHash)) {
                     continue;
                 }
                 try {
+                    FlowGraph graph = FlowSerializer.deserialize(FlowSerializer.serialize(storedGraph));
+                    Map<ReSyncResourceKey, JsonObject> pendingResources = new LinkedHashMap<>();
                     boolean normalizedType = ("function".equals(storedType) || recoveringFunction) && !graph.isFunction();
                     if (normalizedType) {
                         graph.setFunction(true);
@@ -82,7 +90,7 @@ public final class TypedAutomationGraphMigrator {
                         }
                         MigrationResult result;
                         try {
-                            result = migrateNode(graph, flowId, entry.getKey(), node);
+                            result = migrateNode(graph, flowId, entry.getKey(), node, pendingResources);
                         } catch (RuntimeException failure) {
                             Log.warn("[TypedAutomationMigrator] Kept " + flowId + "/" + entry.getKey()
                                 + " on its compatibility handler: " + failure.getMessage());
@@ -94,23 +102,30 @@ public final class TypedAutomationGraphMigrator {
                             skippedNodes++;
                         }
                     }
-                    ledger.prepare(migrationId, flowId, storedType, graph.getResourceRevision(), sourceHash, 1, fence.epoch());
+                    ledger.prepare(migrationId, ledgerId, storedType, graph.getResourceRevision(), sourceHash, 1, fence.epoch());
                     if (changed > 0 || normalizedType) {
                         if (changed > 0 && !recoveringFunction) {
-                            flows.backupGraphForMigration(flowId, migrationId + "-" + sourceHash.substring(0, 12));
+                            flows.backupGraphForMigration(storedType, flowId, migrationId + "-" + sourceHash.substring(0, 12));
                         }
-                        if (recoveringFunction) {
-                            flows.reclassifyGraph(graph, "function");
-                        } else {
-                            flows.saveGraph(graph);
+                        flows.requireValidGraph(graph);
+                        List<ReSyncResourceKey> createdResources = savePendingResources(pendingResources);
+                        try {
+                            if (recoveringFunction) {
+                                flows.reclassifyGraph(graph, "function");
+                            } else {
+                                flows.saveGraph(graph);
+                            }
+                        } catch (RuntimeException failure) {
+                            rollbackResources(createdResources, failure);
+                            throw failure;
                         }
                         migratedGraphs++;
                         migratedNodes += changed;
                     }
-                    ledger.commit(migrationId, flowId, sourceHash);
+                    ledger.commit(migrationId, ledgerId, sourceHash);
                 } catch (RuntimeException | IOException failure) {
                     try {
-                        ledger.fail(migrationId, flowId, sourceHash, failure.getMessage());
+                        ledger.fail(migrationId, ledgerId, sourceHash, failure.getMessage());
                     } catch (IOException ledgerFailure) {
                         failure.addSuppressed(ledgerFailure);
                     }
@@ -126,12 +141,13 @@ public final class TypedAutomationGraphMigrator {
         }
     }
 
-    private MigrationResult migrateNode(FlowGraph graph, String flowId, String nodeId, FlowNode node) {
+    private MigrationResult migrateNode(FlowGraph graph, String flowId, String nodeId, FlowNode node,
+                                        Map<ReSyncResourceKey, JsonObject> pendingResources) {
         if ("variable.access".equals(node.getType())) {
-            return migrateVariable(graph, flowId, nodeId, node);
+            return migrateVariable(graph, flowId, nodeId, node, pendingResources);
         }
         if (SCHEDULE_TYPES.contains(node.getType())) {
-            return migrateSchedule(graph, flowId, nodeId, node);
+            return migrateSchedule(graph, flowId, nodeId, node, pendingResources);
         }
         if ("schedule.cancel_task".equals(node.getType()) && recoverableCancel(graph, nodeId)) {
             return migrateCancelTask(graph, nodeId, node);
@@ -139,7 +155,8 @@ public final class TypedAutomationGraphMigrator {
         return MigrationResult.UNCHANGED;
     }
 
-    private MigrationResult migrateVariable(FlowGraph graph, String flowId, String nodeId, FlowNode node) {
+    private MigrationResult migrateVariable(FlowGraph graph, String flowId, String nodeId, FlowNode node,
+                                            Map<ReSyncResourceKey, JsonObject> pendingResources) {
         Map<String, Object> input = values(node);
         String action = text(input.getOrDefault("mode", "get")).toLowerCase(Locale.ROOT);
         if ("list".equals(action) || wired(graph, nodeId, Set.of("name", "scope", "persist"))) {
@@ -171,11 +188,11 @@ public final class TypedAutomationGraphMigrator {
             return MigrationResult.SKIPPED;
         }
         String definitionId = definitionId("variable", name, scope, persistent ? "persistent" : "runtime", valueType);
-        saveVariableDefinition(definitionId, name, scope, persistent, valueType);
+        saveVariableDefinition(pendingResources, definitionId, name, scope, persistent, valueType);
         Object owner = input.get("player");
         input.keySet().removeAll(Set.of("mode", "scope", "persist", "name", "player"));
         input.put("variable", new FlowResourceReference(ReSyncResourceCatalog.VARIABLE_DEFINITION, definitionId, "server"));
-        input.put("action", action);
+        input.put("action", action.substring(0, 1).toUpperCase(Locale.ROOT) + action.substring(1));
         if (owner != null) {
             input.put("owner", owner);
         }
@@ -221,7 +238,8 @@ public final class TypedAutomationGraphMigrator {
         }
     }
 
-    private MigrationResult migrateSchedule(FlowGraph graph, String flowId, String nodeId, FlowNode node) {
+    private MigrationResult migrateSchedule(FlowGraph graph, String flowId, String nodeId, FlowNode node,
+                                            Map<ReSyncResourceKey, JsonObject> pendingResources) {
         if (wired(graph, nodeId, identityPins(node.getType())) || outgoing(graph, nodeId, Set.of("result"))
             || (outgoing(graph, nodeId, Set.of("task_id")) && !recoverableTaskOutputs(graph, nodeId))) {
             return MigrationResult.SKIPPED;
@@ -236,7 +254,7 @@ public final class TypedAutomationGraphMigrator {
         if (definition == null) {
             return MigrationResult.SKIPPED;
         }
-        saveIfMissing(ReSyncResourceCatalog.SCHEDULE_DEFINITION, definitionId, definition);
+        queueIfMissing(pendingResources, ReSyncResourceCatalog.SCHEDULE_DEFINITION, definitionId, definition);
         Object flowInput = input.get("flow");
         Map<String, Object> replacement = new LinkedHashMap<>();
         if (flowInput != null) {
@@ -277,7 +295,8 @@ public final class TypedAutomationGraphMigrator {
         return MigrationResult.MIGRATED;
     }
 
-    private void saveVariableDefinition(String id, String name, String scope, boolean persistent, String valueType) {
+    private void saveVariableDefinition(Map<ReSyncResourceKey, JsonObject> pendingResources, String id, String name, String scope,
+                                        boolean persistent, String valueType) {
         JsonObject definition = new JsonObject();
         definition.addProperty("id", id);
         definition.addProperty("name", name);
@@ -285,7 +304,7 @@ public final class TypedAutomationGraphMigrator {
         definition.addProperty("valueType", valueType);
         definition.addProperty("scope", scope);
         definition.addProperty("persistent", persistent);
-        saveIfMissing(ReSyncResourceCatalog.VARIABLE_DEFINITION, id, definition);
+        queueIfMissing(pendingResources, ReSyncResourceCatalog.VARIABLE_DEFINITION, id, definition);
     }
 
     private JsonObject scheduleDefinition(String id, String type, String targetId, Map<String, Object> input) {
@@ -340,9 +359,36 @@ public final class TypedAutomationGraphMigrator {
         return definition;
     }
 
-    private void saveIfMissing(String type, String id, JsonObject definition) {
+    private void queueIfMissing(Map<ReSyncResourceKey, JsonObject> pendingResources, String type, String id, JsonObject definition) {
         if (resources.get(type, id) == null) {
-            resources.save(type, definition);
+            pendingResources.putIfAbsent(new ReSyncResourceKey(type, id), definition);
+        }
+    }
+
+    private List<ReSyncResourceKey> savePendingResources(Map<ReSyncResourceKey, JsonObject> pendingResources) {
+        List<ReSyncResourceKey> created = new ArrayList<>();
+        try {
+            for (Map.Entry<ReSyncResourceKey, JsonObject> entry : pendingResources.entrySet()) {
+                ReSyncResourceKey key = entry.getKey();
+                if (resources.get(key.type(), key.id()) == null) {
+                    resources.save(key.type(), entry.getValue());
+                    created.add(key);
+                }
+            }
+            return created;
+        } catch (RuntimeException failure) {
+            rollbackResources(created, failure);
+            throw failure;
+        }
+    }
+
+    private void rollbackResources(List<ReSyncResourceKey> created, RuntimeException failure) {
+        for (ReSyncResourceKey key : created.reversed()) {
+            try {
+                resources.delete(key.type(), key.id());
+            } catch (RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
         }
     }
 

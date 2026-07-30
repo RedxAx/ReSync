@@ -4,14 +4,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
+import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.CustomFunctionCallHandler;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.registry.NodeDefinitionValidator;
+import restudio.resync.flow.validation.FlowGraphValidator;
 
-import java.util.List;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -72,5 +77,38 @@ class CustomFunctionNodeDefinitionsTest {
 
         assertEquals(1, generated.size());
         assertEquals("custom_function:valid_function", generated.getFirst().getId());
+    }
+
+    @Test
+    void persistedFunctionRemainsCallableFromCommandAfterStorageReload() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph function = new FlowGraph();
+        function.setId("Name_Color_Select");
+        function.setFunction(true);
+        storage.saveGraph(function);
+
+        FlowStorage reopened = new FlowStorage(tempDir.toFile());
+        NodeDefinitionRegistry definitions = new NodeDefinitionRegistry();
+        HandlerRegistry handlers = new HandlerRegistry();
+        new CustomFunctionCallHandler().registerTo(handlers);
+        CustomFunctionNodeDefinitions.rebuild(definitions, reopened);
+        definitions.register(new NodeDefinition.Builder("event.resync.command", "Command Start", NodeDefinition.NodeCategory.EVENT)
+            .input("command", NodeDefinition.PinType.DATA, FlowDataType.STRING)
+            .trigger(true)
+            .eventType("resync.command")
+            .build());
+        reopened.setGraphValidator(new FlowGraphValidator(definitions, handlers, new TypeAdapterRegistry(), new OptionCatalogRegistry()));
+        FlowGraph command = new FlowGraph();
+        command.setId("name");
+        command.setResourceType("command");
+        command.setNodes(new HashMap<>(Map.of(
+            "start", new FlowNode("event.resync.command", 0, 0, Map.of("command", "name")),
+            "select", new FlowNode("custom_function:Name_Color_Select", 240, 0, Map.of())
+        )));
+
+        reopened.saveGraph(command);
+
+        assertEquals(List.of("Name_Color_Select"), reopened.listGraphIds("function"));
+        assertEquals(List.of("name"), reopened.listGraphIds("command"));
     }
 }

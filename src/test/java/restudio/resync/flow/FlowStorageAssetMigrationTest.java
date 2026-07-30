@@ -112,7 +112,7 @@ class FlowStorageAssetMigrationTest {
     void graphStorageRejectsCrossTypeDuplicateIds() {
         FlowStorage storage = new FlowStorage(tempDir.toFile());
         FlowGraph command = FlowSerializer.deserialize("""
-            {"id":"shared","version":2,"resourceType":"command","nodes":{},"connections":[],"localVariables":[]}
+            {"id":"shared","version":2,"resourceType":"command","nodes":{"start":{"type":"event.resync.command","version":1,"x":0,"y":0,"inputValues":{}}},"connections":[],"localVariables":[]}
             """);
         FlowGraph function = FlowSerializer.deserialize("""
             {"id":"shared","version":2,"function":true,"resourceType":"function","nodes":{},"connections":[],"localVariables":[]}
@@ -244,6 +244,16 @@ class FlowStorageAssetMigrationTest {
     }
 
     @Test
+    void migrationRemovesEmptyFoldersThatAreNotInProjectMetadata() throws Exception {
+        Path leakedCopy = tempDir.resolve("assets/Blueprints/Commands/Blueprints Copy");
+        Files.createDirectories(leakedCopy);
+
+        new FlowStorage(tempDir.toFile());
+
+        assertFalse(Files.exists(leakedCopy));
+    }
+
+    @Test
     void graphResourcesUseTheManagedLifecycleRegistry() {
         FlowStorage storage = new FlowStorage(tempDir.toFile());
         FlowResourceRegistry registry = new FlowResourceRegistry();
@@ -270,7 +280,7 @@ class FlowStorageAssetMigrationTest {
             {"id":"lookup","version":2,"function":true,"nodes":{},"connections":[],"localVariables":[]}
             """);
         FlowGraph command = FlowSerializer.deserialize("""
-            {"id":"restart","version":2,"resourceType":"command","nodes":{},"connections":[],"localVariables":[]}
+            {"id":"restart","version":2,"resourceType":"command","nodes":{"start":{"type":"event.resync.command","version":1,"x":0,"y":0,"inputValues":{}}},"connections":[],"localVariables":[]}
             """);
         storage.saveGraph(function);
         storage.saveGraph(command);

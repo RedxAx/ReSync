@@ -521,14 +521,20 @@ public class ReSyncCommand implements TabExecutor {
             }
             return true;
         }
-        JsonObject resource = storage.get(type, id);
-        if (resource == null) {
+        JsonObject stored = storage.get(type, id);
+        if (stored == null) {
             sendError(sender, "Resource Not Found", id);
             return true;
         }
+        JsonObject resource = stored.deepCopy();
         String value = joinArgs(args, 5);
         putResourceValue(resource, field, value);
-        storage.save(type, resource);
+        try {
+            storage.save(type, resource);
+        } catch (IllegalArgumentException exception) {
+            sendError(sender, "Resource Update Rejected", exception.getMessage());
+            return true;
+        }
         sendSuccess(sender, "Resource Updated", id + " " + field);
         return true;
     }
@@ -1136,7 +1142,7 @@ public class ReSyncCommand implements TabExecutor {
 
     private boolean arrayResourceField(String field) {
         return switch (field) {
-            case "frames", "colors", "shape", "ingredients", "nodes", "temporaryNodes", "parents", "tracks", "prefixes", "suffixes", "players", "sources", "offers", "pools" -> true;
+            case "frames", "values", "colors", "shape", "ingredients", "nodes", "temporaryNodes", "parents", "tracks", "prefixes", "suffixes", "players", "sources", "offers", "pools" -> true;
             default -> false;
         };
     }

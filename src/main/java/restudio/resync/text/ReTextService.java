@@ -42,6 +42,11 @@ public class ReTextService {
 
     public ReTextService(ReSyncJsonResourceStorage storage) {
         this.storage = storage;
+        storage.addListener((type, id, value, deleted) -> {
+            if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type)) {
+                clearTemplateCache();
+            }
+        });
     }
 
     public Component render(String input, Player subject, Player viewer) {

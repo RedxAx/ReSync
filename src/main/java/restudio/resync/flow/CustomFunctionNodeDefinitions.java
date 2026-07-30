@@ -29,7 +29,7 @@ public final class CustomFunctionNodeDefinitions {
 
         definitionRegistry.unregisterPlugin(PLUGIN_ID);
         List<NodeDefinition> definitions = new ArrayList<>();
-        Set<String> flowIds = new HashSet<>(storage.listFlowIds());
+        Set<String> flowIds = new HashSet<>(storage.listGraphIds("function"));
         flowIds.removeIf(flowId -> flowId == null || flowId.isBlank());
         List<String> sortedFlowIds = new ArrayList<>(flowIds);
         sortedFlowIds.sort(String.CASE_INSENSITIVE_ORDER);

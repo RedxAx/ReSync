@@ -162,6 +162,21 @@ class StorageDurabilityTest {
     }
 
     @Test
+    void integrityScanIgnoresInternalMigrationAndDurabilityState() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Files.createDirectories(assets.resolve(".migrations"));
+        Files.createDirectories(assets.resolve(".tombstones"));
+        Files.writeString(assets.resolve(".migrations/command-bindings-v1.json"), "{\"migration\":\"command-bindings-v1\"}");
+        Files.writeString(assets.resolve(".tombstones/deleted.json"), "{\"id\":\"deleted\"}");
+        Files.writeString(assets.resolve("project.json"), "{\"resources\":[]}");
+
+        AssetIntegrityService.HealthReport report = new AssetIntegrityService(assets).scan(0);
+
+        assertEquals(AssetIntegrityService.Status.HEALTHY, report.status());
+        assertTrue(report.issues().isEmpty());
+    }
+
+    @Test
     void integrityScanUsesProjectPathsToDistinguishRecoverableCopies() throws Exception {
         Path assets = tempDir.resolve("assets");
         Path canonical = assets.resolve("Blueprints").resolve("Commands").resolve("shared.json");

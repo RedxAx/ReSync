@@ -1227,6 +1227,10 @@ public final class FlowGraphValidator {
         if (name == null) {
             return false;
         }
+        if (Set.of("event.resync.command", "event:resync_command").contains(definition.getId())
+            && Set.of("command", "subcommands", "structured").contains(name)) {
+            return true;
+        }
         if ("__flow_branches".equals(name) || "__removed_optional_inputs".equals(name) || "__permission_count".equals(name)
             || CALL_PARAMETERS_KEY.equals(name) || "__function_signature".equals(name) || "__function_signature_issues".equals(name)) {
             return true;

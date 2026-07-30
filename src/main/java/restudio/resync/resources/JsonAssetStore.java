@@ -377,8 +377,11 @@ public class JsonAssetStore<T> {
         try (Stream<Path> paths = Files.walk(assetsRoot)) {
             for (Path path : paths.filter(Files::isRegularFile).toList()) {
                 AssetName asset = assetName(path);
+                if (!typeId.equals(asset.type())) {
+                    continue;
+                }
                 String safeId = safeId(asset.id(), "index");
-                if (!typeId.equals(asset.type()) || safeId == null) {
+                if (safeId == null) {
                     continue;
                 }
                 Path existing = fileIndex.get(safeId);

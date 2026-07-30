@@ -117,6 +117,23 @@ class FlowGraphValidatorTest {
     }
 
     @Test
+    void commandResourceMetadataIsNotValidatedAsInputPins() {
+        definitions.register(new NodeDefinition.Builder("event.resync.command", "Command Start", NodeDefinition.NodeCategory.EVENT)
+            .trigger(true)
+            .eventType("resync.command")
+            .build());
+        FlowGraph command = graph(Map.of(
+            "start", new FlowNode("event.resync.command", 0, 0, Map.of(
+                "command", "gui",
+                "subcommands", List.of(),
+                "structured", false
+            ))
+        ), List.of());
+
+        assertTrue(validator.validate(command).valid());
+    }
+
+    @Test
     void templatePlaceholdersAreValidatedAsDynamicDataInputs() {
         definitions.register(query("test.color", FlowDataType.STRING));
         definitions.register(action("test.message", FlowDataType.STRING, null));

@@ -52,13 +52,14 @@ class TypedAutomationGraphMigratorTest {
 
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
-        assertEquals("automation.variable", node.getType());
-        FlowResourceReference reference = assertInstanceOf(FlowResourceReference.class, node.getInputValues().get("variable"));
+        FlowNode migrated = flows.getGraph("variables").getNodes().get("variable");
+        assertEquals("automation.variable", migrated.getType());
+        FlowResourceReference reference = assertInstanceOf(FlowResourceReference.class, migrated.getInputValues().get("variable"));
         assertEquals(ReSyncResourceCatalog.VARIABLE_DEFINITION, reference.kind());
         assertNotNull(resources.get(ReSyncResourceCatalog.VARIABLE_DEFINITION, reference.id()));
-        assertEquals("set", node.getInputValues().get("action"));
-        assertFalse(node.getInputValues().containsKey("scope"));
-        assertFalse(node.getInputValues().containsKey("persist"));
+        assertEquals("Set", migrated.getInputValues().get("action"));
+        assertFalse(migrated.getInputValues().containsKey("scope"));
+        assertFalse(migrated.getInputValues().containsKey("persist"));
     }
 
     @Test
@@ -76,6 +77,23 @@ class TypedAutomationGraphMigratorTest {
     }
 
     @Test
+    void rejectedGraphLeavesCacheAndResourcesUnchanged() {
+        JavaPlugin plugin = MockBukkit.createMockPlugin();
+        RejectingFlowStorage rejectingFlows = new RejectingFlowStorage(plugin);
+        ReSyncJsonResourceStorage rejectingResources = new ReSyncJsonResourceStorage(plugin);
+        FlowGraph graph = graph("rejected-variables");
+        graph.getNodes().put("variable", new FlowNode("variable.access", 0, 0, new HashMap<>(Map.of(
+            "mode", "set", "scope", "global", "persist", false, "name", "Round", "value", 1))));
+        rejectingFlows.saveGraph(graph);
+        rejectingFlows.reject = true;
+
+        new TypedAutomationGraphMigrator(rejectingFlows, rejectingResources).migrateStoredFlows();
+
+        assertEquals("variable.access", rejectingFlows.getGraph("rejected-variables").getNodes().get("variable").getType());
+        assertTrue(rejectingResources.listIds(ReSyncResourceCatalog.VARIABLE_DEFINITION).isEmpty());
+    }
+
+    @Test
     void groupsCompatibleGetAndSetUsagesIntoTheSameDefinition() {
         FlowGraph graph = graph("grouped-variables");
         FlowNode setter = new FlowNode("variable.access", 0, 0, new HashMap<>(Map.of(
@@ -88,8 +106,9 @@ class TypedAutomationGraphMigratorTest {
 
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
-        FlowResourceReference setReference = assertInstanceOf(FlowResourceReference.class, setter.getInputValues().get("variable"));
-        FlowResourceReference getReference = assertInstanceOf(FlowResourceReference.class, getter.getInputValues().get("variable"));
+        FlowGraph migrated = flows.getGraph("grouped-variables");
+        FlowResourceReference setReference = assertInstanceOf(FlowResourceReference.class, migrated.getNodes().get("setter").getInputValues().get("variable"));
+        FlowResourceReference getReference = assertInstanceOf(FlowResourceReference.class, migrated.getNodes().get("getter").getInputValues().get("variable"));
         assertEquals(setReference.id(), getReference.id());
     }
 
@@ -105,10 +124,12 @@ class TypedAutomationGraphMigratorTest {
 
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
-        assertEquals("automation.schedule", schedule.getType());
-        FlowResourceReference reference = assertInstanceOf(FlowResourceReference.class, schedule.getInputValues().get("schedule"));
+        FlowGraph migrated = flows.getGraph("schedules");
+        FlowNode migratedSchedule = migrated.getNodes().get("schedule");
+        assertEquals("automation.schedule", migratedSchedule.getType());
+        FlowResourceReference reference = assertInstanceOf(FlowResourceReference.class, migratedSchedule.getInputValues().get("schedule"));
         assertNotNull(resources.get(ReSyncResourceCatalog.SCHEDULE_DEFINITION, reference.id()));
-        assertEquals("scheduled", graph.getConnections().getFirst().getSourcePin());
+        assertEquals("scheduled", migrated.getConnections().getFirst().getSourcePin());
     }
 
     @Test
@@ -124,10 +145,11 @@ class TypedAutomationGraphMigratorTest {
 
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
-        assertEquals("automation.schedule", schedule.getType());
-        assertEquals("automation.scheduled_task", cancel.getType());
-        assertEquals("task", graph.getConnections().getFirst().getSourcePin());
-        assertEquals("task", graph.getConnections().getFirst().getTargetPin());
+        FlowGraph migrated = flows.getGraph("schedule-cancel");
+        assertEquals("automation.schedule", migrated.getNodes().get("schedule").getType());
+        assertEquals("automation.scheduled_task", migrated.getNodes().get("cancel").getType());
+        assertEquals("task", migrated.getConnections().getFirst().getSourcePin());
+        assertEquals("task", migrated.getConnections().getFirst().getTargetPin());
     }
 
     @Test
@@ -142,8 +164,9 @@ class TypedAutomationGraphMigratorTest {
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
         assertEquals("function", flows.getGraphResourceType(graph.getId()));
-        assertTrue(graph.isFunction());
-        assertEquals("automation.variable", graph.getNodes().get("variable").getType());
+        FlowGraph migrated = flows.getGraph("function", graph.getId());
+        assertTrue(migrated.isFunction());
+        assertEquals("automation.variable", migrated.getNodes().get("variable").getType());
     }
 
     @Test
@@ -157,13 +180,30 @@ class TypedAutomationGraphMigratorTest {
         new TypedAutomationGraphMigrator(flows, resources).migrateStoredFlows();
 
         assertEquals("function", flows.getGraphResourceType(graph.getId()));
-        assertTrue(graph.isFunction());
-        assertEquals(1, graph.getNodes().size());
+        FlowGraph migrated = flows.getGraph("function", graph.getId());
+        assertTrue(migrated.isFunction());
+        assertEquals(1, migrated.getNodes().size());
     }
 
     private FlowGraph graph(String id) {
         FlowGraph graph = new FlowGraph();
         graph.setId(id);
         return graph;
+    }
+
+    private static final class RejectingFlowStorage extends FlowStorage {
+        private boolean reject;
+
+        private RejectingFlowStorage(JavaPlugin plugin) {
+            super(plugin);
+        }
+
+        @Override
+        public void requireValidGraph(FlowGraph graph) {
+            if (reject) {
+                throw new IllegalArgumentException("Rejected");
+            }
+            super.requireValidGraph(graph);
+        }
     }
 }

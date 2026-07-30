@@ -1,6 +1,7 @@
 package restudio.resync.worldgen.pipeline;
 
 import restudio.flow.data.FlowDataType;
+import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenGraph;
@@ -9,6 +10,7 @@ import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenStage;
 import restudio.resync.worldgen.evaluator.FractalEvaluator;
 import restudio.resync.worldgen.evaluator.NoiseEvaluator;
+import restudio.resync.worldgen.datapack.VanillaWorldGenValidator;
 import restudio.resync.worldgen.registry.WorldGenNodeDefinitions;
 import restudio.resync.worldgen.registry.WorldGenNodeRegistry;
 import org.bukkit.Material;
@@ -26,9 +28,15 @@ public class PipelineCompiler {
         long started = System.nanoTime();
         WorldGenCompileDiagnostics diagnostics = new WorldGenCompileDiagnostics();
         try {
-            compileProject(project);
+            if (isVanilla(project)) {
+                VanillaWorldGenValidator.validate(project);
+            } else {
+                compileProject(project);
+            }
             diagnostics.setSuccess(true);
-            addCapabilityWarnings(project, diagnostics);
+            if (!isVanilla(project)) {
+                addCapabilityWarnings(project, diagnostics);
+            }
         } catch (CompilationException exception) {
             diagnostics.setSuccess(false);
             diagnostics.add(stageFromMessage(exception.getMessage()), "error", exception.getMessage());
@@ -71,7 +79,13 @@ public class PipelineCompiler {
 
     public static TerrainPipeline compileProject(WorldGenProject project) {
         if (project == null) throw new CompilationException("Project Missing");
-        if (project.getSettings() != null) WorldGenTargetVersion.require(project.getSettings().getTargetVersion());
+        if (isVanilla(project)) throw new CompilationException("Vanilla Projects Compile Through The Datapack Pipeline");
+        if (project.getSettings() != null) {
+            String targetVersion = project.getSettings().getTargetVersion();
+            if (targetVersion != null && !targetVersion.isBlank() && !WorldGenTargetVersion.AUTOMATIC.equalsIgnoreCase(targetVersion.trim())) {
+                WorldGenTargetVersion.require(targetVersion);
+            }
+        }
         WorldGenNodeRegistry registry = WorldGenNodeRegistry.getInstance();
         if (!registry.hasDefinitions()) {
             WorldGenNodeDefinitions.registerDefaults(registry);
@@ -104,6 +118,11 @@ public class PipelineCompiler {
             biomePolicy.spawnRules(), settings == null ? StructureTerrainPolicy.DEFAULT
                 : new StructureTerrainPolicy(settings.isVanillaStructureTerrainSafety(), settings.getVanillaStructureSampleRadius(),
                     settings.getVanillaStructureMaxHeightDelta()));
+    }
+
+    private static boolean isVanilla(WorldGenProject project) {
+        return project != null && project.getSettings() != null
+            && WorldGenGenerationMode.resolve(project.getSettings().getGenerationMode()) == WorldGenGenerationMode.VANILLA;
     }
 
     public static TerrainPipeline compile(WorldGenGraph graph) {
@@ -287,13 +306,14 @@ public class PipelineCompiler {
             case "liquid_lake" -> (ctx, upstreams) -> "lake:" + input(node, upstreams, "fluid", "minecraft:water");
             case "disk" -> (ctx, upstreams) -> "disk:" + input(node, upstreams, "block", "minecraft:clay") + ":" + inputFloat(node, upstreams, "radius", 4f);
             case "boulder" -> (ctx, upstreams) -> "boulder:" + input(node, upstreams, "block", "minecraft:mossy_cobblestone");
-            case "scatter" -> (ctx, upstreams) -> input(node, upstreams, "feature", "") + "|scatter|" + inputFloat(node, upstreams, "chance", 0.1f);
-            case "poisson_scatter" -> (ctx, upstreams) -> input(node, upstreams, "feature", "") + "|poisson|" + inputFloat(node, upstreams, "spacing", 12f);
+            case "placed_feature" -> (ctx, upstreams) -> "placed:" + input(node, upstreams, "feature", "minecraft:patch_grass");
+            case "scatter" -> (ctx, upstreams) -> append(input(node, upstreams, "previous", ""), input(node, upstreams, "feature", "") + "|scatter|" + inputFloat(node, upstreams, "count", 8f) + "|" + inputFloat(node, upstreams, "chance", 1f) + "|" + inputFloat(node, upstreams, "min_y", -64f) + "|" + inputFloat(node, upstreams, "max_y", 319f) + "|" + input(node, upstreams, "biome", "") + "|" + input(node, upstreams, "generation_step", "vegetal_decoration") + "|" + inputBoolean(node, upstreams, "override_vanilla", false));
+            case "poisson_scatter" -> (ctx, upstreams) -> append(input(node, upstreams, "previous", ""), input(node, upstreams, "feature", "") + "|poisson|" + inputFloat(node, upstreams, "spacing", 12f) + "|" + inputFloat(node, upstreams, "min_y", -64f) + "|" + inputFloat(node, upstreams, "max_y", 319f) + "|" + input(node, upstreams, "biome", "") + "|" + input(node, upstreams, "generation_step", "vegetal_decoration") + "|" + inputBoolean(node, upstreams, "override_vanilla", false));
             case "biome_filter" -> (ctx, upstreams) -> true;
             case "height_filter" -> (ctx, upstreams) -> ctx.y() >= inputFloat(node, upstreams, "min", 0f) && ctx.y() <= inputFloat(node, upstreams, "max", 320f);
             case "chance_filter" -> (ctx, upstreams) -> deterministicChance(ctx.x(), ctx.z(), seed(node, upstreams, ctx), inputFloat(node, upstreams, "chance", 0.5f));
-            case "structure_placement" -> (ctx, upstreams) -> "structure:" + input(node, upstreams, "structure_id", "") + ":" + Math.round(inputFloat(node, upstreams, "spacing", 32f)) + ":" + Math.round(inputFloat(node, upstreams, "separation", 8f)) + ":" + seed(node, upstreams, ctx) + ":" + Math.round(inputFloat(node, upstreams, "y_offset", 0f));
-            case "spawn_rule" -> (ctx, upstreams) -> "spawn:" + input(node, upstreams, "entity", "minecraft:zombie") + ":" + Math.round(inputFloat(node, upstreams, "weight", 10f)) + ":" + Math.round(inputFloat(node, upstreams, "min_group", 1f)) + ":" + Math.round(inputFloat(node, upstreams, "max_group", 4f));
+            case "structure_placement" -> (ctx, upstreams) -> append(input(node, upstreams, "previous", ""), "structure:" + input(node, upstreams, "structure_id", "") + ":" + Math.round(inputFloat(node, upstreams, "spacing", 32f)) + ":" + Math.round(inputFloat(node, upstreams, "separation", 8f)) + ":" + seed(node, upstreams, ctx) + ":" + Math.round(inputFloat(node, upstreams, "y_offset", 0f)) + ":" + input(node, upstreams, "anchor", "surface") + "|" + input(node, upstreams, "biome", "") + "|" + inputBoolean(node, upstreams, "terrain_match", true));
+            case "spawn_rule" -> (ctx, upstreams) -> append(input(node, upstreams, "previous", ""), "spawn:" + input(node, upstreams, "entity", "minecraft:zombie") + ":" + input(node, upstreams, "category", "monster") + ":" + Math.round(inputFloat(node, upstreams, "weight", 10f)) + ":" + Math.round(inputFloat(node, upstreams, "min_group", 1f)) + ":" + Math.round(inputFloat(node, upstreams, "max_group", 4f)) + ":" + input(node, upstreams, "biome", "") + ":" + Math.round(inputFloat(node, upstreams, "min_y", -64f)) + ":" + Math.round(inputFloat(node, upstreams, "max_y", 319f)) + ":" + input(node, upstreams, "block_below", "") + ":" + Math.round(inputFloat(node, upstreams, "min_light", 0f)) + ":" + Math.round(inputFloat(node, upstreams, "max_light", 15f)) + ":" + input(node, upstreams, "time", "any") + ":" + input(node, upstreams, "weather", "any") + ":" + inputBoolean(node, upstreams, "override_vanilla", false));
             case "output_features" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");
             case "output_structures" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");
             case "output_spawns" -> (ctx, upstreams) -> input(node, upstreams, "table", "");
@@ -380,6 +400,15 @@ public class PipelineCompiler {
     private static float terrace(float value, float steps) {
         float count = Math.max(1f, steps);
         return Math.round(value * count) / count;
+    }
+
+    private static String append(Object previous, Object value) {
+        String head = previous == null ? "" : String.valueOf(previous).trim();
+        String tail = value == null ? "" : String.valueOf(value).trim();
+        if (tail.isBlank()) {
+            return head;
+        }
+        return head.isBlank() ? tail : head + "\n" + tail;
     }
 
     private static class CompiledGraphs {

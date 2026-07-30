@@ -1,5 +1,6 @@
 package restudio.resync.worldgen.generator;
 
+import org.bukkit.HeightMap;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.generator.BlockPopulator;
@@ -83,6 +84,32 @@ public class NodeGraphChunkGenerator extends ChunkGenerator {
         for (int y = Math.max(startY, minHeight); y <= seaLevel; y++) {
             chunkData.setBlock(localX, y, localZ, pipeline.getDefaultFluid());
         }
+    }
+
+    @Override
+    public int getBaseHeight(WorldInfo worldInfo, Random random, int x, int z, HeightMap heightMap) {
+        TerrainPipeline pipeline = pipelineHolder.get();
+        int minHeight = worldInfo.getMinHeight();
+        int maxHeight = worldInfo.getMaxHeight();
+        int surface = terrainSurface(pipeline, worldInfo, x, z, minHeight, maxHeight);
+        if (!pipeline.getDefaultFluid().isAir() && (heightMap == HeightMap.WORLD_SURFACE || heightMap == HeightMap.WORLD_SURFACE_WG
+            || heightMap == HeightMap.MOTION_BLOCKING || heightMap == HeightMap.MOTION_BLOCKING_NO_LEAVES)) {
+            return Math.max(surface, Math.min(pipeline.getSeaLevel(), maxHeight - 1));
+        }
+        return surface;
+    }
+
+    private int terrainSurface(TerrainPipeline pipeline, WorldInfo worldInfo, int x, int z, int minHeight, int maxHeight) {
+        long seed = worldInfo.getSeed();
+        if (!pipeline.hasDensityOutput()) {
+            return Math.clamp(Math.round(pipeline.getHeight(x, z, seed, worldInfo)), minHeight, maxHeight - 1);
+        }
+        for (int y = maxHeight - 1; y >= minHeight; y--) {
+            if (pipeline.getDensity(x, y, z, seed, worldInfo) > 0f && pipeline.getCaveDensity(x, y, z, seed, worldInfo) >= -0.38f) {
+                return y;
+            }
+        }
+        return minHeight;
     }
 
     @Override

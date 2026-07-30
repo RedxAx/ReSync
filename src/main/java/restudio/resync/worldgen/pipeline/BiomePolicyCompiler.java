@@ -1,6 +1,7 @@
 package restudio.resync.worldgen.pipeline;
 
 import restudio.resync.worldgen.data.WorldGenBiomeProfile;
+import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
@@ -9,17 +10,19 @@ import restudio.resync.worldgen.data.WorldGenSpawnRule;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-final class BiomePolicyCompiler {
-    record Result(CompiledBiomePolicy policy, List<WorldGenSpawnRule> spawnRules) {
+public final class BiomePolicyCompiler {
+    public record Result(CompiledBiomePolicy policy, List<WorldGenSpawnRule> spawnRules) {
     }
 
     private BiomePolicyCompiler() {
     }
 
-    static Result compile(WorldGenProject project) {
+    public static Result compile(WorldGenProject project) {
         WorldGenProjectSettings settings = project.getSettings();
         Map<String, Boolean> featureOverrides = new HashMap<>(settings == null ? Map.of() : settings.getBiomeVanillaFeatureOverrides());
         Map<String, Boolean> structureOverrides = new HashMap<>();
@@ -28,10 +31,16 @@ final class BiomePolicyCompiler {
         collectProfilePolicies(project, featureOverrides, structureOverrides, spawnOverrides, spawnRules);
         collectNodePolicies(project.getBiomeGraph(), featureOverrides, structureOverrides, spawnOverrides);
         collectSpawnRules(project.getSpawnGraph(), spawnRules);
+        boolean defaultFeatures = collectOverridePolicies(project.getFeatureGraph(), "scatter", "poisson_scatter", featureOverrides,
+            settings == null || settings.isVanillaFeaturesEnabled());
+        boolean defaultStructures = collectOverridePolicies(project.getStructureGraph(), "structure_placement", null, structureOverrides,
+            settings == null || settings.isVanillaStructuresEnabled());
+        boolean defaultSpawns = collectOverridePolicies(project.getSpawnGraph(), "spawn_rule", null, spawnOverrides,
+            settings == null || settings.isVanillaSpawnsEnabled());
         return new Result(new CompiledBiomePolicy(
-            settings == null || settings.isVanillaFeaturesEnabled(),
-            settings == null || settings.isVanillaStructuresEnabled(),
-            settings == null || settings.isVanillaSpawnsEnabled(),
+            defaultFeatures,
+            defaultStructures,
+            defaultSpawns,
             featureOverrides, structureOverrides, spawnOverrides), spawnRules);
     }
 
@@ -96,8 +105,10 @@ final class BiomePolicyCompiler {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
-        for (WorldGenNode node : graph.getNodes().values()) {
-            if (node == null || !"spawn_rule".equals(node.getType())) {
+        Set<String> active = activeNodes(graph, "output_spawns");
+        for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
+            WorldGenNode node = entry.getValue();
+            if (node == null || !active.contains(entry.getKey()) || !"spawn_rule".equals(node.getType())) {
                 continue;
             }
             WorldGenSpawnRule rule = new WorldGenSpawnRule();
@@ -105,8 +116,64 @@ final class BiomePolicyCompiler {
             rule.setWeight(Math.round(number(node.getInputValues().get("weight"), 10f)));
             rule.setMinGroup(Math.round(number(node.getInputValues().get("min_group"), 1f)));
             rule.setMaxGroup(Math.round(number(node.getInputValues().get("max_group"), 4f)));
+            rule.setCategory(String.valueOf(node.getInputValues().getOrDefault("category", "monster")));
+            String biome = String.valueOf(node.getInputValues().getOrDefault("biome", "")).trim();
+            rule.setBiomeFilters(biome.isBlank() ? List.of() : List.of(biome));
+            rule.setMinY(Math.round(number(node.getInputValues().get("min_y"), -64f)));
+            rule.setMaxY(Math.round(number(node.getInputValues().get("max_y"), 319f)));
+            rule.setBlockBelow(String.valueOf(node.getInputValues().getOrDefault("block_below", "")));
+            rule.setMinLight(Math.round(number(node.getInputValues().get("min_light"), 0f)));
+            rule.setMaxLight(Math.round(number(node.getInputValues().get("max_light"), 15f)));
+            rule.setTime(String.valueOf(node.getInputValues().getOrDefault("time", "any")));
+            rule.setWeather(String.valueOf(node.getInputValues().getOrDefault("weather", "any")));
             spawnRules.add(rule);
         }
+    }
+
+    private static boolean collectOverridePolicies(WorldGenGraph graph, String firstType, String secondType, Map<String, Boolean> overrides, boolean defaultValue) {
+        if (graph == null || graph.getNodes() == null) {
+            return defaultValue;
+        }
+        boolean result = defaultValue;
+        String outputType = "structure_placement".equals(firstType) ? "output_structures" : "spawn_rule".equals(firstType) ? "output_spawns" : "output_features";
+        Set<String> active = activeNodes(graph, outputType);
+        for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
+            WorldGenNode node = entry.getValue();
+            if (node == null || !active.contains(entry.getKey()) || !firstType.equals(node.getType()) && (secondType == null || !secondType.equals(node.getType()))
+                || !booleanValue(node.getInputValues().get("override_vanilla"), false)) {
+                continue;
+            }
+            String biome = String.valueOf(node.getInputValues().getOrDefault("biome", "")).trim();
+            if (biome.isBlank()) {
+                result = false;
+            } else {
+                overrides.put(biome, false);
+            }
+        }
+        return result;
+    }
+
+    private static Set<String> activeNodes(WorldGenGraph graph, String outputType) {
+        Set<String> active = new LinkedHashSet<>();
+        List<String> pending = new ArrayList<>();
+        graph.getNodes().forEach((id, node) -> {
+            if (node != null && outputType.equals(node.getType())) {
+                active.add(id);
+                pending.add(id);
+            }
+        });
+        if (pending.isEmpty()) {
+            return new LinkedHashSet<>(graph.getNodes().keySet());
+        }
+        for (int index = 0; index < pending.size(); index++) {
+            String target = pending.get(index);
+            for (WorldGenConnection connection : graph.getConnections()) {
+                if (target.equals(connection.getTargetNodeId()) && active.add(connection.getSourceNodeId())) {
+                    pending.add(connection.getSourceNodeId());
+                }
+            }
+        }
+        return active;
     }
 
     private static void addPolicyId(List<String> ids, Object value) {

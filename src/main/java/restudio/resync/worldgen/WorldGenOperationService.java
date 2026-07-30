@@ -223,6 +223,8 @@ public final class WorldGenOperationService {
         result.put("projectId", value(build.getProjectId()));
         result.put("namespace", value(build.getNamespace()));
         result.put("packName", value(build.getPackName()));
+        result.put("generationMode", value(build.getGenerationMode()));
+        result.put("dimensionKey", value(build.getDimensionKey()));
         result.put("minecraftVersion", value(build.getMinecraftVersion()));
         result.put("packFormat", build.getPackFormat());
         result.put("packFormatMinor", build.getPackFormatMinor());

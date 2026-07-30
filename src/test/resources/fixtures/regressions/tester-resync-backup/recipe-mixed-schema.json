@@ -1,0 +1,1 @@
+{"id":"telescope_helmet_recipe","displayName":"telescope_helmet_recipe","folder":"Content/Recipes","enabled":true,"type":"shapeless","output":{"amount":1,"contentId":"telescope_helmet"},"shape":["A"],"keys":{"A":"STONE"},"ingredients":["",{"material":"spyglass"},"",{"material":"diamond_helmet"}],"resourceType":"recipe_definition","assetFormatVersion":2}

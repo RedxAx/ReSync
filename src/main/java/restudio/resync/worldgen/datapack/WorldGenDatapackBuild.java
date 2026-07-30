@@ -8,6 +8,8 @@ public class WorldGenDatapackBuild {
     private String projectId = "";
     private String namespace = "resync_worldgen";
     private String packName = "";
+    private String generationMode = "hybrid";
+    private String dimensionKey = "";
     private String minecraftVersion = "";
     private String datapackVersion = "";
     private int packFormat;
@@ -23,6 +25,10 @@ public class WorldGenDatapackBuild {
     public void setNamespace(String namespace) { this.namespace = namespace; }
     public String getPackName() { return packName; }
     public void setPackName(String packName) { this.packName = packName; }
+    public String getGenerationMode() { return generationMode; }
+    public void setGenerationMode(String generationMode) { this.generationMode = generationMode; }
+    public String getDimensionKey() { return dimensionKey; }
+    public void setDimensionKey(String dimensionKey) { this.dimensionKey = dimensionKey; }
     public String getMinecraftVersion() { return minecraftVersion; }
     public void setMinecraftVersion(String minecraftVersion) { this.minecraftVersion = minecraftVersion; }
     public String getDatapackVersion() { return datapackVersion; }

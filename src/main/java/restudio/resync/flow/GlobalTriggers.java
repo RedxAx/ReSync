@@ -152,7 +152,7 @@ public class GlobalTriggers implements Listener {
     }
 
     public void registerTrigger(String eventType, String flowId) {
-        FlowGraph graph = storage.getGraph(flowId);
+        FlowGraph graph = storage.getGraph("flow", flowId);
         if (graph == null) {
             Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
@@ -174,7 +174,7 @@ public class GlobalTriggers implements Listener {
         if (binding == null || binding.getFlowId() == null) {
             return;
         }
-        FlowGraph graph = storage.getGraph(binding.getFlowId());
+        FlowGraph graph = storage.getGraph("command", binding.getFlowId());
         if (graph == null) {
             return;
         }
@@ -459,7 +459,7 @@ public class GlobalTriggers implements Listener {
                 return false;
             }
         }
-        FlowGraph graph = storage.getGraph(trigger.flowId);
+        FlowGraph graph = storage.getGraph("command", trigger.flowId);
         if (graph == null) {
             return false;
         }

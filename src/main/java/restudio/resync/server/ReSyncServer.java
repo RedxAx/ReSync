@@ -176,10 +176,6 @@ public class ReSyncServer {
         ReTextService reTextService = new ReTextService(jsonResourceStorage);
         moduleContext.registerService(ReTextService.class, reTextService);
         jsonResourceStorage.addListener((type, id, value, deleted) -> {
-            if (ReSyncResourceCatalog.TEXT_TEMPLATE.equals(type)) {
-                reTextService.clearTemplateCache();
-                return;
-            }
             if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
                 RecipeModule recipes = moduleContext.getService(RecipeModule.class);
                 if (recipes != null) {

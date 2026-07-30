@@ -38,6 +38,7 @@ class FlowBlueprintStartupBindingTest {
         FlowGraph graph = new FlowGraph("gui", Map.of(
             "start", new FlowNode("event.resync.command", 0, 0, Map.of())
         ), List.of(), List.of());
+        graph.setResourceType("command");
         storage.saveGraph(graph);
         TriggerRegistry triggers = new TriggerRegistry(plugin);
         GlobalTriggers globalTriggers = new GlobalTriggers(storage,

@@ -25,9 +25,13 @@ import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.jobs.JobRecord;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.StorageSafety;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,6 +68,7 @@ public class FlowBlueprintPacketHandler {
         this.definitionRegistry = definitionRegistry;
         this.sender = sender;
         this.resourceRegistry = resourceRegistry;
+        migrateLegacyCommandBindings();
         refreshAllGraphBindings();
     }
 
@@ -272,7 +277,7 @@ public class FlowBlueprintPacketHandler {
         try {
             List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
             }.getType());
-            triggerRegistry.setBindingsPreservingType(bindings, TriggerType.EVENT);
+            triggerRegistry.setBindingsPreservingTypes(bindings, Set.of(TriggerType.EVENT, TriggerType.COMMAND));
             if (globalTriggers != null) {
                 globalTriggers.refreshBindings();
             }
@@ -287,11 +292,13 @@ public class FlowBlueprintPacketHandler {
         if (triggerRegistry == null) {
             return;
         }
-        for (String flowId : storage.listFlowIds()) {
-            FlowGraph graph = storage.getGraph(flowId);
-            if (graph != null && graph.getId() != null && !graph.getId().isBlank() && graph.getNodes() != null) {
-                updateEventBindings(graph);
-                updateCommandBindings(graph);
+        for (String type : List.of(ReSyncResourceCatalog.FLOW, ReSyncResourceCatalog.FUNCTION, ReSyncResourceCatalog.COMMAND)) {
+            for (String graphId : storage.listGraphIds(type)) {
+                FlowGraph graph = storage.getGraph(type, graphId);
+                if (graph != null && graph.getId() != null && !graph.getId().isBlank() && graph.getNodes() != null) {
+                    updateEventBindings(graph);
+                    updateCommandBindings(graph);
+                }
             }
         }
         if (globalTriggers != null) {
@@ -299,8 +306,8 @@ public class FlowBlueprintPacketHandler {
         }
     }
 
-    public void refreshGraphBinding(String flowId, boolean deleted) {
-        if (flowId == null || flowId.isBlank() || triggerRegistry == null) {
+    public void refreshGraphBinding(String type, String flowId, boolean deleted) {
+        if (type == null || flowId == null || flowId.isBlank() || triggerRegistry == null) {
             return;
         }
         if (deleted) {
@@ -310,10 +317,120 @@ public class FlowBlueprintPacketHandler {
             }
             return;
         }
-        FlowGraph graph = storage.getGraph(flowId);
+        FlowGraph graph = storage.getGraph(type, flowId);
         if (graph != null) {
             updateGraphBindings(graph);
         }
+    }
+
+    private void migrateLegacyCommandBindings() {
+        if (triggerRegistry == null) {
+            return;
+        }
+        Path reportFile = storage.getAssetsPath().resolve(".migrations").resolve("command-bindings-v1.json");
+        if (Files.exists(reportFile)) {
+            return;
+        }
+        int inspected = 0;
+        int migrated = 0;
+        int skipped = 0;
+        List<String> migratedIds = new ArrayList<>();
+        List<String> skippedIds = new ArrayList<>();
+        Map<String, String> rejected = new HashMap<>();
+        for (String commandId : storage.listGraphIds(ReSyncResourceCatalog.COMMAND)) {
+            FlowGraph graph = storage.getGraph(ReSyncResourceCatalog.COMMAND, commandId);
+            if (graph == null || graph.getNodes() == null) {
+                continue;
+            }
+            FlowGraph candidate = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
+            List<TriggerBinding> legacy = triggerRegistry.getBindings(TriggerType.COMMAND).stream()
+                .filter(binding -> commandId.equals(binding.getFlowId()) && binding.getContext() != null && !binding.getContext().isBlank())
+                .sorted((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.getId() != null ? left.getId() : "", right.getId() != null ? right.getId() : ""))
+                .toList();
+            if (legacy.isEmpty()) {
+                continue;
+            }
+            inspected++;
+            List<Map.Entry<String, FlowNode>> commandNodes = candidate.getNodes().entrySet().stream()
+                .filter(entry -> entry.getValue() != null && isCommandNode(entry.getValue().getType()))
+                .sorted(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER))
+                .toList();
+            boolean changed = false;
+            for (Map.Entry<String, FlowNode> commandNode : commandNodes) {
+                TriggerBinding binding = legacy.stream()
+                    .filter(legacyBinding -> legacyBinding.getId() != null && legacyBinding.getId().equals(commandId + ":command:" + commandNode.getKey()))
+                    .findFirst()
+                    .orElse(legacy.size() == 1 ? legacy.getFirst() : null);
+                if (binding != null) {
+                    changed |= applyLegacyCommandContext(commandNode.getValue(), binding.getContext());
+                } else if (!legacy.isEmpty()) {
+                    Log.warn("Command binding migration skipped ambiguous paths for " + commandId + ':' + commandNode.getKey());
+                }
+            }
+            if (changed) {
+                try {
+                    storage.saveGraph(candidate);
+                    migrated++;
+                    migratedIds.add(commandId);
+                } catch (RuntimeException exception) {
+                    skipped++;
+                    rejected.put(commandId, exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName());
+                    Log.warn("Command binding migration rejected " + commandId + ": " + rejected.get(commandId));
+                }
+            } else {
+                skipped++;
+                skippedIds.add(commandId);
+            }
+        }
+        JsonObject report = new JsonObject();
+        report.addProperty("version", 1);
+        report.addProperty("inspected", inspected);
+        report.addProperty("migrated", migrated);
+        report.addProperty("skipped", skipped);
+        report.add("migratedIds", gson.toJsonTree(migratedIds));
+        report.add("skippedIds", gson.toJsonTree(skippedIds));
+        report.add("rejected", gson.toJsonTree(rejected));
+        try {
+            StorageSafety.writeUtf8Atomic(reportFile, gson.toJson(report));
+        } catch (IOException exception) {
+            Log.warn("Failed to save command binding migration report: " + exception.getMessage());
+        }
+    }
+
+    private boolean applyLegacyCommandContext(FlowNode node, String context) {
+        Map<String, Object> values = node.getInputValues();
+        if (values == null) {
+            values = new HashMap<>();
+            node.setInputValues(values);
+        }
+        if (!text(values, "command").isBlank() || !text(values, "label").isBlank() || !text(values, "name").isBlank()) {
+            return false;
+        }
+        String command = context.trim();
+        List<String> subcommands = List.of();
+        boolean structured = false;
+        if (command.startsWith("{")) {
+            JsonObject payload;
+            try {
+                payload = gson.fromJson(command, JsonObject.class);
+            } catch (RuntimeException exception) {
+                Log.warn("Command binding migration skipped malformed context: " + exception.getMessage());
+                return false;
+            }
+            if (payload == null) {
+                return false;
+            }
+            command = payload.has("command") && !payload.get("command").isJsonNull() ? payload.get("command").getAsString() : "";
+            subcommands = payload.has("subcommands") ? stringList(gson.fromJson(payload.get("subcommands"), List.class)) : List.of();
+            structured = payload.has("structured") && payload.get("structured").getAsBoolean();
+        }
+        if (command.isBlank()) {
+            return false;
+        }
+        values.put("command", command);
+        values.put("subcommands", subcommands);
+        values.put("structured", structured);
+        return true;
     }
 
     private void notifyDeleted(String type, String resourceId) {

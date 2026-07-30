@@ -68,6 +68,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ReSyncNetworkAgent {
@@ -80,6 +81,8 @@ public class ReSyncNetworkAgent {
     private final AtomicBoolean stopping = new AtomicBoolean();
     private final AtomicBoolean reconnectScheduled = new AtomicBoolean();
     private final AtomicBoolean reconnectRequested = new AtomicBoolean();
+    private final AtomicBoolean unavailableReported = new AtomicBoolean();
+    private final AtomicInteger reconnectFailures = new AtomicInteger();
     private final AtomicLong requestIds = new AtomicLong();
     private final Map<String, CompletableFuture<NetworkFrame>> pendingRequests = new ConcurrentHashMap<>();
     private final Map<String, NetworkNodePresence> presence = new ConcurrentHashMap<>();
@@ -325,7 +328,7 @@ public class ReSyncNetworkAgent {
             client = next;
             next.connect();
         } catch (Exception exception) {
-            Log.warn("ReSync network connection failed: " + rootMessage(exception));
+            reportUnavailable(rootMessage(exception));
             scheduleReconnect();
         }
     }
@@ -382,6 +385,8 @@ public class ReSyncNetworkAgent {
             }
             credential = issuedCredential;
             authorized = true;
+            reconnectFailures.set(0);
+            unavailableReported.set(false);
             Log.info("ReSync network node enrolled as " + config.nodeId());
             sendPresence();
             notifyConnected();
@@ -389,6 +394,8 @@ public class ReSyncNetworkAgent {
         }
         if (frame.type() == NetworkFrameType.RESPONSE && frame.context().requestId().equals("session")) {
             authorized = true;
+            reconnectFailures.set(0);
+            unavailableReported.set(false);
             Log.info("ReSync network node connected as " + config.nodeId());
             sendPresence();
             notifyConnected();
@@ -705,7 +712,19 @@ public class ReSyncNetworkAgent {
         if (stopping.get() || !reconnectScheduled.compareAndSet(false, true)) {
             return;
         }
-        Bukkit.getScheduler().runTaskLater(plugin, this::connect, Math.max(20, config.reconnectDelayTicks()));
+        Bukkit.getScheduler().runTaskLater(plugin, this::connect, reconnectDelayTicks(config.reconnectDelayTicks(), reconnectFailures.getAndIncrement()));
+    }
+
+    static long reconnectDelayTicks(long configuredDelayTicks, int failures) {
+        long baseDelay = Math.clamp(configuredDelayTicks, 20, 1_200);
+        long multiplier = 1L << Math.clamp(failures, 0, 6);
+        return Math.min(1_200, baseDelay * multiplier);
+    }
+
+    private void reportUnavailable(String reason) {
+        if (unavailableReported.compareAndSet(false, true)) {
+            Log.warn("ReSync network unavailable; retrying in background: " + reason);
+        }
     }
 
     private String rootMessage(Throwable throwable) {
@@ -822,6 +841,9 @@ public class ReSyncNetworkAgent {
 
         @Override
         public void onClose(int code, String reason, boolean remote) {
+            if (client != this) {
+                return;
+            }
             authorized = false;
             presence.clear();
             failPending(new IllegalStateException("ReSync Network Disconnected: " + reason));
@@ -839,15 +861,16 @@ public class ReSyncNetworkAgent {
                         Log.warn("ReSync network credential reset failed: " + rootMessage(exception));
                     }
                 }
-                Log.warn("ReSync network node disconnected: " + reason);
+                reportUnavailable(reason);
                 scheduleReconnect();
             }
         }
 
         @Override
         public void onError(Exception exception) {
-            if (!stopping.get()) {
-                Log.warn("ReSync network transport error: " + rootMessage(exception));
+            if (client == this && !stopping.get()) {
+                reportUnavailable(rootMessage(exception));
+                scheduleReconnect();
             }
         }
     }

@@ -44,7 +44,7 @@ public class SystemEventListener implements Listener {
     }
     
     public void registerTrigger(String eventType, String flowId) {
-        FlowGraph graph = storage.getGraph(flowId);
+        FlowGraph graph = storage.getGraph("flow", flowId);
         if (graph == null) {
             Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
@@ -155,7 +155,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onServerLoad(ServerLoadEvent event) {
         for (Map.Entry<String, String> entry : serverStartTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.server_name", Bukkit.getServer().getName());
@@ -169,7 +169,7 @@ public class SystemEventListener implements Listener {
         Plugin plugin = event.getPlugin();
         
         for (Map.Entry<String, String> entry : pluginDisableTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.plugin_name", plugin.getName());
@@ -184,7 +184,7 @@ public class SystemEventListener implements Listener {
         Plugin plugin = event.getPlugin();
         
         for (Map.Entry<String, String> entry : pluginEnableTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.plugin_name", plugin.getName());
@@ -196,7 +196,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {
         for (Map.Entry<String, String> entry : worldLoadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.world_name", event.getWorld().getName());
@@ -208,7 +208,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         for (Map.Entry<String, String> entry : worldUnloadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.world_name", event.getWorld().getName());
@@ -220,7 +220,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         for (Map.Entry<String, String> entry : chunkLoadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.chunk_x", event.getChunk().getX());
@@ -233,7 +233,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
         for (Map.Entry<String, String> entry : chunkUnloadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.chunk_x", event.getChunk().getX());
@@ -247,7 +247,7 @@ public class SystemEventListener implements Listener {
         int tick = tickCounter.incrementAndGet();
         
         for (Map.Entry<String, String> entry : serverTickTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.tick_number", tick);
@@ -258,7 +258,7 @@ public class SystemEventListener implements Listener {
 
     public void onServerStop() {
         for (Map.Entry<String, String> entry : serverStopTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.server_name", Bukkit.getServer().getName());
@@ -270,7 +270,7 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onWorldSave(WorldSaveEvent event) {
         for (Map.Entry<String, String> entry : serverSaveTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph(entry.getKey());
+            FlowGraph graph = storage.getGraph("flow", entry.getKey());
             if (graph != null) {
                 Map<String, Object> eventVars = new HashMap<>();
                 eventVars.put("event.world_name", event.getWorld().getName());

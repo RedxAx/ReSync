@@ -19,6 +19,7 @@ import restudio.resync.core.Session;
 import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.contract.EditorError;
 import restudio.resync.flow.diagnostics.FlowTraceRecord;
 import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.flow.sync.NodeRegistrySnapshot;
@@ -113,6 +114,16 @@ public class FlowPacketSender {
 
     public void sendFlowSaveAck(Session session, String flowId, String requestId, long revision, String hash) {
         sendIdAck(session, resourcePackets("flow").saveAck(), flowId, requestId, revision, hash);
+    }
+
+    public void sendGraphSaveAck(Session session, String resourceType, String graphId, String requestId, long revision, String hash) {
+        String type = Set.of("flow", "function", "command").contains(resourceType) ? resourceType : "flow";
+        sendIdAck(session, resourcePackets(type).saveAck(), graphId, requestId, revision, hash);
+    }
+
+    public void sendGraphSaveAck(Session session, String resourceType, String graphId, String requestId) {
+        String type = Set.of("flow", "function", "command").contains(resourceType) ? resourceType : "flow";
+        sendIdAck(session, resourcePackets(type).saveAck(), graphId, requestId);
     }
 
     public void sendGuiSaveAck(Session session, String guiId) {
@@ -414,6 +425,18 @@ public class FlowPacketSender {
         Log.warn("Error sent to " + session.getClientId() + ": " + errorCode + " - " + message);
     }
 
+    public void sendEditorError(Session session, EditorError error) {
+        String payload = EditorError.PREFIX + gson.toJson(error);
+        byte[] errorBytes = payload.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + errorBytes.length);
+        buffer.put(ReSyncProtocolContract.FLOW_PACKET_ERROR);
+        buffer.putInt(errorBytes.length);
+        buffer.put(errorBytes);
+        sendRaw(session, buffer.array(), false);
+        Log.warn("Editor issue sent to " + session.getClientId() + ": " + error.title() + " - " + error.diagnostics().size() + " issue"
+            + (error.diagnostics().size() == 1 ? "" : "s"));
+    }
+
     public void sendPresenceSnapshot(Session session, String json) {
         sendJsonPacket(session, ReSyncProtocolContract.FLOW_PACKET_PRESENCE_SNAPSHOT, json, "PRESENCE_TOO_LARGE", "Presence snapshot exceeds maximum size");
     }
@@ -534,7 +557,7 @@ public class FlowPacketSender {
     }
 
     public void sendRaw(Session session, byte[] payload, boolean compress) {
-        if (session == null || payload == null) {
+        if (session == null || payload == null || session.getConnection() == null || !session.getConnection().isOpen()) {
             return;
         }
         DataMessage msg = new DataMessage();

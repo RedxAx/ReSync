@@ -42,6 +42,7 @@ import restudio.resync.network.NetworkRequestContext;
 import restudio.resync.network.NetworkResource;
 import restudio.resync.network.NetworkResourceCodec;
 import restudio.resync.network.NetworkResourceKey;
+import restudio.resync.network.NetworkResourceMetadata;
 import restudio.resync.network.NetworkResourceMutation;
 import restudio.resync.network.NetworkResourceQuery;
 import restudio.resync.network.NetworkRoute;
@@ -73,6 +74,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,11 +86,13 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class ReSyncVelocityHub extends WebSocketServer {
@@ -115,6 +119,7 @@ public class ReSyncVelocityHub extends WebSocketServer {
     private final SnapshotUploadRegistry snapshotUploads = new SnapshotUploadRegistry(MAXIMUM_ACTIVE_SNAPSHOT_UPLOADS, MAXIMUM_SNAPSHOT_UPLOAD_MILLIS);
     private final Map<String, CompletableFuture<PlayerTransfer>> transferReadiness = new ConcurrentHashMap<>();
     private final Map<String, PendingReconciliation> pendingReconciliations = new ConcurrentHashMap<>();
+    private final List<Consumer<NetworkResource>> resourceListeners = new CopyOnWriteArrayList<>();
     private final AtomicLong lifecycleOrder = new AtomicLong();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "resync-velocity-heartbeats");
@@ -210,6 +215,33 @@ public class ReSyncVelocityHub extends WebSocketServer {
             logger.warn("Failed to record proxy shutdown", exception);
         }
         store.close();
+    }
+
+    public CompletableFuture<List<NetworkResource>> resources(String type) {
+        String normalizedType = type == null ? "" : type.trim().toLowerCase(Locale.ROOT);
+        return resourceMetadata(NetworkResourceQuery.firstPage(), normalizedType, new ArrayList<>()).thenCompose(metadata -> {
+            List<CompletableFuture<Optional<NetworkResource>>> requests = metadata.stream()
+                .map(resource -> store.getResource(config.networkId(), resource.type(), resource.resourceId()))
+                .toList();
+            return CompletableFuture.allOf(requests.toArray(new CompletableFuture[0]))
+                .thenApply(ignored -> requests.stream().map(CompletableFuture::join).flatMap(Optional::stream).filter(resource -> !resource.deleted()).toList());
+        });
+    }
+
+    public void addResourceListener(Consumer<NetworkResource> listener) {
+        if (listener != null) {
+            resourceListeners.add(listener);
+        }
+    }
+
+    private CompletableFuture<List<NetworkResourceMetadata>> resourceMetadata(NetworkResourceQuery query, String type, List<NetworkResourceMetadata> resources) {
+        return store.listResources(config.networkId(), query).thenCompose(page -> {
+            page.resources().stream().filter(resource -> type.equals(resource.type()) && !resource.deleted()).forEach(resources::add);
+            if (!page.hasNext()) {
+                return CompletableFuture.completedFuture(List.copyOf(resources));
+            }
+            return resourceMetadata(new NetworkResourceQuery(page.nextType(), page.nextResourceId(), 128), type, resources);
+        });
     }
 
     @Override
@@ -698,6 +730,13 @@ public class ReSyncVelocityHub extends WebSocketServer {
             }
             byte[] payload = NetworkResourceCodec.encodeResource(resource);
             send(connection, NetworkFrameType.RESPONSE, NetworkChannels.RESOURCES, frame.context().requestId(), payload, sessionScopes(session));
+            resourceListeners.forEach(listener -> {
+                try {
+                    listener.accept(resource);
+                } catch (RuntimeException exception) {
+                    logger.warn("ReSync network resource listener failed", exception);
+                }
+            });
             publishResource(resource, session.nodeId());
         });
     }

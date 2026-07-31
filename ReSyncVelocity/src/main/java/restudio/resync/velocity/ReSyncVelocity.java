@@ -8,6 +8,7 @@ import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.player.KickedFromServerEvent;
 import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyPingEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.plugin.Plugin;
@@ -19,13 +20,18 @@ import restudio.resync.network.NetworkPlayerLifecycleType;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Plugin(id = "resyncvelocity", name = "ReSyncVelocity", version = "1.3.0", description = "ReSync Network Hub")
 public class ReSyncVelocity {
     private final Logger logger;
     private final Path dataDirectory;
     private final ProxyServer proxyServer;
-    private ReSyncVelocityHub hub;
+    private volatile ReSyncVelocityHub hub;
+    private volatile VelocityMotdProfile motdProfile;
+    private volatile long motdRefreshAt;
+    private final AtomicBoolean motdRefreshRunning = new AtomicBoolean();
+    private final AtomicBoolean motdRefreshPending = new AtomicBoolean();
 
     @Inject
     public ReSyncVelocity(Logger logger, @DataDirectory Path dataDirectory, ProxyServer proxyServer) {
@@ -42,8 +48,15 @@ public class ReSyncVelocity {
                 logger.info("ReSync network hub is disabled");
                 return;
             }
-            hub = new ReSyncVelocityHub(config, logger, proxyServer);
-            hub.startHub();
+            ReSyncVelocityHub createdHub = new ReSyncVelocityHub(config, logger, proxyServer);
+            createdHub.addResourceListener(resource -> {
+                if ("motd_profile".equals(resource.type())) {
+                    refreshMotdProfile(createdHub, true);
+                }
+            });
+            hub = createdHub;
+            createdHub.startHub();
+            refreshMotdProfile(createdHub, true);
         } catch (Exception exception) {
             logger.error("Failed to start ReSync network hub", exception);
             if (hub != null) {
@@ -59,6 +72,36 @@ public class ReSyncVelocity {
             hub.stopHub();
             hub = null;
         }
+        motdProfile = null;
+        motdRefreshPending.set(false);
+    }
+
+    @Subscribe(order = PostOrder.LAST)
+    public void onProxyPing(ProxyPingEvent event) {
+        ReSyncVelocityHub current = hub;
+        if (current == null) {
+            return;
+        }
+        refreshMotdProfile(current, false);
+        VelocityMotdProfile profile = motdProfile;
+        if (profile == null) {
+            return;
+        }
+        var builder = event.getPing().asBuilder().description(profile.description());
+        if ("hidden".equals(profile.playerCountMode())) {
+            builder.nullPlayers();
+        } else if ("fixed".equals(profile.playerCountMode())) {
+            if (profile.onlinePlayers() != null) {
+                builder.onlinePlayers(profile.onlinePlayers());
+            }
+            if (profile.maxPlayers() != null) {
+                builder.maximumPlayers(profile.maxPlayers());
+            }
+        }
+        if (profile.favicon() != null) {
+            builder.favicon(profile.favicon());
+        }
+        event.setPing(builder.build());
     }
 
     @Subscribe
@@ -183,5 +226,31 @@ public class ReSyncVelocity {
             current = current.getCause();
         }
         return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
+    }
+
+    private void refreshMotdProfile(ReSyncVelocityHub current, boolean force) {
+        long now = System.currentTimeMillis();
+        if (!force && now < motdRefreshAt) {
+            return;
+        }
+        if (!motdRefreshRunning.compareAndSet(false, true)) {
+            if (force) {
+                motdRefreshPending.set(true);
+            }
+            return;
+        }
+        motdRefreshAt = now + 1_000L;
+        current.resources("motd_profile").whenComplete((resources, throwable) -> {
+            if (throwable == null && hub == current) {
+                motdProfile = VelocityMotdProfile.select(resources).orElse(null);
+            }
+            motdRefreshRunning.set(false);
+            if (throwable != null) {
+                logger.warn("Failed to refresh network MOTD: {}", rootMessage(throwable));
+            }
+            if (motdRefreshPending.getAndSet(false) && hub == current) {
+                refreshMotdProfile(current, true);
+            }
+        });
     }
 }

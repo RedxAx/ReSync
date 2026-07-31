@@ -346,6 +346,11 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     }
 
     @Override
+    public WorldOperationResult updateWorld(WorldRegistryEntry world) {
+        return callSync(() -> updateWorldSync(world));
+    }
+
+    @Override
     public WorldOperationResult createPortal(WorldPortal portal) {
         return callSync(() -> createPortalSync(portal));
     }
@@ -1261,6 +1266,53 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         publishMessage(WorldChannelMessage.event("worldProfileUpdated", buildWorldStatePayload(entry)));
         publishSnapshotEvent();
         return WorldOperationResult.success("setWorldProfile", normalizedName, "WorldProfileUpdated").withData("world", entry.copy());
+    }
+
+    private WorldOperationResult updateWorldSync(WorldRegistryEntry incoming) {
+        String normalizedName = incoming != null ? sanitizeWorldName(incoming.getWorldName()) : null;
+        Difficulty difficulty = incoming != null ? parseDifficulty(incoming.getDifficulty()) : null;
+        WorldRegistryEntry entry = normalizedName != null ? worlds.get(worldKey(normalizedName)) : null;
+        if (entry == null) {
+            return WorldOperationResult.failure("updateWorld", normalizedName, "WorldNotFound");
+        }
+        if (difficulty == null) {
+            return WorldOperationResult.failure("updateWorld", normalizedName, "InvalidDifficulty");
+        }
+        WorldProfileSettings profile = incoming.getProfileSettings().copy();
+        if (profile.getRespawnWorld() != null && !profile.getRespawnWorld().isBlank()) {
+            String respawnWorld = sanitizeWorldName(profile.getRespawnWorld());
+            if (respawnWorld == null) {
+                return WorldOperationResult.failure("updateWorld", normalizedName, "InvalidRespawnWorld");
+            }
+            profile.setRespawnWorld(respawnWorld);
+        }
+        entry.setDifficulty(difficulty.name());
+        entry.setIsolatedPlayerState(incoming.isIsolatedPlayerState());
+        entry.setTimeLockEnabled(incoming.isTimeLockEnabled());
+        entry.setLockedTime(incoming.getLockedTime());
+        entry.setWeatherLockEnabled(incoming.isWeatherLockEnabled());
+        entry.setLockedStorm(incoming.isLockedStorm());
+        entry.setLockedThundering(incoming.isLockedThundering());
+        entry.setProfileSettings(profile);
+        entry.setUpdatedAt(System.currentTimeMillis());
+        reconcileProfileInventoryGroup(entry);
+        World loaded = Bukkit.getWorld(normalizedName);
+        if (loaded != null) {
+            loaded.setDifficulty(difficulty);
+            applyProfileState(entry, loaded);
+            if (entry.isTimeLockEnabled()) {
+                loaded.setTime(entry.getLockedTime());
+            }
+            if (entry.isWeatherLockEnabled()) {
+                loaded.setStorm(entry.isLockedStorm());
+                loaded.setThundering(entry.isLockedThundering());
+            }
+            entry.setLoaded(true);
+        }
+        persistWorlds();
+        publishMessage(WorldChannelMessage.event("worldUpdated", buildWorldStatePayload(entry)));
+        publishSnapshotEvent();
+        return WorldOperationResult.success("updateWorld", normalizedName, "WorldUpdated").withData("world", entry.copy());
     }
 
     private WorldOperationResult createPortalSync(WorldPortal portal) {

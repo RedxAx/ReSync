@@ -56,6 +56,8 @@ public interface WorldManagementService {
 
     WorldOperationResult setWorldProfile(String worldName, WorldProfileSettings profileSettings);
 
+    WorldOperationResult updateWorld(WorldRegistryEntry world);
+
     WorldOperationResult createPortal(WorldPortal portal);
 
     WorldOperationResult resizePortal(WorldPortal portal);

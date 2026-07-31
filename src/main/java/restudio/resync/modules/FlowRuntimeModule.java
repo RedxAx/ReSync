@@ -128,6 +128,7 @@ import restudio.resync.modules.flow.FlowResourceAdapter;
 import restudio.resync.modules.flow.FlowResourceAuditRecord;
 import restudio.resync.modules.flow.FlowResourcePacketRouter;
 import restudio.resync.modules.flow.FlowResourceRegistry;
+import restudio.resync.modules.flow.WorldWorkspaceDocumentProvider;
 import restudio.resync.modules.flow.BuiltinOptionCatalogService;
 import restudio.resync.modules.flow.LuckPermsOptionCatalogService;
 import restudio.resync.player.PlayerSessionLinkService;
@@ -170,6 +171,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -232,6 +236,7 @@ public class FlowRuntimeModule implements Module {
         optionCatalogRegistry = context.getRequiredService(OptionCatalogRegistry.class);
         runtimeDataRegistry = optionCatalogRegistry.runtimeData();
         resourceRegistry = new FlowResourceRegistry();
+        resourceRegistry.setLiveRefreshExecutor(this::runLiveRefresh);
         valueCodecs = new FlowValueCodecRegistry();
         automationDefinitions = new AutomationDefinitionRegistry(jsonResourceStorage);
         automationTasks = new AutomationTaskService(context.getPlugin(), automationDefinitions);
@@ -282,6 +287,7 @@ public class FlowRuntimeModule implements Module {
         executor.setTraceService(traceService);
         executor.setDebugService(debugService);
         executor.setGraphValidator(graphValidator);
+        executor.setExecutionAuthority(storage::isExecutionAuthorized);
         storage.setGraphChangeListener(executor::cancelPendingTasks);
         customContentService = new CustomContentService(customContentStorage, storage, executor, itemAttributeSchemaService);
         runtimeDataRegistry.register(new CustomContentItemDataAdapter(customContentStorage, customContentService));
@@ -318,6 +324,7 @@ public class FlowRuntimeModule implements Module {
         delegate.setTraceService(traceService);
         delegate.setDebugService(debugService);
         delegate.setExecutor(executor);
+        delegate.registerWorkspaceDocumentProvider(new WorldWorkspaceDocumentProvider(worldManagementService));
         if (worldGenStorage != null) {
             worldGenStorage.setChangeListener(() -> delegate.broadcastOptionCatalog("server:resync:" + ReSyncResourceCatalog.WORLDGEN));
         }
@@ -1095,6 +1102,29 @@ public class FlowRuntimeModule implements Module {
             } else {
                 registerResourceCatalog(registry, type, () -> storage.listIds(type));
             }
+        }
+    }
+
+    private void runLiveRefresh(Runnable refresh) {
+        if (Bukkit.isPrimaryThread()) {
+            refresh.run();
+            return;
+        }
+        try {
+            Bukkit.getScheduler().callSyncMethod(moduleContext.getPlugin(), () -> {
+                refresh.run();
+                return null;
+            }).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Live resource refresh was interrupted", exception);
+        } catch (ExecutionException exception) {
+            if (exception.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("Live resource refresh failed", exception.getCause());
+        } catch (TimeoutException exception) {
+            throw new IllegalStateException("Live resource refresh timed out", exception);
         }
     }
 

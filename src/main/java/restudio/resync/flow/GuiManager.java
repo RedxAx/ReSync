@@ -123,7 +123,7 @@ public class GuiManager implements Listener {
     }
 
     private void openGui(Player player, GuiDefinition def, boolean runOpenLifecycle) {
-        if (player == null || def == null) {
+        if (player == null || def == null || !def.isEnabled()) {
             return;
         }
         RemotelyHolder holder = new RemotelyHolder(def, player);
@@ -221,7 +221,11 @@ public class GuiManager implements Listener {
             }
             GuiDefinition open = holder.getGuiDefinition();
             if (open != null && gui.getId().equals(open.getId())) {
-                openGui(player, gui, false);
+                if (gui.isEnabled()) {
+                    openGui(player, gui, false);
+                } else {
+                    closeGui(player);
+                }
             }
         }
     }

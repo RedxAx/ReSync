@@ -246,7 +246,7 @@ public class CustomContentService {
 
     public ItemStack createItem(String contentId, int amount) {
         CustomContentDefinition definition = contentStorage.get(contentId);
-        if (definition == null) {
+        if (definition == null || !definition.isEnabled()) {
             return null;
         }
         return providerFor(definition).createItem(definition, amount);
@@ -427,7 +427,7 @@ public class CustomContentService {
 
     public void dispatch(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
         CustomContentDefinition definition = contentStorage.get(contentId);
-        if (definition == null || trigger == null) {
+        if (definition == null || !definition.isEnabled() || trigger == null) {
             return;
         }
         definition = compiledDefinition(contentId, definition);

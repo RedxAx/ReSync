@@ -237,11 +237,10 @@ public class FlowResourcePacketRouter {
             public void sendSaveAck(Session session, String id, String requestId) {
                 FlowGraph saved = storage.getGraph(resourceType, id);
                 if (saved == null) {
-                    sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id, requestId);
+                    sender.sendGraphSaveAck(session, resourceType, id, requestId);
                     return;
                 }
-                sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id, requestId,
-                    saved.getResourceRevision(), saved.getResourceHash());
+                sender.sendGraphSaveAck(session, resourceType, id, requestId, saved.getResourceRevision(), saved.getResourceHash());
             }
 
             @Override

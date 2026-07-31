@@ -13,7 +13,6 @@ import restudio.resync.core.CollaborationIdentity;
 import restudio.resync.core.Session;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.flow.FlowStorage;
-import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.workspace.WorkspacePatch;
 import restudio.resync.flow.workspace.WorkspaceRevision;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -25,31 +24,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 public final class FlowWorkspaceService {
-    private static final long CHECKPOINT_DELAY_MS = 500L;
     private static final int MAX_PATCHES = 512;
     private static final int MAX_PATCH_PATH_LENGTH = 512;
     private static final Set<String> GRAPH_TYPES = Set.of("flow", "function", "command", ReSyncResourceCatalog.CUSTOM_CONTENT);
     private static final Set<String> PATCH_OPERATIONS = Set.of("set", "remove", "array_add", "array_remove");
-    private static final Set<String> IMMUTABLE_ROOTS = Set.of("id", "function", "resourceType", "resourceRevision", "resourceHash", "resourceMutationId");
+    private static final Set<String> IMMUTABLE_ROOTS = Set.of("id", "worldName", "flowId", "function", "resourceType", "resourceRevision", "resourceHash",
+        "resourceMutationId", "enabled");
+    private static final Set<String> REVISION_ROOTS = Set.of("resourceRevision", "resourceHash", "resourceMutationId");
     private final FlowStorage storage;
     private final CustomContentStorage customContentStorage;
     private final FlowPacketSender sender;
-    private final FlowCollaborationService collaboration;
+    private final FlowResourceRegistry resources;
+    private final Map<String, FlowWorkspaceDocumentProvider> documentProviders = new ConcurrentHashMap<>();
     private final Gson gson = new Gson();
     private final Map<String, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private final ThreadLocal<Boolean> workspaceSaveCommit = ThreadLocal.withInitial(() -> false);
 
     public FlowWorkspaceService(FlowStorage storage, FlowPacketSender sender, FlowCollaborationService collaboration) {
-        this(storage, null, sender, collaboration);
+        this(storage, null, sender, collaboration, null);
     }
 
     public FlowWorkspaceService(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender, FlowCollaborationService collaboration) {
+        this(storage, customContentStorage, sender, collaboration, null);
+    }
+
+    public FlowWorkspaceService(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender,
+                                FlowCollaborationService collaboration, FlowResourceRegistry resources) {
         this.storage = storage;
         this.customContentStorage = customContentStorage;
         this.sender = sender;
-        this.collaboration = collaboration;
+        this.resources = resources;
     }
 
     public void handleJoin(Session session, ByteBuffer buffer) {
@@ -68,15 +76,23 @@ public final class FlowWorkspaceService {
                 return;
             }
             sessions.put(session.getSessionId(), session);
+            SnapshotEvent snapshot;
             synchronized (workspace) {
                 if (workspaces.get(key) != workspace) {
                     continue;
                 }
                 workspace.members.add(session.getSessionId());
-                sender.sendWorkspaceSnapshot(session, gson.toJson(new SnapshotEvent(type, resourceId, workspace.revision.sequence(),
-                    workspace.document.deepCopy(), List.copyOf(workspace.awareness.values()))));
-                return;
+                snapshot = new SnapshotEvent(type, resourceId, workspace.revision.sequence(), workspace.document.deepCopy(),
+                    List.copyOf(workspace.awareness.values()));
             }
+            sender.sendWorkspaceSnapshot(session, gson.toJson(snapshot));
+            return;
+        }
+    }
+
+    public void registerDocumentProvider(FlowWorkspaceDocumentProvider provider) {
+        if (provider != null && provider.type() != null && !provider.type().isBlank()) {
+            documentProviders.put(provider.type().trim(), provider);
         }
     }
 
@@ -102,37 +118,46 @@ public final class FlowWorkspaceService {
             sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(type, resourceId, "Workspace Not Joined")));
             return;
         }
+        OperationEvent event = null;
+        OperationEvent existing = null;
+        String resyncReason = null;
+        List<Session> targets = List.of();
         synchronized (workspace) {
-            if (!workspace.members.contains(session.getSessionId())) {
-                sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(type, resourceId, "Workspace Not Joined")));
-                return;
-            }
-            WorkspaceRevision.Assessment<OperationEvent> assessment =
-                workspace.revision.assess(request.baseSequence(), request.operationId());
-            if (assessment.status() == WorkspaceRevision.Status.DUPLICATE) {
-                sender.sendWorkspaceOperation(session, gson.toJson(assessment.existing()));
-                return;
-            }
-            if (assessment.status() == WorkspaceRevision.Status.CONFLICT) {
-                sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(type, resourceId, "Workspace Sequence Conflict")));
-                return;
-            }
-            try {
-                JsonObject next = workspace.document.deepCopy();
-                for (WorkspacePatch<JsonElement> patch : request.patches()) {
-                    apply(next, patch);
+            if (!isWorkspaceMember(workspace, session)) {
+                resyncReason = "Workspace Not Joined";
+            } else {
+                WorkspaceRevision.Assessment<OperationEvent> assessment =
+                    workspace.revision.assess(request.baseSequence(), request.operationId());
+                if (assessment.status() == WorkspaceRevision.Status.DUPLICATE) {
+                    existing = assessment.existing();
+                } else if (assessment.status() == WorkspaceRevision.Status.CONFLICT) {
+                    resyncReason = "Workspace Sequence Conflict";
+                } else {
+                    try {
+                        JsonObject next = workspace.document.deepCopy();
+                        for (WorkspacePatch<JsonElement> patch : request.patches()) {
+                            apply(next, patch);
+                        }
+                        workspace.document = next;
+                    } catch (RuntimeException exception) {
+                        resyncReason = "Invalid Operation";
+                    }
+                    if (resyncReason == null) {
+                        request.patches().stream().map(this::copy).forEach(workspace.pendingPatches::add);
+                        event = workspace.revision.advance(request.operationId(), sequence ->
+                            new OperationEvent(type, resourceId, sequence, safe(request.operationId()), session.getSessionId(),
+                                identity(session), List.copyOf(request.patches())));
+                        targets = members(workspace, null);
+                    }
                 }
-                workspace.document = next;
-            } catch (RuntimeException exception) {
-                sender.sendWorkspaceResync(session, gson.toJson(new ResyncEvent(type, resourceId, "Invalid Operation")));
-                return;
             }
-            request.patches().stream().map(this::copy).forEach(workspace.pendingPatches::add);
-            workspace.dirtyAt = System.currentTimeMillis();
-            OperationEvent event = workspace.revision.advance(request.operationId(), sequence ->
-                new OperationEvent(type, resourceId, sequence, safe(request.operationId()), session.getSessionId(),
-                    identity(session), List.copyOf(request.patches())));
-            broadcastOperation(workspace, event);
+        }
+        if (resyncReason != null) {
+            sendResync(List.of(session), type, resourceId, resyncReason);
+        } else if (existing != null) {
+            sender.sendWorkspaceOperation(session, gson.toJson(existing));
+        } else if (event != null) {
+            sendOperation(targets, event);
         }
     }
 
@@ -150,59 +175,15 @@ public final class FlowWorkspaceService {
         JsonObject state = request.state() != null ? request.state().deepCopy() : new JsonObject();
         AwarenessEvent event = new AwarenessEvent(type, resourceId, session.getSessionId(), identity(session), state,
             System.currentTimeMillis());
+        List<Session> targets;
         synchronized (workspace) {
-            if (!workspace.members.contains(session.getSessionId())) {
+            if (!isWorkspaceMember(workspace, session)) {
                 return;
             }
             workspace.awareness.put(session.getSessionId(), event);
-            broadcastAwareness(workspace, event);
+            targets = members(workspace, event.authorSessionId());
         }
-    }
-
-    public void checkpoint() {
-        long now = System.currentTimeMillis();
-        for (Workspace workspace : workspaces.values()) {
-            synchronized (workspace) {
-                if (workspace.deleted || workspaces.get(key(workspace.type, workspace.resourceId)) != workspace
-                    || workspace.dirtyAt == 0L || now - workspace.dirtyAt < CHECKPOINT_DELAY_MS) {
-                    continue;
-                }
-                workspace.dirtyAt = 0L;
-                try {
-                    FlowGraph graph = FlowSerializer.deserialize(workspace.document.toString());
-                    graph.setId(workspace.resourceId);
-                    graph.setResourceType(workspace.type);
-                    collaboration.suppressResourceEvents(() -> persistGraph(workspace.type, workspace.resourceId, graph));
-                    List<WorkspacePatch<JsonElement>> metadata = metadataPatches(graph);
-                    if (!metadata.isEmpty()) {
-                        for (WorkspacePatch<JsonElement> patch : metadata) {
-                            apply(workspace.document, patch);
-                        }
-                        long sequence = workspace.revision.advance();
-                        OperationEvent event = new OperationEvent(workspace.type, workspace.resourceId, sequence, "checkpoint:" + sequence, "", null, metadata);
-                        broadcastOperation(workspace, event);
-                    }
-                    workspace.pendingPatches.clear();
-                    if (workspace.members.isEmpty() && workspace.dirtyAt == 0L) {
-                        workspaces.remove(key(workspace.type, workspace.resourceId), workspace);
-                    }
-                } catch (ResourceRevisionConflictException exception) {
-                    if (!rebaseFromStored(workspace, now)) {
-                        workspace.dirtyAt = now;
-                    }
-                } catch (RuntimeException exception) {
-                    workspace.dirtyAt = now;
-                }
-            }
-        }
-    }
-
-    private List<WorkspacePatch<JsonElement>> metadataPatches(FlowGraph graph) {
-        ArrayList<WorkspacePatch<JsonElement>> patches = new ArrayList<>();
-        patches.add(new WorkspacePatch<>("set", "/resourceRevision", gson.toJsonTree(graph.getResourceRevision())));
-        patches.add(new WorkspacePatch<>("set", "/resourceHash", gson.toJsonTree(graph.getResourceHash())));
-        patches.add(new WorkspacePatch<>("set", "/resourceMutationId", gson.toJsonTree(graph.getResourceMutationId())));
-        return List.copyOf(patches);
+        sendAwareness(targets, event);
     }
 
     public void cleanup(Session session) {
@@ -213,47 +194,122 @@ public final class FlowWorkspaceService {
     }
 
     public void resourceDeleted(String type, String resourceId) {
-        synchronized (workspaces) {
-            for (Workspace workspace : List.copyOf(workspaces.values())) {
-                if (!safe(type).equals(workspace.type) || !safe(resourceId).equals(workspace.resourceId)) {
-                    continue;
-                }
-                synchronized (workspace) {
-                    if (!workspaces.remove(key(workspace.type, workspace.resourceId), workspace)) {
-                        continue;
-                    }
+        delete(type, resourceId, () -> {
+            if (storage != null && storage.getGraph(type, resourceId) != null) {
+                storage.deleteGraph(type, resourceId);
+            }
+        });
+    }
+
+    void delete(String type, String resourceId, Runnable action) {
+        Workspace workspace = workspaces.get(key(type, resourceId));
+        if (workspace == null) {
+            action.run();
+            return;
+        }
+        List<Session> targets = List.of();
+        workspace.commitLock.lock();
+        try {
+            action.run();
+            synchronized (workspace) {
+                if (workspaces.remove(key(workspace.type, workspace.resourceId), workspace)) {
                     workspace.deleted = true;
-                    workspace.dirtyAt = 0L;
-                    String json = gson.toJson(new ResyncEvent(workspace.type, workspace.resourceId, "Resource Unavailable"));
-                    for (String member : List.copyOf(workspace.members)) {
-                        Session target = sessions.get(member);
-                        if (target != null) {
-                            sender.sendWorkspaceResync(target, json);
-                        }
-                    }
+                    targets = members(workspace, null);
                     workspace.members.clear();
                     workspace.awareness.clear();
                 }
             }
-            if (storage.getGraph(type, resourceId) != null) {
-                storage.deleteGraph(type, resourceId);
-            }
+        } finally {
+            workspace.commitLock.unlock();
         }
+        sendResync(targets, workspace.type, workspace.resourceId, "Resource Unavailable");
     }
 
     public void resourceSaved(String type, String resourceId, String payload) {
+        if (workspaceSaveCommit.get()) {
+            return;
+        }
         Workspace workspace = workspaces.get(key(type, resourceId));
         JsonObject latest = workspaceDocument(type, resourceId, payload);
         if (workspace == null || latest == null) {
             return;
         }
+        List<Session> targets;
         synchronized (workspace) {
             if (workspaces.get(key(workspace.type, workspace.resourceId)) != workspace || workspace.deleted) {
                 return;
             }
             workspace.document = rebase(latest, workspace.pendingPatches);
-            workspace.dirtyAt = workspace.pendingPatches.isEmpty() ? 0L : System.currentTimeMillis();
-            requestResync(workspace, "Resource Updated");
+            targets = members(workspace, null);
+        }
+        sendResync(targets, workspace.type, workspace.resourceId, "Resource Updated");
+    }
+
+    <T> T save(Session session, FlowResourceAdapter<T> adapter, T value) {
+        String type = adapter.descriptor().typeId();
+        String resourceId = adapter.id(value);
+        Workspace workspace = workspaces.get(key(type, resourceId));
+        if (workspace == null || !isWorkspaceMember(workspace, session)) {
+            adapter.save(value);
+            return value;
+        }
+        workspace.commitLock.lock();
+        try {
+            T submitted = withCurrentImmutableRoots(adapter, value, adapter.get(resourceId), false);
+            workspaceSaveCommit.set(true);
+            try {
+                adapter.save(submitted);
+            } finally {
+                workspaceSaveCommit.remove();
+            }
+            JsonObject latest = workspaceDocument(type, resourceId, adapter.serialize(submitted));
+            List<Session> targets;
+            synchronized (workspace) {
+                if (latest != null && workspaces.get(key(type, resourceId)) == workspace && !workspace.deleted) {
+                    workspace.document = latest;
+                    workspace.pendingPatches.clear();
+                }
+                targets = members(workspace, null);
+            }
+            sendResync(targets, type, resourceId, "Resource Updated");
+            return submitted;
+        } finally {
+            workspace.commitLock.unlock();
+        }
+    }
+
+    private boolean isWorkspaceMember(Workspace workspace, Session session) {
+        synchronized (workspace) {
+            return !workspace.deleted && workspaces.get(key(workspace.type, workspace.resourceId)) == workspace
+                && workspace.members.contains(session.getSessionId());
+        }
+    }
+
+    private <T> T withCurrentImmutableRoots(FlowResourceAdapter<T> adapter, T submitted, T current, boolean includeRevision) {
+        if (submitted == null || current == null) {
+            return submitted;
+        }
+        try {
+            JsonElement submittedElement = JsonParser.parseString(adapter.serialize(submitted));
+            JsonElement currentElement = JsonParser.parseString(adapter.serialize(current));
+            if (!submittedElement.isJsonObject() || !currentElement.isJsonObject()) {
+                return null;
+            }
+            JsonObject submittedDocument = submittedElement.getAsJsonObject();
+            JsonObject currentDocument = currentElement.getAsJsonObject();
+            boolean copied = false;
+            for (String field : IMMUTABLE_ROOTS) {
+                if (!includeRevision && REVISION_ROOTS.contains(field)) {
+                    continue;
+                }
+                if (currentDocument.has(field)) {
+                    submittedDocument.add(field, currentDocument.get(field).deepCopy());
+                    copied = true;
+                }
+            }
+            return copied ? adapter.deserialize(submittedDocument.toString()) : submitted;
+        } catch (RuntimeException exception) {
+            return submitted;
         }
     }
 
@@ -264,11 +320,10 @@ public final class FlowWorkspaceService {
             if (existing != null) {
                 return existing;
             }
-            FlowGraph graph = loadGraph(type, resourceId);
-            if (graph == null || !compatibleGraphType(type, graph)) {
+            JsonObject document = loadDocument(type, resourceId);
+            if (document == null) {
                 return null;
             }
-            JsonObject document = JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject();
             Workspace created = new Workspace(type, resourceId, document);
             workspaces.put(key, created);
             return created;
@@ -280,40 +335,42 @@ public final class FlowWorkspaceService {
         if (workspace == null) {
             return;
         }
+        AwarenessEvent event;
+        List<Session> targets;
         synchronized (workspace) {
             if (!workspace.members.remove(session.getSessionId())) {
                 return;
             }
             workspace.awareness.remove(session.getSessionId());
-            AwarenessEvent event = new AwarenessEvent(workspace.type, workspace.resourceId, session.getSessionId(), identity(session), new JsonObject(),
+            event = new AwarenessEvent(workspace.type, workspace.resourceId, session.getSessionId(), identity(session), new JsonObject(),
                 System.currentTimeMillis());
-            broadcastAwareness(workspace, event);
-            if (workspace.members.isEmpty() && workspace.dirtyAt == 0L) {
+            targets = members(workspace, event.authorSessionId());
+            if (workspace.members.isEmpty()) {
                 workspaces.remove(key, workspace);
             }
         }
+        sendAwareness(targets, event);
     }
 
-    private void broadcastOperation(Workspace workspace, OperationEvent event) {
+    private List<Session> members(Workspace workspace, String excludedSessionId) {
+        return workspace.members.stream()
+            .filter(member -> excludedSessionId == null || !member.equals(excludedSessionId))
+            .map(sessions::get)
+            .filter(target -> target != null)
+            .toList();
+    }
+
+    private void sendOperation(List<Session> targets, OperationEvent event) {
         String json = gson.toJson(event);
-        for (String member : List.copyOf(workspace.members)) {
-            Session target = sessions.get(member);
-            if (target != null) {
-                sender.sendWorkspaceOperation(target, json);
-            }
+        for (Session target : targets) {
+            sender.sendWorkspaceOperation(target, json);
         }
     }
 
-    private void broadcastAwareness(Workspace workspace, AwarenessEvent event) {
+    private void sendAwareness(List<Session> targets, AwarenessEvent event) {
         String json = gson.toJson(event);
-        for (String member : List.copyOf(workspace.members)) {
-            if (member.equals(event.authorSessionId())) {
-                continue;
-            }
-            Session target = sessions.get(member);
-            if (target != null) {
-                sender.sendWorkspaceAwareness(target, json);
-            }
+        for (Session target : targets) {
+            sender.sendWorkspaceAwareness(target, json);
         }
     }
 
@@ -325,46 +382,107 @@ public final class FlowWorkspaceService {
         return document;
     }
 
-    private boolean rebaseFromStored(Workspace workspace, long now) {
-        FlowGraph latest = loadGraph(workspace.type, workspace.resourceId);
-        if (latest == null) {
-            return false;
-        }
-        JsonObject document = JsonParser.parseString(FlowSerializer.serialize(latest)).getAsJsonObject();
-        workspace.document = rebase(document, workspace.pendingPatches);
-        workspace.dirtyAt = workspace.pendingPatches.isEmpty() ? 0L : now;
-        requestResync(workspace, "Resource Updated");
-        return true;
-    }
-
     private JsonObject workspaceDocument(String type, String resourceId, String payload) {
         if (payload == null || payload.isBlank()) {
             return null;
         }
         try {
-            if (!ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type)) {
+            if (isGraphWorkspace(type) && !ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type)) {
                 FlowGraph graph = FlowSerializer.deserialize(payload);
                 return JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject();
             }
-            CustomContentDefinition content = gson.fromJson(payload, CustomContentDefinition.class);
-            if (content == null || content.getGraph() == null) {
-                return null;
+            if (ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type)) {
+                CustomContentDefinition content = gson.fromJson(payload, CustomContentDefinition.class);
+                if (content == null || content.getGraph() == null) {
+                    return null;
+                }
+                FlowGraph graph = content.getGraph();
+                graph.setId(content.getFlowId() != null && !content.getFlowId().isBlank() ? content.getFlowId() : resourceId);
+                return JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject();
             }
-            FlowGraph graph = content.getGraph();
-            graph.setId(content.getFlowId() != null && !content.getFlowId().isBlank() ? content.getFlowId() : resourceId);
-            return JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject();
+            JsonElement document = JsonParser.parseString(payload);
+            return document.isJsonObject() ? document.getAsJsonObject() : null;
         } catch (RuntimeException exception) {
             return null;
         }
     }
 
-    private void requestResync(Workspace workspace, String reason) {
-        String json = gson.toJson(new ResyncEvent(workspace.type, workspace.resourceId, reason));
-        for (String member : List.copyOf(workspace.members)) {
-            Session target = sessions.get(member);
-            if (target != null) {
-                sender.sendWorkspaceResync(target, json);
-            }
+    JsonObject loadDocument(String type, String resourceId) {
+        if (isGraphWorkspace(type)) {
+            FlowGraph graph = loadGraph(type, resourceId);
+            return graph != null && compatibleGraphType(type, graph)
+                ? JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject() : null;
+        }
+        FlowWorkspaceDocumentProvider provider = documentProviders.get(type);
+        if (provider != null) {
+            JsonObject document = provider.load(resourceId);
+            return document != null ? document.deepCopy() : null;
+        }
+        FlowResourceAdapter<?> adapter = resources != null ? resources.get(type) : null;
+        if (adapter == null) {
+            return null;
+        }
+        Object value = adapter.get(resourceId);
+        if (value == null) {
+            return null;
+        }
+        JsonElement document = JsonParser.parseString(serialize(adapter, value));
+        return document.isJsonObject() ? document.getAsJsonObject() : null;
+    }
+
+    JsonObject persistDocument(String type, String resourceId, JsonObject document) {
+        Persistence persistence = persistDocumentDurable(type, resourceId, document, () -> {
+        }, () -> {
+        });
+        persistence.completion().run();
+        return persistence.document();
+    }
+
+    private Persistence persistDocumentDurable(String type, String resourceId, JsonObject document, Runnable beforeVisible, Runnable afterVisible) {
+        if (isGraphWorkspace(type)) {
+            FlowGraph graph = FlowSerializer.deserialize(document.toString());
+            graph.setId(resourceId);
+            graph.setResourceType(type);
+            Runnable completion = persistGraph(type, resourceId, graph, beforeVisible, afterVisible);
+            return new Persistence(JsonParser.parseString(FlowSerializer.serialize(graph)).getAsJsonObject(), completion);
+        }
+        FlowWorkspaceDocumentProvider provider = documentProviders.get(type);
+        if (provider != null) {
+            provider.persist(resourceId, document.deepCopy());
+            return new Persistence(document.deepCopy(), () -> {
+            });
+        }
+        FlowResourceAdapter<?> adapter = resources != null ? resources.get(type) : null;
+        if (adapter == null) {
+            throw new IllegalStateException("Resource adapter unavailable: " + type);
+        }
+        Object value = adapter.deserialize(document.toString());
+        if (value == null || !resourceId.equals(resourceId(adapter, value))) {
+            throw new IllegalStateException("Workspace resource identity changed");
+        }
+        Runnable completion = resources.saveAuthoritativeDurable(type, value, beforeVisible, afterVisible);
+        return new Persistence(JsonParser.parseString(serialize(adapter, value)).getAsJsonObject(), completion);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String serialize(FlowResourceAdapter<?> adapter, Object value) {
+        return ((FlowResourceAdapter<Object>) adapter).serialize(value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String resourceId(FlowResourceAdapter<?> adapter, Object value) {
+        return ((FlowResourceAdapter<Object>) adapter).id(value);
+    }
+
+    private boolean isGraphWorkspace(String type) {
+        return ReSyncResourceCatalog.FLOW.equals(type) || ReSyncResourceCatalog.FUNCTION.equals(type)
+            || ReSyncResourceCatalog.COMMAND.equals(type) || ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type);
+    }
+
+    private void sendResync(List<Session> targets, String type, String resourceId, String reason) {
+        String json = gson.toJson(new ResyncEvent(type, resourceId, reason));
+        for (Session target : targets) {
+            sender.sendWorkspaceResync(target, json);
         }
     }
 
@@ -485,16 +603,22 @@ public final class FlowWorkspaceService {
     }
 
     private boolean valid(JoinRequest request) {
-        return request != null && GRAPH_TYPES.contains(safe(request.type())) && validId(request.resourceId());
+        return request != null && supportsWorkspaceType(request.type()) && validId(request.resourceId());
     }
 
     private boolean valid(OperationRequest request) {
-        return request != null && GRAPH_TYPES.contains(safe(request.type())) && validId(request.resourceId())
+        return request != null && supportsWorkspaceType(request.type()) && validId(request.resourceId())
             && request.baseSequence() >= 0L && validOperationId(request.operationId());
     }
 
     private boolean valid(AwarenessRequest request) {
-        return request != null && GRAPH_TYPES.contains(safe(request.type())) && validId(request.resourceId());
+        return request != null && supportsWorkspaceType(request.type()) && validId(request.resourceId());
+    }
+
+    boolean supportsWorkspaceType(String type) {
+        String normalized = safe(type);
+        return GRAPH_TYPES.contains(normalized) || documentProviders.containsKey(normalized)
+            || resources != null && resources.get(normalized) != null;
     }
 
     private boolean validId(String value) {
@@ -527,18 +651,36 @@ public final class FlowWorkspaceService {
         return content != null ? content.getGraph() : null;
     }
 
-    private void persistGraph(String type, String resourceId, FlowGraph graph) {
+    private Runnable persistGraph(String type, String resourceId, FlowGraph graph, Runnable beforeVisible, Runnable afterVisible) {
+        if (resources != null) {
+            Object value = graph;
+            if (ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type)) {
+                CustomContentDefinition cached = customContentStorage != null ? customContentStorage.get(resourceId) : null;
+                if (cached == null) {
+                    throw new IllegalStateException("Custom content not found: " + resourceId);
+                }
+                CustomContentDefinition content = gson.fromJson(gson.toJsonTree(cached), CustomContentDefinition.class);
+                graph.setId(content.getFlowId() != null && !content.getFlowId().isBlank() ? content.getFlowId() : graph.getId());
+                content.setGraph(graph);
+                value = content;
+            }
+            return resources.saveAuthoritativeDurable(type, value, beforeVisible, afterVisible);
+        }
         if (!ReSyncResourceCatalog.CUSTOM_CONTENT.equals(type)) {
             storage.saveGraph(graph);
-            return;
+            return () -> {
+            };
         }
-        CustomContentDefinition content = customContentStorage != null ? customContentStorage.get(resourceId) : null;
-        if (content == null) {
+        CustomContentDefinition cached = customContentStorage != null ? customContentStorage.get(resourceId) : null;
+        if (cached == null) {
             throw new IllegalStateException("Custom content not found: " + resourceId);
         }
+        CustomContentDefinition content = gson.fromJson(gson.toJsonTree(cached), CustomContentDefinition.class);
         graph.setId(content.getFlowId() != null && !content.getFlowId().isBlank() ? content.getFlowId() : graph.getId());
         content.setGraph(graph);
         customContentStorage.save(content);
+        return () -> {
+        };
     }
 
     private String key(String type, String resourceId) {
@@ -585,6 +727,9 @@ public final class FlowWorkspaceService {
     private record ResyncEvent(String type, String resourceId, String reason) {
     }
 
+    private record Persistence(JsonObject document, Runnable completion) {
+    }
+
     private static final class Workspace {
         private final String type;
         private final String resourceId;
@@ -593,7 +738,7 @@ public final class FlowWorkspaceService {
         private final Map<String, AwarenessEvent> awareness = new ConcurrentHashMap<>();
         private final List<WorkspacePatch<JsonElement>> pendingPatches = new ArrayList<>();
         private final WorkspaceRevision<OperationEvent> revision = new WorkspaceRevision<>();
-        private long dirtyAt;
+        private final ReentrantLock commitLock = new ReentrantLock();
         private boolean deleted;
 
         private Workspace(String type, String resourceId, JsonObject document) {

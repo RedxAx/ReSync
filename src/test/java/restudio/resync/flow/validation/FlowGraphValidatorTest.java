@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowGraphValidatorTest {
@@ -459,7 +460,15 @@ class FlowGraphValidatorTest {
         assertTrue(validator.validate(defaultMode).valid());
         assertTrue(validator.validate(staleHiddenLiteral).valid());
         assertTrue(validator.validate(dynamicMode).valid());
-        assertTrue(hasCode(validator.validate(activeMissing), "REQUIRED_INPUT_MISSING"));
+        FlowGraphValidationResult missing = validator.validate(activeMissing);
+        assertTrue(hasCode(missing, "REQUIRED_INPUT_MISSING"));
+        FlowGraphDiagnostic missingInput = missing.errors().stream()
+            .filter(diagnostic -> "REQUIRED_INPUT_MISSING".equals(diagnostic.code()))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("target", missingInput.nodeId());
+        assertEquals("asset", missingInput.pin());
+        assertFalse(missingInput.remediation().isBlank());
         assertTrue(hasCode(validator.validate(activeUnknown), "CATALOG_VALUE_UNRESOLVED"));
     }
 

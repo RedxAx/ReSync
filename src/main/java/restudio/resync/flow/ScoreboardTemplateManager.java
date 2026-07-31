@@ -98,7 +98,7 @@ public final class ScoreboardTemplateManager {
     }
 
     public static boolean showTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
-        if (player == null || definition == null) {
+        if (player == null || definition == null || !definition.isEnabled()) {
             return false;
         }
         applyTemplate(player, definition, usePapi);
@@ -115,8 +115,10 @@ public final class ScoreboardTemplateManager {
             ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
             if (state != null) {
                 ScoreboardDefinition definition = storage.getScoreboard(state.scoreboardId());
-                if (definition != null) {
+                if (definition != null && definition.isEnabled()) {
                     applyTemplate(player, definition, state.usePapi());
+                } else {
+                    hideActive(player);
                 }
             }
         }
@@ -124,7 +126,7 @@ public final class ScoreboardTemplateManager {
         if (defaultId != null && !defaultId.isBlank()) {
             boolean usePapi = storage.isDefaultScoreboardUsePapi();
             ScoreboardDefinition definition = storage.getScoreboard(defaultId);
-            if (definition != null) {
+            if (definition != null && definition.isEnabled()) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!ACTIVE_SCOREBOARDS.containsKey(player.getUniqueId())) {
                         applyTemplate(player, definition, usePapi);
@@ -142,6 +144,13 @@ public final class ScoreboardTemplateManager {
         }
         ScoreboardDefinition definition = storage.getScoreboard(scoreboardId);
         if (definition == null) {
+            return;
+        }
+        if (!definition.isEnabled()) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
+                if (state != null && scoreboardId.equalsIgnoreCase(state.scoreboardId())) hideActive(player);
+            }
             return;
         }
         for (Player player : Bukkit.getOnlinePlayers()) {

@@ -21,6 +21,7 @@ import java.util.function.UnaryOperator;
 public class FlowGraph {
     public static final int CURRENT_VERSION = 2;
     private String id;
+    private boolean enabled = true;
     private int version;
     private Map<String, FlowNode> nodes;
     private List<FlowConnection> connections;
@@ -212,6 +213,14 @@ public class FlowGraph {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public int getVersion() {

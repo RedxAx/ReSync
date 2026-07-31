@@ -12,10 +12,12 @@ import restudio.resync.storage.StorageSafety;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -286,6 +288,9 @@ public class JsonAssetStore<T> {
         }
         try (Stream<Path> paths = Files.walk(assetsRoot)) {
             for (Path file : paths.filter(Files::isRegularFile).toList()) {
+                if (isInternalAssetPath(file)) {
+                    continue;
+                }
                 AssetName asset = assetName(file);
                 if (!typeId.equals(asset.type()) || safeId(asset.id(), "migrate") == null) {
                     continue;
@@ -297,10 +302,16 @@ public class JsonAssetStore<T> {
                 if (Files.exists(target) && !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
                     String targetType = AssetFileFormat.readResourceType(target);
                     if (typeId.equals(targetType)) {
+                        if (AssetFileFormat.isIdOnlyFileName(file.getFileName().toString())) {
+                            quarantineDuplicate(file);
+                        }
                         continue;
                     }
                     target = conflictAssetFile(asset.id(), 1);
                     if (Files.exists(target) && typeId.equals(AssetFileFormat.readResourceType(target))) {
+                        if (AssetFileFormat.isIdOnlyFileName(file.getFileName().toString())) {
+                            quarantineDuplicate(file);
+                        }
                         continue;
                     }
                 }
@@ -369,6 +380,32 @@ public class JsonAssetStore<T> {
         fileIndex.clear();
     }
 
+    private void quarantineDuplicate(Path file) throws IOException {
+        Path root = assetsRoot.toAbsolutePath().normalize();
+        Path source = file.toAbsolutePath().normalize();
+        Path quarantineRoot = root.resolve(".quarantine").resolve("duplicates").resolve(UUID.randomUUID().toString());
+        Path target = quarantineRoot.resolve(root.relativize(source)).normalize();
+        if (!source.startsWith(root) || !target.startsWith(quarantineRoot)) {
+            throw new IOException("Unsafe " + typeId + " asset quarantine path: " + file);
+        }
+        Files.createDirectories(target.getParent());
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException exception) {
+            Files.move(source, target);
+        }
+    }
+
+    private boolean isInternalAssetPath(Path file) {
+        Path root = assetsRoot.toAbsolutePath().normalize();
+        Path relative = root.relativize(file.toAbsolutePath().normalize());
+        if (relative.getNameCount() == 0) {
+            return false;
+        }
+        return Set.of(".transactions", ".snapshots", ".quarantine", ".durability", ".tombstones", ".migrations", "migration-backups")
+            .contains(relative.getName(0).toString());
+    }
+
     private void rebuildFileIndex() {
         fileIndex.clear();
         if (!Files.exists(assetsRoot)) {
@@ -376,6 +413,9 @@ public class JsonAssetStore<T> {
         }
         try (Stream<Path> paths = Files.walk(assetsRoot)) {
             for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                if (isInternalAssetPath(path)) {
+                    continue;
+                }
                 AssetName asset = assetName(path);
                 if (!typeId.equals(asset.type())) {
                     continue;
@@ -471,6 +511,9 @@ public class JsonAssetStore<T> {
         }
         try (Stream<Path> paths = Files.walk(assetsRoot)) {
             for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                if (isInternalAssetPath(path)) {
+                    continue;
+                }
                 AssetName asset = assetName(path);
                 if (typeId.equals(asset.type()) && id.equals(asset.id())) {
                     deleteAssetFile(path);
@@ -505,10 +548,16 @@ public class JsonAssetStore<T> {
         int separator = fileName.indexOf("__");
         if (separator > 0) {
             String type = fileName.substring(0, separator);
+            if ("chat_channel".equals(type)) {
+                type = "chat";
+            }
             String id = fileName.substring(separator + 2, fileName.length() - 5);
             return new AssetName(type, id);
         }
         String type = AssetFileFormat.readResourceType(path);
+        if ("chat_channel".equals(type)) {
+            type = "chat";
+        }
         String id = AssetFileFormat.idFromIdOnlyFileName(fileName);
         return new AssetName(type, id);
     }

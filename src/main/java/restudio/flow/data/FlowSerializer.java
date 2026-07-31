@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class FlowSerializer {
-    private static final Set<String> GRAPH_PROPERTIES = Set.of("id", "version", "nodes", "connections", "localVariables", "function", "functionOwner", "functionNamespace", "functionVersion", "functionDescription", "functionInputs", "functionOutputs", "editorPassthroughs", "contentProperties", "resourceType", "resourceRevision", "resourceHash", "resourceMutationId", "assetFormatVersion", "assetRevision", "assetHash", "assetMutationId");
+    private static final Set<String> GRAPH_PROPERTIES = Set.of("id", "enabled", "version", "nodes", "connections", "localVariables", "function", "functionOwner", "functionNamespace", "functionVersion", "functionDescription", "functionInputs", "functionOutputs", "editorPassthroughs", "contentProperties", "resourceType", "resourceRevision", "resourceHash", "resourceMutationId", "assetFormatVersion", "assetRevision", "assetHash", "assetMutationId");
     private static final FlowDataObjectAdapter DATA_OBJECT_ADAPTER = new FlowDataObjectAdapter();
     private static final Gson gson = new GsonBuilder()
             .setPrettyPrinting()

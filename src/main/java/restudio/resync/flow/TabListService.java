@@ -64,7 +64,7 @@ public final class TabListService {
     }
 
     public static boolean applyTemplate(Player viewer, TabDefinition definition, boolean usePapi) {
-        if (viewer == null || definition == null) {
+        if (viewer == null || definition == null || !definition.isEnabled()) {
             return false;
         }
         String tabId = definition.getId() != null ? definition.getId() : "main";
@@ -117,6 +117,13 @@ public final class TabListService {
         }
         TabDefinition definition = storage.getTab(tabId);
         if (definition == null) {
+            return;
+        }
+        if (!definition.isEnabled()) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                ActiveTabState state = ACTIVE_TABS.get(player.getUniqueId());
+                if (state != null && tabId.equalsIgnoreCase(state.tabId())) clearForPlayer(player);
+            }
             return;
         }
         for (Player player : Bukkit.getOnlinePlayers()) {

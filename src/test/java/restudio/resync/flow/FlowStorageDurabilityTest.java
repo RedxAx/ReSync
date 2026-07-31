@@ -52,11 +52,77 @@ class FlowStorageDurabilityTest {
         FlowGraph firstEditor = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
         FlowGraph staleEditor = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
 
-        firstEditor.setResourceMutationId("");
+        firstEditor.setEnabled(false);
         storage.saveGraph(firstEditor);
+        staleEditor.setVersion(3);
 
         assertThrows(ResourceRevisionConflictException.class, () -> storage.saveGraph(staleEditor));
         assertEquals(2L, storage.getGraph("shared").getResourceRevision());
+    }
+
+    @Test
+    void staleEquivalentGraphConvergesToCurrentRevision() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph graph = FlowSerializer.deserialize("""
+            {"id":"shared","version":2,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(graph);
+        FlowGraph firstEditor = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
+        FlowGraph staleEditor = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
+
+        firstEditor.setEnabled(false);
+        staleEditor.setEnabled(false);
+        storage.saveGraph(firstEditor);
+        storage.saveGraph(staleEditor);
+
+        assertEquals(2L, staleEditor.getResourceRevision());
+        assertEquals(firstEditor.getResourceMutationId(), staleEditor.getResourceMutationId());
+        assertEquals(firstEditor.getResourceHash(), staleEditor.getResourceHash());
+    }
+
+    @Test
+    void unchangedGraphDoesNotAdvanceRevision() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph graph = FlowSerializer.deserialize("""
+            {"id":"shared","version":2,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(graph);
+        String mutationId = graph.getResourceMutationId();
+        String hash = graph.getResourceHash();
+
+        storage.saveGraph(FlowSerializer.deserialize(FlowSerializer.serialize(graph)));
+
+        FlowGraph stored = storage.getGraph("shared");
+        assertEquals(1L, stored.getResourceRevision());
+        assertEquals(mutationId, stored.getResourceMutationId());
+        assertEquals(hash, stored.getResourceHash());
+    }
+
+    @Test
+    void functionSaveUndoSequenceUsesTheCurrentRevision() {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph original = FlowSerializer.deserialize("""
+            {"id":"request_message","version":2,"function":true,"resourceType":"function","functionDescription":"Original",
+             "nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(original);
+        FlowGraph unchanged = FlowSerializer.deserialize(FlowSerializer.serialize(original));
+        storage.saveGraph(unchanged);
+        assertEquals(1L, unchanged.getResourceRevision());
+
+        FlowGraph changed = FlowSerializer.deserialize(FlowSerializer.serialize(unchanged));
+        changed.setFunctionDescription("Changed");
+        storage.saveGraph(changed);
+        assertEquals(2L, changed.getResourceRevision());
+
+        FlowGraph undone = FlowSerializer.deserialize(FlowSerializer.serialize(original));
+        undone.setResourceRevision(changed.getResourceRevision());
+        undone.setResourceHash(changed.getResourceHash());
+        undone.setResourceMutationId(changed.getResourceMutationId());
+        storage.saveGraph(undone);
+
+        assertEquals(3L, undone.getResourceRevision());
+        assertEquals("Original", storage.getGraph("function", "request_message").getFunctionDescription());
     }
 
     @Test
@@ -152,7 +218,7 @@ class FlowStorageDurabilityTest {
         storage.saveGraph(functionGraph);
 
         assertEquals("flow", storage.getGraph("flow", "shared").getResourceMutationId());
-        assertNotEquals("function", storage.getGraph("function", "shared").getResourceMutationId());
+        assertEquals("function", storage.getGraph("function", "shared").getResourceMutationId());
 
         storage.deleteGraph("function", "shared");
 

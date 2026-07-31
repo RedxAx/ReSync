@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import restudio.resync.resources.AssetFileFormat;
+import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -56,7 +57,7 @@ public final class AssetIntegrityService {
                 return;
             }
             JsonObject object = parsed.getAsJsonObject();
-            String type = text(object, AssetFileFormat.RESOURCE_TYPE);
+            String type = resourceType(object, file);
             String id = text(object, "id");
             if (id.isBlank()) {
                 id = AssetFileFormat.idFromIdOnlyFileName(file.getFileName().toString());
@@ -208,6 +209,23 @@ public final class AssetIntegrityService {
 
     private String key(String type, String id) {
         return type + "\u0000" + id;
+    }
+
+    private String resourceType(JsonObject object, Path file) {
+        String type = text(object, AssetFileFormat.RESOURCE_TYPE);
+        if (!type.isBlank()) {
+            return "chat_channel".equals(type) ? ReSyncResourceCatalog.CHAT : type;
+        }
+        String fileName = file != null && file.getFileName() != null ? file.getFileName().toString() : "";
+        int separator = fileName.indexOf("__");
+        if (separator <= 0) {
+            return "";
+        }
+        String legacyType = fileName.substring(0, separator);
+        if ("chat_channel".equals(legacyType)) {
+            return ReSyncResourceCatalog.CHAT;
+        }
+        return ReSyncResourceCatalog.byType(legacyType) != null ? legacyType : "";
     }
 
     private HealthReport report(List<Issue> issues, List<ResourceIdentity> resources, int recoveredTransactions) {

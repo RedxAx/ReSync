@@ -1,8 +1,13 @@
 package restudio.resync.modules.flow;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowResourceReference;
 import restudio.resync.Log;
+import restudio.resync.core.Session;
+import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.sync.FlowResourceMetadata;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
@@ -18,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -28,8 +34,10 @@ public final class FlowResourceRegistry {
     private final Deque<FlowResourceAuditRecord> auditRecords = new ArrayDeque<>();
     private Consumer<String> changeListener = ignored -> {
     };
+    private Consumer<Runnable> liveRefreshExecutor = Runnable::run;
     private FlowResourceMutationListener mutationListener = FlowResourceMutationListener.NONE;
     private FlowResourceCommitListener commitListener = FlowResourceCommitListener.NONE;
+    private FlowWorkspaceService workspaces;
     private FlowResourceAuthorizationPolicy authorizationPolicy = (context, operation, resourceType, resourceId) ->
         "system".equals(context.source()) || "flow".equals(context.source());
 
@@ -43,12 +51,56 @@ public final class FlowResourceRegistry {
         };
     }
 
+    public void setLiveRefreshExecutor(Consumer<Runnable> liveRefreshExecutor) {
+        this.liveRefreshExecutor = liveRefreshExecutor != null ? liveRefreshExecutor : Runnable::run;
+    }
+
+    void runLiveRefresh(Runnable refresh) {
+        liveRefreshExecutor.accept(refresh);
+    }
+
     public void setMutationListener(FlowResourceMutationListener mutationListener) {
         this.mutationListener = mutationListener != null ? mutationListener : FlowResourceMutationListener.NONE;
     }
 
     public void setCommitListener(FlowResourceCommitListener commitListener) {
         this.commitListener = commitListener != null ? commitListener : FlowResourceCommitListener.NONE;
+    }
+
+    public void setWorkspaceService(FlowWorkspaceService workspaces) {
+        this.workspaces = workspaces;
+    }
+
+    <T> T saveFromSession(Session session, FlowResourceAdapter<T> adapter, T value) {
+        if (workspaces != null) {
+            return workspaces.save(session, adapter, value);
+        }
+        adapter.save(value);
+        return value;
+    }
+
+    <T> void completeSessionSave(Session session, FlowResourceAdapter<T> adapter, T value) {
+        String id = adapter.id(value);
+        String expectedPayload = adapter.serialize(value);
+        runLiveRefresh(() -> {
+            T latest = adapter.get(id);
+            if (!sameDurableValue(adapter, expectedPayload, latest)) {
+                return;
+            }
+            adapter.afterSave(session, latest);
+            latest = adapter.get(id);
+            if (sameDurableValue(adapter, expectedPayload, latest)) {
+                notifySaved(session, adapter, latest);
+            }
+        });
+    }
+
+    void deleteSerialized(FlowResourceAdapter<?> adapter, String id) {
+        if (workspaces != null) {
+            workspaces.delete(adapter.descriptor().typeId(), id, () -> adapter.delete(id));
+            return;
+        }
+        adapter.delete(id);
     }
 
     public void setAuthorizationPolicy(FlowResourceAuthorizationPolicy authorizationPolicy) {
@@ -104,6 +156,52 @@ public final class FlowResourceRegistry {
         return registrations.values().stream()
             .<FlowResourceAdapter<?>>map(ResourceRegistration::adapter)
             .toList();
+    }
+
+    public List<String> typeIds() {
+        return registrations.values().stream().map(registration -> registration.adapter().descriptor().typeId())
+            .sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    public String serialize(String typeId, String id) {
+        ResourceRegistration registration = registration(typeId);
+        if (registration == null) {
+            throw new IllegalArgumentException("Unknown resource type");
+        }
+        FlowResourceAdapter<Object> adapter = adapter(registration.adapter());
+        Object value = adapter.get(id);
+        if (value == null) {
+            throw new IllegalArgumentException("Resource not found");
+        }
+        return adapter.serialize(value);
+    }
+
+    public void createJson(String typeId, String json) {
+        persistJson(typeId, json, true);
+    }
+
+    public void updateJson(String typeId, String json) {
+        persistJson(typeId, json, false);
+    }
+
+    private void persistJson(String typeId, String json, boolean create) {
+        ResourceRegistration registration = registration(typeId);
+        if (registration == null) {
+            throw new IllegalArgumentException("Unknown resource type");
+        }
+        FlowResourceAdapter<Object> adapter = adapter(registration.adapter());
+        Object value = adapter.deserialize(json);
+        FlowOperationResult<FlowResourceReference> result = create ? create(typeId, value) : update(typeId, value);
+        if (!result.success()) {
+            throw new IllegalArgumentException(result.message());
+        }
+    }
+
+    public void deleteAuthoritative(String typeId, String id) {
+        FlowOperationResult<FlowResourceReference> result = delete(typeId, id);
+        if (!result.success()) {
+            throw new IllegalArgumentException(result.message());
+        }
     }
 
     public FlowResourceReference reference(String typeId, String id, boolean available) {
@@ -168,6 +266,188 @@ public final class FlowResourceRegistry {
 
     public FlowOperationResult<FlowResourceReference> save(String typeId, Object value, FlowResourceMutationContext context) {
         return authorizedMutation(typeId, resourceId(typeId, value), "save", context, () -> persist(typeId, value, "save", ExistencePolicy.ANY));
+    }
+
+    void saveAuthoritative(String typeId, Object value) {
+        saveAuthoritativeDurable(typeId, value).run();
+    }
+
+    Runnable saveAuthoritativeDurable(String typeId, Object value) {
+        return saveAuthoritativeDurable(typeId, value, () -> {
+        }, () -> {
+        });
+    }
+
+    Runnable saveAuthoritativeDurable(String typeId, Object value, Runnable beforeVisible, Runnable afterVisible) {
+        ResourceRegistration registration = typeId != null ? registrations.get(normalize(typeId)) : null;
+        FlowResourceAdapter<?> rawAdapter = registration != null ? registration.adapter() : null;
+        if (rawAdapter == null) {
+            throw new IllegalStateException("Resource adapter unavailable: " + typeId);
+        }
+        if (!rawAdapter.supportedOperations().contains("save")) {
+            throw new IllegalStateException("Resource save is unavailable: " + typeId);
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("Resource value is required");
+        }
+        FlowResourceAdapter<Object> adapter = adapter(rawAdapter);
+        String id = adapter.id(value);
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Resource ID is required");
+        }
+        adapter.validate(value);
+        adapter.save(value);
+        String expectedPayload = adapter.serialize(value);
+        return () -> runLiveRefresh(() -> {
+            Object latest = adapter.get(id);
+            if (!sameDurableValue(adapter, expectedPayload, latest)) {
+                return;
+            }
+            beforeVisible.run();
+            try {
+                adapter.afterSave(latest);
+                latest = adapter.get(id);
+                if (!sameDurableValue(adapter, expectedPayload, latest)) {
+                    return;
+                }
+                try {
+                    changeListener.accept(adapter.catalogSource());
+                } catch (RuntimeException exception) {
+                }
+                notifySaved(adapter, latest);
+            } finally {
+                afterVisible.run();
+            }
+        });
+    }
+
+    private <T> boolean sameDurableValue(FlowResourceAdapter<T> adapter, String expectedPayload, T value) {
+        if (value == null || expectedPayload == null) {
+            return false;
+        }
+        String currentPayload;
+        try {
+            currentPayload = adapter.serialize(value);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+        try {
+            return JsonParser.parseString(expectedPayload).equals(JsonParser.parseString(currentPayload));
+        } catch (RuntimeException exception) {
+            return expectedPayload.equals(currentPayload);
+        }
+    }
+
+    public String setEnabledAuthoritative(String typeId, String resourceId, boolean enabled) {
+        return setEnabledAuthoritative(null, typeId, resourceId, enabled);
+    }
+
+    public String setEnabledAuthoritative(Session session, String typeId, String resourceId, boolean enabled) {
+        AtomicReference<String> result = new AtomicReference<>("");
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        runLiveRefresh(() -> {
+            try {
+                result.set(setEnabledOnRuntime(session, typeId, resourceId, enabled));
+            } catch (RuntimeException exception) {
+                failure.set(exception);
+            }
+        });
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+        return result.get();
+    }
+
+    private String setEnabledOnRuntime(Session session, String typeId, String resourceId, boolean enabled) {
+        ResourceRegistration registration = typeId != null ? registrations.get(normalize(typeId)) : null;
+        FlowResourceAdapter<?> rawAdapter = registration != null ? registration.adapter() : null;
+        if (rawAdapter == null) {
+            throw new IllegalStateException("Resource unavailable");
+        }
+        if (!rawAdapter.supportedOperations().contains("save")) {
+            throw new IllegalStateException("Resource cannot be updated");
+        }
+        if (resourceId == null || resourceId.isBlank()) {
+            throw new IllegalArgumentException("Resource ID is required");
+        }
+        FlowResourceAdapter<Object> adapter = adapter(rawAdapter);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Object current = adapter.get(resourceId);
+            if (current == null) {
+                throw new IllegalArgumentException("Resource not found");
+            }
+            JsonObject document;
+            try {
+                document = JsonParser.parseString(adapter.serialize(current)).getAsJsonObject();
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException("Resource cannot be updated", exception);
+            }
+            boolean currentEnabled = !document.has("enabled") || document.get("enabled").isJsonNull() || document.get("enabled").getAsBoolean();
+            if (currentEnabled == enabled) {
+                return adapter.serialize(current);
+            }
+            JsonElement previousEnabled = document.has("enabled") ? document.get("enabled").deepCopy() : null;
+            document.addProperty("enabled", enabled);
+            Object updated = adapter.deserialize(document.toString());
+            if (updated == null || !resourceId.equals(adapter.id(updated))) {
+                throw new IllegalStateException("Resource identity changed");
+            }
+            try {
+                if (enabled) {
+                    adapter.validate(updated);
+                }
+                adapter.save(updated);
+                RefreshOutcome refresh = refreshAfterSaveReliably(adapter, updated);
+                if (!refresh.succeeded()) {
+                    rollbackEnabled(adapter, resourceId, previousEnabled);
+                    throw new IllegalStateException("The live resource could not be refreshed: " + refresh.error());
+                }
+                notifySaved(session, adapter, updated);
+                return adapter.serialize(updated);
+            } catch (ResourceRevisionConflictException exception) {
+                if (attempt == 2) {
+                    throw exception;
+                }
+            }
+        }
+        throw new IllegalStateException("Resource could not be updated");
+    }
+
+    private RefreshOutcome refreshAfterSaveReliably(FlowResourceAdapter<Object> adapter, Object value) {
+        RefreshOutcome refresh = refreshAfterSave(adapter, value);
+        for (int attempt = 1; attempt < 3 && !refresh.succeeded(); attempt++) {
+            refresh = refreshAfterSave(adapter, value);
+        }
+        return refresh;
+    }
+
+    private void rollbackEnabled(FlowResourceAdapter<Object> adapter, String resourceId, JsonElement previousEnabled) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Object latest = adapter.get(resourceId);
+            if (latest == null) {
+                throw new IllegalStateException("The previous resource state could not be restored");
+            }
+            JsonObject document = JsonParser.parseString(adapter.serialize(latest)).getAsJsonObject();
+            if (previousEnabled == null) {
+                document.remove("enabled");
+            } else {
+                document.add("enabled", previousEnabled.deepCopy());
+            }
+            Object restored = adapter.deserialize(document.toString());
+            try {
+                adapter.save(restored);
+                RefreshOutcome refresh = refreshAfterSaveReliably(adapter, restored);
+                if (!refresh.succeeded()) {
+                    throw new IllegalStateException("The previous live resource state could not be restored: " + refresh.error());
+                }
+                notifySaved(adapter, restored);
+                return;
+            } catch (ResourceRevisionConflictException exception) {
+                if (attempt == 2) {
+                    throw exception;
+                }
+            }
+        }
     }
 
     public FlowOperationResult<FlowResourceReference> create(String typeId, Object value) {
@@ -454,7 +734,7 @@ public final class FlowResourceRegistry {
             if (adapter.get(id) == null) {
                 return FlowOperationResult.failure("RESOURCE_NOT_FOUND", "Resource not found: " + id, Map.of("resourceType", typeId, "resourceId", id));
             }
-            adapter.delete(id);
+            deleteSerialized(adapter, id);
             RefreshOutcome refresh = refreshAfterDelete(adapter, id);
             notifyDeleted(typeId, id);
             return new FlowOperationResult<>(true, reference(registration, id, false), "", "",
@@ -598,7 +878,7 @@ public final class FlowResourceRegistry {
     private RefreshOutcome refreshAfterSave(FlowResourceAdapter<Object> adapter, Object value) {
         String error = "";
         try {
-            adapter.afterSave(value);
+            runLiveRefresh(() -> adapter.afterSave(value));
         } catch (RuntimeException exception) {
             error = failureMessage(exception);
         }
@@ -613,7 +893,7 @@ public final class FlowResourceRegistry {
     private RefreshOutcome refreshAfterDelete(FlowResourceAdapter<?> adapter, String id) {
         String error = "";
         try {
-            adapter.afterDelete(id);
+            runLiveRefresh(() -> adapter.afterDelete(id));
         } catch (RuntimeException exception) {
             error = failureMessage(exception);
         }
@@ -655,6 +935,10 @@ public final class FlowResourceRegistry {
     }
 
     public <T> void notifySaved(FlowResourceAdapter<T> adapter, T value) {
+        notifySaved(null, adapter, value);
+    }
+
+    <T> void notifySaved(Session session, FlowResourceAdapter<T> adapter, T value) {
         if (adapter == null || value == null) {
             return;
         }
@@ -675,20 +959,32 @@ public final class FlowResourceRegistry {
             Log.warn("Publish ReSync resource change failed: " + failureMessage(exception));
         }
         try {
-            commitListener.saved(type, resourceId, payload);
+            if (session != null) {
+                commitListener.saved(session, type, resourceId, payload);
+            } else {
+                commitListener.saved(type, resourceId, payload);
+            }
         } catch (RuntimeException exception) {
             Log.warn("Broadcast ReSync resource change failed: " + failureMessage(exception));
         }
     }
 
     public void notifyDeleted(String typeId, String resourceId) {
+        notifyDeleted(null, typeId, resourceId);
+    }
+
+    void notifyDeleted(Session session, String typeId, String resourceId) {
         try {
             mutationListener.deleted(typeId, resourceId);
         } catch (RuntimeException exception) {
             Log.warn("Publish ReSync resource deletion failed: " + failureMessage(exception));
         }
         try {
-            commitListener.deleted(typeId, resourceId);
+            if (session != null) {
+                commitListener.deleted(session, typeId, resourceId);
+            } else {
+                commitListener.deleted(typeId, resourceId);
+            }
         } catch (RuntimeException exception) {
             Log.warn("Broadcast ReSync resource deletion failed: " + failureMessage(exception));
         }

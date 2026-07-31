@@ -30,7 +30,10 @@ import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.FlowValueCodecRegistry;
+import restudio.resync.flow.contract.EditorDiagnostic;
+import restudio.resync.flow.contract.EditorError;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GlobalTriggers;
 import restudio.resync.flow.FlowRegistry;
@@ -43,6 +46,7 @@ import restudio.resync.flow.diagnostics.FlowTraceService;
 import restudio.resync.flow.diagnostics.FlowTraceSink;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.flow.testing.FlowFunctionTestHarness;
+import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.messages.MessageLogService;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.modules.flow.FlowBlueprintPacketHandler;
@@ -56,6 +60,7 @@ import restudio.resync.modules.flow.FlowResourcePacketRouter;
 import restudio.resync.modules.flow.FlowResourceCommitListener;
 import restudio.resync.modules.flow.FlowResourceRegistry;
 import restudio.resync.modules.flow.FlowWorkspaceService;
+import restudio.resync.modules.flow.FlowWorkspaceDocumentProvider;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
@@ -70,6 +75,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -80,6 +86,7 @@ public class FlowModule implements Module {
     private static final ModuleMetadata METADATA = ModuleMetadata.of("flowLegacyHandler", "FlowLegacyHandler", "flow");
     private static final long CUSTOM_CONTENT_CATALOG_POLL_INTERVAL_MS = 2000L;
     private static final long QUICK_EDIT_SESSION_TTL_MS = 30L * 60L * 1000L;
+    private static final int MAX_RESOURCE_ACTIVATION_RESULTS = 2048;
     private final FlowStorage storage;
     private final Set<Session> subscribedSessions = ConcurrentHashMap.newKeySet();
     private final FlowPacketSender sender;
@@ -88,6 +95,7 @@ public class FlowModule implements Module {
     private final FlowPlaceholderPreviewHandler placeholderPreviewHandler;
     private final FlowOptionCatalogPacketHandler optionCatalogHandler;
     private final FlowNodeRegistryPacketHandler nodeRegistryHandler;
+    private final FlowResourceRegistry resources;
     private final FlowCollaborationService collaboration;
     private final FlowWorkspaceService workspaces;
     private final NodeDefinitionRegistry definitionRegistry;
@@ -100,6 +108,7 @@ public class FlowModule implements Module {
     private final Gson gson = new Gson();
     private final ItemAttributeSchemaService quickEditAttributeService;
     private final Map<String, QuickEditSession> quickEditSessions = new ConcurrentHashMap<>();
+    private final Map<String, ResourceActivationResult> resourceActivationResults = new LinkedHashMap<>();
     private long lastCustomContentCatalogPollAt;
 
     public FlowModule(FlowStorage storage, Codec codec, int channelId, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
@@ -189,8 +198,10 @@ public class FlowModule implements Module {
         this.sessionLinkService = sessionLinkService;
         this.sender = new FlowPacketSender(codec, channelId, subscribedSessions, flowJobs);
         this.collaboration = new FlowCollaborationService(subscribedSessions, sender);
-        this.workspaces = new FlowWorkspaceService(storage, customContentStorage, sender, collaboration);
         FlowResourceRegistry resources = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
+        this.resources = resources;
+        this.workspaces = new FlowWorkspaceService(storage, customContentStorage, sender, collaboration, resources);
+        resources.setWorkspaceService(workspaces);
         resources.setCommitListener(new FlowResourceCommitListener() {
             @Override
             public void saved(String type, String resourceId, String payload) {
@@ -200,8 +211,22 @@ public class FlowModule implements Module {
             }
 
             @Override
+            public void saved(Session session, String type, String resourceId, String payload) {
+                workspaces.resourceSaved(type, resourceId, payload);
+                collaboration.saved(session, type, resourceId, payload);
+                refreshSharedResource(type, resourceId, false);
+            }
+
+            @Override
             public void deleted(String type, String resourceId) {
                 collaboration.deleted(type, resourceId);
+                workspaces.resourceDeleted(type, resourceId);
+                refreshSharedResource(type, resourceId, true);
+            }
+
+            @Override
+            public void deleted(Session session, String type, String resourceId) {
+                collaboration.deleted(session, type, resourceId);
                 workspaces.resourceDeleted(type, resourceId);
                 refreshSharedResource(type, resourceId, true);
             }
@@ -245,7 +270,6 @@ public class FlowModule implements Module {
 
     @Override
     public void onTick() {
-        workspaces.checkpoint();
         if (subscribedSessions.isEmpty()) {
             return;
         }
@@ -319,6 +343,7 @@ public class FlowModule implements Module {
                     case ReSyncProtocolContract.FLOW_PACKET_DEBUG_COMMAND -> handleDebugCommand(session, buffer);
                     case ReSyncProtocolContract.FLOW_PACKET_FUNCTION_TEST_REQUEST -> handleFunctionTest(session, buffer);
                     case ReSyncProtocolContract.FLOW_PACKET_QUICK_EDIT_APPLY -> handleQuickEditApply(session, buffer);
+                    case ReSyncProtocolContract.FLOW_PACKET_RESOURCE_ACTIVATION -> handleResourceActivation(session, buffer);
                     default -> {
                         Log.warn("Unknown flow packet: 0x" + String.format("%02X", packetId));
                         sender.sendError(session, "UNKNOWN_PACKET", "Unknown flow packet: 0x" + String.format("%02X", packetId));
@@ -369,6 +394,49 @@ public class FlowModule implements Module {
 
     public int getSubscribedSessionCount() {
         return subscribedSessions.size();
+    }
+
+    public boolean supportsResourceActivation(String type) {
+        var adapter = resources.get(type);
+        return adapter != null && (Set.of(ReSyncResourceCatalog.FLOW, ReSyncResourceCatalog.FUNCTION, ReSyncResourceCatalog.COMMAND,
+            ReSyncResourceCatalog.GUI, ReSyncResourceCatalog.SCOREBOARD, ReSyncResourceCatalog.TAB, ReSyncResourceCatalog.CUSTOM_CONTENT).contains(type)
+            || adapter.descriptor().jsonStorageSupported());
+    }
+
+    public List<String> resourceIds(String type) {
+        var adapter = resources.get(type);
+        return adapter != null ? adapter.listIds() : List.of();
+    }
+
+    public List<String> resourceTypes() {
+        return resources.typeIds();
+    }
+
+    public JsonObject resourceJson(String type, String resourceId) {
+        return JsonParser.parseString(resources.serialize(type, resourceId)).getAsJsonObject();
+    }
+
+    public void createResource(String type, JsonObject resource) {
+        resources.createJson(type, gson.toJson(resource));
+    }
+
+    public void updateResource(String type, JsonObject resource) {
+        resources.updateJson(type, gson.toJson(resource));
+    }
+
+    public void deleteResource(String type, String resourceId) {
+        resources.deleteAuthoritative(type, resourceId);
+    }
+
+    public void setResourceEnabled(String type, String resourceId, boolean enabled) {
+        if (!supportsResourceActivation(type)) {
+            throw new IllegalArgumentException("This resource cannot be enabled or disabled");
+        }
+        resources.setEnabledAuthoritative(type, resourceId, enabled);
+    }
+
+    public void registerWorkspaceDocumentProvider(FlowWorkspaceDocumentProvider provider) {
+        workspaces.registerDocumentProvider(provider);
     }
 
     public QuickEditResult startQuickEdit(Player player) {
@@ -789,6 +857,107 @@ public class FlowModule implements Module {
                 Map.of("code", code, "message", defaultText(message, code)))), "FUNCTION_TEST_RESULT_TOO_LARGE", "Function test result exceeds maximum size");
     }
 
+    private void handleResourceActivation(Session session, ByteBuffer buffer) {
+        ResourceActivationRequest request;
+        try {
+            request = gson.fromJson(readRemaining(buffer), ResourceActivationRequest.class);
+        } catch (RuntimeException exception) {
+            sendResourceActivationResult(session, null, false, "Request is invalid");
+            return;
+        }
+        if (request == null || request.type() == null || request.type().isBlank() || request.resourceId() == null || request.resourceId().isBlank()
+            || request.requestId() == null || request.requestId().isBlank()) {
+            sendResourceActivationResult(session, request, false, "Resource is required");
+            return;
+        }
+        synchronized (resourceActivationResults) {
+            ResourceActivationResult previous = resourceActivationResults.get(request.requestId());
+            if (previous != null) {
+                if (previous.type().equals(request.type()) && previous.resourceId().equals(request.resourceId()) && previous.enabled() == request.enabled()) {
+                    sendResourceActivationResult(session, previous);
+                } else {
+                    sendResourceActivationResult(session, request, false, "This update request is invalid");
+                }
+                return;
+            }
+            if (!resources.metadata().stream().anyMatch(metadata -> request.type().equals(metadata.getTypeId()) && metadata.isAvailable())) {
+                sendResourceActivationResult(session, request, false, "This resource cannot be enabled or disabled");
+                return;
+            }
+            try {
+                resources.setEnabledAuthoritative(session, request.type(), request.resourceId(), request.enabled());
+                sendResourceActivationResult(session, request, true, "");
+            } catch (FlowGraphValidationException exception) {
+                List<EditorDiagnostic> diagnostics = exception.getResult().diagnostics().stream()
+                    .map(diagnostic -> new EditorDiagnostic(EditorDiagnostic.Severity.valueOf(diagnostic.severity().name()),
+                        diagnostic.code(), diagnostic.nodeId(), diagnostic.pin(), "", diagnostic.message(), diagnostic.remediation()))
+                    .toList();
+                sender.sendEditorError(session, new EditorError("ACTIVATION_FAILED", request.type(), request.resourceId(),
+                    "Resource Needs Attention", "Fix the highlighted issues before enabling.", diagnostics));
+                sendResourceActivationResult(session, request, false, "Fix the highlighted issues before enabling.", true);
+            } catch (IllegalArgumentException exception) {
+                if ("Resource not found".equals(exception.getMessage())) {
+                    sendResourceActivationResult(session, request, false, "The resource no longer exists.");
+                    return;
+                }
+                EditorDiagnostic diagnostic = activationDiagnostic(request, exception);
+                sender.sendEditorError(session, new EditorError("ACTIVATION_FAILED", request.type(), request.resourceId(),
+                    "Resource Needs Attention", "Review the editor before enabling.", List.of(diagnostic)));
+                sendResourceActivationResult(session, request, false, "Review the highlighted editor values before enabling.", true);
+            } catch (RuntimeException exception) {
+                Log.warn("Could not update " + request.type() + " " + request.resourceId() + ": " + exception.getMessage());
+                sendResourceActivationResult(session, request, false, resourceActivationFailure(exception));
+            }
+        }
+    }
+
+    private EditorDiagnostic activationDiagnostic(ResourceActivationRequest request, IllegalArgumentException exception) {
+        String message = exception.getMessage() != null && !exception.getMessage().isBlank()
+            ? exception.getMessage() : "This resource is not ready to be enabled";
+        String field = "";
+        try {
+            JsonObject resource = JsonParser.parseString(resources.serialize(request.type(), request.resourceId())).getAsJsonObject();
+            String normalizedMessage = message.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+            field = resource.keySet().stream()
+                .filter(key -> !key.isBlank() && normalizedMessage.contains(key.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT)))
+                .findFirst().orElse("");
+        } catch (RuntimeException ignored) {
+        }
+        return new EditorDiagnostic(EditorDiagnostic.Severity.ERROR, "ACTIVATION_INVALID", "", field,
+            field.isBlank() ? "" : '/' + field, message, "Review this value and try again");
+    }
+
+    private String resourceActivationFailure(RuntimeException exception) {
+        if (exception instanceof ResourceRevisionConflictException) {
+            return "The resource kept changing while it was updating. Try again.";
+        }
+        return "The resource could not be updated.";
+    }
+
+    private void sendResourceActivationResult(Session session, ResourceActivationRequest request, boolean success, String message) {
+        sendResourceActivationResult(session, request, success, message, false);
+    }
+
+    private void sendResourceActivationResult(Session session, ResourceActivationRequest request, boolean success, String message, boolean editorError) {
+        ResourceActivationResult result = new ResourceActivationResult(success, request != null ? request.type() : "",
+            request != null ? request.resourceId() : "", request != null && request.enabled(),
+            request != null ? request.requestId() : "", message != null ? message : "", editorError);
+        if (request != null && request.requestId() != null && !request.requestId().isBlank()) {
+            synchronized (resourceActivationResults) {
+                resourceActivationResults.put(request.requestId(), result);
+                while (resourceActivationResults.size() > MAX_RESOURCE_ACTIVATION_RESULTS) {
+                    resourceActivationResults.remove(resourceActivationResults.keySet().iterator().next());
+                }
+            }
+        }
+        sendResourceActivationResult(session, result);
+    }
+
+    private void sendResourceActivationResult(Session session, ResourceActivationResult result) {
+        sender.sendJsonPayload(session, ReSyncProtocolContract.FLOW_PACKET_RESOURCE_ACTIVATION_RESULT, gson.toJson(result),
+            "RESOURCE_ACTIVATION_RESULT_TOO_LARGE", "Resource update result exceeds maximum size");
+    }
+
     private Map<String, Object> objectMap(JsonElement element) {
         if (element == null || !element.isJsonObject()) {
             return Map.of();
@@ -879,5 +1048,12 @@ public class FlowModule implements Module {
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
         return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    private record ResourceActivationRequest(String type, String resourceId, boolean enabled, String requestId) {
+    }
+
+    private record ResourceActivationResult(boolean success, String type, String resourceId, boolean enabled, String requestId, String message,
+                                            boolean editorError) {
     }
 }

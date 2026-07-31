@@ -217,7 +217,7 @@ public class FlowStorage {
         saveGraph(graph);
     }
 
-    private void saveGraph(FlowGraph graph, String forcedType) {
+    private synchronized void saveGraph(FlowGraph graph, String forcedType) {
         if (graph == null) {
             throw new IllegalArgumentException("Flow is required");
         }
@@ -247,6 +247,14 @@ public class FlowStorage {
             String type = !forcedType.isBlank() || !Set.of("flow", "function", "command").contains(existingType) ? requestedType : existingType;
             long currentRevision = existingFile ? AssetFileFormat.readRevision(file) : 0L;
             String currentMutationId = existingFile ? AssetFileFormat.readMutationId(file) : "";
+            FlowGraph current = existingFile ? FlowSerializer.deserialize(StorageSafety.readUtf8(file)) : null;
+            if (current != null) {
+                applyResourceIdentity(current, file);
+            }
+            if (sameGraphContent(graph, current)) {
+                applyCurrentIdentity(graph, current);
+                return;
+            }
             if (existingFile && graph.getResourceRevision() > 0L && graph.getResourceRevision() != currentRevision) {
                 throw new ResourceRevisionConflictException(safeId, graph.getResourceRevision(), currentRevision);
             }
@@ -292,6 +300,27 @@ public class FlowStorage {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save flow: " + safeId, e);
         }
+    }
+
+    private boolean sameGraphContent(FlowGraph incoming, FlowGraph current) {
+        if (incoming == null || current == null) {
+            return false;
+        }
+        JsonObject incomingJson = gson.fromJson(FlowSerializer.serialize(incoming), JsonObject.class);
+        JsonObject currentJson = gson.fromJson(FlowSerializer.serialize(current), JsonObject.class);
+        for (String field : List.of("resourceRevision", "resourceHash", "resourceMutationId")) {
+            incomingJson.remove(field);
+            currentJson.remove(field);
+        }
+        return incomingJson.equals(currentJson);
+    }
+
+    private void applyCurrentIdentity(FlowGraph graph, FlowGraph current) {
+        graph.setFunction(current.isFunction());
+        graph.setResourceType(current.getResourceType());
+        graph.setResourceRevision(current.getResourceRevision());
+        graph.setResourceHash(current.getResourceHash());
+        graph.setResourceMutationId(current.getResourceMutationId());
     }
 
     public void setGraphValidator(FlowGraphValidator graphValidator) {
@@ -691,6 +720,27 @@ public class FlowStorage {
             return "command";
         }
         return graph.isFunction() ? "function" : "flow";
+    }
+
+    public boolean isExecutionAuthorized(FlowGraph graph) {
+        if (graph == null) {
+            return true;
+        }
+        String type = graphResourceType(graph);
+        if (!GRAPH_TYPES.contains(type)) {
+            return true;
+        }
+        String id = graph.getId();
+        boolean storedIdentity = graph.getResourceRevision() > 0L || !graph.getResourceHash().isBlank()
+            || !graph.getResourceMutationId().isBlank();
+        if (id == null || id.isBlank()) {
+            return !"command".equals(type) && !storedIdentity;
+        }
+        FlowGraph current = getGraph(type, id);
+        if (current != null) {
+            return current.isEnabled();
+        }
+        return !"command".equals(type) && !storedIdentity;
     }
 
     public boolean hasStoredGraphVersion(String id) {
@@ -1558,6 +1608,10 @@ public class FlowStorage {
                 if (Files.exists(target) && !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
                     String targetType = AssetFileFormat.readResourceType(target);
                     if (type.equals(targetType)) {
+                        if (AssetFileFormat.isIdOnlyFileName(file.getFileName().toString())) {
+                            quarantineDuplicate(root, file);
+                        }
+                        changed = true;
                         continue;
                     }
                     folder = conflictFolderForType(type, id, 1);
@@ -1565,11 +1619,16 @@ public class FlowStorage {
                     target = safeAssetFolder(folder).resolve(AssetFileFormat.idOnlyFileName(id));
                     if (Files.exists(target) && type.equals(AssetFileFormat.readResourceType(target))) {
                         changed |= ensureAssetResource(metadata, type, id, id, folder);
+                        if (AssetFileFormat.isIdOnlyFileName(file.getFileName().toString())) {
+                            quarantineDuplicate(root, file);
+                        }
+                        changed = true;
                         continue;
                     }
                 }
                 changed |= ensureAssetResource(metadata, type, id, id, folder);
-                if (AssetFileFormat.needsRewrite(file, type) || !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) {
+                boolean moved = !file.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize());
+                if (AssetFileFormat.needsRewrite(file, type) || moved) {
                     AssetFileFormat.copyTyped(file, target, type);
                 }
             }
@@ -1632,19 +1691,23 @@ public class FlowStorage {
         }
         int separator = fileName.indexOf("__");
         if (separator <= 0) {
-            String type = AssetFileFormat.readResourceType(file);
+            String type = normalizeAssetType(AssetFileFormat.readResourceType(file));
             if (!knownAssetType(type)) {
                 return null;
             }
             String id = AssetFileFormat.idFromIdOnlyFileName(fileName);
             return id.isBlank() ? null : new AssetResourceName(type, id);
         }
-        String type = fileName.substring(0, separator);
+        String type = normalizeAssetType(fileName.substring(0, separator));
         if (!knownAssetType(type)) {
             return null;
         }
         String id = fileName.substring(separator + 2, fileName.length() - 5);
         return id.isBlank() ? null : new AssetResourceName(type, id);
+    }
+
+    private String normalizeAssetType(String type) {
+        return "chat_channel".equals(type) ? "chat" : type;
     }
 
     private boolean knownAssetType(String type) {

@@ -133,7 +133,11 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onError(WebSocket conn, Exception ex) {
-                Log.error("WebSocket error: " + ex.getMessage(), ex);
+                if (expectedDisconnect(ex)) {
+                    Log.fine("WebSocket peer disconnected: " + ex.getMessage());
+                } else {
+                    Log.error("WebSocket error: " + ex.getMessage(), ex);
+                }
             }
 
             @Override
@@ -158,6 +162,18 @@ public class ReSync extends JavaPlugin {
         }
 
         registerPlaceholderExpansion();
+    }
+
+    private static boolean expectedDisconnect(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof java.net.SocketException
+                && "Connection reset".equalsIgnoreCase(current.getMessage())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     @Override

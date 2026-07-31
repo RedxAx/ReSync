@@ -376,7 +376,8 @@ public class ReSyncServer {
             info.getFrameSender().close(1008, exception.getMessage());
             return;
         }
-        completeHandshake(info, req, identity);
+        CollaborationIdentity collaborationIdentity = collaborationIdentity(req, identity.clientId());
+        completeHandshake(info, req, identity, collaborationIdentity);
     }
 
     private void handleBridgeHandshake(ConnectionInfo info, Player player, HandshakeRequest req) {
@@ -388,9 +389,9 @@ public class ReSyncServer {
         String requestedClientId = req.getClientId();
         String clientId = "bridge:" + player.getUniqueId() + ':' + (requestedClientId != null && !requestedClientId.isBlank() ? requestedClientId : "remotely");
         req.setClientId(clientId);
-        completeHandshake(info, req, new ClientIdentity(clientId, req.getClientVersion()));
+        completeHandshake(info, req, new ClientIdentity(clientId, req.getClientVersion()),
+            new CollaborationIdentity(player.getUniqueId().toString(), player.getName(), player.getUniqueId().toString(), "minecraft"));
         Session session = sessionManager.getSession(info);
-        session.setCollaborationIdentity(new CollaborationIdentity(player.getUniqueId().toString(), player.getName(), player.getUniqueId().toString(), "minecraft"));
         sessionManager.linkPlayerToSession(player.getUniqueId(), session);
         PlayerSessionLinkService linkService = getPlayerSessionLinkService();
         if (linkService != null) {
@@ -407,7 +408,7 @@ public class ReSyncServer {
         }
     }
 
-    private void completeHandshake(ConnectionInfo info, HandshakeRequest req, ClientIdentity identity) {
+    private void completeHandshake(ConnectionInfo info, HandshakeRequest req, ClientIdentity identity, CollaborationIdentity collaborationIdentity) {
         Session oldSession = sessionManager.getSession(info);
         if (oldSession != null) {
             moduleRegistry.cleanupSession(oldSession);
@@ -424,7 +425,7 @@ public class ReSyncServer {
         info.setClientCapabilities(clientCapabilities(req.getCapabilitiesJson()));
         info.setState(ConnectionState.AUTHENTICATED);
         Session session = sessionManager.createSession(info, identity);
-        session.setCollaborationIdentity(collaborationIdentity(req, identity.clientId()));
+        session.setCollaborationIdentity(collaborationIdentity);
 
         HandshakeResponse response = new HandshakeResponse();
         response.setSuccess(true);

@@ -28,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class GlobalTriggers implements Listener {
     private final JavaPlugin plugin;
@@ -79,6 +80,9 @@ public class GlobalTriggers implements Listener {
 
         @Override
         public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+            if (runtimeCommands.get(baseLabel) != this) {
+                return false;
+            }
             String normalizedLabel = normalizeCommandLabel(commandLabel);
             String joinedArgs = String.join(" ", args);
             Player player = sender instanceof Player p ? p : null;
@@ -153,7 +157,7 @@ public class GlobalTriggers implements Listener {
 
     public void registerTrigger(String eventType, String flowId) {
         FlowGraph graph = storage.getGraph("flow", flowId);
-        if (graph == null) {
+        if (graph == null || !graph.isEnabled()) {
             Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
             return;
         }
@@ -175,7 +179,7 @@ public class GlobalTriggers implements Listener {
             return;
         }
         FlowGraph graph = storage.getGraph("command", binding.getFlowId());
-        if (graph == null) {
+        if (graph == null || !graph.isEnabled()) {
             return;
         }
         String startNode = null;
@@ -460,7 +464,7 @@ public class GlobalTriggers implements Listener {
             }
         }
         FlowGraph graph = storage.getGraph("command", trigger.flowId);
-        if (graph == null) {
+        if (graph == null || !graph.isEnabled()) {
             return false;
         }
         Map<String, Object> eventVars = new HashMap<>();
@@ -584,6 +588,21 @@ public class GlobalTriggers implements Listener {
     }
 
     public void refreshBindings() {
+        if (!Bukkit.isPrimaryThread()) {
+            try {
+                Bukkit.getScheduler().callSyncMethod(plugin, () -> {
+                    refreshBindingsNow();
+                    return null;
+                }).get(10, TimeUnit.SECONDS);
+            } catch (Exception exception) {
+                throw new IllegalStateException("Could not refresh flow commands on the server thread", exception);
+            }
+            return;
+        }
+        refreshBindingsNow();
+    }
+
+    private synchronized void refreshBindingsNow() {
         triggerDispatcher.clearBindings();
         commandTriggers.clear();
 

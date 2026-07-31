@@ -108,12 +108,22 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
 
     @Override
     public void saved(String type, String resourceId, String payload) {
-        publishResource(false, type, resourceId, payload);
+        publishResource(actor.get(), false, type, resourceId, payload);
+    }
+
+    @Override
+    public void saved(Session session, String type, String resourceId, String payload) {
+        publishResource(session != null ? session : actor.get(), false, type, resourceId, payload);
     }
 
     @Override
     public void deleted(String type, String resourceId) {
-        publishResource(true, type, resourceId, "");
+        publishResource(actor.get(), true, type, resourceId, "");
+    }
+
+    @Override
+    public void deleted(Session session, String type, String resourceId) {
+        publishResource(session != null ? session : actor.get(), true, type, resourceId, "");
     }
 
     private Presence presence(Session session, Update update) {
@@ -131,16 +141,19 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
         List<Presence> snapshot = List.copyOf(collaborators);
         for (Session session : sessions) {
             if (supports(session, "collaboration_presence")) {
-                sender.sendPresenceSnapshot(session, gson.toJson(new Snapshot(session.getSessionId(), snapshot)));
+                List<String> selfSessionIds = List.of(session.getSessionId());
+                List<Presence> remote = snapshot.stream()
+                    .filter(value -> !value.sessionId().equals(session.getSessionId()))
+                    .toList();
+                sender.sendPresenceSnapshot(session, gson.toJson(new Snapshot(session.getSessionId(), session.getCollaborationIdentity(), selfSessionIds, remote)));
             }
         }
     }
 
-    private void publishResource(boolean deleted, String type, String resourceId, String payload) {
+    private void publishResource(Session source, boolean deleted, String type, String resourceId, String payload) {
         if (resourceEventsSuppressed.get()) {
             return;
         }
-        Session source = actor.get();
         ResourceEvent event = new ResourceEvent(safe(type, 64), safe(resourceId, 256), payload != null ? payload : "",
             source != null ? source.getSessionId() : "", source != null ? source.getCollaborationIdentity() : null, System.currentTimeMillis());
         String json = gson.toJson(event);
@@ -179,7 +192,7 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
                             double x, double y, boolean active, boolean typing, int color, boolean customColor, long updatedAt) {
     }
 
-    private record Snapshot(String selfSessionId, List<Presence> collaborators) {
+    private record Snapshot(String selfSessionId, CollaborationIdentity selfIdentity, List<String> selfSessionIds, List<Presence> collaborators) {
     }
 
     private record ChatRequest(String message) {

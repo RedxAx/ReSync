@@ -48,6 +48,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public class FlowExecutor {
@@ -75,6 +76,7 @@ public class FlowExecutor {
     private FlowTraceService traceService;
     private FlowDebugService debugService;
     private FlowGraphValidator graphValidator;
+    private Predicate<FlowGraph> executionAuthority = graph -> true;
     private FlowNodeAuthorizationPolicy authorizationPolicy = (context, node, definition) -> {
         String policy = definition != null ? definition.getAuthorizationPolicy() : "trusted_server_flow";
         return "trusted_server_flow".equals(policy) || "public".equals(policy)
@@ -197,6 +199,7 @@ public class FlowExecutor {
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, Player player, Event event, Map<String, Object> eventVars) {
+        if (executionBlocked(graph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(graph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
@@ -216,6 +219,7 @@ public class FlowExecutor {
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
                                             Map<String, Object> eventVars) {
+        if (executionBlocked(graph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(graph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
@@ -239,6 +243,7 @@ public class FlowExecutor {
 
     public CompletableFuture<Object> executeSubFlow(FlowGraph subGraph, String startNodeId, String outputNodeId, String outputPin,
                                                       Player player, Event event, Map<String, Object> localInputs) {
+        if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(subGraph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
@@ -261,6 +266,7 @@ public class FlowExecutor {
 
     public CompletableFuture<Object> executeSubFlow(FlowGraph subGraph, String outputNodeId, String outputPin,
                                                      Player player, Event event, Map<String, Object> localInputs) {
+        if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(subGraph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
@@ -283,6 +289,7 @@ public class FlowExecutor {
                 "Execute the subflow from an active Flow context"
             ));
         }
+        if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(subGraph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
@@ -313,6 +320,9 @@ public class FlowExecutor {
                 null,
                 "Select an existing Flow function"
             ));
+        }
+        if (executionBlocked(functionGraph)) {
+            return CompletableFuture.completedFuture(Map.of());
         }
         FlowGraphValidationException validationFailure = validationFailure(functionGraph);
         if (validationFailure != null) {
@@ -379,6 +389,10 @@ public class FlowExecutor {
         this.graphValidator = graphValidator;
     }
 
+    public void setExecutionAuthority(Predicate<FlowGraph> executionAuthority) {
+        this.executionAuthority = executionAuthority != null ? executionAuthority : graph -> true;
+    }
+
     public void setAuthorizationPolicy(FlowNodeAuthorizationPolicy authorizationPolicy) {
         if (authorizationPolicy != null) {
             this.authorizationPolicy = authorizationPolicy;
@@ -395,6 +409,14 @@ public class FlowExecutor {
         }
         FlowGraphValidationResult result = graphValidator.validate(graph);
         return result.valid() ? null : new FlowGraphValidationException(result);
+    }
+
+    private boolean executionBlocked(FlowGraph graph) {
+        return graph != null && (!graph.isEnabled() || executionDenied(graph));
+    }
+
+    private boolean executionDenied(FlowGraph graph) {
+        return graph != null && !executionAuthority.test(graph);
     }
 
     private CompletableFuture<Void> execute(FlowRuntime runtime, String startNodeId, Player player, Event event, int steps) {
@@ -834,6 +856,12 @@ public class FlowExecutor {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_NOT_FOUND", "Function not found: " + functionId, null, startNodeId,
                 "Select an existing function or restore the missing function"));
+        }
+        if (executionBlocked(functionGraph)) {
+            Map<String, Object> results = Map.of();
+            runtime.setNodeOutput(startNodeId, "results", results);
+            runtime.setNodeOutput(startNodeId, "result", FlowOperationResult.success(results));
+            return executeTargets(runtime, findTargetNodes(runtime.getGraph(), startNodeId, "flow"), player, event, steps + 1);
         }
         FlowGraphValidationException functionValidationFailure = validationFailure(functionGraph);
         if (functionValidationFailure != null) {

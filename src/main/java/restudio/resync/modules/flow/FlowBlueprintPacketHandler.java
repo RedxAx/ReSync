@@ -173,8 +173,9 @@ public class FlowBlueprintPacketHandler {
             }
             updateGraphBindings(graph);
             Log.fine("Flow saved: " + flowId);
-            notifySaved(storage.getGraphResourceType(flowId), graph);
-            sender.sendFlowSaveAck(session, flowId, payload.requestId(), graph.getResourceRevision(), graph.getResourceHash());
+            String resourceType = storage.getGraphResourceType(flowId);
+            notifySaved(resourceType, graph);
+            sender.sendGraphSaveAck(session, resourceType, flowId, payload.requestId(), graph.getResourceRevision(), graph.getResourceHash());
             sender.succeedJob(job, flowId, "Saved");
         } catch (FlowGraphValidationException e) {
             String diagnostics = gson.toJson(e.getResult().errors());

@@ -46,6 +46,14 @@ class NodeDefinitionCatalogTest {
     }
 
     @Test
+    void timerUsesDefinitionDefaultsForOptionalRuntimeInputs() throws Exception {
+        JsonObject timer = findNode(Path.of("src", "main", "resources", "nodes", "automation.json"), "automation.timer");
+        assertEquals(2, timer.get("schemaVersion").getAsInt());
+        assertTrue(pin(timer, "inputs", "owner").get("optional").getAsBoolean());
+        assertTrue(pin(timer, "inputs", "duration").get("optional").getAsBoolean());
+    }
+
+    @Test
     void graphResourcesExposeTypedGetterNodes() throws Exception {
         assertEquals("flow_definition", pinType(findNode("domain_resources.json", "flow.get"), "outputs", "value"));
         assertEquals("function_definition", pinType(findNode("domain_resources.json", "function.get"), "outputs", "value"));
@@ -358,7 +366,10 @@ class NodeDefinitionCatalogTest {
     }
 
     private JsonObject findNode(String fileName, String id) throws Exception {
-        Path file = Path.of("src", "main", "resources", "nodes", "migrated", fileName);
+        return findNode(Path.of("src", "main", "resources", "nodes", "migrated", fileName), id);
+    }
+
+    private JsonObject findNode(Path file, String id) throws Exception {
         JsonElement element = JsonParser.parseString(Files.readString(file));
         for (JsonElement child : element.getAsJsonArray()) {
             JsonObject object = child.getAsJsonObject();
@@ -366,7 +377,7 @@ class NodeDefinitionCatalogTest {
                 return object;
             }
         }
-        throw new AssertionError("Missing node " + id + " in " + fileName);
+        throw new AssertionError("Missing node " + id + " in " + file);
     }
 
     private boolean hasFlowPin(JsonObject node) {

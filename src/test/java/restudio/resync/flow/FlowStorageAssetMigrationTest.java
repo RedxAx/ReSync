@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FlowStorageAssetMigrationTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void projectMetadataSaveDoesNotRewriteCanonicalTypedAssets() throws Exception {
+        FlowStorage storage = new FlowStorage(tempDir.toFile());
+        FlowGraph graph = FlowSerializer.deserialize("""
+            {"id":"stable","version":2,"nodes":{},"connections":[],"localVariables":[]}
+            """);
+        storage.saveGraph(graph);
+        Path asset;
+        try (var paths = Files.walk(tempDir.resolve("assets"))) {
+            asset = paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().equals("stable.json"))
+                .findFirst()
+                .orElseThrow();
+        }
+        FileTime marker = FileTime.fromMillis(1_600_000_000_000L);
+        Files.setLastModifiedTime(asset, marker);
+
+        storage.saveProjectMetadata(storage.getProjectMetadata("project"));
+
+        assertEquals(marker, Files.getLastModifiedTime(asset));
+    }
 
     @Test
     void migrationPrunesMissingFileBackedResourcesButKeepsRuntimeWorldEntries() throws Exception {

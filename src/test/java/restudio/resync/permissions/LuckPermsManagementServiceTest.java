@@ -9,6 +9,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
+import restudio.resync.permissions.LuckPermsManagementContract.AppliedEntity;
+import restudio.resync.permissions.LuckPermsManagementContract.EntityType;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -24,6 +27,16 @@ class LuckPermsManagementServiceTest {
         List<UUID> users = LuckPermsManagementService.mergeUserIds(List.of(second), List.of(first, second));
 
         assertEquals(List.of(first, second), users);
+    }
+
+    @Test
+    void reportsCommittedRevisionForEveryAppliedEntity() {
+        List<AppliedEntity> committed = LuckPermsManagementService.committedEntities(List.of(
+            new AppliedEntity(EntityType.USER, "player", 4, true, "Saved"),
+            new AppliedEntity(EntityType.GROUP, "admin", 8, true, "Saved")
+        ), 12);
+
+        assertEquals(List.of(12L, 12L), committed.stream().map(AppliedEntity::revision).toList());
     }
 
     @Test

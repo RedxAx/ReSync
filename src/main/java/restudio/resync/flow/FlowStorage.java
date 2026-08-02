@@ -2032,7 +2032,9 @@ public class FlowStorage {
                 AssetFileFormat.copyTyped(currentAsset, target, resource.type);
                 continue;
             } else if (currentAsset != null) {
-                AssetFileFormat.copyTyped(currentAsset, currentAsset, resource.type);
+                if (AssetFileFormat.needsRewrite(currentAsset, resource.type)) {
+                    AssetFileFormat.rewriteTyped(currentAsset, currentAsset, resource.type);
+                }
                 continue;
             }
             if (legacyDirectory.exists()) {

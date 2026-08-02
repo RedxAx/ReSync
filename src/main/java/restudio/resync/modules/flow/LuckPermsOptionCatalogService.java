@@ -3,6 +3,7 @@ package restudio.resync.modules.flow;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.track.Track;
+import net.luckperms.api.node.types.PermissionNode;
 import org.bukkit.Bukkit;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -13,6 +14,7 @@ import restudio.resync.api.OptionCatalogRegistry;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -87,8 +89,10 @@ public final class LuckPermsOptionCatalogService {
         Bukkit.getPluginManager().getPermissions().stream().map(Permission::getName).forEach(permissions::add);
         LuckPerms luckPerms = luckPerms();
         if (luckPerms != null) {
-            luckPerms.getGroupManager().getLoadedGroups().forEach(group -> group.getNodes().forEach(node -> permissions.add(node.getKey())));
-            luckPerms.getUserManager().getLoadedUsers().forEach(user -> user.getNodes().forEach(node -> permissions.add(node.getKey())));
+            luckPerms.getGroupManager().getLoadedGroups().forEach(group -> group.getNodes().stream().filter(PermissionNode.class::isInstance).map(PermissionNode.class::cast)
+                .map(PermissionNode::getPermission).forEach(permissions::add));
+            luckPerms.getUserManager().getLoadedUsers().forEach(user -> user.getNodes().stream().filter(PermissionNode.class::isInstance).map(PermissionNode.class::cast)
+                .map(PermissionNode::getPermission).forEach(permissions::add));
         }
         return List.copyOf(permissions);
     }
@@ -120,10 +124,23 @@ public final class LuckPermsOptionCatalogService {
     private OptionCatalogItem permissionItem(String name) {
         Permission permission = Bukkit.getPluginManager().getPermission(name);
         String description = permission == null || permission.getDescription().isBlank() ? "Permission Used By Installed Plugins" : permission.getDescription();
-        return new OptionCatalogItem(name, name, description, "permission", "Permissions", Map.of(
+        return new OptionCatalogItem(name, name, description, "", permissionCategory(name), Map.of(
             "provider", permission == null ? "LuckPerms" : "Bukkit",
             "available", true
         ));
+    }
+
+    private String permissionCategory(String permission) {
+        int separator = permission.indexOf('.');
+        String namespace = (separator > 0 ? permission.substring(0, separator) : "Other").replace('_', ' ');
+        return switch (namespace.toLowerCase(Locale.ROOT)) {
+            case "bukkit" -> "Bukkit";
+            case "minecraft" -> "Minecraft";
+            case "resync" -> "ReSync";
+            case "luckperms", "lp" -> "LuckPerms";
+            case "other" -> "Other";
+            default -> Character.toUpperCase(namespace.charAt(0)) + namespace.substring(1);
+        };
     }
 
     private LuckPerms luckPerms() {

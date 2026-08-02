@@ -413,7 +413,7 @@ public final class LuckPermsManagementService implements AutoCloseable {
         }
         return runCompensating(mutations, applied -> {
             Invalidation invalidation = recordChange(applied, actor);
-            SaveResult result = new SaveResult(changes.operationId(), true, invalidation.revision(), List.of(), applied);
+            SaveResult result = new SaveResult(changes.operationId(), true, invalidation.revision(), List.of(), committedEntities(applied, invalidation.revision()));
             rememberCompleted(result);
             notifyInvalidation(invalidation);
             return CompletableFuture.completedFuture(result);
@@ -437,6 +437,10 @@ public final class LuckPermsManagementService implements AutoCloseable {
             return response(request, rollbackFailed ? "Permissions Need Recovery" : "Permissions Were Not Saved",
                 null, null, null, null, null, null, result);
         });
+    }
+
+    static List<AppliedEntity> committedEntities(List<AppliedEntity> applied, long revision) {
+        return applied.stream().map(entity -> new AppliedEntity(entity.type(), entity.id(), revision, entity.success(), entity.message())).toList();
     }
 
     static <T> CompletableFuture<List<T>> runCompensating(List<Supplier<CompletableFuture<Compensated<T>>>> mutations) {
@@ -780,7 +784,7 @@ public final class LuckPermsManagementService implements AutoCloseable {
     }
 
     private SubjectDetail subjectDetail(SubjectRef reference, PermissionHolder holder) {
-        String name = holder instanceof User user ? Optional.ofNullable(user.getUsername()).orElse(user.getUniqueId().toString()) : ((Group) holder).getDisplayName();
+        String name = holder instanceof User user ? playerName(user) : ((Group) holder).getDisplayName();
         if (name == null || name.isBlank()) {
             name = reference.id();
         }
@@ -793,11 +797,23 @@ public final class LuckPermsManagementService implements AutoCloseable {
     private UserSummary userSummary(User user) {
         Player player = Bukkit.getPlayer(user.getUniqueId());
         OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(user.getUniqueId());
-        String username = Optional.ofNullable(user.getUsername()).filter(value -> !value.isBlank()).orElseGet(() -> Optional.ofNullable(offlinePlayer.getName()).orElse(""));
+        String username = playerName(user);
         String prefix = Optional.ofNullable(user.getCachedData().getMetaData().getPrefix()).orElse("");
         String suffix = Optional.ofNullable(user.getCachedData().getMetaData().getSuffix()).orElse("");
         return new UserSummary(user.getUniqueId().toString(), username, user.getPrimaryGroup(), player != null && player.isOnline(),
             user.data().toCollection().size(), prefix, suffix, player != null ? System.currentTimeMillis() : offlinePlayer.getLastPlayed());
+    }
+
+    private String playerName(User user) {
+        Player player = Bukkit.getPlayer(user.getUniqueId());
+        if (player != null && !player.getName().isBlank()) {
+            return player.getName();
+        }
+        String offlineName = Bukkit.getOfflinePlayer(user.getUniqueId()).getName();
+        if (offlineName != null && !offlineName.isBlank()) {
+            return offlineName;
+        }
+        return Optional.ofNullable(user.getUsername()).filter(value -> !value.isBlank()).orElse(user.getUniqueId().toString());
     }
 
     private GroupSummary groupSummary(Group group) {

@@ -1,0 +1,26 @@
+{
+  "id": "typed-automation",
+  "version": 1,
+  "resourceType": "flow",
+  "nodes": {
+    "variable": {
+      "type": "variable.access",
+      "version": 1,
+      "x": 0,
+      "y": 0,
+      "inputValues": {
+        "mode": "set",
+        "scope": "global",
+        "persist": true,
+        "name": "Fixture Variable",
+        "value": true
+      }
+    }
+  },
+  "connections": [],
+  "currentExpectation": {
+    "nodeType": "automation.variable",
+    "resourceType": "variable_definition",
+    "action": "Set"
+  }
+}

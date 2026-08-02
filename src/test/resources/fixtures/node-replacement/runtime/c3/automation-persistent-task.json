@@ -1,0 +1,23 @@
+{
+  "taskId": "task-automation-01",
+  "kind": "TIMER",
+  "definitionId": "shared",
+  "scope": "SERVER",
+  "ownerId": "server-owner",
+  "state": "PAUSED",
+  "generation": 3,
+  "createdAt": 1700000000000,
+  "nextRun": 1700000060000,
+  "lastRun": 1700000030000,
+  "runCount": 2,
+  "duration": 60000,
+  "deadline": 1700000060000,
+  "remaining": 30000,
+  "tickInterval": 1000,
+  "arguments": {
+    "mode": "synthetic"
+  },
+  "signatureVersion": 1,
+  "lastResult": "",
+  "lastError": ""
+}

@@ -1,0 +1,48 @@
+{
+  "fixtureId": "FX-013",
+  "schemaVersion": 1,
+  "participantTreeHashAlgorithm": "SHA-256 over UTF-8 sorted records of lowercase file SHA-256, two ASCII spaces, slash-normalized path relative to populated, newline-delimited with one final newline; a leaf participant uses the same one-record algorithm.",
+  "sanitizer": {"id": "gate-0a-structural-sanitizer", "version": "1", "policy": "No live values copied. Source file paths, hashes, sizes, and JSON root/top-level structural shapes are retained; all source values and dynamic names are replaced by deterministic fixture values."},
+  "compatibility": {"java": "21", "resyncHead": "b2941e66d762ffb76391715fbf4487c068fe12ea", "remotelyHead": "76c4eb8989aaf856a4f002fa7fe6e56a67c373df", "catalogHash": "c83f2e2828ee599c18563beaab2a131a160acceeb5b7ae8220064124188ff0e8", "extensionState": "source-empty; populated-fixture-extension-1.0.0"},
+  "source": {"root": "run/plugins/ReSync", "fileCount": 10, "totalBytes": 1982595, "files": [
+    {"path":"assets/project.json","size":1683,"sha256":"9b2eb14f3580f63497e6c520d3614f67df66f7359a8670bdf1a1ecadaaed9d28","sanitizedPath":"sanitized-real/assets/project.json","shape":{"root":"object","topLevel":["serverId","folders","resources"]}},
+    {"path":"config.properties","size":170,"sha256":"2c514f5ab1c4f29a8ca337bc71d76be40fec9cb6bbcc5ce19c759759e082b4af","sanitizedPath":"sanitized-real/config.properties","shape":{"root":"properties","keyCount":5}},
+    {"path":"config.yml","size":97,"sha256":"743930c190c82e5ca94423e3279d37f222dbb408c4a0ef06458731b468950e3a","sanitizedPath":"sanitized-real/config.yml","shape":{"root":"key-value","keyCount":3}},
+    {"path":"diagnostics/programmability-acceptance-20260717-135605.json","size":1001882,"sha256":"4fc159d59c73d2cbaca46a465fe324d5276ab13a01419cf8807930b2de33678a","sanitizedPath":"sanitized-real/diagnostics/programmability-acceptance-00000000-000000.json","shape":{"root":"object","topLevel":["schemaVersion","capturedAt","serverVersion","pluginVersion","ready","checks","readiness","registryDiagnostics"]}},
+    {"path":"diagnostics/programmability-acceptance-20260717-135954.json","size":970373,"sha256":"282c3e9993372acc3cb64097e622517ed3ffff2b8878232730886fa2698d1231","sanitizedPath":"sanitized-real/diagnostics/programmability-acceptance-00000000-000001.json","shape":{"root":"object","topLevel":["schemaVersion","capturedAt","serverVersion","pluginVersion","ready","checks","readiness","registryDiagnostics"]}},
+    {"path":"world-management/inventory-groups.json","size":2,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","sanitizedPath":"sanitized-real/world-management/inventory-groups.json","shape":{"root":"object","topLevel":[]}},
+    {"path":"world-management/player-states.json","size":2,"sha256":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","sanitizedPath":"sanitized-real/world-management/player-states.json","shape":{"root":"object","topLevel":[]}},
+    {"path":"world-management/portals.json","size":2,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","sanitizedPath":"sanitized-real/world-management/portals.json","shape":{"root":"object","topLevel":[]}},
+    {"path":"world-management/sign-portals.json","size":2,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945","sanitizedPath":"sanitized-real/world-management/sign-portals.json","shape":{"root":"object","topLevel":[]}},
+    {"path":"world-management/worlds.json","size":8382,"sha256":"5c061614c318a053ad1430984e6542f747c24dd38c35574961005264ad2e0280","sanitizedPath":"sanitized-real/world-management/worlds.json","shape":{"root":"array","length":3}}
+  ]},
+  "participants": [
+    {"owner":"core-config","path":"populated/config.properties","size":111,"sha256":"ed8c6e757964119912f740738781ee1b0042413dfb7661ee3f0988e497e496fb","format":"properties","build":"current-head","catalog":"c83f2e2828ee599c18563beaab2a131a160acceeb5b7ae8220064124188ff0e8","extensionState":"none","expected":"preserved-and-sanitized"},
+    {"owner":"core-config","path":"populated/config.yml","size":57,"sha256":"a7bd2e8d1e2ce99e88785adeebcbce0483a79238c6d2076f9bbe209445bbecb0","format":"yaml","build":"current-head","catalog":"current","extensionState":"none","expected":"preserved-and-sanitized"},
+    {"owner":"flow-storage","path":"populated/assets","size":1565,"sha256":"9a387eb9d2563d2175056656e1d2112a963b495daafb8503798533161ebe3398","format":"json-tree","build":"current-head","catalog":"current","extensionState":"fixture-extension-1.0.0","expected":"graphs-functions-commands-project-metadata-tombstone"},
+    {"owner":"triggers","path":"populated/triggers.json","size":182,"sha256":"2a35f4546089589576308f71b1c18203b68210ad6ff60590d47433a6f0ac58e5","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"typed-flow-command-bindings"},
+    {"owner":"json-resources","path":"populated/resources/custom-content.json","size":142,"sha256":"e06863d30e3a557f30d9ea2b8f17c030a66c7585929b0c07892b3295968e9194","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"revision-and-mutation-id"},
+    {"owner":"extensions","path":"populated/extensions","size":196,"sha256":"b61389411c0ec588a3a5b7fdf07d37bac5e612ff4755654e235d0fd257e8c4e6","format":"json-tree","build":"current-head","catalog":"current","extensionState":"fixture-extension-1.0.0","expected":"manifest-and-extension-state-no-jar"},
+    {"owner":"local-catalog","path":"populated/nodes/fixture-extension.json","size":190,"sha256":"e9aea1dcf7698ca3ee2477a812dfc5f2218f8f8dbff779e93f6a02d36f8f9255","format":"json","build":"current-head","catalog":"current","extensionState":"fixture-extension-1.0.0","expected":"local-node-definition"},
+    {"owner":"worldgen","path":"populated/worldgen/fixture-project.json","size":92,"sha256":"827bab74b3248a4de6c89995c35ee86a8918e488ad942f6dbbcc8263b69d0060","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"project-state"},
+    {"owner":"world-management","path":"populated/world-management/worlds.json","size":88,"sha256":"3d4ec01a115f839c98fed9056af0eff3a64bb5731e30c119d739ec7dc6ceed51","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"world-state"},
+    {"owner":"network","path":"populated/network/network-state.json","size":98,"sha256":"29179ca28d1a061fe963496c597e66d0c53c9d42ced8009e765a25df2c2e2e62","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"network-state"},
+    {"owner":"automation","path":"populated/automation/runtime-state.json","size":159,"sha256":"f7e9e2b7af1d8fe172d30eb7750454aa6ef7b8dbf56d2a970dbc06f57d21910a","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"timers-and-schedules"},
+    {"owner":"migration","path":"populated/migration/journal.json","size":162,"sha256":"8433201c32d108d23c0ecbde5e7cdff6f8164a0b96bc1ea2a3faee80b7f51280","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"prepared-journal"},
+    {"owner":"quarantine","path":"populated/quarantine/unresolved.json","size":153,"sha256":"91a7636dc11a29ebf3eff4ccbb012813edaab24b52bdacd744a2d1bf66e5d885","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"unaccepted-quarantine"},
+    {"owner":"diagnostics","path":"populated/diagnostics/diagnostics.json","size":155,"sha256":"9bd3ceb606e4324406f3ad850ba5da79a77a5f4d349a8811b9cc50da27acb4b0","format":"json","build":"current-head","catalog":"current","extensionState":"none","expected":"structured-diagnostic"}
+  ],
+  "sanitizedFiles": [
+    {"path":"sanitized-real/assets/project.json","size":73,"sha256":"ecf2aafe3cd2b934652799cf982e983f02a15001326b36d8767656ca4865b370"},
+    {"path":"sanitized-real/config.properties","size":111,"sha256":"9f1a3c864d08f4c64f397cff8386d5bacd49eb8c99556e4d87e7dc49091b04fe"},
+    {"path":"sanitized-real/config.yml","size":62,"sha256":"b6c7f632e122b2300763e4681c76c036286bad2f13f54882afc535801e559444"},
+    {"path":"sanitized-real/diagnostics/programmability-acceptance-00000000-000000.json","size":211,"sha256":"2431948e44dbe8b9c62968c95922e740394f5e983d0b05e42f4b2f5764e01ebd"},
+    {"path":"sanitized-real/diagnostics/programmability-acceptance-00000000-000001.json","size":211,"sha256":"2431948e44dbe8b9c62968c95922e740394f5e983d0b05e42f4b2f5764e01ebd"},
+    {"path":"sanitized-real/world-management/inventory-groups.json","size":3,"sha256":"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+    {"path":"sanitized-real/world-management/player-states.json","size":3,"sha256":"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+    {"path":"sanitized-real/world-management/portals.json","size":3,"sha256":"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+    {"path":"sanitized-real/world-management/sign-portals.json","size":3,"sha256":"ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+    {"path":"sanitized-real/world-management/worlds.json","size":282,"sha256":"76b5187a110b46a072b4d5a209455eeb2df5515dfe5ab441ceb065a8d3322e29"}
+  ],
+  "expectedResult": {"sanitizedReal":"structural-only-copy", "populated":"deterministic-participant-coverage", "quarantine":"unaccepted", "sourceMutation":"forbidden"}
+}

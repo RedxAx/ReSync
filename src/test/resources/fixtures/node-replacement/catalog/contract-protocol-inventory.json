@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "protocolHash": "8fcc0f84538c4c9907c58e67a38670f51d4db3b992734e479e5ec50afc4ae527",
+  "packetFamilyCount": 21,
+  "operationsPerPacketFamily": 7,
+  "mirrorPairCount": 8,
+  "protocolSource": "Remotely/contracts/resync-protocol.json",
+  "packetFamilies": [
+    ["flow", 1, 9, 2, 10, 3, 8, 7], ["function", 231, 232, 233, 234, 235, 236, 237], ["command", 238, 239, 240, 241, 242, 243, 244],
+    ["gui", 17, 20, 18, 21, 19, 22, 23], ["scoreboard", 24, 26, 28, 29, 25, 27, 30], ["tab", 32, 34, 36, 37, 33, 35, 38],
+    ["custom_content", 48, 54, 50, 49, 51, 52, 53], ["project_metadata", 80, 81, 82, 83, 84, 85, 86], ["chat", 103, 104, 105, 106, 107, 108, 109],
+    ["motd_profile", 145, 146, 147, 148, 149, 150, 151], ["message_rule", 152, 153, 154, 155, 156, 157, 158], ["recipe_definition", 159, 160, 161, 162, 163, 164, 165],
+    ["text_template", 166, 167, 168, 169, 170, 171, 172], ["advancement_tree", 173, 174, 175, 176, 177, 178, 179], ["dialog", 180, 181, 182, 183, 184, 185, 186],
+    ["trade_profile", 189, 190, 191, 192, 193, 194, 195], ["npc_definition", 196, 197, 198, 199, 200, 201, 202], ["loot_table", 203, 204, 205, 206, 207, 208, 209],
+    ["variable_definition", 210, 211, 212, 213, 214, 215, 216], ["timer_definition", 217, 218, 219, 220, 221, 222, 223], ["schedule_definition", 224, 225, 226, 227, 228, 229, 230]
+  ],
+  "mirrors": {
+    "ReSync/src/main/java/restudio/resync/flow/registry/NodeDefinition.java": "fed1e9a7950515e64eec7b0279f2f0a3787cbd3315d443347f5bb25bdbdca3ab",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/registry/NodeDefinition.java": "01678a4a562c87d4ed300fd26f256532cd15fd8563776645237002a3e21fd019",
+    "ReSync/src/main/java/restudio/resync/flow/sync/NodeRegistrySnapshot.java": "9871e0892340ff5fb80e73147cbdc941e56d699c3dd0e54e7dc753e828a26cb3",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/sync/NodeRegistrySnapshot.java": "1eeeecc3bdd7ccbf8bfb1e8b5f78de296b037d41130bb4b42ec11016229fd663",
+    "ReSync/src/main/java/restudio/flow/data/FlowGraph.java": "27ff3e7de4ef351ffce06605f1980f4e357fe342a4244e98b8eafec8b8dc5060",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowGraph.java": "fbfdadc414d07370305f7bd0b5b046ca95b7f42ff73bd562d908469889f457d2",
+    "ReSync/src/main/java/restudio/flow/data/FlowSerializer.java": "bf6e1cbcf38eec06c4a2efad1ca13d295129bd5012782019b3d7fef7d3f0e104",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowSerializer.java": "9a37d6a664b4087aef24a4e1e4fae0417389839d9f9357f5cc2aff0d0bcfa1cd"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowNode.java": "e731d2d4fdd0c2684a9973ebdfdab64fcee8b0db0a84eb810a9ca93c266f741f"
+    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowNode.java": "ab82d0f68b7605660bbd744499d5d947c0a52073ba58a555040363d7720cc7ed"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowConnection.java": "8e31048c73569e16514bb26f860147c7699db1478a8a2bc5bda5d133fb5994fa"
+    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowConnection.java": "0b92105f2a4f9f9fdf6500b6a7231a687e4fb97f0be54adef09c4314364ed18c"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowDataType.java": "52e6b137294685181aae9cc4b5b0abb90b03afb271172f0762f4f9d3fc78b953"
+    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowDataType.java": "c040782f5e8165a9353c551c75b26b45d825c96e721092c8515841a1c3c02ab1"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowTypeRef.java": "106e2493c84bd096f35557029a9e722c6c0dca878f00c6bd2f59b4a248a55e40"
+    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowTypeRef.java": "8254f70ba82d18d6561b603b5c2448a09d19d5f60a8893a1e0796530104a954d"
+  }
+}

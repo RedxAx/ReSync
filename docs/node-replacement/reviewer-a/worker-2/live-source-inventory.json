@@ -1,0 +1,12 @@
+{
+  "scope": "read-only structural inventory of ReSync/run/plugins/ReSync; no data values copied",
+  "rootExists": true,
+  "reportedRootEntries": 10,
+  "localNodesDirectoryPresent": false,
+  "localNodeJsonCount": 0,
+  "extensionsDirectoryPresent": true,
+  "extensionJarCount": 0,
+  "assetsDirectoryPresent": true,
+  "catalogImplication": "This live installation currently contributes no local node JSON and no jar extension catalog. It remains a required migration/snapshot input because FlowRuntimeModule discovers data-folder nodes when present and ReSyncExtensionManager scans the extensions directory at runtime.",
+  "sanitizationNeed": "Capture structure, hashes, versions, and catalog/extension inventory only. Do not copy resource, player, credential, or graph values into Gate 0A evidence."
+}

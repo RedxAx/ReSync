@@ -1,0 +1,21 @@
+{
+  "assetTransaction": {
+    "currentStates": ["PREPARED", "COMMITTED"],
+    "recovery": "A later AssetTransactionManager construction or recover call re-applies PREPARED transaction entries.",
+    "restore": "Committed transaction entries only, below assets root."
+  },
+  "migrationLedger": {
+    "currentStates": ["PREPARED", "COMMITTED", "FAILED"],
+    "scope": "Per migration/resource/source hash below assets/.durability/migrations.json."
+  },
+  "planJournalStates": {
+    "PREPARED": "current component state only",
+    "TRANSFORMING": "absent",
+    "VALIDATING": "absent",
+    "STAGED": "absent",
+    "ACTIVATED": "absent",
+    "FAILED": "migration ledger only",
+    "ROLLED_BACK": "absent",
+    "COMMITTED": "current component state only"
+  }
+}

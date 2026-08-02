@@ -1,0 +1,13 @@
+{
+  "owner": "fixture.extension",
+  "nodeId": "fixture.extension:node",
+  "handlerId": "fixture.extension:handler",
+  "sequence": [
+    "register-node",
+    "register-handler",
+    "unregister-plugin-nodes",
+    "unregister-handler",
+    "register-node",
+    "register-handler"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "sourceTreeHash": "c83f2e2828ee599c18563beaab2a131a160acceeb5b7ae8220064124188ff0e8",
+  "files": 61,
+  "definitions": 1428,
+  "physicalPins": 7273,
+  "logicalCompatibilityPins": 7278,
+  "missingNodeDescriptions": 1237,
+  "missingPhysicalPinDescriptions": 6215,
+  "missingLogicalCompatibilityPinDescriptions": 6220,
+  "definitionsWithoutInputs": ["custom_content.current", "event.custom_content", "logic.logic_true", "logic.logic_false", "map.create"]
+}

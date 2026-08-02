@@ -1,0 +1,3 @@
+server-id: sanitized-server
+websocket: false
+telemetry: false

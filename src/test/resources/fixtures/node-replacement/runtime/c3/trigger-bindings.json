@@ -1,0 +1,14 @@
+[
+  {
+    "id": "event-primary",
+    "flowId": "shared",
+    "type": "EVENT",
+    "context": "player_join"
+  },
+  {
+    "id": "system-primary",
+    "flowId": "shared",
+    "type": "SYSTEM",
+    "context": "startup"
+  }
+]

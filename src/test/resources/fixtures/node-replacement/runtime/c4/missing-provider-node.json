@@ -1,0 +1,23 @@
+{
+  "id": "missing-provider",
+  "enabled": true,
+  "nodes": {
+    "extension-node": {
+      "type": "fixture.extension:missing",
+      "version": 1,
+      "x": 10,
+      "y": 20,
+      "inputValues": {
+        "value": "kept"
+      },
+      "extensionPayload": {
+        "provider": "fixture.extension",
+        "schema": 7
+      }
+    }
+  },
+  "connections": [],
+  "futureGraphPayload": {
+    "provider": "fixture.extension"
+  }
+}

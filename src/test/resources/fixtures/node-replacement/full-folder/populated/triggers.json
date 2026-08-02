@@ -1,0 +1,1 @@
+{"version":1,"events":[{"event":"server_start","resource":{"type":"flow","id":"fixture-flow"}}],"commands":[{"path":"fixture","resource":{"type":"command","id":"fixture-command"}}]}

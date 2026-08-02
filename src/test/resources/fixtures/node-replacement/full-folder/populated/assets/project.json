@@ -1,0 +1,11 @@
+{
+  "serverId": "fixture-server",
+  "folders": [
+    {"id": "folder-automation", "name": "Automation", "path": "Automation"}
+  ],
+  "resources": [
+    {"type": "flow", "id": "fixture-flow", "path": "Blueprints/Flows/fixture-flow.json", "revision": 3, "mutationId": "mutation-flow-003"},
+    {"type": "function", "id": "fixture-function", "path": "Blueprints/Functions/fixture-function.json", "revision": 2, "mutationId": "mutation-function-002"},
+    {"type": "command", "id": "fixture-command", "path": "Blueprints/Commands/fixture-command.json", "revision": 4, "mutationId": "mutation-command-004"}
+  ]
+}

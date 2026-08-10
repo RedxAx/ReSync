@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "protocolHash": "8fcc0f84538c4c9907c58e67a38670f51d4db3b992734e479e5ec50afc4ae527",
+  "protocolHash": "1ecf42568829e6176772e7be00b4150b27be44d338dc75dc5dcf7c7a46712264",
   "packetFamilyCount": 21,
   "operationsPerPacketFamily": 7,
   "mirrorPairCount": 8,
@@ -15,20 +15,20 @@
     ["variable_definition", 210, 211, 212, 213, 214, 215, 216], ["timer_definition", 217, 218, 219, 220, 221, 222, 223], ["schedule_definition", 224, 225, 226, 227, 228, 229, 230]
   ],
   "mirrors": {
-    "ReSync/src/main/java/restudio/resync/flow/registry/NodeDefinition.java": "fed1e9a7950515e64eec7b0279f2f0a3787cbd3315d443347f5bb25bdbdca3ab",
-    "Remotely/src/main/java/redxax/oxy/remotely/flow/registry/NodeDefinition.java": "01678a4a562c87d4ed300fd26f256532cd15fd8563776645237002a3e21fd019",
-    "ReSync/src/main/java/restudio/resync/flow/sync/NodeRegistrySnapshot.java": "9871e0892340ff5fb80e73147cbdc941e56d699c3dd0e54e7dc753e828a26cb3",
-    "Remotely/src/main/java/redxax/oxy/remotely/flow/sync/NodeRegistrySnapshot.java": "1eeeecc3bdd7ccbf8bfb1e8b5f78de296b037d41130bb4b42ec11016229fd663",
-    "ReSync/src/main/java/restudio/flow/data/FlowGraph.java": "27ff3e7de4ef351ffce06605f1980f4e357fe342a4244e98b8eafec8b8dc5060",
-    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowGraph.java": "fbfdadc414d07370305f7bd0b5b046ca95b7f42ff73bd562d908469889f457d2",
-    "ReSync/src/main/java/restudio/flow/data/FlowSerializer.java": "bf6e1cbcf38eec06c4a2efad1ca13d295129bd5012782019b3d7fef7d3f0e104",
-    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowSerializer.java": "9a37d6a664b4087aef24a4e1e4fae0417389839d9f9357f5cc2aff0d0bcfa1cd"
-    ,"ReSync/src/main/java/restudio/flow/data/FlowNode.java": "e731d2d4fdd0c2684a9973ebdfdab64fcee8b0db0a84eb810a9ca93c266f741f"
+    "ReSync/src/main/java/restudio/resync/flow/registry/NodeDefinition.java": "b7fe745e42317dfd380a77ebf1b5ac8ef28f60099d1f77f732de2a99d0addb88",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/registry/NodeDefinition.java": "c7ae6ebd4d75d5e7a3a19d281398e457e2993ada1aebaf3001815020d01b4336",
+    "ReSync/src/main/java/restudio/resync/flow/sync/NodeRegistrySnapshot.java": "74ececab6d9fb8c9d4e393f0c181c385b131e00720842c831726ffa3bb23b0dc",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/sync/NodeRegistrySnapshot.java": "44f030a919d73e9bf41ab847d04aac2b1b114db010b916f74cb351644c5b07f5",
+    "ReSync/src/main/java/restudio/flow/data/FlowGraph.java": "f18d3066e65a5cbca39c4121d01691925c34deea94391120baad1388ed1cc602",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowGraph.java": "d59a48647e18589b4d9b01347bd2c09a7c7034a4e7a4942bf9ca0a7d56180349",
+    "ReSync/src/main/java/restudio/flow/data/FlowSerializer.java": "a4ea82a0dff104021bba5f96486f72ce8ac234fdaab761b3d25daa38f8a36cd7",
+    "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowSerializer.java": "a9dc1b5a99fec8156d03a7142004870b0663e342868d8ea74e1b2b588e0a1968"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowNode.java": "6aa507190b1527ef5919c553623cc65fc59a571181c8be46afae081c0f18d1a6"
     ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowNode.java": "ab82d0f68b7605660bbd744499d5d947c0a52073ba58a555040363d7720cc7ed"
     ,"ReSync/src/main/java/restudio/flow/data/FlowConnection.java": "8e31048c73569e16514bb26f860147c7699db1478a8a2bc5bda5d133fb5994fa"
     ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowConnection.java": "0b92105f2a4f9f9fdf6500b6a7231a687e4fb97f0be54adef09c4314364ed18c"
-    ,"ReSync/src/main/java/restudio/flow/data/FlowDataType.java": "52e6b137294685181aae9cc4b5b0abb90b03afb271172f0762f4f9d3fc78b953"
-    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowDataType.java": "c040782f5e8165a9353c551c75b26b45d825c96e721092c8515841a1c3c02ab1"
+    ,"ReSync/src/main/java/restudio/flow/data/FlowDataType.java": "ba4885221ef524402c1ff2a83cdbc0f8d337ecf631b70f350cf27dab279cef69"
+    ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowDataType.java": "00646cab3c226013fce01481cdf233c2e5ca10da278caedc8c2e668081732152"
     ,"ReSync/src/main/java/restudio/flow/data/FlowTypeRef.java": "106e2493c84bd096f35557029a9e722c6c0dca878f00c6bd2f59b4a248a55e40"
     ,"Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowTypeRef.java": "8254f70ba82d18d6561b603b5c2448a09d19d5f60a8893a1e0796530104a954d"
   }

@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -40,15 +41,16 @@ public final class ContractEvidenceScanner {
             mirror(workspace, "ReSync/src/main/java/restudio/flow/data/FlowTypeRef.java", "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowTypeRef.java"),
             mirror(workspace, "ReSync/src/main/java/restudio/flow/data/FlowSerializer.java", "Remotely/src/main/java/redxax/oxy/remotely/flow/data/FlowSerializer.java")
         );
-        return new Inventory(hash(Files.readAllBytes(protocol)), List.copyOf(packets), mirrors);
+        return new Inventory(hash(Files.readString(protocol)), List.copyOf(packets), mirrors);
     }
 
     private static Mirror mirror(Path workspace, String server, String client) throws IOException {
-        return new Mirror(server, client, hash(Files.readAllBytes(workspace.resolve(server))), hash(Files.readAllBytes(workspace.resolve(client))));
+        return new Mirror(server, client, hash(Files.readString(workspace.resolve(server))), hash(Files.readString(workspace.resolve(client))));
     }
 
-    private static String hash(byte[] bytes) {
+    private static String hash(String source) {
         try {
+            byte[] bytes = source.replace("\r\n", "\n").replace('\r', '\n').getBytes(StandardCharsets.UTF_8);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(exception);

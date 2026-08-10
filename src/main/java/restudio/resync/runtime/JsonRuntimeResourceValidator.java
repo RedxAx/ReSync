@@ -229,6 +229,16 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
     private void validateLootTable(JsonObject table) {
         validateObjectField(table, "hooks");
         validateObjectField(table, "trigger");
+        if (table.has("trigger") && table.get("trigger").isJsonObject()) {
+            validateLootTrigger(table.getAsJsonObject("trigger"));
+        }
+        if (table.has("links") && table.get("links").isJsonArray()) {
+            for (JsonElement element : table.getAsJsonArray("links")) {
+                if (element != null && element.isJsonObject()) {
+                    validateLootTrigger(element.getAsJsonObject());
+                }
+            }
+        }
         JsonArray pools = requiredArray(table, "pools", "Loot table pools");
         for (int poolIndex = 0; poolIndex < pools.size(); poolIndex++) {
             JsonObject pool = requiredObject(pools.get(poolIndex), "Loot pool " + poolIndex);
@@ -255,6 +265,17 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
                 validateObjectField(entry, "components");
             }
         }
+    }
+
+    private void validateLootTrigger(JsonObject trigger) {
+        if (!"vault_open".equalsIgnoreCase(text(trigger, "event"))) {
+            return;
+        }
+        String mode = text(trigger, "target").trim().toLowerCase(Locale.ROOT);
+        if (!Set.of("", "normal", "ominous", "any").contains(mode)) {
+            throw new IllegalArgumentException("Vault target must be normal, ominous, or any");
+        }
+        validateAvailableItem(text(trigger, "tool"), "Vault key", false);
     }
 
     private void validateNpcDefinition(JsonObject definition) {
@@ -483,7 +504,7 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
     }
 
     private void validateAvailableItem(String reference, String label, boolean required) {
-        if (reference == null || reference.isBlank()) {
+        if (reference == null || reference.isBlank() || "none".equalsIgnoreCase(reference)) {
             if (required) {
                 throw new IllegalArgumentException(label + " is required");
             }

@@ -180,7 +180,7 @@ public class CustomContentService {
             }
             String value = material.name().toLowerCase(Locale.ROOT);
             if (values.add(value)) {
-                items.add(new OptionCatalogItem(value, formatMaterialLabel(value), "", "", "Vanilla", Map.of()));
+                items.add(new OptionCatalogItem(value, formatMaterialLabel(value), "", "", "Minecraft", Map.of()));
             }
         }
         items.sort(Comparator.comparingInt((OptionCatalogItem item) -> recipeItemGroupRank(item.group()))

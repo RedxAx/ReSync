@@ -948,6 +948,9 @@ public class ReSyncCommand implements TabExecutor {
         if (ReSyncResourceCatalog.TRADE_PROFILE.equals(type) && "villagerType".equalsIgnoreCase(field)) {
             return List.of("plains", "desert", "jungle", "savanna", "snow", "swamp", "taiga");
         }
+        if (ReSyncResourceCatalog.LOOT_TABLE.equals(type) && "trigger.event".equalsIgnoreCase(field)) {
+            return List.of("none", "block_break", "block_place", "entity_death", "item_use", "item_hit_entity", "vault_open");
+        }
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) && ("ai".equalsIgnoreCase(field) || "gravity".equalsIgnoreCase(field) || "invulnerable".equalsIgnoreCase(field) || "followPlayer".equalsIgnoreCase(field))) {
             return booleanOptions();
         }

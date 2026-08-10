@@ -304,7 +304,7 @@ public class FlowRuntimeModule implements Module {
         new TypedAutomationGraphMigrator(storage, jsonResourceStorage, nodeDefinitionRegistry).migrateStoredFlows();
         CustomFunctionNodeDefinitions.rebuild(nodeDefinitionRegistry, storage);
         RuntimeFlowDispatcher runtimeFlowDispatcher = new RuntimeFlowDispatcher(storage, executor);
-        lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher);
+        lootTableService = new LootTableService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
         tradeProfileService = new TradeProfileService(jsonResourceStorage, customContentService, runtimeFlowDispatcher, context.getPlugin());
         TriggerRegistry triggerRegistry = new TriggerRegistry(context.getPlugin());
         globalTriggers = new GlobalTriggers(storage, executor, triggerRegistry, context.getRequiredService(ReTextService.class));
@@ -1053,7 +1053,10 @@ public class FlowRuntimeModule implements Module {
             if (customContentListener != null) HandlerList.unregisterAll(customContentListener);
         });
         failure = cleanupFailure(failure, () -> {
-            if (lootTableService != null) HandlerList.unregisterAll(lootTableService);
+            if (lootTableService != null) {
+                lootTableService.shutdown();
+                HandlerList.unregisterAll(lootTableService);
+            }
         });
         failure = cleanupFailure(failure, () -> {
             if (tradeProfileService != null) HandlerList.unregisterAll(tradeProfileService);

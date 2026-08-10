@@ -5,10 +5,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Vault;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -18,7 +21,9 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockDispenseLootEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.VaultDisplayItemEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -27,6 +32,8 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.loot.LootTable;
+import org.bukkit.plugin.Plugin;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.util.TextFormatter;
@@ -38,26 +45,44 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LootTableService implements Listener {
     private static final GsonComponentSerializer COMPONENT_SERIALIZER = GsonComponentSerializer.gson();
     private final ReSyncJsonResourceStorage storage;
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
+    private final Plugin plugin;
     private final Random random = new Random();
+    private final Map<VaultUseKey, VaultSelection> pendingVaultUses = new ConcurrentHashMap<>();
+    private final Map<VaultLocation, VaultSelection> restoringVaultUses = new ConcurrentHashMap<>();
 
     public LootTableService(ReSyncJsonResourceStorage storage, CustomContentService customContentService) {
-        this(storage, customContentService, null);
+        this(storage, customContentService, null, null);
     }
 
     public LootTableService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher) {
+        this(storage, customContentService, dispatcher, null);
+    }
+
+    public LootTableService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, Plugin plugin) {
         this.storage = storage;
         this.customContentService = customContentService;
         this.dispatcher = dispatcher;
+        this.plugin = plugin;
     }
 
     public JsonObject get(String id) {
         return storage != null ? storage.get(ReSyncResourceCatalog.LOOT_TABLE, id) : null;
+    }
+
+    public void shutdown() {
+        Map<VaultLocation, VaultSelection> restores = new HashMap<>(restoringVaultUses);
+        pendingVaultUses.forEach((use, selection) -> restores.putIfAbsent(use.vault(), selection));
+        pendingVaultUses.clear();
+        restoringVaultUses.clear();
+        restores.forEach((vault, selection) -> restoreVaultState(vault.location(), selection));
     }
 
     public List<ItemStack> generate(String id) {
@@ -101,6 +126,24 @@ public class LootTableService implements Listener {
         List<ItemStack> items = List.copyOf(result);
         dispatch(table, "afterRollFlow", rollContext, items, event);
         return items;
+    }
+
+    public ItemStack preview(String id, Map<String, Object> context) {
+        JsonObject table = get(id);
+        if (table == null || !bool(table, "enabled", true)) {
+            return null;
+        }
+        for (JsonElement poolElement : array(table, "pools")) {
+            if (poolElement == null || !poolElement.isJsonObject()) {
+                continue;
+            }
+            ItemStack item = roll(array(poolElement.getAsJsonObject(), "entries"), context != null ? context : Map.of());
+            if (item != null) {
+                item.setAmount(1);
+                return item;
+            }
+        }
+        return null;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -149,11 +192,14 @@ public class LootTableService implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND) {
-            return;
-        }
         ItemStack item = event.getItem();
         if (item == null || event.getAction() == Action.PHYSICAL) {
+            return;
+        }
+        if (prepareVaultUse(event, item)) {
+            return;
+        }
+        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         Location location = event.getClickedBlock() != null ? event.getClickedBlock().getLocation() : event.getPlayer().getLocation();
@@ -163,6 +209,64 @@ public class LootTableService implements Listener {
         context.put("event.item", item);
         TriggeredLootResult result = triggeredLoot("item_use", context, event, event.getPlayer(), item, null, location, null);
         dropNaturally(location, result.items());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBlockDispenseLoot(BlockDispenseLootEvent event) {
+        Player player = event.getPlayer();
+        BlockState state = event.getBlock().getState();
+        if (player == null || !(state instanceof Vault vault)) {
+            return;
+        }
+        Location location = event.getBlock().getLocation();
+        VaultSelection selection = pendingVaultUses.remove(new VaultUseKey(vaultLocation(location), player.getUniqueId()));
+        if (selection == null) {
+            return;
+        }
+        VaultLocation vaultLocation = vaultLocation(location);
+        restoringVaultUses.put(vaultLocation, selection);
+        Map<String, Object> context = context(player, null, location);
+        context.put("event.type", "vault_open");
+        context.put("event.block", event.getBlock());
+        context.put("event.vault", vault);
+        context.put("event.item", selection.usedKey());
+        context.put("event.ominous", selection.ominous());
+        try {
+            event.setDispensedLoot(generate(selection.lootTableId(), context, event));
+        } finally {
+            schedule(1L, () -> {
+                if (restoringVaultUses.remove(vaultLocation, selection)) {
+                    restoreVaultState(location, selection);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onVaultDisplayItem(VaultDisplayItemEvent event) {
+        BlockState state = event.getBlock().getState();
+        if (!(state instanceof Vault vault)) {
+            return;
+        }
+        List<VaultTrigger> candidates = vaultTriggers(vault);
+        if (candidates.isEmpty()) {
+            return;
+        }
+        List<VaultPreview> previews = vaultPreviews(vault, candidates);
+        if (previews.isEmpty()) {
+            return;
+        }
+        VaultPreview selected = previews.get(random.nextInt(previews.size()));
+        Map<String, Object> context = context(selected.player(), null, event.getBlock().getLocation());
+        context.put("event.type", "vault_preview");
+        context.put("event.block", event.getBlock());
+        context.put("event.vault", vault);
+        context.put("event.item", selected.key());
+        context.put("event.ominous", selected.trigger().ominous());
+        ItemStack item = preview(selected.trigger().lootTableId(), context);
+        if (item != null) {
+            event.setDisplayItem(item);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -221,6 +325,158 @@ public class LootTableService implements Listener {
             context.put("location", location);
         }
         return context;
+    }
+
+    private boolean prepareVaultUse(PlayerInteractEvent event, ItemStack usedKey) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null || plugin == null) {
+            return false;
+        }
+        BlockState state = event.getClickedBlock().getState();
+        if (!(state instanceof Vault vault)) {
+            return false;
+        }
+        List<VaultTrigger> candidates = vaultTriggers(vault);
+        if (candidates.isEmpty()) {
+            return false;
+        }
+        if (!VaultBlockDataAccess.isActive(vault.getBlockData())) {
+            return true;
+        }
+        VaultTrigger match = candidates.stream().filter(candidate -> matchesItemTarget(usedKey, candidate.keyReference())).findFirst().orElse(null);
+        if (match == null || vault.hasRewardedPlayer(event.getPlayer().getUniqueId())) {
+            event.setUseInteractedBlock(Event.Result.DENY);
+            return true;
+        }
+        LootTable carrierLootTable = vaultCarrierLootTable(match.ominous());
+        if (carrierLootTable == null) {
+            event.setUseInteractedBlock(Event.Result.DENY);
+            return true;
+        }
+        ItemStack nativeKey = usedKey.clone();
+        nativeKey.setAmount(1);
+        VaultSelection selection = new VaultSelection(match.lootTableId(), match.ominous(), nativeKey, vault.getKeyItem().clone(), vault.getLootTable(), carrierLootTable);
+        Location location = event.getClickedBlock().getLocation();
+        VaultUseKey useKey = new VaultUseKey(vaultLocation(location), event.getPlayer().getUniqueId());
+        pendingVaultUses.put(useKey, selection);
+        vault.setKeyItem(nativeKey);
+        vault.setLootTable(carrierLootTable);
+        vault.update(true, false);
+        schedule(2L, () -> {
+            if (pendingVaultUses.remove(useKey, selection)) {
+                restoreVaultState(location, selection);
+            }
+        });
+        return true;
+    }
+
+    private List<VaultTrigger> vaultTriggers(Vault vault) {
+        if (storage == null || vault == null) {
+            return List.of();
+        }
+        boolean ominous = VaultBlockDataAccess.isOminous(vault.getBlockData());
+        List<VaultTrigger> result = new ArrayList<>();
+        List<String> ids = storage.listIds(ReSyncResourceCatalog.LOOT_TABLE).stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        for (String id : ids) {
+            JsonObject table = get(id);
+            if (table == null || !bool(table, "enabled", true)) {
+                continue;
+            }
+            for (JsonObject trigger : triggers(table)) {
+                if (!"vault_open".equalsIgnoreCase(text(trigger, "event")) || !vaultModeMatches(text(trigger, "target"), ominous)) {
+                    continue;
+                }
+                result.add(new VaultTrigger(id, ominous, vaultKeyReference(trigger, ominous)));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private List<VaultPreview> vaultPreviews(Vault vault, List<VaultTrigger> candidates) {
+        if (vault == null || candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        List<VaultPreview> previews = new ArrayList<>();
+        for (UUID playerId : vault.getConnectedPlayers()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline() || vault.hasRewardedPlayer(playerId)) {
+                continue;
+            }
+            for (VaultTrigger candidate : candidates) {
+                ItemStack key = matchingVaultKey(player, candidate.keyReference());
+                if (key != null) {
+                    previews.add(new VaultPreview(candidate, player, key));
+                }
+            }
+        }
+        return List.copyOf(previews);
+    }
+
+    private ItemStack matchingVaultKey(Player player, String reference) {
+        if (player == null) {
+            return null;
+        }
+        ItemStack mainHand = player.getInventory().getItemInMainHand();
+        if (matchesItemTarget(mainHand, reference)) {
+            return mainHand;
+        }
+        ItemStack offHand = player.getInventory().getItemInOffHand();
+        return matchesItemTarget(offHand, reference) ? offHand : null;
+    }
+
+    static boolean vaultModeMatches(String configuredMode, boolean ominous) {
+        String mode = configuredMode == null ? "" : configuredMode.trim().toLowerCase(Locale.ROOT);
+        return switch (mode) {
+            case "", "normal" -> !ominous;
+            case "ominous" -> ominous;
+            case "any" -> true;
+            default -> false;
+        };
+    }
+
+    static String vaultKeyReference(JsonObject trigger, boolean ominous) {
+        String configured = trigger != null && trigger.has("tool") && trigger.get("tool").isJsonPrimitive() ? trigger.get("tool").getAsString() : "";
+        return configured.isBlank() || "none".equalsIgnoreCase(configured)
+            ? ominous ? "minecraft:ominous_trial_key" : "minecraft:trial_key"
+            : configured;
+    }
+
+    private LootTable vaultCarrierLootTable(boolean ominous) {
+        String path = ominous ? "chests/trial_chambers/reward_ominous" : "chests/trial_chambers/reward";
+        return Bukkit.getLootTable(NamespacedKey.minecraft(path));
+    }
+
+    private void restoreVaultState(Location location, VaultSelection selection) {
+        if (location == null || selection == null || !(location.getBlock().getState() instanceof Vault vault)) {
+            return;
+        }
+        ItemStack currentKey = vault.getKeyItem();
+        LootTable currentLootTable = vault.getLootTable();
+        boolean changed = false;
+        if (currentKey.isSimilar(selection.usedKey()) && currentKey.getAmount() == selection.usedKey().getAmount()) {
+            vault.setKeyItem(selection.originalKey());
+            changed = true;
+        }
+        if (currentLootTable.getKey().equals(selection.carrierLootTable().getKey())) {
+            vault.setLootTable(selection.originalLootTable());
+            changed = true;
+        }
+        if (changed) {
+            vault.update(true, false);
+        }
+    }
+
+    private void schedule(long delay, Runnable action) {
+        if (plugin == null) {
+            action.run();
+            return;
+        }
+        plugin.getServer().getScheduler().runTaskLater(plugin, action, Math.max(0L, delay));
+    }
+
+    private VaultLocation vaultLocation(Location location) {
+        World world = location != null ? location.getWorld() : null;
+        return new VaultLocation(world != null ? world.getUID() : new UUID(0L, 0L), location != null ? location.getBlockX() : 0,
+            location != null ? location.getBlockY() : 0, location != null ? location.getBlockZ() : 0);
     }
 
     private TriggeredLootResult triggeredLoot(String eventType, Map<String, Object> context, Event event, Player player, ItemStack item, Entity entity, Location location, EntityDamageEvent damageEvent) {
@@ -848,5 +1104,24 @@ public class LootTableService implements Listener {
     }
 
     private record TriggeredLootResult(boolean overrideDrops, List<ItemStack> items) {
+    }
+
+    private record VaultTrigger(String lootTableId, boolean ominous, String keyReference) {
+    }
+
+    private record VaultPreview(VaultTrigger trigger, Player player, ItemStack key) {
+    }
+
+    private record VaultSelection(String lootTableId, boolean ominous, ItemStack usedKey, ItemStack originalKey, LootTable originalLootTable, LootTable carrierLootTable) {
+    }
+
+    private record VaultLocation(UUID worldId, int x, int y, int z) {
+        private Location location() {
+            World world = Bukkit.getWorld(worldId);
+            return world != null ? new Location(world, x, y, z) : null;
+        }
+    }
+
+    private record VaultUseKey(VaultLocation vault, UUID playerId) {
     }
 }

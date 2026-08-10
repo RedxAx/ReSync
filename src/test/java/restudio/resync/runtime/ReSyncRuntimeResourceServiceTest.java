@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReSyncRuntimeResourceServiceTest {
@@ -77,6 +78,22 @@ class ReSyncRuntimeResourceServiceTest {
 
         assertEquals("Starter Stone", item.getItemMeta().getDisplayName());
         assertEquals(77, item.getItemMeta().getCustomModelData());
+    }
+
+    @Test
+    void vaultLootTriggersUseModeSpecificDefaultKeys() {
+        JsonObject trigger = new JsonObject();
+
+        assertTrue(LootTableService.vaultModeMatches("normal", false));
+        assertFalse(LootTableService.vaultModeMatches("normal", true));
+        assertTrue(LootTableService.vaultModeMatches("ominous", true));
+        assertTrue(LootTableService.vaultModeMatches("any", false));
+        assertTrue(LootTableService.vaultModeMatches("any", true));
+        assertEquals("minecraft:trial_key", LootTableService.vaultKeyReference(trigger, false));
+        assertEquals("minecraft:ominous_trial_key", LootTableService.vaultKeyReference(trigger, true));
+
+        trigger.addProperty("tool", "minecraft:diamond");
+        assertEquals("minecraft:diamond", LootTableService.vaultKeyReference(trigger, false));
     }
 
     @Test

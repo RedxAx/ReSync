@@ -69,6 +69,32 @@ class JsonRuntimeResourceValidatorTest {
     }
 
     @Test
+    void vaultLootTriggersValidateModeAndKeyBeforePersistence() {
+        JsonObject valid = lootTable();
+        JsonObject trigger = new JsonObject();
+        trigger.addProperty("event", "vault_open");
+        trigger.addProperty("target", "ominous");
+        trigger.addProperty("tool", "minecraft:ominous_trial_key");
+        valid.add("trigger", trigger);
+        JsonObject invalidMode = valid.deepCopy();
+        invalidMode.getAsJsonObject("trigger").addProperty("target", "trial_spawner");
+        JsonObject invalidKey = valid.deepCopy();
+        invalidKey.getAsJsonObject("trigger").addProperty("tool", "minecraft:not_a_real_key");
+        JsonObject defaultKey = valid.deepCopy();
+        defaultKey.getAsJsonObject("trigger").addProperty("tool", "none");
+        JsonObject invalidLegacyTrigger = lootTable();
+        JsonArray links = new JsonArray();
+        links.add(invalidMode.getAsJsonObject("trigger").deepCopy());
+        invalidLegacyTrigger.add("links", links);
+
+        assertDoesNotThrow(() -> validator.validate(ReSyncResourceCatalog.LOOT_TABLE, valid));
+        assertDoesNotThrow(() -> validator.validate(ReSyncResourceCatalog.LOOT_TABLE, defaultKey));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.LOOT_TABLE, invalidMode));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.LOOT_TABLE, invalidKey));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(ReSyncResourceCatalog.LOOT_TABLE, invalidLegacyTrigger));
+    }
+
+    @Test
     void npcHookAndEntityContractsAreValidatedBeforePersistence() {
         JsonObject valid = npc();
         valid.getAsJsonObject("hooks").addProperty("rightClickAction", "npc-click");

@@ -38,4 +38,5 @@ val browserJar by tasks.registering(Jar::class) {
     archiveClassifier.set("browser")
     dependsOn(tasks.classes)
     from(sourceSets.main.map { it.output })
+    exclude("**/network/*HubStore*")
 }

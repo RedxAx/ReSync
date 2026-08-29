@@ -38,6 +38,7 @@ dependencies {
     implementation("org.java-websocket:Java-WebSocket:1.5.7") {
         exclude(group = "org.slf4j")
     }
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     implementation("com.github.retrooper:packetevents-spigot:2.12.1")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
@@ -245,10 +246,12 @@ tasks {
     shadowJar {
         archiveClassifier.set("")
         mergeServiceFiles()
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
         relocate("io.javalin", "restudio.resync.libs.javalin")
         relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
         relocate("kotlin", "restudio.resync.libs.kotlin")
         relocate("org.java_websocket", "restudio.resync.libs.websocket")
+        relocate("org.bouncycastle", "restudio.resync.libs.bouncycastle")
         relocate("com.github.retrooper.packetevents", "restudio.resync.libs.packetevents.api")
         relocate("io.github.retrooper.packetevents", "restudio.resync.libs.packetevents.impl")
         dependencies {

@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 import restudio.resync.commands.ReSyncCommand;
 import restudio.resync.bridge.ReSyncPluginMessageBridge;
@@ -22,17 +23,23 @@ import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.server.ConfigLoader;
 import restudio.resync.server.ReSyncConfig;
+import restudio.resync.server.ReSyncTlsIdentity;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReSync extends JavaPlugin {
     private static ReSync instance;
     private WebSocketServer wsServer;
+    private ReSyncTlsIdentity.Prepared tlsIdentity;
+    private final AtomicBoolean webSocketStopScheduled = new AtomicBoolean();
+    private volatile boolean webSocketApiReady;
     private ReSyncServer server;
     private ReSyncPluginMessageBridge pluginMessageBridge;
     private ReSyncNetworkAgent networkAgent;
@@ -46,6 +53,11 @@ public class ReSync extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        webSocketStopScheduled.set(false);
+        webSocketApiReady = false;
+        tlsIdentity = null;
+        webSocketApiReady = false;
+        webSocketStopScheduled.set(false);
         Log.init(getLogger());
 
         ReSyncConfig config = ConfigLoader.load(getDataFolder().toPath().resolve("config.properties").toString());
@@ -54,6 +66,16 @@ public class ReSync extends JavaPlugin {
         if (!config.isEnabled()) {
             Log.info("ReSync is disabled in config");
             return;
+        }
+
+        if (config.getTls().isEnabled()) {
+            try {
+                tlsIdentity = ReSyncTlsIdentity.prepare(getDataFolder().toPath(), config.getTls());
+                Log.info("ReSync TLS identity ready with SPKI fingerprint " + tlsIdentity.metadata().spkiFingerprint());
+            } catch (Exception exception) {
+                Log.error("ReSync TLS setup failed. WebSocket API disabled: " + exception.getMessage(), exception);
+                return;
+            }
         }
 
         server = new ReSyncServer(this, config);
@@ -113,6 +135,10 @@ public class ReSync extends JavaPlugin {
         wsServer = new WebSocketServer(new InetSocketAddress(config.getBindHost(), config.getPort())) {
             @Override
             public void onOpen(WebSocket conn, ClientHandshake handshake) {
+                if (!webSocketApiReady) {
+                    conn.close(1013, "ReSync WebSocket API Is Unavailable");
+                    return;
+                }
                 server.onOpen(conn, handshake);
             }
 
@@ -123,16 +149,28 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onMessage(WebSocket conn, String message) {
+                if (!webSocketApiReady) {
+                    conn.close(1013, "ReSync WebSocket API Is Unavailable");
+                    return;
+                }
                 server.onMessage(conn, ByteBuffer.wrap(message.getBytes()));
             }
 
             @Override
             public void onMessage(WebSocket conn, ByteBuffer message) {
+                if (!webSocketApiReady) {
+                    conn.close(1013, "ReSync WebSocket API Is Unavailable");
+                    return;
+                }
                 server.onMessage(conn, message);
             }
 
             @Override
             public void onError(WebSocket conn, Exception ex) {
+                if (conn == null) {
+                    webSocketApiReady = false;
+                    withdrawTlsMetadata();
+                }
                 if (expectedDisconnect(ex)) {
                     Log.fine("WebSocket peer disconnected: " + ex.getMessage());
                 } else {
@@ -142,9 +180,24 @@ public class ReSync extends JavaPlugin {
 
             @Override
             public void onStart() {
-                Log.info("WebSocket server ready on " + config.getBindHost() + ":" + getPort());
+                try {
+                    if (tlsIdentity != null) {
+                        ReSyncTlsIdentity.publish(tlsIdentity);
+                    }
+                    webSocketApiReady = true;
+                    Log.info("WebSocket server ready on " + config.getBindHost() + ":" + getPort());
+                } catch (Exception exception) {
+                    webSocketApiReady = false;
+                    withdrawTlsMetadata();
+                    Log.error("ReSync TLS runtime metadata could not be published. WebSocket API disabled: " + exception.getMessage(), exception);
+                    stopWebSocketServerAsync("ReSync TLS Runtime Metadata Could Not Be Published");
+                }
             }
         };
+
+        if (tlsIdentity != null) {
+            wsServer.setWebSocketFactory(new DefaultSSLWebSocketServerFactory(tlsIdentity.sslContext()));
+        }
 
         try {
             wsServer.start();
@@ -167,7 +220,7 @@ public class ReSync extends JavaPlugin {
     private static boolean expectedDisconnect(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
-            if (current instanceof java.net.SocketException
+            if (current instanceof SocketException
                 && "Connection reset".equalsIgnoreCase(current.getMessage())) {
                 return true;
             }
@@ -178,6 +231,8 @@ public class ReSync extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        webSocketApiReady = false;
+        withdrawTlsMetadata();
         networkPathSynchronizers.forEach(NetworkPathSynchronizer::shutdown);
         networkPathSynchronizers = List.of();
         if (networkResourceSynchronizer != null) {
@@ -214,16 +269,49 @@ public class ReSync extends JavaPlugin {
             placeholderExpansion = null;
         }
 
-        if (wsServer != null) {
+        WebSocketServer currentWebSocketServer = wsServer;
+        if (currentWebSocketServer != null) {
             try {
-                wsServer.stop();
+                currentWebSocketServer.stop();
                 Log.info("WebSocket server stopped.");
             } catch (Exception e) {
                 Log.error("Error stopping WebSocket server: " + e.getMessage());
             }
+            if (wsServer == currentWebSocketServer) {
+                wsServer = null;
+            }
         }
 
         Log.info("Plugin disabled.");
+    }
+
+    private void withdrawTlsMetadata() {
+        try {
+            ReSyncTlsIdentity.withdraw(tlsIdentity);
+        } catch (Exception exception) {
+            Log.error("ReSync TLS runtime metadata could not be removed: " + exception.getMessage(), exception);
+        }
+    }
+
+    private void stopWebSocketServerAsync(String reason) {
+        WebSocketServer current = wsServer;
+        if (current == null || !webSocketStopScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        Thread.ofPlatform().name("ReSync-WebSocket-Stop").daemon(true).start(() -> {
+            try {
+                current.stop(0, reason);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                Log.error("ReSync WebSocket shutdown was interrupted: " + exception.getMessage(), exception);
+            } finally {
+                webSocketApiReady = false;
+                withdrawTlsMetadata();
+                if (wsServer == current) {
+                    wsServer = null;
+                }
+            }
+        });
     }
 
     public static ReSync getInstance() {

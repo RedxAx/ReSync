@@ -1,5 +1,7 @@
 package restudio.resync.server;
 
+import java.util.List;
+
 public class ReSyncConfig {
     private boolean enabled;
     private int port;
@@ -9,6 +11,7 @@ public class ReSyncConfig {
     private int maxEncodedFrameBytes;
     private int maxDecompressedPayloadBytes;
     private String logLevel;
+    private TlsConfig tls = new TlsConfig();
 
     private CompressionConfig compression;
     private BatchingConfig batching;
@@ -166,6 +169,45 @@ public class ReSyncConfig {
         }
     }
 
+    public static class TlsConfig {
+        private boolean enabled;
+        private String spkiFingerprint;
+        private String runtimeMetadataFile;
+        private List<String> subjectAlternativeNames = List.of();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getSpkiFingerprint() {
+            return spkiFingerprint;
+        }
+
+        public void setSpkiFingerprint(String spkiFingerprint) {
+            this.spkiFingerprint = spkiFingerprint;
+        }
+
+        public String getRuntimeMetadataFile() {
+            return runtimeMetadataFile;
+        }
+
+        public void setRuntimeMetadataFile(String runtimeMetadataFile) {
+            this.runtimeMetadataFile = runtimeMetadataFile;
+        }
+
+        public List<String> getSubjectAlternativeNames() {
+            return subjectAlternativeNames;
+        }
+
+        public void setSubjectAlternativeNames(List<String> subjectAlternativeNames) {
+            this.subjectAlternativeNames = subjectAlternativeNames == null ? List.of() : List.copyOf(subjectAlternativeNames);
+        }
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -268,5 +310,13 @@ public class ReSyncConfig {
 
     public void setPlayerTracking(PlayerTrackingConfig playerTracking) {
         this.playerTracking = playerTracking;
+    }
+
+    public TlsConfig getTls() {
+        return tls;
+    }
+
+    public void setTls(TlsConfig tls) {
+        this.tls = tls;
     }
 }

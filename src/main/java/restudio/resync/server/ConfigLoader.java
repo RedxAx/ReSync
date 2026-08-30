@@ -7,6 +7,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -47,6 +49,17 @@ public class ConfigLoader {
         config.setMaxEncodedFrameBytes(Integer.parseInt(props.getProperty("protocol.maxEncodedFrameBytes", String.valueOf(Codec.DEFAULT_MAX_ENCODED_FRAME_BYTES))));
         config.setMaxDecompressedPayloadBytes(Integer.parseInt(props.getProperty("protocol.maxDecompressedPayloadBytes", String.valueOf(Codec.DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES))));
         config.setLogLevel(props.getProperty("log-level", "info"));
+
+        ensureDefault(props, "tls.enabled", "false");
+        ensureDefault(props, "tls.spki-fingerprint", "");
+        ensureDefault(props, "tls.runtime-metadata-file", "tls/resync-server.runtime.json");
+        ensureDefault(props, "tls.subject-alternative-names", "");
+        ReSyncConfig.TlsConfig tls = new ReSyncConfig.TlsConfig();
+        tls.setEnabled(Boolean.parseBoolean(props.getProperty("tls.enabled", "false")));
+        tls.setSpkiFingerprint(props.getProperty("tls.spki-fingerprint", "").strip());
+        tls.setRuntimeMetadataFile(props.getProperty("tls.runtime-metadata-file", "tls/resync-server.runtime.json").strip());
+        tls.setSubjectAlternativeNames(parseNames(props.getProperty("tls.subject-alternative-names", "")));
+        config.setTls(tls);
 
         ReSyncConfig.CompressionConfig compression = new ReSyncConfig.CompressionConfig();
         compression.setEnabled(Boolean.parseBoolean(props.getProperty("compression.enabled", "true")));
@@ -112,6 +125,17 @@ public class ConfigLoader {
         }
     }
 
+    private static List<String> parseNames(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split("[,;\\r\\n]+"))
+                .map(String::strip)
+                .filter(name -> !name.isBlank())
+                .distinct()
+                .toList();
+    }
+
     private static void validateProductionConfig(ReSyncConfig config, Properties props) {
         if (config.getApiKey() == null || config.getApiKey().isBlank()) {
             Log.error("ReSync API key is empty. WebSocket API disabled.");
@@ -129,6 +153,14 @@ public class ConfigLoader {
         }
         if (config.getQueue().getMaxGlobalRequests() <= 0 || config.getQueue().getMaxRequestsPerClient() <= 0) {
             Log.error("ReSync queue limits are invalid. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+        if (config.getTls().isEnabled() && config.getTls().getRuntimeMetadataFile().isBlank()) {
+            Log.error("ReSync TLS runtime metadata path is empty. WebSocket API disabled.");
+            config.setEnabled(false);
+        }
+        if (config.getTls().isEnabled() && config.getTls().getSubjectAlternativeNames().isEmpty()) {
+            Log.error("ReSync TLS subject alternative names are empty. WebSocket API disabled.");
             config.setEnabled(false);
         }
     }

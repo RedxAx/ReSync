@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     implementation(project(":ReSyncCore"))
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.java-websocket:Java-WebSocket:1.5.7") {
         exclude(group = "org.slf4j")

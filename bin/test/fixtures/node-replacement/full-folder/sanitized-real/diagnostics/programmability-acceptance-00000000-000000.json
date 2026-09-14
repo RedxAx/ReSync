@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "1970-01-01T00:00:00Z",
+  "serverVersion": "sanitized",
+  "pluginVersion": "sanitized",
+  "ready": false,
+  "checks": [],
+  "readiness": {},
+  "registryDiagnostics": {}
+}

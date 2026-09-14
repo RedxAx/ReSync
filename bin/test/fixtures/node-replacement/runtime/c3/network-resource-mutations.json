@@ -1,0 +1,16 @@
+[
+  {
+    "type": "flow",
+    "resourceId": "shared",
+    "expectedRevision": 7,
+    "payload": "c2F2ZQ==",
+    "deleted": false
+  },
+  {
+    "type": "command",
+    "resourceId": "shared",
+    "expectedRevision": 8,
+    "payload": "",
+    "deleted": true
+  }
+]

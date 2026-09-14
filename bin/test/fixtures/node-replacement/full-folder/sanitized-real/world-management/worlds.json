@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sanitized-world-a",
+    "enabled": false,
+    "seed": 0,
+    "rules": {}
+  },
+  {
+    "id": "sanitized-world-b",
+    "enabled": false,
+    "seed": 0,
+    "rules": {}
+  },
+  {
+    "id": "sanitized-world-c",
+    "enabled": false,
+    "seed": 0,
+    "rules": {}
+  }
+]

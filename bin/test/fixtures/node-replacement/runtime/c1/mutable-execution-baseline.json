@@ -1,0 +1,7 @@
+{
+  "case": "live-definition-mutation-and-default",
+  "expected": {
+    "handlerResolutionWritesHandlerConfig": true,
+    "definitionDefaultChangesWithoutGraphLiteral": true
+  }
+}

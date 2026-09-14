@@ -1,0 +1,14 @@
+{
+  "id": "fixture-function",
+  "resourceType": "function",
+  "resourceRevision": 2,
+  "mutationId": "mutation-function-002",
+  "function": true,
+  "functionOwner": "fixture-extension",
+  "functionNamespace": "fixture",
+  "functionVersion": 1,
+  "functionInputs": [{"name": "value", "dataType": "string"}],
+  "functionOutputs": [{"name": "result", "dataType": "string"}],
+  "nodes": {},
+  "connections": []
+}

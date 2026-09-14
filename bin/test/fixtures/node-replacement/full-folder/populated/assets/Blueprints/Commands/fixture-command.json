@@ -1,0 +1,9 @@
+{
+  "id": "fixture-command",
+  "resourceType": "command",
+  "resourceRevision": 4,
+  "mutationId": "mutation-command-004",
+  "commandPaths": ["fixture"],
+  "nodes": {"start": {"type": "event.resync.command", "inputs": {}}},
+  "connections": []
+}

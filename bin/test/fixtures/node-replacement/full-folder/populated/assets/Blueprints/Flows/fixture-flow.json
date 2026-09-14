@@ -1,0 +1,8 @@
+{
+  "id": "fixture-flow",
+  "resourceType": "flow",
+  "resourceRevision": 3,
+  "mutationId": "mutation-flow-003",
+  "nodes": {"start": {"type": "event.server_start", "inputs": {}}},
+  "connections": []
+}

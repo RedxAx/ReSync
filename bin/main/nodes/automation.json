@@ -13,7 +13,7 @@
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "variable", "dataType": "variable_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:variable_definition"},
       {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Get", "Set", "Delete", "Exists", "Increment", "Decrement", "Multiply", "Divide", "List"], "defaultValue": "Get"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Runtime owner for Player, Entity, or Network scope. Flow and Server scope do not need this input."},
       {"name": "value", "dataType": "any", "visibleWhen": {"action": "Set"}},
       {"name": "amount", "dataType": "number", "defaultValue": 1, "visibleWhen": {"action": "Increment,Decrement,Multiply,Divide"}}
     ],
@@ -30,7 +30,7 @@
     "displayName": "Timer",
     "description": "Start, stop, pause, resume, or check a known countdown.",
     "category": "UTILITY",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "kind": "ACTION",
     "tags": ["timer", "countdown", "state"],
     "handler": "TimerHandler",
@@ -39,8 +39,8 @@
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "timer", "dataType": "timer_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:timer_definition"},
       {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Start", "Stop", "Pause", "Resume", "Check"], "defaultValue": "Check"},
-      {"name": "owner", "dataType": "any"},
-      {"name": "duration", "dataType": "number", "visibleWhen": {"action": "Start"}},
+      {"name": "owner", "dataType": "any", "optional": true, "description": "Runtime owner for Player, Entity, or Network scope. Flow and Server scope do not need this input."},
+      {"name": "duration", "dataType": "number", "optional": true, "visibleWhen": {"action": "Start"}},
       {"name": "unit", "dataType": "string", "widget": "DROPDOWN", "options": ["Ticks", "Seconds", "Minutes"], "defaultValue": "Seconds", "visibleWhen": {"action": "Start"}}
     ],
     "outputs": [
@@ -69,7 +69,7 @@
     "inputs": [
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Runtime owner for Player, Entity, or Network scope. Flow and Server scope do not need this input."},
       {"name": "arguments", "dataType": "map<string,any>", "optional": true}
     ],
     "outputs": [
@@ -97,7 +97,7 @@
       {"name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["Check", "Cancel", "Pause", "Resume", "Run Now"], "defaultValue": "Check"},
       {"name": "task", "dataType": "scheduled_task", "optional": true},
       {"name": "schedule", "dataType": "schedule_reference", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:schedule_definition", "optional": true},
-      {"name": "owner", "dataType": "any"}
+      {"name": "owner", "dataType": "any", "description": "Runtime owner for Player, Entity, or Network scope. Flow and Server scope do not need this input."}
     ],
     "outputs": [
       {"name": "active", "pinType": "FLOW", "dataType": "execution"},
@@ -130,7 +130,7 @@
     "outputs": [
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "variable", "dataType": "variable_reference"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Player, Entity, or Network owner whose Variable changed."},
       {"name": "old_value", "dataType": "any"},
       {"name": "new_value", "dataType": "any"}
     ],
@@ -158,7 +158,7 @@
     "outputs": [
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "timer", "dataType": "timer_reference"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Player, Entity, or Network owner of this Timer instance."},
       {"name": "state", "dataType": "string"},
       {"name": "remaining", "dataType": "duration"},
       {"name": "elapsed", "dataType": "duration"},
@@ -193,7 +193,7 @@
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "schedule", "dataType": "schedule_reference"},
       {"name": "task", "dataType": "scheduled_task"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Player, Entity, or Network owner of this scheduled task."},
       {"name": "target_type", "dataType": "string"},
       {"name": "target", "dataType": "string"},
       {"name": "fired_at", "dataType": "instant"},
@@ -230,7 +230,7 @@
       {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
       {"name": "schedule", "dataType": "schedule_reference"},
       {"name": "task", "dataType": "scheduled_task"},
-      {"name": "owner", "dataType": "any"},
+      {"name": "owner", "dataType": "any", "description": "Player, Entity, or Network owner that started this Flow."},
       {"name": "arguments", "dataType": "map<string,any>"},
       {"name": "fired_at", "dataType": "instant"},
       {"name": "run_count", "dataType": "number"}

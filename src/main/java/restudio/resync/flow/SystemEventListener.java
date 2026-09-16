@@ -1,6 +1,7 @@
 package restudio.resync.flow;
 
 import org.bukkit.Bukkit;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -8,15 +9,17 @@ import org.bukkit.event.server.*;
 import org.bukkit.event.world.*;
 import org.bukkit.plugin.Plugin;
 import restudio.flow.data.FlowGraph;
-import restudio.resync.Log;
+import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SystemEventListener implements Listener {
@@ -24,6 +27,7 @@ public class SystemEventListener implements Listener {
     private final FlowExecutor executor;
     private final TriggerRegistry triggerRegistry;
     private final AtomicInteger tickCounter = new AtomicInteger(0);
+    private volatile CompiledTriggerExecution compiledExecution;
     
     private final Map<String, String> serverStartTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> serverStopTriggers = new ConcurrentHashMap<>();
@@ -35,6 +39,7 @@ public class SystemEventListener implements Listener {
     private final Map<String, String> chunkUnloadTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> serverTickTriggers = new ConcurrentHashMap<>();
     private final Map<String, String> serverSaveTriggers = new ConcurrentHashMap<>();
+    private final Map<String, FlowGraph> graphSnapshots = new ConcurrentHashMap<>();
     
     public SystemEventListener(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry) {
         this.storage = storage;
@@ -46,7 +51,7 @@ public class SystemEventListener implements Listener {
     public void registerTrigger(String eventType, String flowId) {
         FlowGraph graph = storage.getGraph("flow", flowId);
         if (graph == null) {
-            Log.warn("[ReSync] Failed to load flow for trigger: " + flowId);
+            warnRegistration(flowId, eventType, "TRIGGER.GRAPH_UNAVAILABLE", "graph-unavailable");
             return;
         }
         
@@ -55,8 +60,13 @@ public class SystemEventListener implements Listener {
             startNode = findStartNode(graph);
         }
         if (startNode == null) {
-            Log.warn("[ReSync] No event node found for trigger: " + eventType + " in flow: " + flowId);
+            warnRegistration(flowId, eventType, "TRIGGER.START_NODE_UNAVAILABLE", "start-node-unavailable");
             return;
+        }
+        graphSnapshots.put(flowId, graph);
+        CompiledTriggerExecution execution = compiledExecution;
+        if (execution != null) {
+            execution.prepare(graph);
         }
         
         String key = normalizeEventKey(eventType);
@@ -102,7 +112,7 @@ public class SystemEventListener implements Listener {
                 serverSaveTriggers.put(flowId, startNode);
                 break;
             default:
-                Log.warn("[ReSync] Unknown system trigger type: " + eventType);
+                warnRegistration(flowId, eventType, "TRIGGER.EVENT_TYPE_UNAVAILABLE", "event-type-unavailable");
         }
     }
     
@@ -117,6 +127,7 @@ public class SystemEventListener implements Listener {
         chunkUnloadTriggers.clear();
         serverTickTriggers.clear();
         serverSaveTriggers.clear();
+        graphSnapshots.clear();
         
         if (triggerRegistry == null) {
             return;
@@ -128,6 +139,105 @@ public class SystemEventListener implements Listener {
                 registerTrigger(context, binding.getFlowId());
             }
         }
+    }
+
+    public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
+        this.compiledExecution = compiledExecution;
+        if (compiledExecution != null) {
+            graphSnapshots.values().forEach(compiledExecution::prepare);
+        }
+    }
+
+    CompletableFuture<Void> dispatch(FlowGraph graph, String startNodeId, Event event,
+                                     Map<String, Object> eventVars) {
+        return dispatch(graph == null ? "" : graph.getId(), startNodeId, "system", event, eventVars, graph);
+    }
+
+    private CompletableFuture<Void> dispatch(String flowId, String startNodeId, String eventType, Event event,
+                                             Map<String, Object> eventVars, FlowGraph suppliedGraph) {
+        CorrelationId invocationId = CorrelationId.random();
+        long started = TemporaryLifecycleDiagnostics.start();
+        Map<String, Object> ingress = TemporaryLifecycleDiagnostics.with(
+            TemporaryLifecycleDiagnostics.identity(null, "flow:" + flowId, "trigger-execution", null, null,
+                invocationId, null, null, null, null),
+            "source", "system-event", "eventType", eventType, "startNodeId", startNodeId, "outcome", "matched");
+        TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
+        Map<String, Object> terminalIdentity = ingress;
+        String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
+        String failureReason = "graph-resolution-failed";
+        try {
+            FlowGraph graph = suppliedGraph != null ? suppliedGraph : graphSnapshots.get(flowId);
+            if (graph == null || !graph.isEnabled()) {
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingress, "rejected",
+                    "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
+                warn(flowId, invocationId, "TRIGGER.GRAPH_UNAVAILABLE", "rejected");
+                return failed("CORE_EXECUTION_UNAVAILABLE", "The system trigger graph is unavailable", startNodeId);
+            }
+            Map<String, Object> binding = TemporaryLifecycleDiagnostics.with(ingress, "revision", graph.getResourceRevision(),
+                "graphHash", graph.getResourceHash(), "outcome", "selected");
+            terminalIdentity = binding;
+            TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started, binding);
+            CompiledTriggerExecution execution = compiledExecution;
+            if (execution == null) {
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, binding, "rejected",
+                    "TRIGGER.EXECUTOR_UNAVAILABLE", "compiled-executor-unavailable");
+                warn(flowId, invocationId, "TRIGGER.EXECUTOR_UNAVAILABLE", "rejected");
+                return failed("CORE_EXECUTION_UNAVAILABLE", "Compiled Core trigger execution is not initialized", startNodeId);
+            }
+            failureCode = "TRIGGER.EXECUTOR_REJECTED";
+            failureReason = "synchronous-rejection";
+            CompletableFuture<Void> future = execution.execute(graph, startNodeId, null, event, eventVars, null, invocationId);
+            execution.observe(future, invocationId, "system-event:" + eventType + ":" + flowId);
+            return future;
+        } catch (RuntimeException failure) {
+            TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, terminalIdentity, "failed",
+                failureCode, failureReason);
+            warn(flowId, invocationId, failureCode, "failed");
+            return failed("CORE_EXECUTION_FAILED", "System trigger execution could not be admitted", startNodeId);
+        }
+    }
+
+    private void dispatch(String flowId, String startNodeId, String eventType, Event event, Map<String, Object> eventVars) {
+        dispatch(flowId, startNodeId, eventType, event, eventVars, null);
+    }
+
+    public void refreshGraph(String flowId) {
+        if (flowId == null || flowId.isBlank()) {
+            return;
+        }
+        FlowGraph graph = storage.getGraph("flow", flowId);
+        if (graph == null) {
+            graphSnapshots.remove(flowId);
+            CompiledTriggerExecution execution = compiledExecution;
+            if (execution != null) {
+                execution.retire("flow", flowId);
+            }
+        } else if (graphSnapshots.containsKey(flowId)) {
+            graphSnapshots.put(flowId, graph);
+            CompiledTriggerExecution execution = compiledExecution;
+            if (execution != null) {
+                execution.prepare(graph);
+            }
+        }
+    }
+
+    private CompletableFuture<Void> failed(String code, String message, String startNodeId) {
+        return CompletableFuture.failedFuture(new FlowExecutor.FlowExecutionException(code, message, null, startNodeId,
+            "Restore the compiled Core trigger boundary before dispatching system triggers"));
+    }
+
+    private void warn(String flowId, CorrelationId invocationId, String code, String outcome) {
+        CompiledTriggerExecution.warnInvocation("system-event|" + flowId + "|" + code,
+            "Compiled system trigger invocation " + outcome + " correlationId=" + invocationId.canonicalText()
+                + " diagnosticCode=" + code + " source=system-event:" + flowId);
+    }
+
+    private void warnRegistration(String flowId, String eventType, String code, String outcome) {
+        String resourceId = flowId == null || flowId.isBlank() ? "unknown" : flowId;
+        String triggerType = eventType == null || eventType.isBlank() ? "unknown" : normalizeEventKey(eventType);
+        CompiledTriggerExecution.warnInvocation("system-event-registration|" + resourceId + "|" + triggerType + "|" + code,
+            "Compiled system trigger registration " + outcome + " diagnosticCode=" + code
+                + " resourceType=flow resourceId=" + resourceId + " eventType=" + triggerType);
     }
     
     private boolean isSystemEvent(String eventType) {
@@ -155,12 +265,9 @@ public class SystemEventListener implements Listener {
     @EventHandler
     public void onServerLoad(ServerLoadEvent event) {
         for (Map.Entry<String, String> entry : serverStartTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.server_name", Bukkit.getServer().getName());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.server_name", Bukkit.getServer().getName());
+            dispatch(entry.getKey(), entry.getValue(), "server_start", event, eventVars);
         }
     }
     
@@ -169,14 +276,15 @@ public class SystemEventListener implements Listener {
         Plugin plugin = event.getPlugin();
         
         for (Map.Entry<String, String> entry : pluginDisableTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.plugin_name", plugin.getName());
-                eventVars.put("event.plugin_instance", plugin);
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.plugin_name", plugin.getName());
+            eventVars.put("event.plugin_instance", pluginIdentity(plugin));
+            dispatch(entry.getKey(), entry.getValue(), "plugin_disable", event, eventVars);
         }
+    }
+
+    private Map<String, Object> pluginIdentity(Plugin plugin) {
+        return Map.of("kind", "bukkit-plugin", "name", plugin.getName(), "version", plugin.getDescription().getVersion());
     }
     
     @EventHandler
@@ -184,62 +292,47 @@ public class SystemEventListener implements Listener {
         Plugin plugin = event.getPlugin();
         
         for (Map.Entry<String, String> entry : pluginEnableTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.plugin_name", plugin.getName());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.plugin_name", plugin.getName());
+            dispatch(entry.getKey(), entry.getValue(), "plugin_enable", event, eventVars);
         }
     }
     
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {
         for (Map.Entry<String, String> entry : worldLoadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.world_name", event.getWorld().getName());
+            dispatch(entry.getKey(), entry.getValue(), "world_load", event, eventVars);
         }
     }
     
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         for (Map.Entry<String, String> entry : worldUnloadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.world_name", event.getWorld().getName());
+            dispatch(entry.getKey(), entry.getValue(), "world_unload", event, eventVars);
         }
     }
     
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         for (Map.Entry<String, String> entry : chunkLoadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.chunk_x", event.getChunk().getX());
-                eventVars.put("event.chunk_z", event.getChunk().getZ());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.chunk_x", event.getChunk().getX());
+            eventVars.put("event.chunk_z", event.getChunk().getZ());
+            dispatch(entry.getKey(), entry.getValue(), "chunk_load", event, eventVars);
         }
     }
     
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
         for (Map.Entry<String, String> entry : chunkUnloadTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.chunk_x", event.getChunk().getX());
-                eventVars.put("event.chunk_z", event.getChunk().getZ());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.chunk_x", event.getChunk().getX());
+            eventVars.put("event.chunk_z", event.getChunk().getZ());
+            dispatch(entry.getKey(), entry.getValue(), "chunk_unload", event, eventVars);
         }
     }
     
@@ -247,42 +340,39 @@ public class SystemEventListener implements Listener {
         int tick = tickCounter.incrementAndGet();
         
         for (Map.Entry<String, String> entry : serverTickTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.tick_number", tick);
-                executor.execute(graph, entry.getValue(), null, null, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.tick_number", tick);
+            dispatch(entry.getKey(), entry.getValue(), "server_tick", null, eventVars);
         }
     }
 
     public void onServerStop() {
         for (Map.Entry<String, String> entry : serverStopTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.server_name", Bukkit.getServer().getName());
-                executor.execute(graph, entry.getValue(), null, null, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.server_name", Bukkit.getServer().getName());
+            dispatch(entry.getKey(), entry.getValue(), "server_stop", null, eventVars);
         }
     }
     
     @EventHandler
     public void onWorldSave(WorldSaveEvent event) {
         for (Map.Entry<String, String> entry : serverSaveTriggers.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", entry.getKey());
-            if (graph != null) {
-                Map<String, Object> eventVars = new HashMap<>();
-                eventVars.put("event.world_name", event.getWorld().getName());
-                executor.execute(graph, entry.getValue(), null, event, eventVars);
-            }
+            Map<String, Object> eventVars = new HashMap<>();
+            eventVars.put("event.world_name", event.getWorld().getName());
+            dispatch(entry.getKey(), entry.getValue(), "server_save", event, eventVars);
         }
     }
     
     private String findStartNodeForEvent(FlowGraph graph, String eventType) {
+        String expected = normalizeEventKey(eventType);
         for (var entry : graph.getNodes().entrySet()) {
             String nodeType = entry.getValue().getType();
-            if (nodeType != null && nodeType.equalsIgnoreCase(eventType)) {
+            String localNodeType = nodeType != null && nodeType.contains("/")
+                ? nodeType.substring(nodeType.indexOf('/') + 1) : nodeType;
+            String bindingContext = executor == null ? null : executor.eventBindingContext(nodeType);
+            if (expected.equals(normalizeEventKey(nodeType))
+                || expected.equals(normalizeEventKey(localNodeType))
+                || expected.equals(normalizeEventKey(bindingContext))) {
                 return entry.getKey();
             }
         }

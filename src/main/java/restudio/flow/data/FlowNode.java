@@ -1,8 +1,10 @@
 package restudio.flow.data;
 
+import com.google.gson.JsonElement;
 import restudio.resync.flow.handler.HandlerConfig;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class FlowNode {
@@ -13,6 +15,8 @@ public class FlowNode {
     private double y;
     private Map<String, Object> inputValues;
     private Map<String, Object> handlerConfig = new HashMap<>();
+    private transient boolean handlerConfigDeclared;
+    private transient Map<String, JsonElement> opaqueProperties;
 
     public FlowNode() {
         this.version = CURRENT_VERSION;
@@ -77,5 +81,29 @@ public class FlowNode {
 
     public void setHandlerConfig(Map<String, Object> handlerConfig) {
         this.handlerConfig = handlerConfig != null ? new HashMap<>(handlerConfig) : new HashMap<>();
+        handlerConfigDeclared = true;
+    }
+
+    boolean handlerConfigDeclared() {
+        return handlerConfigDeclared;
+    }
+
+    void markHandlerConfigDeclared(boolean declared) {
+        handlerConfigDeclared = declared;
+    }
+
+    public Map<String, JsonElement> getOpaqueProperties() {
+        if (opaqueProperties == null) {
+            opaqueProperties = new LinkedHashMap<>();
+        }
+        return opaqueProperties;
+    }
+
+    Map<String, JsonElement> peekOpaqueProperties() {
+        return opaqueProperties;
+    }
+
+    public void setOpaqueProperties(Map<String, JsonElement> opaqueProperties) {
+        this.opaqueProperties = opaqueProperties != null ? new LinkedHashMap<>(opaqueProperties) : new LinkedHashMap<>();
     }
 }

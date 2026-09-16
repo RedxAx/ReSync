@@ -1,0 +1,1261 @@
+[
+  {
+    "id": "block.block_set",
+    "displayName": "Block Set",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_replace",
+    "displayName": "Block Replace",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_replace"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "old_type",
+        "dataType": "material"
+      },
+      {
+        "name": "new_type",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_fill",
+    "displayName": "Block Fill",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_fill"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_replace_area",
+    "displayName": "Block Replace Area",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_replace_area"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "min_location",
+        "dataType": "location"
+      },
+      {
+        "name": "max_location",
+        "dataType": "location"
+      },
+      {
+        "name": "old_type",
+        "dataType": "material"
+      },
+      {
+        "name": "new_type",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_break_naturally",
+    "displayName": "Block Break Naturally",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_naturally"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_drop_item",
+    "displayName": "Block Drop Item",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_drop_item"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "item",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_update",
+    "displayName": "Block Update",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_update"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_biome",
+    "displayName": "Block Set Biome",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_biome"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "biome",
+        "dataType": "biome"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_type",
+    "displayName": "Block Set Type",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_type"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "material",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_data",
+    "displayName": "Block Set Data",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_data"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "data",
+        "dataType": "map<any,any>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_age",
+    "displayName": "Block Set Age",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_age"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "age",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_level",
+    "displayName": "Block Set Level",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_level"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "level",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_rotation",
+    "displayName": "Block Set Rotation",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_rotation"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "rotation",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_face",
+    "displayName": "Block Set Face",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_face"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "face",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_powered",
+    "displayName": "Block Set Powered",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_powered"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "powered",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_set_lit",
+    "displayName": "Block Set Lit",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_lit"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "lit",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_interact",
+    "displayName": "Block Interact",
+    "category": "BLOCK",
+    "hidden": true,
+    "hiddenReason": "migration-only-unsupported-runtime-state",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_interact"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_break_particles",
+    "displayName": "Block Break Particles",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_particles"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "type",
+        "dataType": "material"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_play_sound",
+    "displayName": "Block Play Sound",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_play_sound"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "name": "volume",
+        "dataType": "number",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 16.0
+        }
+      },
+      {
+        "name": "pitch",
+        "dataType": "number",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 2.0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_physics",
+    "displayName": "Block Physics",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_physics"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_explode",
+    "displayName": "Block Explode",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_explode"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "power",
+        "dataType": "number",
+        "defaultValue": 4.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 100.0
+        }
+      },
+      {
+        "name": "fire",
+        "dataType": "boolean"
+      },
+      {
+        "name": "break_blocks",
+        "dataType": "boolean"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_raytrace",
+    "displayName": "Block Raytrace",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_raytrace"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "start_location",
+        "dataType": "location"
+      },
+      {
+        "name": "direction_vector",
+        "dataType": "vector"
+      },
+      {
+        "name": "max_distance",
+        "dataType": "number",
+        "defaultValue": 50.0,
+        "constraints": {
+          "min": 0.0,
+          "max": 1024.0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "hit_block",
+        "dataType": "block"
+      },
+      {
+        "name": "hit_location",
+        "dataType": "location"
+      },
+      {
+        "name": "distance",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "block.block_offset",
+    "displayName": "Block Offset",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_offset"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "offset_x",
+        "dataType": "number"
+      },
+      {
+        "name": "offset_y",
+        "dataType": "number"
+      },
+      {
+        "name": "offset_z",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block",
+        "dataType": "block"
+      }
+    ]
+  },
+  {
+    "id": "block.block_sign_text",
+    "displayName": "Block Sign Text",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_sign_text"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "line1",
+        "dataType": "string"
+      },
+      {
+        "name": "line2",
+        "dataType": "string"
+      },
+      {
+        "name": "line3",
+        "dataType": "string"
+      },
+      {
+        "name": "line4",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_container_get",
+    "displayName": "Block Container Get",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_get"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "items_list",
+        "dataType": "list<item>"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  },
+  {
+    "id": "block.block_container_set",
+    "displayName": "Block Container Set",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_set"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "items_list",
+        "dataType": "list<item>"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_container_add",
+    "displayName": "Block Container Add",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_add"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_spawn_falling",
+    "displayName": "Block Spawn Falling",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_spawn_falling"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      },
+      {
+        "name": "material_type",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "falling_block_entity",
+        "dataType": "entity"
+      }
+    ]
+  },
+  {
+    "id": "block.block_break_naturally_drops",
+    "displayName": "Block Break Naturally Drops",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_naturally_drops"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "tool_item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "dropped_items_list",
+        "dataType": "list<item>"
+      }
+    ]
+  },
+  {
+    "id": "block.block_break_instantly",
+    "displayName": "Block Break Instantly",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_instantly"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_get_drops",
+    "displayName": "Block Get Drops",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_drops"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "tool_item",
+        "dataType": "itemstack"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "dropped_items_list",
+        "dataType": "list<item>"
+      }
+    ]
+  },
+  {
+    "id": "block.block_get_state",
+    "displayName": "Block Get State",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_state"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "state_data",
+        "dataType": "string"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  },
+  {
+    "id": "block.block_set_state",
+    "displayName": "Block Set State",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_state"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      },
+      {
+        "name": "state_data",
+        "dataType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "block.block_get",
+    "displayName": "Block Block Get",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "type",
+        "dataType": "string"
+      },
+      {
+        "name": "data",
+        "dataType": "string"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  },
+  {
+    "id": "block.block_get_type",
+    "displayName": "Block Block Get Type",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_type"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "type",
+        "dataType": "string"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  },
+  {
+    "id": "block.block_get_data",
+    "displayName": "Block Block Get Data",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_data"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "data",
+        "dataType": "string"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  },
+  {
+    "id": "block.block_is_solid",
+    "displayName": "Block Block Is Solid",
+    "category": "BLOCK",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_is_solid"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "block_location",
+        "dataType": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "is_solid",
+        "dataType": "boolean"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "block.properties"
+  }
+]

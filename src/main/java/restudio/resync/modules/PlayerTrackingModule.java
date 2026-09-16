@@ -50,6 +50,7 @@ import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -73,6 +74,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
     private PlayerTrackingService trackingService;
     private PlayerSessionLinkService sessionLinkService;
     private FlowExecutor flowExecutor;
+    private PaperPlayerDataMutationAdmission playerDataAdmission;
     private final PlayerTrackingPrivacyPolicy privacyPolicy = new PlayerTrackingPrivacyPolicy();
     private final Map<UUID, Integer> pendingLiveBroadcastTasks = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastLiveBroadcastAt = new ConcurrentHashMap<>();
@@ -95,6 +97,7 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
         this.channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         this.trackingService = context.getRequiredService(PlayerTrackingService.class);
         this.sessionLinkService = context.getRequiredService(PlayerSessionLinkService.class);
+        this.playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
     }
 
     @Override
@@ -438,7 +441,9 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             return;
         }
         Bukkit.getScheduler().runTask(context.getPlugin(), () -> {
-            syncInventoryRevisionIfChanged(onlinePlayer);
+            try (PaperPlayerDataMutationAdmission.Lease ignored = playerDataAdmission.acquirePdc(
+                "player-tracking-inventory-edit:" + uuid, uuid, onlinePlayer.getWorld().getWorldFolder().toPath())) {
+                syncInventoryRevisionIfChanged(onlinePlayer);
             long currentInventoryRevision = inventoryRevision(uuid);
             if (request.baseInventoryRevision < 0L || request.baseInventoryRevision != currentInventoryRevision) {
                 sendControlResponse(session, request, false, "InventoryChanged", Map.of("playerData", livePlayerData(onlinePlayer)));
@@ -485,6 +490,9 @@ public class PlayerTrackingModule implements Module, Listener, PlayerTrackingLis
             } else {
                 sendControlResponse(session, request, false, "InventoryEditFailed", Map.of("playerData", livePlayerData(onlinePlayer)));
                 sendLivePlayerData(onlinePlayer, "inventoryRollback");
+            }
+            } catch (RuntimeException exception) {
+                sendControlResponse(session, request, false, "PlayerDataUnavailable", Map.of());
             }
         });
     }

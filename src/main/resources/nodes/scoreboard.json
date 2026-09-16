@@ -1,0 +1,606 @@
+[
+  {
+    "id": "scoreboard_create",
+    "displayName": "Create Objective",
+    "description": "Create a scoreboard objective with a stable ID, name, and criteria.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.create"],
+    "tags": ["scoreboard", "objective", "create"],
+    "examples": ["Connect Flow, provide an Objective ID, name, and criteria, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_create"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts objective creation."},
+      {"id": "objective_id", "displayName": "Objective ID", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "constraints": {"max": 128}, "description": "Sets the stable ID of the new objective."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Objective", "description": "Sets the display name shown for the objective."},
+      {"id": "criteria", "displayName": "Criteria", "name": "criteria", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "dummy", "description": "Sets the Bukkit scoreboard criteria used by the objective."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the objective is registered."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "criteria", "target": "criteria"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_set_display",
+    "displayName": "Set Display Slot",
+    "description": "Show an objective in the sidebar, player list, or below-name display slot.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.set.display"],
+    "tags": ["scoreboard", "objective", "display"],
+    "examples": ["Connect Flow, select an Objective and Display Slot, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_set_display"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the objective display slot."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to display."},
+      {"id": "display_slot", "displayName": "Display Slot", "name": "display_slot", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["sidebar", "list", "player_list", "below_name", "belowname"], "defaultValue": "sidebar", "description": "Selects where the objective is displayed."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the display slot is assigned."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "display_slot", "target": "display_slot"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_set_score",
+    "displayName": "Set Score",
+    "description": "Set a player's score for a scoreboard objective.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.set.score"],
+    "tags": ["scoreboard", "score", "set"],
+    "examples": ["Connect Flow, select an Objective and Player, enter the score, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_set_score"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the score update."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should change; uses the current Flow player when omitted."},
+      {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the player's score."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the score is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "score", "target": "score"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_reset_score",
+    "displayName": "Reset Score",
+    "description": "Remove a player's score from a scoreboard objective.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.reset.score"],
+    "tags": ["scoreboard", "score", "reset"],
+    "examples": ["Connect Flow, select an Objective and Player, then continue through Flow after the score is reset."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_reset_score"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts resetting the score."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be reset; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the score is reset."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_get_score",
+    "displayName": "Get Score",
+    "description": "Read a player's score for a scoreboard objective.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["scoreboard.get.score"],
+    "tags": ["scoreboard", "score", "query"],
+    "examples": ["Select an Objective and Player, then connect Score to a number-compatible input."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_get_score"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "objective_id",
+          "target": "objective_id"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "score",
+          "target": "score"
+        }
+      ]
+    },
+    "inputs": [
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to inspect."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should be read; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "output", "dataType": "integer", "description": "Returns the player's current score."}
+    ]
+  },
+  {
+    "id": "scoreboard_remove",
+    "displayName": "Remove Objective",
+    "description": "Unregister a scoreboard objective.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.remove"],
+    "tags": ["scoreboard", "objective", "remove"],
+    "examples": ["Connect Flow, select the Objective to remove, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_remove"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts removing the objective."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to unregister."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the objective is removed."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_add_score",
+    "displayName": "Add Score",
+    "description": "Increase a player's score by an exact integer amount.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.add.score"],
+    "tags": ["scoreboard", "score", "add"],
+    "examples": ["Connect Flow, select an Objective and Player, set Amount, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_add_score"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts increasing the score."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should increase; uses the current Flow player when omitted."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to add."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the score is increased."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "amount", "target": "amount"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_remove_score",
+    "displayName": "Remove Score",
+    "description": "Decrease a player's score by an exact integer amount.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.remove.score"],
+    "tags": ["scoreboard", "score", "remove"],
+    "examples": ["Connect Flow, select an Objective and Player, set Amount, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_remove_score"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts decreasing the score."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose score should decrease; uses the current Flow player when omitted."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 1, "description": "Sets the exact number of points to remove."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the score is decreased."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "amount", "target": "amount"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_get_objectives",
+    "displayName": "Get Objectives",
+    "description": "Return the IDs of every objective on the main scoreboard.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["scoreboard.get.objectives"],
+    "tags": ["scoreboard", "objective", "query"],
+    "examples": ["Connect Objectives to a list-compatible input to inspect the main scoreboard."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_get_objectives"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "objectives",
+          "target": "objectives"
+        }
+      ]
+    },
+    "inputs": [],
+    "outputs": [
+      {"id": "objectives", "displayName": "Objectives", "name": "objectives", "pinType": "DATA", "direction": "output", "dataType": "list<string>", "description": "Returns the IDs of all main scoreboard objectives."}
+    ]
+  },
+  {
+    "id": "scoreboard_set_name",
+    "displayName": "Set Objective Name",
+    "description": "Change the display name of a scoreboard objective.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.set.name"],
+    "tags": ["scoreboard", "objective", "name"],
+    "examples": ["Connect Flow, select an Objective, enter its display name, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_set_name"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the objective name."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Objective", "description": "Sets the new display name."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the objective name is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_set_render_type",
+    "displayName": "Set Render Type",
+    "description": "Choose whether an objective renders as integer values or hearts.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.set.render.type"],
+    "tags": ["scoreboard", "objective", "render"],
+    "examples": ["Connect Flow, select an Objective, choose Integer or Hearts, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_set_render_type"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the render type."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective to update."},
+      {"id": "render_type", "displayName": "Render Type", "name": "render_type", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["integer", "hearts"], "defaultValue": "integer", "description": "Selects the objective's score rendering style."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the render type is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "render_type", "target": "render_type"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_set_sidebar_line",
+    "displayName": "Set Sidebar Line",
+    "description": "Set one formatted line on a player's active scoreboard sidebar.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.set.sidebar.line"],
+    "tags": ["scoreboard", "sidebar", "line", "placeholder"],
+    "examples": ["Connect Flow, provide a Player, Objective, line text, and score, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_set_sidebar_line"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the sidebar line."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should change; uses the current Flow player when omitted."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the sidebar objective on the player's scoreboard."},
+      {"id": "title", "displayName": "Text", "name": "title", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Sets the line text after placeholder expansion."},
+      {"id": "line", "displayName": "Line", "name": "line", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the logical line number."},
+      {"id": "score", "displayName": "Score", "name": "score", "pinType": "DATA", "direction": "input", "dataType": "integer", "defaultValue": 0, "description": "Sets the numeric score shown for this entry."},
+      {"id": "use_papi", "displayName": "Use PlaceholderAPI", "name": "use_papi", "pinType": "DATA", "direction": "input", "dataType": "boolean", "defaultValue": false, "description": "Controls whether PlaceholderAPI placeholders are expanded."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the sidebar line is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "input", "source": "title", "target": "title"},
+        {"direction": "input", "source": "line", "target": "line"},
+        {"direction": "input", "source": "score", "target": "score"},
+        {"direction": "input", "source": "use_papi", "target": "use_papi"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_clear_sidebar",
+    "displayName": "Clear Sidebar",
+    "description": "Remove an objective from the active display slot.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.clear.sidebar"],
+    "tags": ["scoreboard", "sidebar", "clear"],
+    "examples": ["Connect Flow, select the Objective whose active display should be cleared, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_clear_sidebar"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts clearing the active display slot."},
+      {"id": "objective_id", "displayName": "Objective", "name": "objective_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the objective whose display slot should be cleared."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the active display slot is cleared."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "objective_id", "target": "objective_id"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_hide_active",
+    "displayName": "Hide Active Scoreboard",
+    "description": "Hide the ReSync-managed active scoreboard template from a player.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.hide.active"],
+    "tags": ["scoreboard", "template", "hide", "player"],
+    "examples": ["Connect Flow and provide the Player whose active scoreboard template should be hidden."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_hide_active"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts hiding the active scoreboard."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose scoreboard should be hidden; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the active scoreboard is hidden."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "scoreboard_show_template",
+    "displayName": "Show Scoreboard Template",
+    "description": "Show a managed scoreboard template to a player with optional PlaceholderAPI expansion.",
+    "domain": "scoreboard",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "flow.scoreboard",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["scoreboard.show.template"],
+    "tags": ["scoreboard", "template", "show", "player"],
+    "examples": ["Connect Flow, provide a Player and Scoreboard Template, choose PlaceholderAPI support, then continue through Flow."],
+    "handler": "ScoreboardHandler",
+    "handlerConfig": {"operation": "scoreboard_show_template"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts showing the scoreboard template."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player who should see the template; uses the current Flow player when omitted."},
+      {"id": "scoreboard_id", "displayName": "Scoreboard Template", "name": "scoreboard_id", "pinType": "DATA", "direction": "input", "dataType": "scoreboard_id", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:scoreboard", "description": "Selects the managed scoreboard template to show."},
+      {"id": "use_papi", "displayName": "Use PlaceholderAPI", "name": "use_papi", "pinType": "DATA", "direction": "input", "dataType": "boolean", "defaultValue": false, "description": "Controls whether PlaceholderAPI placeholders are expanded."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the template is shown."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "scoreboard_id", "target": "scoreboard_id"},
+        {"direction": "input", "source": "use_papi", "target": "use_papi"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  }
+]

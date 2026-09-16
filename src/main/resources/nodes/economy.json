@@ -1,0 +1,1573 @@
+[
+  {
+    "id": "eco.get.balance",
+    "displayName": "Get Balance",
+    "description": "Read a player's current balance from the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.get.balance",
+      "eco_get_balance"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-get-balance"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_balance"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the balance lookup."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "balance",
+        "displayName": "Balance",
+        "name": "balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's current balance."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "balance",
+          "target": "balance"
+        }
+      ]
+    },
+    "aliases": [
+      "eco get balance"
+    ]
+  },
+  {
+    "id": "eco.set.balance",
+    "displayName": "Set Balance",
+    "description": "Set a player's balance through the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.set.balance",
+      "eco_set_balance"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-set-balance"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_set_balance"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      },
+      {
+        "id": "balance",
+        "displayName": "Balance",
+        "name": "balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the requested player balance.",
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after setting the balance."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "output_balance",
+        "displayName": "Balance",
+        "name": "balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's current balance."
+      },
+      {
+        "id": "new_balance",
+        "displayName": "New Balance",
+        "name": "new_balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's balance after the transaction."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "balance",
+          "target": "balance"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "balance",
+          "target": "output_balance"
+        },
+        {
+          "direction": "output",
+          "source": "new_balance",
+          "target": "new_balance"
+        }
+      ]
+    },
+    "aliases": [
+      "eco set balance"
+    ]
+  },
+  {
+    "id": "eco.add.balance",
+    "displayName": "Add Balance",
+    "description": "Add balance to a player's account through the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.add.balance",
+      "eco_add_balance",
+      "eco.deposit",
+      "eco_deposit"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-add-balance"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_add_balance"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the non-negative amount for this operation.",
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding balance."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "balance",
+        "displayName": "Balance",
+        "name": "balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's current balance."
+      },
+      {
+        "id": "new_balance",
+        "displayName": "New Balance",
+        "name": "new_balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's balance after the transaction."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "balance",
+          "target": "balance"
+        },
+        {
+          "direction": "output",
+          "source": "new_balance",
+          "target": "new_balance"
+        }
+      ]
+    },
+    "aliases": [
+      "eco add balance"
+    ]
+  },
+  {
+    "id": "eco.transfer",
+    "displayName": "Transfer Balance",
+    "description": "Transfer balance between two different player accounts with rollback on a failed deposit.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.transfer",
+      "eco_transfer"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-transfer"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_transfer"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "from_player",
+        "displayName": "From Player",
+        "name": "from_player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose balance is withdrawn."
+      },
+      {
+        "id": "to_player",
+        "displayName": "To Player",
+        "name": "to_player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose balance receives the transfer."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the non-negative transfer amount.",
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the transfer is accepted or rejected."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "from_balance",
+        "displayName": "From Balance",
+        "name": "from_balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the sender's balance after the transfer."
+      },
+      {
+        "id": "to_balance",
+        "displayName": "To Balance",
+        "name": "to_balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the recipient's balance."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "from_player",
+          "target": "from_player"
+        },
+        {
+          "direction": "input",
+          "source": "to_player",
+          "target": "to_player"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "from_balance",
+          "target": "from_balance"
+        },
+        {
+          "direction": "output",
+          "source": "to_balance",
+          "target": "to_balance"
+        }
+      ]
+    },
+    "aliases": [
+      "eco transfer"
+    ]
+  },
+  {
+    "id": "eco.remove.balance",
+    "displayName": "Remove Balance",
+    "description": "Remove balance from a player's account through the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.remove.balance",
+      "eco_remove_balance",
+      "eco_subtract_balance",
+      "eco.withdraw",
+      "eco_withdraw"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-subtract-balance"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_subtract_balance"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the non-negative amount for this operation.",
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removing balance."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "balance",
+        "displayName": "Balance",
+        "name": "balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's current balance."
+      },
+      {
+        "id": "new_balance",
+        "displayName": "New Balance",
+        "name": "new_balance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the player's balance after the transaction."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "new_balance",
+          "target": "new_balance"
+        }
+      ]
+    },
+    "aliases": [
+      "eco subtract balance"
+    ]
+  },
+  {
+    "id": "eco.has.balance",
+    "displayName": "Has Enough Balance",
+    "description": "Check whether a player has enough balance for an amount.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.has.balance",
+      "eco_has_balance",
+      "eco_has_enough"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-has-enough"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_has_enough"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the non-negative amount for this operation.",
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the balance check."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "has",
+        "displayName": "Has Enough",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the player has at least the requested amount."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        }
+      ]
+    },
+    "aliases": [
+      "eco has enough"
+    ]
+  },
+  {
+    "id": "economy.eco_get_top",
+    "displayName": "Get Balance Leaderboard",
+    "description": "List the online players with the highest balances.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "economy.eco_get_top",
+      "eco_get_top"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-get-top"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_top"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "limit",
+        "displayName": "Limit",
+        "name": "limit",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the maximum number of online players to include.",
+        "defaultValue": 10,
+        "constraints": {
+          "min": 1,
+          "max": 100
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the leaderboard is built."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "top",
+        "displayName": "Top",
+        "name": "top",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Returns online players ordered by balance with formatted amounts."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "limit",
+          "target": "limit"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "top",
+          "target": "top"
+        }
+      ]
+    },
+    "aliases": [
+      "eco get top"
+    ]
+  },
+  {
+    "id": "eco.format",
+    "displayName": "Format Balance",
+    "description": "Format an amount using the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.format",
+      "eco_format"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "format"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "format"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the finite amount to format."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after formatting the amount."
+      },
+      {
+        "id": "formatted",
+        "displayName": "Formatted",
+        "name": "formatted",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the provider-formatted amount."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "formatted",
+          "target": "formatted"
+        }
+      ]
+    },
+    "aliases": [
+      "format"
+    ]
+  },
+  {
+    "id": "eco.get.currency",
+    "displayName": "Get Currency",
+    "description": "Read the currency names from the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.get.currency",
+      "eco_get_currency"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-get-currency"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_currency"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after reading the currency names."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "singular",
+        "displayName": "Singular",
+        "name": "singular",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the singular currency name."
+      },
+      {
+        "id": "plural",
+        "displayName": "Plural",
+        "name": "plural",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the plural currency name."
+      },
+      {
+        "id": "currency",
+        "displayName": "Currency",
+        "name": "currency",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the provider's default currency label."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "singular",
+          "target": "singular"
+        },
+        {
+          "direction": "output",
+          "source": "plural",
+          "target": "plural"
+        }
+      ]
+    },
+    "aliases": [
+      "eco get currency"
+    ]
+  },
+  {
+    "id": "eco.has.bank",
+    "displayName": "Has Bank Support",
+    "description": "Check whether the active Vault economy provider supports bank accounts.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.has.bank",
+      "eco_has_bank"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-has-bank"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_has_bank"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after checking bank support."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      },
+      {
+        "id": "has_bank",
+        "displayName": "Has Bank",
+        "name": "has_bank",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the provider supports named bank accounts."
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the provider supports named bank accounts."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has_bank",
+          "target": "has_bank"
+        }
+      ]
+    },
+    "aliases": [
+      "eco has bank"
+    ]
+  },
+  {
+    "id": "eco.create.bank",
+    "displayName": "Create Bank Account",
+    "description": "Create a named bank account through the active Vault economy provider.",
+    "domain": "economy",
+    "family": "vault",
+    "lifecycle": "active",
+    "handlerCapability": "economy.vault",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ECONOMY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "eco.create.bank",
+      "eco_create_bank"
+    ],
+    "tags": [
+      "economy",
+      "vault",
+      "eco-create-bank"
+    ],
+    "examples": [
+      "Connect Flow, provide the account inputs, then handle the balance or transaction result."
+    ],
+    "availability": {
+      "plugin": "Vault",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_create_bank"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the economy operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player whose economy account is used."
+      },
+      {
+        "id": "bank_name",
+        "displayName": "Bank Name",
+        "name": "bank_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Sets the bank name. If omitted, the player's name is used.",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the bank account request."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the economy provider accepted the operation."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the economy provider rejected the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "eco create bank"
+    ]
+  }
+]

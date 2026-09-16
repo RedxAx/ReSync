@@ -11,11 +11,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class GenericMathHandler implements NodeHandler {
 
+    private static final Set<String> DATA_ONLY_OPERATIONS = Set.of(
+        "abs", "floor", "ceil", "sqrt", "cbrt", "signum", "to_radians", "to_degrees",
+        "add", "subtract", "multiply", "negate", "hypotenuse", "sin", "cos", "tan", "atan",
+        "clamp", "lerp", "round", "asin", "acos", "atan2", "distance", "min", "max",
+        "log", "log10", "pow", "power", "round_decimal", "divide", "modulo");
     private static final Random RANDOM = new Random();
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
@@ -28,69 +34,72 @@ public class GenericMathHandler implements NodeHandler {
 
     private void registerBasicOperations() {
         operations.put("add", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Add input a");
+            double b = finiteScalar(ctx, node, "b", 0.0, "Add input b");
             ctx.setOutput(node, "result", a + b);
         });
         operations.put("subtract", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Subtract input a");
+            double b = finiteScalar(ctx, node, "b", 0.0, "Subtract input b");
             ctx.setOutput(node, "result", a - b);
         });
         operations.put("multiply", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Multiply input a");
+            double b = finiteScalar(ctx, node, "b", 0.0, "Multiply input b");
             ctx.setOutput(node, "result", a * b);
         });
         operations.put("divide", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 1.0);
-            ctx.setOutput(node, "result", b != 0 ? a / b : 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Divide input a");
+            double b = finiteScalar(ctx, node, "b", 1.0, "Divide input b");
+            ctx.setOutput(node, "result", finiteResult(b != 0 ? a / b : 0.0, "Divide result"));
         });
         operations.put("modulo", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 1.0);
-            ctx.setOutput(node, "result", b != 0 ? a % b : 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Modulo input a");
+            double b = finiteScalar(ctx, node, "b", 1.0, "Modulo input b");
+            ctx.setOutput(node, "result", finiteResult(b != 0 ? a % b : 0.0, "Modulo result"));
         });
         operations.put("power", (ctx, node) -> {
-            Double base = ctx.getInputValue(node, "base", Double.class, 0.0);
-            Double exponent = ctx.getInputValue(node, "exponent", Double.class, 0.0);
-            ctx.setOutput(node, "result", Math.pow(base, exponent));
+            double base = finiteScalar(ctx, node, "base", 0.0, "Power base");
+            double exponent = finiteScalar(ctx, node, "exponent", 0.0, "Power exponent");
+            ctx.setOutput(node, "result", finiteResult(Math.pow(base, exponent), "Power result"));
         });
         operations.put("sqrt", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Square root input");
+            if (value < 0) {
+                throw new IllegalArgumentException("Square root input must be a finite non-negative number");
+            }
             ctx.setOutput(node, "sqrt", Math.sqrt(value));
         });
         operations.put("abs", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Absolute input");
             ctx.setOutput(node, "absolute", Math.abs(value));
         });
         operations.put("floor", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Floor input");
             ctx.setOutput(node, "floored", Math.floor(value));
         });
         operations.put("ceil", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Ceiling input");
             ctx.setOutput(node, "ceiling", Math.ceil(value));
         });
         operations.put("round", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Round input");
             Integer decimalPlaces = ctx.getInputValue(node, "decimal_places", Integer.class, 0);
             double factor = Math.pow(10.0, Math.clamp(decimalPlaces, -15, 15));
             ctx.setOutput(node, "rounded", Math.round(value * factor) / factor);
         });
         operations.put("min", (ctx, node) -> {
             List<?> values = ctx.getInputValue(node, "values_list", List.class, List.of());
-            ctx.setOutput(node, "min", values.stream().filter(Number.class::isInstance).map(Number.class::cast).mapToDouble(Number::doubleValue).min().orElse(0.0));
+            ctx.setOutput(node, "min", finiteListExtremum(values, true, "Minimum"));
         });
         operations.put("max", (ctx, node) -> {
             List<?> values = ctx.getInputValue(node, "values_list", List.class, List.of());
-            ctx.setOutput(node, "max", values.stream().filter(Number.class::isInstance).map(Number.class::cast).mapToDouble(Number::doubleValue).max().orElse(0.0));
+            ctx.setOutput(node, "max", finiteListExtremum(values, false, "Maximum"));
         });
         operations.put("clamp", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
-            Double min = ctx.getInputValue(node, "min", Double.class, 0.0);
-            Double max = ctx.getInputValue(node, "max", Double.class, 1.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Clamp value");
+            double min = finiteScalar(ctx, node, "min", 0.0, "Clamp minimum");
+            double max = finiteScalar(ctx, node, "max", 1.0, "Clamp maximum");
             ctx.setOutput(node, "clamped", Math.max(min, Math.min(max, value)));
         });
         operations.put("random", (ctx, node) -> {
@@ -99,16 +108,16 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "result", min + Math.random() * (max - min));
         });
         operations.put("negate", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Negate input");
             ctx.setOutput(node, "result", -value);
         });
         operations.put("distance", (ctx, node) -> {
-            Double x1 = ctx.getInputValue(node, "x1", Double.class, 0.0);
-            Double y1 = ctx.getInputValue(node, "y1", Double.class, 0.0);
-            Double z1 = ctx.getInputValue(node, "z1", Double.class, 0.0);
-            Double x2 = ctx.getInputValue(node, "x2", Double.class, 0.0);
-            Double y2 = ctx.getInputValue(node, "y2", Double.class, 0.0);
-            Double z2 = ctx.getInputValue(node, "z2", Double.class, 0.0);
+            double x1 = finiteScalar(ctx, node, "x1", 0.0, "Distance input x1");
+            double y1 = finiteScalar(ctx, node, "y1", 0.0, "Distance input y1");
+            double z1 = finiteScalar(ctx, node, "z1", 0.0, "Distance input z1");
+            double x2 = finiteScalar(ctx, node, "x2", 0.0, "Distance input x2");
+            double y2 = finiteScalar(ctx, node, "y2", 0.0, "Distance input y2");
+            double z2 = finiteScalar(ctx, node, "z2", 0.0, "Distance input z2");
             double dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
             ctx.setOutput(node, "result", Math.sqrt(dx * dx + dy * dy + dz * dz));
         });
@@ -151,35 +160,41 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "chosen_item", chosenItem);
         });
         operations.put("lerp", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
-            Double t = ctx.getInputValue(node, "t", Double.class, 0.5);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Lerp input a");
+            double b = finiteScalar(ctx, node, "b", 0.0, "Lerp input b");
+            double t = finiteScalar(ctx, node, "t", 0.5, "Lerp input t");
             ctx.setOutput(node, "result", a + (b - a) * Math.max(0.0, Math.min(1.0, t)));
         });
         operations.put("hypotenuse", (ctx, node) -> {
-            Double a = ctx.getInputValue(node, "a", Double.class, 0.0);
-            Double b = ctx.getInputValue(node, "b", Double.class, 0.0);
+            double a = finiteScalar(ctx, node, "a", 0.0, "Hypotenuse input a");
+            double b = finiteScalar(ctx, node, "b", 0.0, "Hypotenuse input b");
             ctx.setOutput(node, "hypotenuse", Math.hypot(a, b));
         });
         operations.put("log", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 1.0);
+            double value = finiteScalar(ctx, node, "value", 1.0, "Log input");
+            if (value <= 0) {
+                throw new IllegalArgumentException("Log input must be greater than zero");
+            }
             ctx.setOutput(node, "log", Math.log(value));
         });
         operations.put("log10", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 1.0);
+            double value = finiteScalar(ctx, node, "value", 1.0, "Log10 input");
+            if (value <= 0) {
+                throw new IllegalArgumentException("Log10 input must be greater than zero");
+            }
             ctx.setOutput(node, "log10", Math.log10(value));
         });
         operations.put("cbrt", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Cube root input");
             ctx.setOutput(node, "cbrt", Math.cbrt(value));
         });
         operations.put("pow", (ctx, node) -> {
-            Double base = ctx.getInputValue(node, "base", Double.class, 0.0);
-            Double exponent = ctx.getInputValue(node, "exponent", Double.class, 1.0);
-            ctx.setOutput(node, "result", Math.pow(base, exponent));
+            double base = finiteScalar(ctx, node, "base", 0.0, "Pow base");
+            double exponent = finiteScalar(ctx, node, "exponent", 1.0, "Pow exponent");
+            ctx.setOutput(node, "result", finiteResult(Math.pow(base, exponent), "Pow result"));
         });
         operations.put("signum", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Signum input");
             ctx.setOutput(node, "sign", Math.signum(value));
         });
         operations.put("min_list", (ctx, node) -> {
@@ -193,10 +208,10 @@ public class GenericMathHandler implements NodeHandler {
             ctx.setOutput(node, "max", max);
         });
         operations.put("round_decimal", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Round decimal input");
             Integer decimalPlaces = ctx.getInputValue(node, "decimal_places", Integer.class, 0);
-            double factor = Math.pow(10, decimalPlaces);
-            ctx.setOutput(node, "rounded", Math.round(value * factor) / factor);
+            double factor = Math.pow(10, Math.clamp(decimalPlaces, -15, 15));
+            ctx.setOutput(node, "rounded", finiteResult(Math.round(value * factor) / factor, "Round decimal result"));
         });
     }
 
@@ -382,42 +397,75 @@ public class GenericMathHandler implements NodeHandler {
         return divisor != 0 ? dividend / divisor : 0.0;
     }
 
+    private double finiteScalar(FlowContext ctx, FlowNode node, String pinName, double defaultValue, String label) {
+        Double value = ctx.getInputValue(node, pinName, Double.class, defaultValue);
+        if (value == null || !Double.isFinite(value)) {
+            throw new IllegalArgumentException(label + " must be finite");
+        }
+        return value;
+    }
+
+    private double finiteResult(double value, String label) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(label + " must be finite");
+        }
+        return value;
+    }
+
+    private double finiteListExtremum(List<?> values, boolean minimum, String label) {
+        double extremum = minimum ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        boolean found = false;
+        if (values != null) {
+            for (Object value : values) {
+                if (value instanceof Number number) {
+                    double numericValue = number.doubleValue();
+                    if (!Double.isFinite(numericValue)) {
+                        throw new IllegalArgumentException(label + " values must be finite");
+                    }
+                    extremum = minimum ? Math.min(extremum, numericValue) : Math.max(extremum, numericValue);
+                    found = true;
+                }
+            }
+        }
+        return found ? extremum : 0.0;
+    }
+
     private void registerTrigOperations() {
         operations.put("sin", (ctx, node) -> {
-            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            double angle = finiteScalar(ctx, node, "angle_degrees", 0.0, "Sine angle");
             ctx.setOutput(node, "sin", Math.sin(Math.toRadians(angle)));
         });
         operations.put("cos", (ctx, node) -> {
-            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            double angle = finiteScalar(ctx, node, "angle_degrees", 0.0, "Cosine angle");
             ctx.setOutput(node, "cos", Math.cos(Math.toRadians(angle)));
         });
         operations.put("tan", (ctx, node) -> {
-            Double angle = ctx.getInputValue(node, "angle_degrees", Double.class, 0.0);
+            double angle = finiteScalar(ctx, node, "angle_degrees", 0.0, "Tangent angle");
             ctx.setOutput(node, "tan", Math.tan(Math.toRadians(angle)));
         });
         operations.put("to_radians", (ctx, node) -> {
-            Double degrees = ctx.getInputValue(node, "degrees", Double.class, 0.0);
+            double degrees = finiteScalar(ctx, node, "degrees", 0.0, "Degrees input");
             ctx.setOutput(node, "radians", Math.toRadians(degrees));
         });
         operations.put("to_degrees", (ctx, node) -> {
-            Double radians = ctx.getInputValue(node, "radians", Double.class, 0.0);
+            double radians = finiteScalar(ctx, node, "radians", 0.0, "Radians input");
             ctx.setOutput(node, "degrees", Math.toDegrees(radians));
         });
         operations.put("asin", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Asin input");
             ctx.setOutput(node, "angle_degrees", Math.toDegrees(Math.asin(Math.max(-1.0, Math.min(1.0, value)))));
         });
         operations.put("acos", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Acos input");
             ctx.setOutput(node, "angle_degrees", Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, value)))));
         });
         operations.put("atan", (ctx, node) -> {
-            Double value = ctx.getInputValue(node, "value", Double.class, 0.0);
+            double value = finiteScalar(ctx, node, "value", 0.0, "Arctangent input");
             ctx.setOutput(node, "angle_degrees", Math.toDegrees(Math.atan(value)));
         });
         operations.put("atan2", (ctx, node) -> {
-            Double y = ctx.getInputValue(node, "y", Double.class, 0.0);
-            Double x = ctx.getInputValue(node, "x", Double.class, 0.0);
+            double y = finiteScalar(ctx, node, "y", 0.0, "Atan2 input y");
+            double x = finiteScalar(ctx, node, "x", 0.0, "Atan2 input x");
             ctx.setOutput(node, "angle_degrees", Math.toDegrees(Math.atan2(y, x)));
         });
     }
@@ -435,6 +483,8 @@ public class GenericMathHandler implements NodeHandler {
         } else {
             throw new IllegalArgumentException("Unknown math operation: " + operation);
         }
-        ctx.triggerOutput("flow");
+        if (!DATA_ONLY_OPERATIONS.contains(operation)) {
+            ctx.triggerOutput("flow");
+        }
     }
 }

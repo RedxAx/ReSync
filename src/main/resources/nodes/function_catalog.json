@@ -1,0 +1,157 @@
+[
+  {
+    "id": "function_list",
+    "displayName": "List Functions",
+    "description": "List callable functions by String identity in deterministic case-insensitive order. Exact-case identities are preferred; ambiguous identities fail instead of choosing arbitrarily. Null storage returns an empty list.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.list"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "list", "catalog"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "list"},
+    "inputs": [],
+    "outputs": [
+      {"id": "functions", "displayName": "Functions", "name": "functions", "pinType": "DATA", "dataType": "list<function>", "description": "Returns callable String function identities in deterministic case-insensitive order, or an empty list when storage is null."}
+    ]
+  },
+  {
+    "id": "function_find",
+    "displayName": "Find Function",
+    "description": "Find a callable function by its String identity. Matching is deterministic and case-insensitive, exact case is preferred; ambiguous identities return FUNCTION_NAME_AMBIGUOUS. Null storage or an absent identity returns FUNCTION_NOT_FOUND with an empty function and failure result.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.find"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "find", "name", "lookup"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "find"},
+    "inputs": [
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "String function identity to find. Matching is case-insensitive, exact case is preferred; ambiguous identities return FUNCTION_NAME_AMBIGUOUS."}
+    ],
+    "outputs": [
+      {"id": "function", "displayName": "Function", "name": "function", "pinType": "DATA", "dataType": "function", "description": "Returns the matched String function identity, or empty text when the function is not found."},
+      {"id": "found", "displayName": "Found", "name": "found", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether one callable String function identity was found; null storage, missing names, and ambiguous matches return false."},
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "result<function>", "description": "Returns a successful function result for one identity, FUNCTION_NAME_AMBIGUOUS for ambiguous identities, or FUNCTION_NOT_FOUND when absent or storage is null."}
+    ]
+  },
+  {
+    "id": "function_exists",
+    "displayName": "Function Exists",
+    "description": "Check whether a callable function's String identity exists. Matching is deterministic and case-insensitive, exact case is preferred, and ambiguous identities are unavailable. Null storage returns false.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "typed-function",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.exists"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "exists", "check"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "exists"},
+    "inputs": [
+      {"id": "function", "displayName": "Function", "name": "function", "pinType": "DATA", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function", "description": "String function identity to check. Matching is case-insensitive, exact case is preferred, and ambiguous identities are unavailable."}
+    ],
+    "outputs": [
+      {"id": "exists", "displayName": "Exists", "name": "exists", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when one callable String function identity exists; null storage, blank identities, and ambiguous matches return false."}
+    ]
+  },
+  {
+    "id": "function_index",
+    "displayName": "Find Function Index",
+    "description": "Find a String function's zero-based position. Custom list identifiers are read without validation or mutation; omitted or null lists use the catalog, while explicit empty lists remain empty. Matching is case-insensitive, exact case is preferred, and ambiguous identities fail.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "typed-function",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.index"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "index", "list", "find"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "index"},
+    "inputs": [
+      {"id": "functions", "displayName": "Functions", "name": "functions", "pinType": "DATA", "dataType": "list<function>", "optional": true, "description": "Optional custom String function identifiers are read without validation or mutation. Omitted or null uses the catalog; an explicit empty list remains empty."},
+      {"id": "function", "displayName": "Function", "name": "function", "pinType": "DATA", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function", "description": "String function identity to locate. Matching is case-insensitive, exact case is preferred, and ambiguous identities fail."}
+    ],
+    "outputs": [
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "Returns the zero-based position, or -1 when the String function identity is absent or ambiguous."},
+      {"id": "found", "displayName": "Found", "name": "found", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the String function identity has one unambiguous position in the selected list."}
+    ]
+  },
+  {
+    "id": "function_at_index",
+    "displayName": "Function At Index",
+    "description": "Get a String function identity at a whole integer index. Omitted or null lists use the catalog; explicit empty lists remain empty. Fractional, non-finite, or overflowing indices return FUNCTION_INDEX_INVALID; whole out-of-range indices return FUNCTION_INDEX_OUT_OF_RANGE.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "typed-function",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.at_index"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "index", "list", "get"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "at_index"},
+    "inputs": [
+      {"id": "functions", "displayName": "Functions", "name": "functions", "pinType": "DATA", "dataType": "list<function>", "optional": true, "description": "Optional custom String function identifiers are read without validation or mutation. Omitted or null uses the catalog; an explicit empty list remains empty."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "Zero-based index to read. It must be a whole finite integer within numeric range; fractional, non-finite, or overflowing values return FUNCTION_INDEX_INVALID, while a whole out-of-range value returns FUNCTION_INDEX_OUT_OF_RANGE."}
+    ],
+    "outputs": [
+      {"id": "function", "displayName": "Function", "name": "function", "pinType": "DATA", "dataType": "function", "description": "Returns the String function identity at the selected whole integer index, or empty text when no function is available."},
+      {"id": "found", "displayName": "Found", "name": "found", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether a whole in-range integer identifies a function; invalid or out-of-range values return false."},
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "result<function>", "description": "Returns the selected function, FUNCTION_INDEX_INVALID for fractional, non-finite, or overflowing indices, or FUNCTION_INDEX_OUT_OF_RANGE for whole indices outside the selected list."}
+    ]
+  },
+  {
+    "id": "function_filter",
+    "displayName": "Filter Functions",
+    "description": "Filter callable String function identities by case-insensitive contains matching. A blank query returns the full catalog in deterministic case-insensitive order; null storage returns an empty list.",
+    "domain": "core",
+    "family": "function-catalog",
+    "lifecycle": "active",
+    "handlerCapability": "function-catalog",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.filter"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "filter", "search", "list"],
+    "handler": "FunctionCatalogHandler",
+    "handlerConfig": {"operation": "filter"},
+    "inputs": [
+      {"id": "query", "displayName": "Query", "name": "query", "pinType": "DATA", "dataType": "string", "description": "Text to find within String function identities. A blank query returns every callable function."}
+    ],
+    "outputs": [
+      {"id": "functions", "displayName": "Functions", "name": "functions", "pinType": "DATA", "dataType": "list<function>", "description": "Returns matching String function identities in deterministic case-insensitive order, or the full catalog for a blank query."}
+    ]
+  }
+]

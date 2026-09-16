@@ -1,0 +1,94 @@
+[
+  {
+    "id": "job.status",
+    "displayName": "Get Job Status",
+    "description": "Inspect the state, progress, metadata, and outcome of a canonical Flow job.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "QUERY",
+    "tags": ["job", "status", "progress", "result"],
+    "examples": ["Poll this node for UI-style progress, or use Job Completed when the Flow should resume only after terminal completion."],
+    "handler": "FlowJobHandler",
+    "handlerConfig": {"operation": "job_status"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "job_reference<any>", "optional": true},
+      {"name": "job_id", "dataType": "string", "optional": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "job_reference<any>"},
+      {"name": "state", "dataType": "string"},
+      {"name": "progress", "dataType": "number"},
+      {"name": "metadata", "dataType": "map<any,any>"},
+      {"name": "outcome", "dataType": "result<any>"},
+      {"name": "completed", "dataType": "boolean"},
+      {"name": "succeeded", "dataType": "boolean"},
+      {"name": "cancelled", "dataType": "boolean"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "job.cancel",
+    "displayName": "Cancel Job",
+    "description": "Request cancellation of a pending or running canonical Flow job.",
+    "category": "UTILITY",
+    "schemaVersion": 1,
+    "kind": "ACTION",
+    "tags": ["job", "cancel", "stop"],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "job_control",
+    "handler": "FlowJobHandler",
+    "handlerConfig": {"operation": "job_cancel"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "job_reference<any>", "optional": true},
+      {"name": "job_id", "dataType": "string", "optional": true}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failed", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "job", "dataType": "job_reference<any>"},
+      {"name": "result", "dataType": "result<boolean>"},
+      {"name": "success", "dataType": "boolean"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ]
+  },
+  {
+    "id": "event.job.completed",
+    "displayName": "Job Completed",
+    "description": "Run when a canonical Flow job succeeds, fails, or is cancelled.",
+    "category": "EVENT",
+    "schemaVersion": 1,
+    "kind": "EVENT",
+    "tags": ["job", "completed", "succeeded", "failed", "cancelled"],
+    "trigger": true,
+    "eventType": "restudio.resync.flow.jobs.FlowJobCompletedEvent",
+    "inputs": [],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.job", "dataType": "job_reference<any>"},
+      {"name": "event.job_id", "dataType": "string"},
+      {"name": "event.job_kind", "dataType": "string"},
+      {"name": "event.job_owner", "dataType": "string"},
+      {"name": "event.job_state", "dataType": "string"},
+      {"name": "event.job_progress", "dataType": "number"},
+      {"name": "event.job_metadata", "dataType": "map<any,any>"},
+      {"name": "event.job_outcome", "dataType": "result<any>"}
+    ],
+    "outputMappings": [
+      {"source": "event.reference", "target": "event.job"},
+      {"source": "event.snapshot.id", "target": "event.job_id"},
+      {"source": "event.snapshot.kind", "target": "event.job_kind"},
+      {"source": "event.snapshot.owner", "target": "event.job_owner"},
+      {"source": "event.snapshot.state.name", "target": "event.job_state"},
+      {"source": "event.snapshot.progress", "target": "event.job_progress"},
+      {"source": "event.snapshot.metadata", "target": "event.job_metadata"},
+      {"source": "event.snapshot.outcome", "target": "event.job_outcome"}
+    ]
+  }
+]

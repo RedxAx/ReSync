@@ -17,6 +17,7 @@ import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.automation.ScheduleDefinition;
 import restudio.resync.flow.automation.TimerDefinition;
 import restudio.resync.flow.automation.VariableDefinition;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.storage.StorageSafety;
 
 import java.util.Locale;
@@ -30,14 +31,21 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
     private final CustomContentService customContentService;
     private final AdvancementTreeValidator advancementTreeValidator = new AdvancementTreeValidator();
     private final FlowValueCodecRegistry valueCodecs;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
 
     public JsonRuntimeResourceValidator(CustomContentService customContentService) {
-        this(customContentService, null);
+        this(customContentService, null, null);
     }
 
     public JsonRuntimeResourceValidator(CustomContentService customContentService, FlowValueCodecRegistry valueCodecs) {
+        this(customContentService, valueCodecs, null);
+    }
+
+    public JsonRuntimeResourceValidator(CustomContentService customContentService, FlowValueCodecRegistry valueCodecs,
+                                        LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.customContentService = customContentService;
         this.valueCodecs = valueCodecs;
+        this.legacyRuntimeGate = legacyRuntimeGate;
     }
 
     public void validate(String type, JsonObject value) {
@@ -119,9 +127,94 @@ public final class JsonRuntimeResourceValidator implements ReSyncJsonResourceSto
     @Override
     public void beforeSave(String type, JsonObject value) {
         if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type)) {
-            migrateNpcDefinition(value);
+            if (legacyRuntimeGate != null && !legacyRuntimeGate.allowsLegacyRuntime()) {
+                rejectLegacyNpcDefinition(value);
+            } else {
+                migrateNpcDefinition(value);
+            }
+        }
+        if (legacyRuntimeGate != null && !legacyRuntimeGate.allowsLegacyRuntime()) {
+            rejectLegacyHookValues(type, value);
         }
         validate(type, value);
+    }
+
+    private void rejectLegacyNpcDefinition(JsonObject definition) {
+        if (definition == null) {
+            return;
+        }
+        for (String field : Set.of("spawnMode", "location", "skinUsername", "skinUuid", "skinTexture", "skinSignature")) {
+            if (definition.has(field)) {
+                throw new IllegalArgumentException("Legacy NPC field is not accepted by the replacement runtime: " + field);
+            }
+        }
+        if (!definition.has("hooks") || !definition.get("hooks").isJsonObject()) {
+            return;
+        }
+        JsonObject hooks = definition.getAsJsonObject("hooks");
+        for (String field : Set.of("spawnFlow", "interactFlow", "rightClickFlow", "leftClickFlow", "damageFlow", "deathFlow", "despawnFlow")) {
+            if (hooks.has(field)) {
+                throw new IllegalArgumentException("Legacy NPC hook is not accepted by the replacement runtime: " + field);
+            }
+        }
+    }
+
+    private void rejectLegacyHookValues(String type, JsonObject value) {
+        if (value == null) {
+            return;
+        }
+        if (ReSyncResourceCatalog.NPC_DEFINITION.equals(type) || ReSyncResourceCatalog.TRADE_PROFILE.equals(type)) {
+            JsonElement hooksElement = value.get("hooks");
+            if (hooksElement != null && hooksElement.isJsonObject()) {
+                for (Map.Entry<String, JsonElement> entry : hooksElement.getAsJsonObject().entrySet()) {
+                    if (!isCanonicalAction(entry.getValue())) {
+                        throw new IllegalArgumentException("Legacy hook value is not accepted by the replacement runtime: " + entry.getKey());
+                    }
+                }
+            }
+        }
+        if (ReSyncResourceCatalog.DIALOG.equals(type)) {
+            JsonElement array = value.get("actions");
+            if (array == null || !array.isJsonArray()) {
+                return;
+            }
+            for (JsonElement element : array.getAsJsonArray()) {
+                if (element != null && element.isJsonObject()) {
+                    rejectLegacyDialogAction(element.getAsJsonObject());
+                }
+            }
+        }
+    }
+
+    private boolean isCanonicalAction(JsonElement value) {
+        if (value == null || value.isJsonNull()) {
+            return true;
+        }
+        if (value.isJsonObject()) {
+            return true;
+        }
+        if (value.isJsonArray()) {
+            for (JsonElement element : value.getAsJsonArray()) {
+                if (!isCanonicalAction(element)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return value.isJsonPrimitive() && "none".equalsIgnoreCase(value.getAsString());
+    }
+
+    private void rejectLegacyDialogAction(JsonObject action) {
+        if (action.has("action")) {
+            throw new IllegalArgumentException("Legacy dialog action is not accepted by the replacement runtime");
+        }
+        JsonObject resync = action.has("resync") && action.get("resync").isJsonObject() ? action.getAsJsonObject("resync") : null;
+        if (resync == null) {
+            return;
+        }
+        if ("Run Flow".equals(text(resync, "actionMode")) || "Flow".equals(text(resync, "predicateMode"))) {
+            throw new IllegalArgumentException("Legacy dialog Flow action is not accepted by the replacement runtime");
+        }
     }
 
     private void migrateNpcDefinition(JsonObject definition) {

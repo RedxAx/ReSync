@@ -1,0 +1,1178 @@
+[
+  {
+    "id": "data.runtime_query",
+    "displayName": "Find Data",
+    "description": "Find server data using sources, categories, tags, properties, or search text.",
+    "domain": "runtime_data",
+    "family": "data",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.data",
+    "selectorIntent": "typed-data",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "data",
+      "query",
+      "filter",
+      "catalog"
+   ],
+   "examples": [
+     "Choose filters for Find Data and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "query"
+   },
+   "inputs": [
+     {
+       "name": "data_type",
+       "dataType": "string",
+       "widget": "SEARCHABLE_LIST",
+       "optionsSource": "server:runtime_data:type",
+       "defaultValue": "item",
+       "id": "data_type",
+       "displayName": "Data Type",
+       "description": "Provides the data type used by find data."
+     },
+     {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by find data."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by find data."
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:category",
+        "optional": true,
+        "id": "category",
+        "displayName": "Category",
+        "description": "Provides the category used by find data."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Provides the categories used by find data."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "tags",
+        "displayName": "Tags",
+        "description": "Provides the tags used by find data."
+      },
+      {
+        "name": "exclude_categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "exclude_categories",
+        "displayName": "Exclude Categories",
+        "description": "Provides the exclude categories used by find data."
+      },
+      {
+        "name": "exclude_tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "exclude_tags",
+        "displayName": "Exclude Tags",
+        "description": "Provides the exclude tags used by find data."
+      },
+      {
+       "name": "properties",
+       "dataType": "map<string,any>",
+       "optional": true,
+       "id": "properties",
+       "displayName": "Properties",
+       "description": "Provides the properties used by find data."
+     },
+     {
+       "name": "search",
+       "dataType": "string",
+       "optional": true,
+       "id": "search",
+       "displayName": "Search",
+       "description": "Provides the search used by find data."
+     },
+     {
+       "name": "category_match",
+       "dataType": "string",
+       "widget": "DROPDOWN",
+       "options": [
+          "any",
+          "all"
+        ],
+        "defaultValue": "any",
+        "id": "category_match",
+        "displayName": "Category Match",
+        "description": "Provides the category match used by find data."
+      },
+      {
+        "name": "tag_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "all",
+          "any"
+        ],
+        "defaultValue": "all",
+        "id": "tag_match",
+        "displayName": "Tag Match",
+        "description": "Provides the tag match used by find data."
+      },
+      {
+        "name": "limit",
+        "dataType": "number",
+        "defaultValue": 0,
+        "id": "limit",
+        "displayName": "Limit",
+        "description": "Provides the limit used by find data."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "results",
+        "dataType": "list<runtime_data_entry>",
+        "id": "results",
+        "displayName": "Results",
+        "description": "Returns the results produced by find data."
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "id": "count",
+        "displayName": "Count",
+        "description": "Returns the count produced by find data."
+      }
+    ]
+  },
+  {
+    "id": "data.runtime_categories",
+    "displayName": "Get Data Categories",
+    "description": "Get the categories available for a type of server data.",
+    "domain": "runtime_data",
+    "family": "data",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.data",
+    "selectorIntent": "typed-data",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+     "data",
+     "category",
+     "query"
+   ],
+   "examples": [
+     "Choose filters for Get Data Categories and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "categories"
+   },
+   "inputs": [
+     {
+       "name": "data_type",
+       "dataType": "string",
+       "widget": "SEARCHABLE_LIST",
+       "optionsSource": "server:runtime_data:type",
+       "defaultValue": "item",
+        "id": "data_type",
+        "displayName": "Data Type",
+        "description": "Provides the data type used by get data categories."
+      },
+      {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by get data categories."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by get data categories."
+      },
+      {
+        "name": "search",
+        "dataType": "string",
+        "optional": true,
+        "id": "search",
+        "displayName": "Search",
+        "description": "Provides the search used by get data categories."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "categories",
+        "dataType": "list<runtime_data_category>",
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Returns the categories produced by get data categories."
+      },
+      {
+        "name": "ids",
+        "dataType": "list<string>",
+        "id": "ids",
+        "displayName": "Ids",
+        "description": "Returns the ids produced by get data categories."
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "id": "count",
+        "displayName": "Count",
+        "description": "Returns the count produced by get data categories."
+      }
+    ]
+  },
+  {
+    "id": "data.filter_runtime_entries",
+    "displayName": "Filter Data",
+    "description": "Filter existing data results without loading them again.",
+    "domain": "runtime_data",
+   "family": "data",
+   "lifecycle": "active",
+   "handlerCapability": "resync.runtime.data",
+   "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "DATA",
+   "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+     "data",
+     "filter",
+     "category",
+     "tag"
+   ],
+   "examples": [
+     "Choose filters for Filter Data and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+      "operation": "filter"
+    },
+    "inputs": [
+      {
+        "name": "data",
+        "dataType": "list<runtime_data_entry>",
+        "id": "data",
+        "displayName": "Data",
+        "description": "Provides the data used by filter data."
+      },
+      {
+        "name": "source",
+        "dataType": "string",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by filter data."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by filter data."
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "optional": true,
+        "id": "category",
+        "displayName": "Category",
+        "description": "Provides the category used by filter data."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Provides the categories used by filter data."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "tags",
+        "displayName": "Tags",
+        "description": "Provides the tags used by filter data."
+      },
+      {
+        "name": "exclude_categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "exclude_categories",
+        "displayName": "Exclude Categories",
+        "description": "Provides the exclude categories used by filter data."
+      },
+      {
+        "name": "exclude_tags",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_tags",
+       "displayName": "Exclude Tags",
+       "description": "Provides the exclude tags used by filter data."
+     },
+     {
+       "name": "properties",
+       "dataType": "map<string,any>",
+       "optional": true,
+       "id": "properties",
+       "displayName": "Properties",
+       "description": "Provides the properties used by filter data."
+     },
+     {
+       "name": "search",
+       "dataType": "string",
+       "optional": true,
+       "id": "search",
+       "displayName": "Search",
+        "description": "Provides the search used by filter data."
+      },
+      {
+        "name": "category_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "any",
+          "all"
+        ],
+        "defaultValue": "any",
+        "id": "category_match",
+        "displayName": "Category Match",
+        "description": "Provides the category match used by filter data."
+      },
+      {
+        "name": "tag_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "all",
+          "any"
+        ],
+        "defaultValue": "all",
+        "id": "tag_match",
+        "displayName": "Tag Match",
+        "description": "Provides the tag match used by filter data."
+      },
+      {
+        "name": "limit",
+        "dataType": "number",
+        "defaultValue": 0,
+        "id": "limit",
+        "displayName": "Limit",
+        "description": "Provides the limit used by filter data."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "results",
+        "dataType": "list<runtime_data_entry>",
+        "id": "results",
+        "displayName": "Results",
+        "description": "Returns the results produced by filter data."
+      },
+      {
+        "name": "count",
+        "dataType": "number",
+        "id": "count",
+        "displayName": "Count",
+        "description": "Returns the count produced by filter data."
+      }
+    ]
+  },
+  {
+    "id": "data.random_runtime_entry",
+    "displayName": "Pick Random Data",
+    "description": "Pick one random result using the selected filters.",
+    "domain": "runtime_data",
+    "family": "data",
+   "lifecycle": "active",
+   "handlerCapability": "resync.runtime.data",
+   "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "DATA",
+   "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+     "data",
+     "random",
+     "query"
+   ],
+   "examples": [
+     "Choose filters for Pick Random Data and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "random"
+   },
+    "inputs": [
+      {
+        "name": "data_type",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:type",
+        "defaultValue": "item",
+        "id": "data_type",
+        "displayName": "Data Type",
+        "description": "Provides the data type used by pick random data."
+      },
+      {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by pick random data."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by pick random data."
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:category",
+        "optional": true,
+        "id": "category",
+        "displayName": "Category",
+        "description": "Provides the category used by pick random data."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Provides the categories used by pick random data."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "tags",
+        "displayName": "Tags",
+        "description": "Provides the tags used by pick random data."
+      },
+      {
+        "name": "exclude_categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "exclude_categories",
+       "displayName": "Exclude Categories",
+       "description": "Provides the exclude categories used by pick random data."
+     },
+     {
+       "name": "exclude_tags",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_tags",
+       "displayName": "Exclude Tags",
+       "description": "Provides the exclude tags used by pick random data."
+     },
+     {
+       "name": "properties",
+       "dataType": "map<string,any>",
+       "optional": true,
+       "id": "properties",
+       "displayName": "Properties",
+       "description": "Provides the properties used by pick random data."
+     },
+     {
+        "name": "search",
+        "dataType": "string",
+        "optional": true,
+        "id": "search",
+        "displayName": "Search",
+        "description": "Provides the search used by pick random data."
+      },
+      {
+        "name": "category_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "any",
+          "all"
+        ],
+        "defaultValue": "any",
+        "id": "category_match",
+        "displayName": "Category Match",
+        "description": "Provides the category match used by pick random data."
+      },
+      {
+        "name": "tag_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "all",
+          "any"
+        ],
+        "defaultValue": "all",
+        "id": "tag_match",
+        "displayName": "Tag Match",
+        "description": "Provides the tag match used by pick random data."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "dataType": "runtime_data_entry",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by pick random data."
+      },
+      {
+        "name": "found",
+        "dataType": "boolean",
+        "id": "found",
+        "displayName": "Found",
+        "description": "Returns the found produced by pick random data."
+      }
+    ]
+  },
+  {
+    "id": "data.runtime_entry_fields",
+    "displayName": "Get Data Details",
+    "description": "Get the source, ID, name, categories, tags, and properties of data.",
+    "domain": "runtime_data",
+    "family": "data",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.data",
+    "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "DATA",
+   "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+     "data",
+     "entry",
+     "fields"
+   ],
+   "examples": [
+     "Choose filters for Get Data Details and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "entry_fields"
+   },
+   "inputs": [
+     {
+       "name": "data",
+        "dataType": "runtime_data_entry",
+        "id": "data",
+        "displayName": "Data",
+        "description": "Provides the data used by get data details."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "data_type",
+        "dataType": "string",
+        "id": "data_type",
+        "displayName": "Data Type",
+        "description": "Returns the data type produced by get data details."
+      },
+      {
+        "name": "source",
+        "dataType": "string",
+        "id": "source",
+        "displayName": "Source",
+        "description": "Returns the source produced by get data details."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "id": "id",
+        "displayName": "Id",
+        "description": "Returns the id produced by get data details."
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "id": "name",
+        "displayName": "Name",
+        "description": "Returns the name produced by get data details."
+      },
+      {
+        "name": "details",
+        "dataType": "string",
+        "id": "details",
+        "displayName": "Details",
+        "description": "Returns the details produced by get data details."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Returns the categories produced by get data details."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "id": "tags",
+        "displayName": "Tags",
+        "description": "Returns the tags produced by get data details."
+      },
+      {
+        "name": "properties",
+        "dataType": "map<string,any>",
+        "id": "properties",
+       "displayName": "Properties",
+       "description": "Returns the properties produced by get data details."
+     }
+   ]
+ },
+ {
+   "id": "data.query_items",
+   "displayName": "Find Items",
+   "description": "Find vanilla, ReSync, and external items using categories, tags, properties, or search text.",
+   "domain": "runtime_data",
+   "family": "item",
+   "lifecycle": "active",
+   "handlerCapability": "resync.runtime.data",
+   "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "ITEM",
+   "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+      "item",
+      "query",
+      "filter",
+      "custom",
+      "content"
+    ],
+    "examples": [
+      "Choose filters for Find Items and use the typed results in the next node."
+    ],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {
+      "operation": "query_items"
+    },
+    "inputs": [
+      {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by find items."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by find items."
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:category",
+        "optional": true,
+        "id": "category",
+        "displayName": "Category",
+        "description": "Provides the category used by find items."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Provides the categories used by find items."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "tags",
+        "displayName": "Tags",
+        "description": "Provides the tags used by find items."
+      },
+      {
+        "name": "exclude_categories",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_categories",
+       "displayName": "Exclude Categories",
+       "description": "Provides the exclude categories used by find items."
+     },
+     {
+       "name": "exclude_tags",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_tags",
+       "displayName": "Exclude Tags",
+       "description": "Provides the exclude tags used by find items."
+     },
+     {
+       "name": "properties",
+       "dataType": "map<string,any>",
+       "optional": true,
+       "id": "properties",
+       "displayName": "Properties",
+        "description": "Provides the properties used by find items."
+      },
+      {
+        "name": "search",
+        "dataType": "string",
+        "optional": true,
+        "id": "search",
+        "displayName": "Search",
+        "description": "Provides the search used by find items."
+      },
+      {
+        "name": "category_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "any",
+          "all"
+        ],
+        "defaultValue": "any",
+        "id": "category_match",
+        "displayName": "Category Match",
+        "description": "Provides the category match used by find items."
+      },
+      {
+        "name": "tag_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "all",
+          "any"
+        ],
+        "defaultValue": "all",
+        "id": "tag_match",
+        "displayName": "Tag Match",
+        "description": "Provides the tag match used by find items."
+      },
+      {
+        "name": "limit",
+        "dataType": "number",
+        "defaultValue": 0,
+        "id": "limit",
+        "displayName": "Limit",
+        "description": "Provides the limit used by find items."
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": 1,
+        "id": "amount",
+        "displayName": "Amount",
+        "description": "Provides the amount used by find items."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "items",
+        "dataType": "list<itemstack>",
+        "id": "items",
+        "displayName": "Items",
+        "description": "Returns the items produced by find items."
+     },
+     {
+       "name": "count",
+       "dataType": "number",
+       "id": "count",
+       "displayName": "Count",
+       "description": "Returns the count produced by find items."
+     }
+   ]
+ },
+ {
+   "id": "data.random_item",
+   "displayName": "Pick Random Item",
+   "description": "Create one random vanilla, ReSync, or external item using the selected filters.",
+   "domain": "runtime_data",
+   "family": "item",
+   "lifecycle": "active",
+   "handlerCapability": "resync.runtime.data",
+   "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "item",
+      "random",
+      "query",
+      "custom",
+      "content"
+    ],
+    "examples": [
+      "Choose filters for Pick Random Item and use the typed results in the next node."
+    ],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {
+      "operation": "random_item"
+    },
+    "inputs": [
+      {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by pick random item."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by pick random item."
+      },
+      {
+        "name": "category",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:category",
+        "optional": true,
+        "id": "category",
+        "displayName": "Category",
+        "description": "Provides the category used by pick random item."
+      },
+      {
+        "name": "categories",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Provides the categories used by pick random item."
+      },
+      {
+        "name": "tags",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "tags",
+       "displayName": "Tags",
+       "description": "Provides the tags used by pick random item."
+     },
+     {
+       "name": "exclude_categories",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_categories",
+       "displayName": "Exclude Categories",
+       "description": "Provides the exclude categories used by pick random item."
+     },
+     {
+       "name": "exclude_tags",
+       "dataType": "list<string>",
+       "optional": true,
+       "id": "exclude_tags",
+       "displayName": "Exclude Tags",
+       "description": "Provides the exclude tags used by pick random item."
+     },
+     {
+        "name": "properties",
+        "dataType": "map<string,any>",
+        "optional": true,
+        "id": "properties",
+        "displayName": "Properties",
+        "description": "Provides the properties used by pick random item."
+      },
+      {
+        "name": "search",
+        "dataType": "string",
+        "optional": true,
+        "id": "search",
+        "displayName": "Search",
+        "description": "Provides the search used by pick random item."
+      },
+      {
+        "name": "category_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "any",
+          "all"
+        ],
+        "defaultValue": "any",
+        "id": "category_match",
+        "displayName": "Category Match",
+        "description": "Provides the category match used by pick random item."
+      },
+      {
+        "name": "tag_match",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "all",
+          "any"
+        ],
+        "defaultValue": "all",
+        "id": "tag_match",
+        "displayName": "Tag Match",
+        "description": "Provides the tag match used by pick random item."
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": 1,
+        "id": "amount",
+        "displayName": "Amount",
+        "description": "Provides the amount used by pick random item."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "id": "item",
+        "displayName": "Item",
+        "description": "Returns the item produced by pick random item."
+      },
+      {
+        "name": "data",
+       "dataType": "runtime_data_entry",
+       "id": "data",
+       "displayName": "Data",
+       "description": "Returns the data produced by pick random item."
+     },
+     {
+       "name": "found",
+       "dataType": "boolean",
+       "id": "found",
+       "displayName": "Found",
+       "description": "Returns the found produced by pick random item."
+     }
+   ]
+ },
+ {
+   "id": "data.item_from_runtime_entry",
+   "displayName": "Create Item From Data",
+   "description": "Create an item from a data result.",
+   "domain": "runtime_data",
+   "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.data",
+    "selectorIntent": "typed-data",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "item",
+      "data",
+      "create"
+    ],
+    "examples": [
+      "Choose filters for Create Item From Data and use the typed results in the next node."
+    ],
+    "handler": "RuntimeDataHandler",
+    "handlerConfig": {
+      "operation": "item_from_entry"
+    },
+    "inputs": [
+      {
+        "name": "data",
+        "dataType": "runtime_data_entry",
+        "id": "data",
+        "displayName": "Data",
+        "description": "Provides the data used by create item from data."
+      },
+      {
+        "name": "amount",
+        "dataType": "number",
+        "defaultValue": 1,
+        "id": "amount",
+        "displayName": "Amount",
+        "description": "Provides the amount used by create item from data."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "item",
+        "dataType": "itemstack",
+        "id": "item",
+        "displayName": "Item",
+        "description": "Returns the item produced by create item from data."
+      },
+      {
+        "name": "found",
+        "dataType": "boolean",
+        "id": "found",
+        "displayName": "Found",
+        "description": "Returns the found produced by create item from data."
+      }
+    ]
+  },
+  {
+    "id": "data.item_categories",
+    "displayName": "Get Item Categories",
+    "description": "Get all current vanilla, ReSync, and external item categories.",
+    "domain": "runtime_data",
+    "family": "item",
+   "lifecycle": "active",
+   "handlerCapability": "resync.runtime.data",
+   "selectorIntent": "typed-data",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "ITEM",
+   "schemaVersion": 2,
+   "kind": "PURE",
+   "tags": [
+     "item",
+     "category",
+     "query"
+   ],
+   "examples": [
+     "Choose filters for Get Item Categories and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "item_categories"
+   },
+    "inputs": [
+      {
+        "name": "source",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:runtime_data:source",
+        "optional": true,
+        "id": "source",
+        "displayName": "Source",
+        "description": "Provides the source used by get item categories."
+      },
+      {
+        "name": "sources",
+        "dataType": "list<string>",
+        "optional": true,
+        "id": "sources",
+        "displayName": "Sources",
+        "description": "Provides the sources used by get item categories."
+      },
+      {
+        "name": "search",
+        "dataType": "string",
+        "optional": true,
+        "id": "search",
+        "displayName": "Search",
+        "description": "Provides the search used by get item categories."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "categories",
+        "dataType": "list<runtime_data_category>",
+        "id": "categories",
+        "displayName": "Categories",
+        "description": "Returns the categories produced by get item categories."
+      },
+      {
+        "name": "ids",
+        "dataType": "list<string>",
+        "id": "ids",
+        "displayName": "Ids",
+        "description": "Returns the ids produced by get item categories."
+      }
+    ]
+  },
+  {
+    "id": "data.describe_item",
+    "displayName": "Identify Item",
+    "description": "Get the data source and details behind an item.",
+    "domain": "runtime_data",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.data",
+    "selectorIntent": "typed-data",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+     "item",
+     "data",
+     "identify"
+   ],
+   "examples": [
+     "Choose filters for Identify Item and use the typed results in the next node."
+   ],
+   "handler": "RuntimeDataHandler",
+   "handlerConfig": {
+     "operation": "describe_item"
+   },
+   "inputs": [
+     {
+       "name": "item",
+       "dataType": "itemstack",
+       "id": "item",
+       "displayName": "Item",
+       "description": "Provides the item used by identify item."
+     }
+   ],
+    "outputs": [
+      {
+        "name": "data",
+        "dataType": "runtime_data_entry",
+        "id": "data",
+        "displayName": "Data",
+        "description": "Returns the data produced by identify item."
+      },
+      {
+        "name": "found",
+        "dataType": "boolean",
+        "id": "found",
+        "displayName": "Found",
+        "description": "Returns the found produced by identify item."
+      }
+    ]
+  }
+]

@@ -48,14 +48,18 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.storage.AsyncStorageExecutor;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.WorldGenGeneratedOutputController;
 import restudio.resync.worldgen.contract.WorldGenGenerationMode;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.datapack.WorldGenBuildRecipe;
 import restudio.resync.worldgen.datapack.WorldGenDatapackBuild;
 import restudio.resync.worldgen.datapack.WorldGenDatapackCompiler;
 import restudio.resync.worldgen.datapack.WorldGenDatapackInstaller;
+import restudio.resync.worldgen.datapack.WorldGenInstalledDatapackCapability;
 import restudio.resync.worldgen.generator.NodeGraphBiomeProvider;
 import restudio.resync.worldgen.generator.NodeGraphChunkGenerator;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
@@ -63,8 +67,10 @@ import restudio.resync.worldgen.pipeline.TerrainPipeline;
 import restudio.resync.worldgen.pipeline.TerrainPipelineHolder;
 import restudio.resync.worldgen.runtime.WorldGenRuntimeRegistry;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -73,6 +79,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -82,7 +89,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
-public class WorldManagementManager implements WorldManagementService, Listener {
+public class WorldManagementManager implements WorldManagementService, Listener, WorldManagementPersistenceParticipant.Controller {
     private static final String MODULE_ID = "worldManagement";
     private static final String GLOBAL_STATE_KEY = "__global__";
     private static final String WORLD_LOCATION_FACET = "worldLocation";
@@ -93,8 +100,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private final WorldStateStorage storage;
     private final AsyncStorageExecutor storageExecutor = new AsyncStorageExecutor();
     private final WorldGenProjectStorage worldGenProjectStorage;
+    private final WorldGenGeneratedOutputController generatedOutput;
     private final WorldGenDatapackCompiler worldGenDatapackCompiler;
-    private final WorldGenDatapackInstaller worldGenDatapackInstaller;
+    private final WorldGenInstalledDatapackCapability worldGenDatapackInstaller;
     private final WorldMapService mapService;
     private final Map<String, WorldRegistryEntry> worlds = new ConcurrentHashMap<>();
     private final Map<String, WorldPortal> portals = new ConcurrentHashMap<>();
@@ -107,59 +115,27 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private volatile Map<String, List<WorldPortal>> portalIndex = Map.of();
     private volatile BukkitTask lockTask;
     private volatile Object economy;
+    private volatile WorldExternalPersistenceCapability externalPersistenceCapability;
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
-    public WorldManagementManager(ReSync plugin, PlayerTrackingService trackingService, WorldGenProjectStorage worldGenProjectStorage) {
+    public WorldManagementManager(ReSync plugin, Path dataRoot, PlayerTrackingService trackingService,
+                                  WorldGenProjectStorage worldGenProjectStorage,
+                                  WorldExternalPersistenceCapability externalPersistenceCapability,
+                                  WorldGenGeneratedOutputController generatedOutput,
+                                  WorldGenInstalledDatapackCapability worldGenDatapackInstaller) {
         this.plugin = plugin;
         this.trackingService = trackingService;
-        this.storage = new WorldStateStorage(plugin);
+        this.externalPersistenceCapability = Objects.requireNonNull(externalPersistenceCapability, "externalPersistenceCapability");
+        this.storage = new WorldStateStorage(dataRoot);
         if (worldGenProjectStorage == null) {
             throw new IllegalArgumentException("WorldGen project storage is required");
         }
         this.worldGenProjectStorage = worldGenProjectStorage;
+        this.generatedOutput = Objects.requireNonNull(generatedOutput, "generatedOutput");
         this.worldGenDatapackCompiler = new WorldGenDatapackCompiler(plugin);
-        this.worldGenDatapackInstaller = new WorldGenDatapackInstaller();
+        this.worldGenDatapackInstaller = Objects.requireNonNull(worldGenDatapackInstaller, "worldGenDatapackInstaller");
         this.mapService = new DefaultWorldMapService();
-        for (WorldRegistryEntry entry : storage.loadWorlds()) {
-            if (entry == null || entry.getWorldName() == null || entry.getWorldName().isBlank()) {
-                continue;
-            }
-            worlds.put(worldKey(entry.getWorldName()), entry.copy());
-        }
-        for (WorldPortal portal : storage.loadPortals()) {
-            if (portal == null || portal.getPortalId() == null || portal.getPortalId().isBlank()) {
-                continue;
-            }
-            portal.normalizeBounds();
-            portals.put(portal.getPortalId(), portal.copy());
-        }
-        for (WorldInventoryGroup group : storage.loadInventoryGroups()) {
-            if (group == null || group.getGroupId() == null || group.getGroupId().isBlank()) {
-                continue;
-            }
-            inventoryGroups.put(groupKey(group.getGroupId()), group.copy());
-        }
-        for (WorldSignPortal signPortal : storage.loadSignPortals()) {
-            if (signPortal == null || signPortal.getSignId() == null || signPortal.getSignId().isBlank()) {
-                continue;
-            }
-            signPortals.put(signPortal.getSignId(), signPortal.copy());
-        }
-        for (Map.Entry<UUID, Map<String, WorldPlayerState>> entry : storage.loadPlayerStates().entrySet()) {
-            if (entry.getKey() == null) {
-                continue;
-            }
-            Map<String, WorldPlayerState> perWorld = new ConcurrentHashMap<>();
-            if (entry.getValue() != null) {
-                for (Map.Entry<String, WorldPlayerState> stateEntry : entry.getValue().entrySet()) {
-                    if (stateEntry.getKey() == null || stateEntry.getKey().isBlank() || stateEntry.getValue() == null) {
-                        continue;
-                    }
-                    perWorld.put(stateEntry.getKey(), stateEntry.getValue().copy());
-                }
-            }
-            playerStates.put(entry.getKey(), perWorld);
-        }
-        rebuildPortalIndex();
+        replaceMetadata(storage.loadState());
         mapService.registerExtension(new WorldPortalMapExtension(this));
         mapService.registerExtension(new WorldPlayersMapExtension(trackingService));
     }
@@ -167,6 +143,128 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     @Override
     public WorldMapService getMapService() {
         return mapService;
+    }
+
+    @Override
+    public Path persistenceRoot() {
+        return storage.getRootPath();
+    }
+
+    @Override
+    public void flushPersistence() throws IOException {
+        storageExecutor.flush();
+        storage.flushPersistence();
+    }
+
+    @Override
+    public void quiescePersistence() throws IOException {
+        storageExecutor.flush();
+        storage.quiescePersistence();
+    }
+
+    @Override
+    public void resumePersistence() throws IOException {
+        storage.resumePersistence();
+    }
+
+    @Override
+    public synchronized void rebindPersistence(Path activeRoot) throws IOException {
+        Path previousRoot = storage.getRootPath();
+        MetadataSnapshot previous = snapshotMetadata();
+        WorldStateStorage.State candidate = storage.readCandidateState(activeRoot);
+        validateCandidateMetadata(candidate);
+        try {
+            storage.rebindPersistence(activeRoot);
+            replaceMetadata(candidate);
+        } catch (IOException | RuntimeException failure) {
+            try {
+                storage.rebindPersistence(previousRoot);
+            } catch (IOException | RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
+            try {
+                replaceMetadata(previous);
+            } catch (RuntimeException rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
+            if (failure instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw (RuntimeException) failure;
+        }
+    }
+
+    @Override
+    public void healthCheckPersistence() throws IOException {
+        storage.healthCheckPersistence();
+    }
+
+    public void bindExternalPersistence(WorldExternalPersistenceCapability capability) {
+        this.externalPersistenceCapability = Objects.requireNonNull(capability, "capability");
+    }
+
+    public void bindExternalPersistence(WorldExternalPersistenceAdapterRegistration registration,
+                                        WorldExternalPersistenceAdapter adapter,
+                                        Collection<WorldExternalPersistenceCapability.WorldRoot> roots) throws IOException {
+        externalPersistenceCapability.bind(registration, adapter, roots);
+    }
+
+    public void registerExternalWorldRoot(String worldName, Path worldRoot) throws IOException {
+        externalPersistenceCapability.registerWorld(worldName, worldRoot);
+    }
+
+    public void clearExternalPersistence() {
+        this.externalPersistenceCapability = WorldExternalPersistenceCapability.unavailable();
+    }
+
+    public WorldExternalPersistenceCapability externalPersistence() {
+        return externalPersistenceCapability;
+    }
+
+    public WorldExternalPersistenceCapability.Health externalPersistenceHealth() {
+        return externalPersistence().health();
+    }
+
+    public void drainExternalPersistence(Duration timeout) throws IOException {
+        requireExternalPersistence().drain(timeout);
+    }
+
+    public void saveExternalPersistence() throws IOException {
+        requireExternalPersistence().save();
+    }
+
+    public void quiesceExternalPersistence() throws IOException {
+        requireExternalPersistence().quiesce();
+    }
+
+    public void resumeExternalPersistence() throws IOException {
+        requireExternalPersistence().resume();
+    }
+
+    public void healthCheckExternalPersistence() throws IOException {
+        requireExternalPersistence().healthCheck();
+    }
+
+    public WorldExternalPersistenceCapability.ExternalWorldSnapshot snapshotExternalWorld(String worldName, Path destination)
+        throws IOException {
+        return requireExternalPersistence().snapshot(worldName, destination);
+    }
+
+    public void restoreExternalWorld(String worldName, WorldExternalPersistenceCapability.ExternalWorldSnapshot snapshot)
+        throws IOException {
+        requireExternalPersistence().restore(worldName, snapshot);
+    }
+
+    public void rebindExternalWorld(String worldName, Path worldRoot) throws IOException {
+        requireExternalPersistence().rebindWorld(worldName, worldRoot);
+    }
+
+    public void rebindExternalPersistence(Map<String, Path> worldRoots) throws IOException {
+        requireExternalPersistence().rebind(worldRoots);
+    }
+
+    private WorldExternalPersistenceCapability requireExternalPersistence() {
+        return externalPersistenceCapability;
     }
 
     @Override
@@ -257,17 +355,21 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public WorldOperationResult createWorld(String worldName, String seed, String environment, String generator) {
-        return callSync(() -> createWorldSync(worldName, seed, environment, generator, null));
+        return guardedWorldCreationMutation("createWorld", worldName == null ? List.of() : List.of(worldName),
+            () -> callSync(() -> createWorldSync(worldName, seed, environment, generator, null)));
     }
 
     @Override
     public WorldOperationResult createWorld(String worldName, String seed, String environment, String generator, String generatorConfig) {
-        return callSync(() -> createWorldSync(worldName, seed, environment, generator, generatorConfig));
+        return guardedWorldCreationMutation("createWorld", worldName == null ? List.of() : List.of(worldName),
+            () -> callSync(() -> createWorldSync(worldName, seed, environment, generator, generatorConfig)));
     }
 
     @Override
     public WorldOperationResult importUnregisteredWorlds() {
-        return callSync(this::importUnregisteredWorldsSync);
+        List<String> folders = findUnregisteredWorldFolders();
+        return folders.isEmpty() ? callSync(this::importUnregisteredWorldsSync)
+            : guardedWorldCreationMutation("importUnregisteredWorlds", folders, () -> callSync(this::importUnregisteredWorldsSync));
     }
 
     @Override
@@ -277,6 +379,17 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public WorldOperationResult cloneWorldAsync(String sourceWorld, String targetWorld, boolean loadAfterClone) {
+        WorldExternalPersistenceCapability capability = externalPersistenceCapability;
+        try (WorldExternalPersistenceCapability.MutationLease ignored = capability.acquireClone("cloneWorld", sourceWorld, targetWorld)) {
+            return cloneWorldWithoutExternalPersistence(sourceWorld, targetWorld, loadAfterClone);
+        } catch (WorldExternalPersistenceCapability.IdentityRejectedException exception) {
+            return WorldOperationResult.failure("cloneWorld", targetWorld, "WorldPersistenceIdentityRejected");
+        } catch (WorldExternalPersistenceCapability.OperationRejectedException exception) {
+            return WorldOperationResult.failure("cloneWorld", targetWorld, exception.code());
+        }
+    }
+
+    private WorldOperationResult cloneWorldWithoutExternalPersistence(String sourceWorld, String targetWorld, boolean loadAfterClone) {
         ClonePreparation preparation = callSync(() -> prepareCloneWorld(sourceWorld, targetWorld));
         if (preparation.failure() != null) {
             return preparation.failure();
@@ -297,128 +410,154 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public WorldOperationResult deleteWorld(String worldName, boolean deleteFiles, String fallbackWorld) {
-        return callSync(() -> deleteWorldSync(worldName, deleteFiles, fallbackWorld));
+        return guardedWorldMutation("deleteWorld", worldName,
+            () -> callSync(() -> deleteWorldSync(worldName, deleteFiles, fallbackWorld)));
     }
 
     @Override
     public WorldOperationResult loadWorld(String worldName) {
-        return callSync(() -> loadWorldSync(worldName));
+        return guardedWorldMutation("loadWorld", worldName, () -> callSync(() -> loadWorldSync(worldName)));
     }
 
     @Override
     public WorldOperationResult unloadWorld(String worldName, String fallbackWorld) {
-        return callSync(() -> unloadWorldSync(worldName, fallbackWorld));
+        return guardedWorldMutation("unloadWorld", worldName,
+            () -> callSync(() -> unloadWorldSync(worldName, fallbackWorld)));
     }
 
     @Override
     public WorldOperationResult setGameRule(String worldName, String ruleName, String value) {
-        return callSync(() -> setGameRuleSync(worldName, ruleName, value));
+        return guardedWorldMutation("setGameRule", worldName,
+            () -> callSync(() -> setGameRuleSync(worldName, ruleName, value)));
     }
 
     @Override
     public WorldOperationResult setGameRules(String worldName, Map<String, String> rules) {
-        return callSync(() -> setGameRulesSync(worldName, rules));
+        return guardedWorldMutation("setGameRules", worldName,
+            () -> callSync(() -> setGameRulesSync(worldName, rules)));
     }
 
     @Override
     public WorldOperationResult setDifficulty(String worldName, String difficulty) {
-        return callSync(() -> setDifficultySync(worldName, difficulty));
+        return guardedWorldMutation("setDifficulty", worldName,
+            () -> callSync(() -> setDifficultySync(worldName, difficulty)));
     }
 
     @Override
     public WorldOperationResult setTimeLock(String worldName, boolean enabled, long lockedTime) {
-        return callSync(() -> setTimeLockSync(worldName, enabled, lockedTime));
+        return guardedWorldMutation("setTimeLock", worldName,
+            () -> callSync(() -> setTimeLockSync(worldName, enabled, lockedTime)));
     }
 
     @Override
     public WorldOperationResult setWeatherLock(String worldName, boolean enabled, boolean storm, boolean thundering) {
-        return callSync(() -> setWeatherLockSync(worldName, enabled, storm, thundering));
+        return guardedWorldMutation("setWeatherLock", worldName,
+            () -> callSync(() -> setWeatherLockSync(worldName, enabled, storm, thundering)));
     }
 
     @Override
     public WorldOperationResult setIsolatedPlayerState(String worldName, boolean enabled) {
-        return callSync(() -> setIsolatedPlayerStateSync(worldName, enabled));
+        return guardedWorldMutation("setIsolatedPlayerState", worldName,
+            () -> callSync(() -> setIsolatedPlayerStateSync(worldName, enabled)));
     }
 
     @Override
     public WorldOperationResult setWorldProfile(String worldName, WorldProfileSettings profileSettings) {
-        return callSync(() -> setWorldProfileSync(worldName, profileSettings));
+        return guardedWorldMutation("setWorldProfile", worldName,
+            () -> callSync(() -> setWorldProfileSync(worldName, profileSettings)));
     }
 
     @Override
     public WorldOperationResult updateWorld(WorldRegistryEntry world) {
-        return callSync(() -> updateWorldSync(world));
+        String worldName = world == null ? null : world.getWorldName();
+        return guardedWorldMutation("updateWorld", worldName,
+            () -> callSync(() -> updateWorldSync(world)));
     }
 
     @Override
     public WorldOperationResult createPortal(WorldPortal portal) {
-        return callSync(() -> createPortalSync(portal));
+        return guardedWorldMutation("createPortal", portal == null ? List.of()
+            : mergeWorldNames(mergeWorldNames(List.of(), portal.getSourceWorld()), portal.getDestinationWorld()),
+            () -> callSync(() -> createPortalSync(portal)));
     }
 
     @Override
     public WorldOperationResult resizePortal(WorldPortal portal) {
-        return callSync(() -> resizePortalSync(portal));
+        return guardedWorldMutation("resizePortal", portal == null ? List.of()
+            : mergeWorldNames(mergeWorldNames(List.of(), portal.getSourceWorld()), portal.getDestinationWorld()),
+            () -> callSync(() -> resizePortalSync(portal)));
     }
 
     @Override
     public WorldOperationResult deletePortal(String portalId) {
-        return callSync(() -> deletePortalSync(portalId));
+        return guardedWorldMutation("deletePortal", portalWorldNames(portalId), () -> callSync(() -> deletePortalSync(portalId)));
     }
 
     @Override
     public WorldOperationResult setPortalEnabled(String portalIdOrName, boolean enabled) {
-        return callSync(() -> setPortalEnabledSync(portalIdOrName, enabled));
+        return guardedWorldMutation("setPortalEnabled", portalWorldNames(portalIdOrName),
+            () -> callSync(() -> setPortalEnabledSync(portalIdOrName, enabled)));
     }
 
     @Override
     public WorldOperationResult setPortalDestination(String portalIdOrName, String destinationWorld, double destinationX, double destinationY, double destinationZ,
                                                      float destinationYaw, float destinationPitch) {
-        return callSync(() -> setPortalDestinationSync(portalIdOrName, destinationWorld, destinationX, destinationY, destinationZ, destinationYaw, destinationPitch));
+        return guardedWorldMutation("setPortalDestination", mergeWorldNames(portalWorldNames(portalIdOrName), destinationWorld),
+            () -> callSync(() -> setPortalDestinationSync(portalIdOrName, destinationWorld, destinationX, destinationY, destinationZ, destinationYaw, destinationPitch)));
     }
 
     @Override
     public WorldOperationResult setPortalBounds(String portalIdOrName, String sourceWorld, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-        return callSync(() -> setPortalBoundsSync(portalIdOrName, sourceWorld, minX, minY, minZ, maxX, maxY, maxZ));
+        return guardedWorldMutation("setPortalBounds", mergeWorldNames(portalWorldNames(portalIdOrName), sourceWorld),
+            () -> callSync(() -> setPortalBoundsSync(portalIdOrName, sourceWorld, minX, minY, minZ, maxX, maxY, maxZ)));
     }
 
     @Override
     public WorldOperationResult teleportPlayerToWorld(String playerName, String worldName, Double x, Double y, Double z, Float yaw, Float pitch) {
-        return callSync(() -> teleportPlayerToWorldSync(playerName, worldName, x, y, z, yaw, pitch));
+        return guardedWorldMutation("teleportPlayerToWorld", worldName,
+            () -> callSync(() -> teleportPlayerToWorldSync(playerName, worldName, x, y, z, yaw, pitch)));
     }
 
     @Override
     public WorldOperationResult teleportPlayerToWorldSpawn(String playerName, String worldName) {
-        return callSync(() -> teleportPlayerToWorldSpawnSync(playerName, worldName));
+        return guardedWorldMutation("teleportPlayerToWorldSpawn", worldName,
+            () -> callSync(() -> teleportPlayerToWorldSpawnSync(playerName, worldName)));
     }
 
     @Override
     public WorldOperationResult teleportPlayerToPortal(String playerName, String portalIdOrName) {
-        return callSync(() -> teleportPlayerToPortalSync(playerName, portalIdOrName));
+        return guardedWorldMutation("teleportPlayerToPortal", portalWorldNames(portalIdOrName),
+            () -> callSync(() -> teleportPlayerToPortalSync(playerName, portalIdOrName)));
     }
 
     @Override
     public WorldOperationResult createInventoryGroup(WorldInventoryGroup group) {
-        return callSync(() -> createInventoryGroupSync(group));
+        return guardedWorldMutation("createInventoryGroup", group == null ? null : group.getWorlds(),
+            () -> callSync(() -> createInventoryGroupSync(group)));
     }
 
     @Override
     public WorldOperationResult updateInventoryGroup(WorldInventoryGroup group) {
-        return callSync(() -> updateInventoryGroupSync(group));
+        return guardedWorldMutation("updateInventoryGroup", group == null ? null : group.getWorlds(),
+            () -> callSync(() -> updateInventoryGroupSync(group)));
     }
 
     @Override
     public WorldOperationResult deleteInventoryGroup(String groupId) {
-        return callSync(() -> deleteInventoryGroupSync(groupId));
+        return guardedWorldMutation("deleteInventoryGroup", inventoryGroupWorldNames(groupId),
+            () -> callSync(() -> deleteInventoryGroupSync(groupId)));
     }
 
     @Override
     public WorldOperationResult createSignPortal(WorldSignPortal signPortal) {
-        return callSync(() -> createSignPortalSync(signPortal));
+        return guardedWorldMutation("createSignPortal", signPortal == null ? null : signPortal.getWorldName(),
+            () -> callSync(() -> createSignPortalSync(signPortal)));
     }
 
     @Override
     public WorldOperationResult deleteSignPortal(String signId) {
-        return callSync(() -> deleteSignPortalSync(signId));
+        return guardedWorldMutation("deleteSignPortal", signPortalWorldName(signId),
+            () -> callSync(() -> deleteSignPortalSync(signId)));
     }
 
     @Override
@@ -428,18 +567,21 @@ public class WorldManagementManager implements WorldManagementService, Listener 
 
     @Override
     public WorldOperationResult purgeWorld(String worldName, boolean monsters, boolean animals, boolean ambient, boolean misc, boolean vehicles, boolean items) {
-        return callSync(() -> purgeWorldSync(worldName, monsters, animals, ambient, misc, vehicles, items));
+        return guardedWorldMutation("purgeWorld", worldName,
+            () -> callSync(() -> purgeWorldSync(worldName, monsters, animals, ambient, misc, vehicles, items)));
     }
 
     @Override
     public void start() {
         callSync(() -> {
             Bukkit.getPluginManager().registerEvents(this, plugin);
-            bootstrapLoadedWorlds();
+            if (externalPersistenceCapability.normalMutationAdmissionOpen()) {
+                bootstrapLoadedWorlds();
+            }
             if (lockTask != null) {
                 lockTask.cancel();
             }
-            lockTask = Bukkit.getScheduler().runTaskTimer(plugin, this::applyLocksTick, 20L, 20L);
+            lockTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
             publishSnapshotEvent();
             return null;
         });
@@ -453,77 +595,135 @@ public class WorldManagementManager implements WorldManagementService, Listener 
                 lockTask.cancel();
                 lockTask = null;
             }
-            persistAll();
-            storageExecutor.shutdown();
+            EventMutationScope mutation = beginEventMutation("stop", List.copyOf(worlds.keySet()));
+            if (mutation != null) {
+                try (mutation) {
+                    persistAll();
+                    storageExecutor.shutdown();
+                }
+            } else {
+                storageExecutor.shutdown();
+            }
             return null;
         });
     }
 
     @Override
     public void tick() {
+        List<String> names = worlds.keySet().stream().toList();
+        List<WorldExternalPersistenceCapability.MutationLease> leases = acquireWorldLeases("tick", names);
+        if (leases == null) {
+            return;
+        }
+        try {
+            applyLocksTick();
+        } finally {
+            leases.forEach(WorldExternalPersistenceCapability.MutationLease::close);
+        }
     }
 
     public void reconcileStoredItems(UnaryOperator<ItemStack> transformer) {
         if (transformer == null) {
             return;
         }
-        callSync(() -> {
-            boolean changed = false;
-            for (Map<String, WorldPlayerState> states : playerStates.values()) {
-                if (states == null) {
-                    continue;
+        EventMutationScope mutation = beginEventMutation("reconcileStoredItems", worlds.keySet());
+        if (mutation == null) {
+            return;
+        }
+        try (mutation) {
+            callSync(() -> {
+                boolean changed = false;
+                for (Map<String, WorldPlayerState> states : playerStates.values()) {
+                    if (states == null) {
+                        continue;
+                    }
+                    for (WorldPlayerState state : states.values()) {
+                        changed |= reconcileStoredStateItems(state, transformer);
+                    }
                 }
-                for (WorldPlayerState state : states.values()) {
-                    changed |= reconcileStoredStateItems(state, transformer);
+                if (changed) {
+                    persistPlayerStatesAsync();
                 }
-            }
-            if (changed) {
-                persistPlayerStatesAsync();
-            }
-            return null;
-        });
+                return null;
+            });
+        }
     }
 
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {
         World world = event.getWorld();
-        WorldRegistryEntry entry = getOrCreateEntry(world.getName());
-        syncEntryFromWorld(entry, world);
-        applyEntryState(entry, world);
-        persistWorldsAsync();
-        publishMessage(WorldChannelMessage.event("worldLoaded", buildWorldStatePayload(entry)));
-        publishSnapshotEvent();
+        if (world == null) {
+            return;
+        }
+        EventMutationScope mutation = beginEventMutation("worldLoad", List.of(world.getName()));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldRegistryEntry entry = getOrCreateEntry(world.getName());
+            syncEntryFromWorld(entry, world);
+            applyEntryState(entry, world);
+            persistWorldsAsync();
+            publishMessage(WorldChannelMessage.event("worldLoaded", buildWorldStatePayload(entry)));
+            publishSnapshotEvent();
+        }
     }
 
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         String worldName = event.getWorld().getName();
-        WorldRegistryEntry entry = getOrCreateEntry(worldName);
-        entry.setLoaded(false);
-        entry.setUpdatedAt(System.currentTimeMillis());
-        persistWorldsAsync();
-        publishMessage(WorldChannelMessage.event("worldUnloaded", buildWorldStatePayload(entry)));
-        publishSnapshotEvent();
+        EventMutationScope mutation = beginEventMutation("worldUnload", List.of(worldName));
+        if (mutation == null) {
+            event.setCancelled(true);
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldRegistryEntry entry = getOrCreateEntry(worldName);
+            entry.setLoaded(false);
+            entry.setUpdatedAt(System.currentTimeMillis());
+            persistWorldsAsync();
+            publishMessage(WorldChannelMessage.event("worldUnloaded", buildWorldStatePayload(entry)));
+            publishSnapshotEvent();
+        }
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         String targetWorld = player.getWorld().getName();
-        initializePlayerState(player, targetWorld);
-        enforceWorldProfile(player, targetWorld, false, false);
-        updatePlayerFacet(player, true);
+        EventMutationScope mutation = beginEventMutation("playerJoin", List.of(targetWorld));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            initializePlayerState(player, targetWorld);
+            enforceWorldProfile(player, targetWorld, false, false);
+            updatePlayerFacet(player, true);
+        }
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        captureWorldState(player, player.getWorld().getName());
-        persistPlayerStatesAsync();
-        portalCooldowns.remove(player.getUniqueId());
-        facetUpdates.remove(player.getUniqueId());
-        if (trackingService != null) {
-            trackingService.removeFacet(player.getUniqueId(), WORLD_LOCATION_FACET);
+        if (player == null || player.getWorld() == null) {
+            return;
+        }
+        EventMutationScope mutation = beginEventMutation("playerQuit", List.of(player.getWorld().getName()));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            captureWorldState(player, player.getWorld().getName());
+            persistPlayerStatesAsync();
+            portalCooldowns.remove(player.getUniqueId());
+            facetUpdates.remove(player.getUniqueId());
+            if (trackingService != null) {
+                trackingService.removeFacet(player.getUniqueId(), WORLD_LOCATION_FACET);
+            }
         }
     }
 
@@ -532,9 +732,16 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         Player player = event.getPlayer();
         String fromWorld = event.getFrom() == null ? null : event.getFrom().getName();
         String targetWorld = player.getWorld().getName();
-        handleWorldTransition(player, fromWorld, targetWorld);
-        enforceWorldProfile(player, targetWorld, true, true);
-        updatePlayerFacet(player, true);
+        EventMutationScope mutation = beginEventMutation("playerChangedWorld", mergeWorldNames(mergeWorldNames(List.of(), fromWorld), targetWorld));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            handleWorldTransition(player, fromWorld, targetWorld);
+            enforceWorldProfile(player, targetWorld, true, true);
+            updatePlayerFacet(player, true);
+        }
     }
 
     @EventHandler
@@ -543,16 +750,26 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null) {
             return;
         }
-        WorldProfileSettings profile = profileFor(player.getWorld() == null ? null : player.getWorld().getName());
-        if (profile != null && profile.getRespawnWorld() != null && !profile.getRespawnWorld().isBlank()) {
-            World targetWorld = ensureWorldLoaded(profile.getRespawnWorld(), "respawnWorld");
-            if (targetWorld != null) {
-                event.setRespawnLocation(resolveProfileSpawn(targetWorld, profile));
-                return;
-            }
+        if (player.getWorld() == null) {
+            return;
         }
-        if (profile != null && profile.isCustomSpawnEnabled()) {
-            event.setRespawnLocation(resolveProfileSpawn(player.getWorld(), profile));
+        EventMutationScope mutation = beginEventMutation("playerRespawn", List.of(player.getWorld().getName()));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(player.getWorld() == null ? null : player.getWorld().getName());
+            if (profile != null && profile.getRespawnWorld() != null && !profile.getRespawnWorld().isBlank()) {
+                World targetWorld = ensureWorldLoaded(profile.getRespawnWorld(), "respawnWorld");
+                if (targetWorld != null) {
+                    event.setRespawnLocation(resolveProfileSpawn(targetWorld, profile));
+                    return;
+                }
+            }
+            if (profile != null && profile.isCustomSpawnEnabled()) {
+                event.setRespawnLocation(resolveProfileSpawn(player.getWorld(), profile));
+            }
         }
     }
 
@@ -563,11 +780,20 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         }
         Player player = event.getPlayer();
         String targetWorld = event.getTo().getWorld().getName();
-        WorldProfileSettings profile = profileFor(targetWorld);
-        if (!canAccessWorld(player, targetWorld, profile)) {
+        String sourceWorld = player.getWorld() == null ? null : player.getWorld().getName();
+        EventMutationScope mutation = beginEventMutation("playerTeleport", mergeWorldNames(mergeWorldNames(List.of(), sourceWorld), targetWorld));
+        if (mutation == null) {
             event.setCancelled(true);
-            if (profile != null) {
-                sendPlayerMessage(player, profile.getDenyMessage(), targetWorld, "Access Denied");
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(targetWorld);
+            if (!canAccessWorld(player, targetWorld, profile)) {
+                event.setCancelled(true);
+                if (profile != null) {
+                    sendPlayerMessage(player, profile.getDenyMessage(), targetWorld, "Access Denied");
+                }
             }
         }
     }
@@ -583,8 +809,18 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
             return;
         }
-        tryPortalTeleport(event.getPlayer(), event.getTo());
-        updatePlayerFacet(event.getPlayer(), false);
+        String sourceWorld = event.getFrom().getWorld() == null ? null : event.getFrom().getWorld().getName();
+        String targetWorld = event.getTo().getWorld() == null ? null : event.getTo().getWorld().getName();
+        EventMutationScope mutation = beginEventMutation("playerMove", mergeWorldNames(mergeWorldNames(List.of(), sourceWorld), targetWorld));
+        if (mutation == null) {
+            event.setCancelled(true);
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            tryPortalTeleport(event.getPlayer(), event.getTo());
+            updatePlayerFacet(event.getPlayer(), false);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -598,14 +834,35 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
             return;
         }
-        tryVehiclePortalTeleport(event.getVehicle(), event.getTo());
+        String sourceWorld = event.getFrom().getWorld() == null ? null : event.getFrom().getWorld().getName();
+        String targetWorld = event.getTo().getWorld() == null ? null : event.getTo().getWorld().getName();
+        EventMutationScope mutation = beginEventMutation("vehicleMove", mergeWorldNames(mergeWorldNames(List.of(), sourceWorld), targetWorld));
+        if (mutation == null) {
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            tryVehiclePortalTeleport(event.getVehicle(), event.getTo());
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerPortal(PlayerPortalEvent event) {
-        Location destination = resolveLinkedPortalDestination(event.getPlayer(), event.getFrom(), event.getCause());
-        if (destination != null) {
-            event.setTo(destination);
+        if (event.getFrom() == null || event.getFrom().getWorld() == null) {
+            event.setCancelled(true);
+            return;
+        }
+        EventMutationScope mutation = beginEventMutation("playerPortal", List.of(event.getFrom().getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            Location destination = resolveLinkedPortalDestination(event.getPlayer(), event.getFrom(), event.getCause());
+            if (destination != null) {
+                event.setTo(destination);
+            }
         }
     }
 
@@ -614,13 +871,21 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (!(event.getEntity() instanceof Player player) || player.getWorld() == null) {
             return;
         }
-        WorldProfileSettings profile = profileFor(player.getWorld().getName());
-        if (profile == null || profile.isHungerEnabled()) {
+        EventMutationScope mutation = beginEventMutation("foodLevelChange", List.of(player.getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
             return;
         }
-        if (event.getFoodLevel() < player.getFoodLevel()) {
-            event.setCancelled(true);
-            event.setFoodLevel(player.getFoodLevel());
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(player.getWorld().getName());
+            if (profile == null || profile.isHungerEnabled()) {
+                return;
+            }
+            if (event.getFoodLevel() < player.getFoodLevel()) {
+                event.setCancelled(true);
+                event.setFoodLevel(player.getFoodLevel());
+            }
         }
     }
 
@@ -629,13 +894,21 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (!(event.getEntity() instanceof Player player) || player.getWorld() == null) {
             return;
         }
-        WorldProfileSettings profile = profileFor(player.getWorld().getName());
-        if (profile == null || profile.isAutoHealEnabled()) {
+        EventMutationScope mutation = beginEventMutation("entityRegainHealth", List.of(player.getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
             return;
         }
-        EntityRegainHealthEvent.RegainReason reason = event.getRegainReason();
-        if (reason == EntityRegainHealthEvent.RegainReason.SATIATED || reason == EntityRegainHealthEvent.RegainReason.REGEN) {
-            event.setCancelled(true);
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(player.getWorld().getName());
+            if (profile == null || profile.isAutoHealEnabled()) {
+                return;
+            }
+            EntityRegainHealthEvent.RegainReason reason = event.getRegainReason();
+            if (reason == EntityRegainHealthEvent.RegainReason.SATIATED || reason == EntityRegainHealthEvent.RegainReason.REGEN) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -644,17 +917,25 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (event.getLocation() == null || event.getLocation().getWorld() == null) {
             return;
         }
-        WorldProfileSettings profile = profileFor(event.getLocation().getWorld().getName());
-        if (profile == null) {
-            return;
-        }
-        if (event.getEntity() instanceof Monster && !profile.isMonsterSpawnsEnabled()) {
+        EventMutationScope mutation = beginEventMutation("creatureSpawn", List.of(event.getLocation().getWorld().getName()));
+        if (mutation == null) {
             event.setCancelled(true);
             return;
         }
-        if ((event.getEntity() instanceof Animals || event.getEntity() instanceof Ambient || event.getEntity() instanceof WaterMob || event.getEntity() instanceof Axolotl)
-            && !profile.isAnimalSpawnsEnabled()) {
-            event.setCancelled(true);
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(event.getLocation().getWorld().getName());
+            if (profile == null) {
+                return;
+            }
+            if (event.getEntity() instanceof Monster && !profile.isMonsterSpawnsEnabled()) {
+                event.setCancelled(true);
+                return;
+            }
+            if ((event.getEntity() instanceof Animals || event.getEntity() instanceof Ambient || event.getEntity() instanceof WaterMob || event.getEntity() instanceof Axolotl)
+                && !profile.isAnimalSpawnsEnabled()) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -663,15 +944,23 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (event.getLocation() == null || event.getLocation().getWorld() == null) {
             return;
         }
-        Entity entity = event.getEntity();
-        if (entity instanceof Player || entity instanceof LivingEntity) {
+        EventMutationScope mutation = beginEventMutation("entitySpawn", List.of(event.getLocation().getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
             return;
         }
-        WorldProfileSettings profile = profileFor(event.getLocation().getWorld().getName());
-        if (profile == null || profile.isNonLivingEntitySpawnsEnabled()) {
-            return;
+        mutation.deferToNextTick();
+        try (mutation) {
+            Entity entity = event.getEntity();
+            if (entity instanceof Player || entity instanceof LivingEntity) {
+                return;
+            }
+            WorldProfileSettings profile = profileFor(event.getLocation().getWorld().getName());
+            if (profile == null || profile.isNonLivingEntitySpawnsEnabled()) {
+                return;
+            }
+            event.setCancelled(true);
         }
-        event.setCancelled(true);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -680,12 +969,20 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null || player.getWorld() == null) {
             return;
         }
-        WorldProfileSettings profile = profileFor(player.getWorld().getName());
-        if (profile == null || profile.isBedRespawnEnabled()) {
+        EventMutationScope mutation = beginEventMutation("playerBedEnter", List.of(player.getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
             return;
         }
-        event.setCancelled(true);
-        sendPlayerMessage(player, profile.getDenyMessage(), player.getWorld().getName(), "Beds Disabled");
+        mutation.deferToNextTick();
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(player.getWorld().getName());
+            if (profile == null || profile.isBedRespawnEnabled()) {
+                return;
+            }
+            event.setCancelled(true);
+            sendPlayerMessage(player, profile.getDenyMessage(), player.getWorld().getName(), "Beds Disabled");
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -693,26 +990,34 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null || event.getPlayer() == null || event.getPlayer().getWorld() == null) {
             return;
         }
-        if (event.getClickedBlock().getState() instanceof Sign) {
-            WorldSignPortal signPortal = findSignPortal(event.getClickedBlock());
-            if (signPortal != null && signPortal.isEnabled()) {
-                event.setCancelled(true);
-                WorldPortal portal = resolveSignPortalDestination(signPortal);
-                if (portal != null) {
-                    usePortal(event.getPlayer(), portal, "signPortalTeleport");
+        EventMutationScope mutation = beginEventMutation("playerInteract", List.of(event.getPlayer().getWorld().getName()));
+        if (mutation == null) {
+            event.setCancelled(true);
+            return;
+        }
+        mutation.deferToNextTick();
+        try (mutation) {
+            if (event.getClickedBlock().getState() instanceof Sign) {
+                WorldSignPortal signPortal = findSignPortal(event.getClickedBlock());
+                if (signPortal != null && signPortal.isEnabled()) {
+                    event.setCancelled(true);
+                    WorldPortal portal = resolveSignPortalDestination(signPortal);
+                    if (portal != null) {
+                        usePortal(event.getPlayer(), portal, "signPortalTeleport");
+                    }
+                    return;
                 }
+            }
+            if (event.getClickedBlock().getType() != Material.RESPAWN_ANCHOR) {
                 return;
             }
+            WorldProfileSettings profile = profileFor(event.getPlayer().getWorld().getName());
+            if (profile == null || profile.isAnchorRespawnEnabled()) {
+                return;
+            }
+            event.setCancelled(true);
+            sendPlayerMessage(event.getPlayer(), profile.getDenyMessage(), event.getPlayer().getWorld().getName(), "Respawn Anchors Disabled");
         }
-        if (event.getClickedBlock().getType() != Material.RESPAWN_ANCHOR) {
-            return;
-        }
-        WorldProfileSettings profile = profileFor(event.getPlayer().getWorld().getName());
-        if (profile == null || profile.isAnchorRespawnEnabled()) {
-            return;
-        }
-        event.setCancelled(true);
-        sendPlayerMessage(event.getPlayer(), profile.getDenyMessage(), event.getPlayer().getWorld().getName(), "Respawn Anchors Disabled");
     }
 
     private WorldSnapshot createSnapshotSync() {
@@ -781,61 +1086,76 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         }
         WorldGenDatapackBuild worldGenDatapack;
         TerrainPipelineHolder worldGenPipeline;
+        WorldGenGeneratedOutputController.Handoff generatedHandoff = null;
         try {
             worldGenPipeline = createWorldGenPipeline(generator, generatorConfig);
-            worldGenDatapack = compileWorldGenDatapack(generator, generatorConfig, normalizedName);
+            PreparedWorldGenDatapack prepared = compileWorldGenDatapack(generator, generatorConfig, normalizedName);
+            worldGenDatapack = prepared == null ? null : prepared.build();
+            generatedHandoff = prepared == null ? null : prepared.handoff();
+            if (generatedHandoff != null) {
+                generatedHandoff.throwIfCancellationRequested();
+            }
         } catch (RuntimeException exception) {
+            if (generatedHandoff != null) {
+                generatedHandoff.close();
+            }
             return WorldOperationResult.failure("createWorld", normalizedName, "WorldGenPreparationFailed")
                 .withData("errorCode", "WORLDGEN_PREPARATION_FAILED")
                 .withData("details", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
         }
-        boolean vanillaWorldGen = worldGenDatapack != null
-            && WorldGenGenerationMode.resolve(worldGenDatapack.getGenerationMode()) == WorldGenGenerationMode.VANILLA;
-        if (vanillaWorldGen) {
-            NamespacedKey dimensionKey = NamespacedKey.fromString(worldGenDatapack.getDimensionKey());
-            if (dimensionKey == null) {
-                return WorldOperationResult.failure("createWorld", normalizedName, "WorldGenDimensionMissing");
+        try {
+            boolean vanillaWorldGen = worldGenDatapack != null
+                && WorldGenGenerationMode.resolve(worldGenDatapack.getGenerationMode()) == WorldGenGenerationMode.VANILLA;
+            if (vanillaWorldGen) {
+                NamespacedKey dimensionKey = NamespacedKey.fromString(worldGenDatapack.getDimensionKey());
+                if (dimensionKey == null) {
+                    return WorldOperationResult.failure("createWorld", normalizedName, "WorldGenDimensionMissing");
+                }
+                creator = WorldCreator.ofNameAndKey(normalizedName, dimensionKey);
+                if (parsedSeed != null) {
+                    creator.seed(parsedSeed);
+                }
             }
-            creator = WorldCreator.ofNameAndKey(normalizedName, dimensionKey);
-            if (parsedSeed != null) {
-                creator.seed(parsedSeed);
+            ChunkGenerator chunkGenerator = worldGenPipeline != null
+                ? new NodeGraphChunkGenerator(worldGenPipeline)
+                : vanillaWorldGen ? null : createGenerator(generator, generatorConfig);
+            if (worldGenPipeline != null) {
+                creator.generator(chunkGenerator);
+                creator.biomeProvider(new NodeGraphBiomeProvider(worldGenPipeline));
+            } else if (chunkGenerator != null) {
+                creator.generator(chunkGenerator);
+            } else if (!vanillaWorldGen && generator != null && !generator.isBlank()) {
+                creator.generator(generator);
+            }
+            World world = creator.createWorld();
+            if (world == null) {
+                return WorldOperationResult.failure("createWorld", normalizedName, "WorldCreationFailed");
+            }
+            if (worldGenPipeline != null) {
+                WorldGenRuntimeRegistry.register(world, worldGenPipeline);
+            } else if (chunkGenerator instanceof NodeGraphChunkGenerator nodeGraphChunkGenerator) {
+                WorldGenRuntimeRegistry.register(world, nodeGraphChunkGenerator.getPipelineHolder());
+            }
+            WorldRegistryEntry entry = getOrCreateEntry(world.getName());
+            syncEntryFromWorld(entry, world);
+            entry.setGenerator(generator == null ? "" : generator);
+            entry.setGeneratorConfig(generatorConfig == null ? "" : generatorConfig);
+            persistWorlds();
+            publishMessage(WorldChannelMessage.event("worldCreated", buildWorldStatePayload(entry)));
+            publishSnapshotEvent();
+            WorldOperationResult result = WorldOperationResult.success("createWorld", world.getName(), "WorldCreated").withData("world", entry.copy());
+            if (worldGenDatapack != null) {
+                result.withData("worldGenProjectId", worldGenDatapack.getProjectId())
+                    .withData("worldGenDatapack", worldGenDatapack.getPackName())
+                    .withData("worldGenDatapackFiles", worldGenDatapack.getFileCount())
+                    .withData("worldGenWarnings", List.copyOf(worldGenDatapack.getWarnings()));
+            }
+            return result;
+        } finally {
+            if (generatedHandoff != null) {
+                generatedHandoff.close();
             }
         }
-        ChunkGenerator chunkGenerator = worldGenPipeline != null
-            ? new NodeGraphChunkGenerator(worldGenPipeline)
-            : vanillaWorldGen ? null : createGenerator(generator, generatorConfig);
-        if (worldGenPipeline != null) {
-            creator.generator(chunkGenerator);
-            creator.biomeProvider(new NodeGraphBiomeProvider(worldGenPipeline));
-        } else if (chunkGenerator != null) {
-            creator.generator(chunkGenerator);
-        } else if (!vanillaWorldGen && generator != null && !generator.isBlank()) {
-            creator.generator(generator);
-        }
-        World world = creator.createWorld();
-        if (world == null) {
-            return WorldOperationResult.failure("createWorld", normalizedName, "WorldCreationFailed");
-        }
-        if (worldGenPipeline != null) {
-            WorldGenRuntimeRegistry.register(world, worldGenPipeline);
-        } else if (chunkGenerator instanceof NodeGraphChunkGenerator nodeGraphChunkGenerator) {
-            WorldGenRuntimeRegistry.register(world, nodeGraphChunkGenerator.getPipelineHolder());
-        }
-        WorldRegistryEntry entry = getOrCreateEntry(world.getName());
-        syncEntryFromWorld(entry, world);
-        entry.setGenerator(generator == null ? "" : generator);
-        entry.setGeneratorConfig(generatorConfig == null ? "" : generatorConfig);
-        persistWorlds();
-        publishMessage(WorldChannelMessage.event("worldCreated", buildWorldStatePayload(entry)));
-        publishSnapshotEvent();
-        WorldOperationResult result = WorldOperationResult.success("createWorld", world.getName(), "WorldCreated").withData("world", entry.copy());
-        if (worldGenDatapack != null) {
-            result.withData("worldGenProjectId", worldGenDatapack.getProjectId())
-                .withData("worldGenDatapack", worldGenDatapack.getPackName())
-                .withData("worldGenDatapackFiles", worldGenDatapack.getFileCount())
-                .withData("worldGenWarnings", List.copyOf(worldGenDatapack.getWarnings()));
-        }
-        return result;
     }
 
     private WorldOperationResult scanUnregisteredWorldsSync() {
@@ -950,7 +1270,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
                 return WorldOperationResult.failure("deleteWorld", normalizedName, "FallbackWorldMissing");
             }
             for (Player player : new ArrayList<>(loaded.getPlayers())) {
-                player.teleport(fallback.getSpawnLocation());
+                mutatePlayer("world-delete-fallback", player, () -> player.teleport(fallback.getSpawnLocation()));
             }
             if (!Bukkit.unloadWorld(loaded, true)) {
                 return WorldOperationResult.failure("deleteWorld", normalizedName, "WorldUnloadFailed");
@@ -1053,7 +1373,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             return WorldOperationResult.failure("unloadWorld", normalizedName, "FallbackWorldMissing");
         }
         for (Player player : new ArrayList<>(world.getPlayers())) {
-            player.teleport(fallback.getSpawnLocation());
+            mutatePlayer("world-unload-fallback", player, () -> player.teleport(fallback.getSpawnLocation()));
         }
         boolean unloaded = Bukkit.unloadWorld(world, true);
         if (!unloaded) {
@@ -1701,6 +2021,12 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     }
 
     private void bootstrapLoadedWorlds() {
+        List<String> worldNames = Bukkit.getWorlds().stream().map(World::getName).toList();
+        List<WorldExternalPersistenceCapability.MutationLease> leases = acquireWorldLeases("bootstrapLoadedWorlds", worldNames);
+        if (leases == null) {
+            return;
+        }
+        try {
         Set<String> known = new LinkedHashSet<>();
         for (World world : Bukkit.getWorlds()) {
             WorldRegistryEntry entry = getOrCreateEntry(world.getName());
@@ -1714,6 +2040,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             }
         }
         persistWorlds();
+        } finally {
+            leases.forEach(WorldExternalPersistenceCapability.MutationLease::close);
+        }
     }
 
     private void applyLocksTick() {
@@ -1741,35 +2070,47 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null || targetWorld == null || targetWorld.isBlank()) {
             return;
         }
-        captureWorldState(player, fromWorld);
-        if (fromWorld == null || !fromWorld.equalsIgnoreCase(targetWorld)) {
-            WorldPlayerState applyState = stateForWorld(player, targetWorld);
-            WorldPlayerStateCodec.apply(player, applyState);
+        EventMutationScope mutation = beginEventMutation("worldTransition", mergeWorldNames(mergeWorldNames(List.of(), fromWorld), targetWorld));
+        if (mutation == null) {
+            return;
         }
-        persistPlayerStates();
+        try (mutation) {
+            captureWorldState(player, fromWorld);
+            if (fromWorld == null || !fromWorld.equalsIgnoreCase(targetWorld)) {
+                WorldPlayerState applyState = stateForWorld(player, targetWorld);
+                WorldPlayerStateCodec.apply(player, applyState, playerDataAdmission);
+            }
+            persistPlayerStates();
+        }
     }
 
     private void initializePlayerState(Player player, String worldName) {
         if (player == null || worldName == null || worldName.isBlank()) {
             return;
         }
-        Map<String, WorldPlayerState> states = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
-        WorldPlayerState globalState = states.get(GLOBAL_STATE_KEY);
-        if (globalState == null) {
-            globalState = WorldPlayerStateCodec.capture(player, GLOBAL_STATE_KEY);
-            states.put(GLOBAL_STATE_KEY, globalState);
+        EventMutationScope mutation = beginEventMutation("initializePlayerState", List.of(worldName));
+        if (mutation == null) {
+            return;
         }
-        String key = worldStateKey(worldName);
-        if (!states.containsKey(key)) {
-            WorldPlayerState targetState = globalState.copy();
-            targetState.setWorldName(key);
-            targetState.setUpdatedAt(System.currentTimeMillis());
-            states.put(key, targetState);
+        try (mutation) {
+            Map<String, WorldPlayerState> states = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
+            WorldPlayerState globalState = states.get(GLOBAL_STATE_KEY);
+            if (globalState == null) {
+                globalState = WorldPlayerStateCodec.capture(player, GLOBAL_STATE_KEY);
+                states.put(GLOBAL_STATE_KEY, globalState);
+            }
+            String key = worldStateKey(worldName);
+            if (!states.containsKey(key)) {
+                WorldPlayerState targetState = globalState.copy();
+                targetState.setWorldName(key);
+                targetState.setUpdatedAt(System.currentTimeMillis());
+                states.put(key, targetState);
+            }
+            if (!GLOBAL_STATE_KEY.equals(stateKey(worldName))) {
+                WorldPlayerStateCodec.apply(player, stateForWorld(player, worldName), playerDataAdmission);
+            }
+            persistPlayerStates();
         }
-        if (!GLOBAL_STATE_KEY.equals(stateKey(worldName))) {
-            WorldPlayerStateCodec.apply(player, stateForWorld(player, worldName));
-        }
-        persistPlayerStates();
     }
 
     private void tryPortalTeleport(Player player, Location location) {
@@ -1797,24 +2138,30 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (trackingService == null || player == null || player.getWorld() == null) {
             return;
         }
-        long now = System.currentTimeMillis();
-        if (!force && now - facetUpdates.getOrDefault(player.getUniqueId(), 0L) < FACET_UPDATE_INTERVAL_MS) {
+        EventMutationScope mutation = beginEventMutation("updatePlayerFacet", List.of(player.getWorld().getName()));
+        if (mutation == null) {
             return;
         }
-        Location location = player.getLocation();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("world", player.getWorld().getName());
-        data.put("x", location.getX());
-        data.put("y", location.getY());
-        data.put("z", location.getZ());
-        data.put("yaw", location.getYaw());
-        data.put("pitch", location.getPitch());
-        data.put("gameMode", player.getGameMode().name());
-        data.put("health", player.getHealth());
-        data.put("food", player.getFoodLevel());
-        data.put("online", true);
-        trackingService.upsertFacet(player.getUniqueId(), player.getName(), WORLD_LOCATION_FACET, MODULE_ID, data);
-        facetUpdates.put(player.getUniqueId(), now);
+        try (mutation) {
+            long now = System.currentTimeMillis();
+            if (!force && now - facetUpdates.getOrDefault(player.getUniqueId(), 0L) < FACET_UPDATE_INTERVAL_MS) {
+                return;
+            }
+            Location location = player.getLocation();
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("world", player.getWorld().getName());
+            data.put("x", location.getX());
+            data.put("y", location.getY());
+            data.put("z", location.getZ());
+            data.put("yaw", location.getYaw());
+            data.put("pitch", location.getPitch());
+            data.put("gameMode", player.getGameMode().name());
+            data.put("health", player.getHealth());
+            data.put("food", player.getFoodLevel());
+            data.put("online", true);
+            trackingService.upsertFacet(player.getUniqueId(), player.getName(), WORLD_LOCATION_FACET, MODULE_ID, data);
+            facetUpdates.put(player.getUniqueId(), now);
+        }
     }
 
     private void captureState(Player player, String stateKey) {
@@ -1829,18 +2176,24 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null) {
             return;
         }
-        String key = worldStateKey(worldName);
-        Map<String, WorldPlayerState> perWorld = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
-        WorldPlayerState captured = WorldPlayerStateCodec.capture(player, key);
-        perWorld.put(key, captured);
-        WorldInventoryGroup group = inventoryGroupForWorld(worldName);
-        if (group != null) {
-            String groupStateKey = "group:" + group.getGroupId();
-            WorldPlayerState groupState = perWorld.getOrDefault(groupStateKey, captured.copy());
-            mergeSharedState(groupState, captured, group);
-            groupState.setWorldName(groupStateKey);
-            groupState.setUpdatedAt(System.currentTimeMillis());
-            perWorld.put(groupStateKey, groupState);
+        EventMutationScope mutation = beginEventMutation("captureWorldState", worldName == null ? List.of() : List.of(worldName));
+        if (mutation == null) {
+            return;
+        }
+        try (mutation) {
+            String key = worldStateKey(worldName);
+            Map<String, WorldPlayerState> perWorld = playerStates.computeIfAbsent(player.getUniqueId(), ignored -> new ConcurrentHashMap<>());
+            WorldPlayerState captured = WorldPlayerStateCodec.capture(player, key);
+            perWorld.put(key, captured);
+            WorldInventoryGroup group = inventoryGroupForWorld(worldName);
+            if (group != null) {
+                String groupStateKey = "group:" + group.getGroupId();
+                WorldPlayerState groupState = perWorld.getOrDefault(groupStateKey, captured.copy());
+                mergeSharedState(groupState, captured, group);
+                groupState.setWorldName(groupStateKey);
+                groupState.setUpdatedAt(System.currentTimeMillis());
+                perWorld.put(groupStateKey, groupState);
+            }
         }
     }
 
@@ -2187,7 +2540,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         return new TerrainPipelineHolder(pipeline);
     }
 
-    private WorldGenDatapackBuild compileWorldGenDatapack(String generator, String generatorConfig, String worldName) {
+    private PreparedWorldGenDatapack compileWorldGenDatapack(String generator, String generatorConfig, String worldName) {
         if (!"worldgen_project".equalsIgnoreCase(generator) && !"WORLDGEN_PROJECT".equalsIgnoreCase(generator)) {
             return null;
         }
@@ -2195,12 +2548,28 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (project == null) {
             throw new IllegalArgumentException("WorldGen Project Missing");
         }
-        WorldGenDatapackBuild build = worldGenDatapackCompiler.compile(project, worldGenDatapackCompiler.generatedRoot(), System.currentTimeMillis());
-        WorldGenDatapackInstaller.InstallResult install = worldGenDatapackInstaller.install(build, worldName);
-        if (!install.installed()) {
-            throw new IllegalStateException(install.message() == null || install.message().isBlank() ? "WorldGen Datapack Install Failed" : install.message());
+        WorldGenBuildRecipe recipe = WorldGenBuildRecipe.capture(project);
+        WorldGenGeneratedOutputController.Handoff handoff = generatedOutput.acquireHandoff("world-management-worldgen-compile");
+        try {
+            WorldGenGeneratedOutputController.TransactionResult<WorldGenDatapackBuild> transaction = handoff.transact(
+                stage -> worldGenDatapackCompiler.compile(project, stage, recipe));
+            WorldGenDatapackBuild build = transaction.value();
+            build.setFolder(transaction.activePath(build.getFolder()));
+            handoff.throwIfCancellationRequested();
+            WorldGenDatapackInstaller.InstallResult install = worldGenDatapackInstaller.installWithHandoff(
+                build, worldName, handoff.mutationLease());
+            if (!install.installed()) {
+                throw new IllegalStateException(install.message() == null || install.message().isBlank() ? "WorldGen Datapack Install Failed" : install.message());
+            }
+            return new PreparedWorldGenDatapack(build, handoff);
+        } catch (IOException | RuntimeException | Error exception) {
+            handoff.close();
+            throw new IllegalStateException("WorldGen Datapack Compile Failed: " + exception.getMessage(), exception);
         }
-        return build;
+    }
+
+    private record PreparedWorldGenDatapack(WorldGenDatapackBuild build,
+                                            WorldGenGeneratedOutputController.Handoff handoff) {
     }
 
     private void applyProfileState(WorldRegistryEntry entry, World world) {
@@ -2224,40 +2593,46 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         if (player == null || worldName == null || worldName.isBlank()) {
             return;
         }
-        WorldProfileSettings profile = profileFor(worldName);
-        if (profile == null) {
+        EventMutationScope mutation = beginEventMutation("enforceWorldProfile", List.of(worldName));
+        if (mutation == null) {
             return;
         }
-        if (!canAccessWorld(player, worldName, profile)) {
-            sendPlayerMessage(player, profile.getDenyMessage(), worldName, "Access Denied");
-            World fallback = resolveFallbackWorld(worldName, profile.getRespawnWorld());
-            if (allowTeleportOut && fallback != null) {
-                player.teleport(fallback.getSpawnLocation());
+        try (mutation) {
+            WorldProfileSettings profile = profileFor(worldName);
+            if (profile == null) {
+                return;
             }
-            return;
-        }
-        if (chargeEntry) {
-            if (!consumeEntryFee(player, worldName, profile)) {
+            if (!canAccessWorld(player, worldName, profile)) {
+                sendPlayerMessage(player, profile.getDenyMessage(), worldName, "Access Denied");
                 World fallback = resolveFallbackWorld(worldName, profile.getRespawnWorld());
                 if (allowTeleportOut && fallback != null) {
-                    player.teleport(fallback.getSpawnLocation());
+                    mutatePlayer("world-profile-denied-teleport", player, () -> player.teleport(fallback.getSpawnLocation()));
                 }
                 return;
             }
-        }
-        if (profile.isForceGameMode()) {
-            GameMode gameMode = parseGameMode(profile.getGameMode());
-            if (gameMode != null && player.getGameMode() != gameMode) {
-                player.setGameMode(gameMode);
+            if (chargeEntry) {
+                if (!consumeEntryFee(player, worldName, profile)) {
+                    World fallback = resolveFallbackWorld(worldName, profile.getRespawnWorld());
+                    if (allowTeleportOut && fallback != null) {
+                        mutatePlayer("world-profile-fee-teleport", player, () -> player.teleport(fallback.getSpawnLocation()));
+                    }
+                    return;
+                }
             }
-        }
-        if (profile.isCustomSpawnEnabled()) {
-            Location spawn = resolveProfileSpawn(player.getWorld(), profile);
-            if (spawn != null && player.getLocation().distanceSquared(spawn) > 9.0) {
-                player.teleport(spawn);
+            if (profile.isForceGameMode()) {
+                GameMode gameMode = parseGameMode(profile.getGameMode());
+                if (gameMode != null && player.getGameMode() != gameMode) {
+                    mutatePlayer("world-profile-game-mode", player, () -> player.setGameMode(gameMode));
+                }
             }
+            if (profile.isCustomSpawnEnabled()) {
+                Location spawn = resolveProfileSpawn(player.getWorld(), profile);
+                if (spawn != null && player.getLocation().distanceSquared(spawn) > 9.0) {
+                    mutatePlayer("world-profile-spawn", player, () -> player.teleport(spawn));
+                }
+            }
+            sendPlayerMessage(player, profile.getArrivalMessage(), worldName, null);
         }
-        sendPlayerMessage(player, profile.getArrivalMessage(), worldName, null);
     }
 
     private WorldProfileSettings profileFor(String worldName) {
@@ -2458,49 +2833,67 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         return exact != null ? exact : Bukkit.getPlayer(playerName);
     }
 
+    private void mutatePlayer(String operation, Player player, Runnable mutation) {
+        playerDataAdmission.mutatePlayer(operation, player, mutation);
+    }
+
     private World ensureWorldLoaded(String worldName, String action) {
         String normalizedName = sanitizeWorldName(worldName);
         if (normalizedName == null) {
             return null;
         }
-        World world = Bukkit.getWorld(normalizedName);
-        if (world != null) {
-            return world;
-        }
-        WorldOperationResult result = loadWorldSync(normalizedName);
-        if (!result.isSuccess()) {
-            publishMessage(WorldChannelMessage.error(action, result.getMessage()));
+        EventMutationScope mutation = beginEventMutation("loadWorld", List.of(normalizedName));
+        if (mutation == null) {
             return null;
         }
-        return Bukkit.getWorld(normalizedName);
+        try (mutation) {
+            World world = Bukkit.getWorld(normalizedName);
+            if (world != null) {
+                return world;
+            }
+            WorldOperationResult result = loadWorldSync(normalizedName);
+            if (!result.isSuccess()) {
+                publishMessage(WorldChannelMessage.error(action, result.getMessage()));
+                return null;
+            }
+            return Bukkit.getWorld(normalizedName);
+        }
     }
 
     private WorldOperationResult teleportPlayer(Player player, Location target, String action, String message) {
         if (player == null || target == null || target.getWorld() == null) {
             return WorldOperationResult.failure(action, null, "InvalidTeleportTarget");
         }
-        boolean teleported = player.teleport(target);
-        if (!teleported) {
-            return WorldOperationResult.failure(action, target.getWorld().getName(), "TeleportFailed");
+        String sourceWorld = player.getWorld() == null ? null : player.getWorld().getName();
+        List<String> names = mergeWorldNames(mergeWorldNames(List.of(), sourceWorld), target.getWorld().getName());
+        EventMutationScope mutation = beginEventMutation("teleportPlayer", names);
+        if (mutation == null) {
+            return WorldOperationResult.failure(action, target.getWorld().getName(), "WORLD_REPLACEMENT_FENCE_CLOSED");
         }
-        LinkedHashMap<String, Object> data = new LinkedHashMap<>();
-        data.put("playerId", player.getUniqueId().toString());
-        data.put("playerName", player.getName());
-        data.put("worldName", target.getWorld().getName());
-        data.put("x", target.getX());
-        data.put("y", target.getY());
-        data.put("z", target.getZ());
-        data.put("yaw", target.getYaw());
-        data.put("pitch", target.getPitch());
-        publishMessage(WorldChannelMessage.event("worldPlayerTeleported", data));
-        return WorldOperationResult.success(action, target.getWorld().getName(), message)
-            .withData("playerName", player.getName())
-            .withData("worldName", target.getWorld().getName())
-            .withData("x", target.getX())
-            .withData("y", target.getY())
-            .withData("z", target.getZ())
-            .withData("yaw", target.getYaw())
-            .withData("pitch", target.getPitch());
+        try (mutation) {
+            boolean teleported = playerDataAdmission.mutatePlayer("world-teleport", player, () -> player.teleport(target));
+            if (!teleported) {
+                return WorldOperationResult.failure(action, target.getWorld().getName(), "TeleportFailed");
+            }
+            LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+            data.put("playerId", player.getUniqueId().toString());
+            data.put("playerName", player.getName());
+            data.put("worldName", target.getWorld().getName());
+            data.put("x", target.getX());
+            data.put("y", target.getY());
+            data.put("z", target.getZ());
+            data.put("yaw", target.getYaw());
+            data.put("pitch", target.getPitch());
+            publishMessage(WorldChannelMessage.event("worldPlayerTeleported", data));
+            return WorldOperationResult.success(action, target.getWorld().getName(), message)
+                .withData("playerName", player.getName())
+                .withData("worldName", target.getWorld().getName())
+                .withData("x", target.getX())
+                .withData("y", target.getY())
+                .withData("z", target.getZ())
+                .withData("yaw", target.getYaw())
+                .withData("pitch", target.getPitch());
+        }
     }
 
     private WorldOperationResult usePortal(Player player, WorldPortal portal, String action) {
@@ -2543,9 +2936,9 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             return result;
         }
         if (velocity != null) {
-            player.setVelocity(velocity);
+            mutatePlayer("world-portal-velocity", player, () -> player.setVelocity(velocity));
         } else if ("CANNON".equalsIgnoreCase(portal.getDestinationMode())) {
-            player.setVelocity(target.getDirection().normalize().multiply(portal.getCannonPower()));
+            mutatePlayer("world-portal-cannon", player, () -> player.setVelocity(target.getDirection().normalize().multiply(portal.getCannonPower())));
         }
         long now = System.currentTimeMillis();
         setPortalCooldown(player.getUniqueId(), portal.getPortalId(), now + portal.getCooldownMillis());
@@ -2940,6 +3333,11 @@ public class WorldManagementManager implements WorldManagementService, Listener 
     private record PortalLookupResult(WorldPortal portal, String errorMessage) {
     }
 
+    private record MetadataSnapshot(List<WorldRegistryEntry> worlds, List<WorldPortal> portals,
+                                    List<WorldInventoryGroup> inventoryGroups, List<WorldSignPortal> signPortals,
+                                    Map<UUID, Map<String, WorldPlayerState>> playerStates) {
+    }
+
     private record ClonePreparation(String source, String target, Path sourceFolder, Path targetFolder, WorldRegistryEntry sourceEntry, WorldOperationResult failure) {
     }
 
@@ -2959,6 +3357,157 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         }
     }
 
+    private void replaceMetadata(WorldStateStorage.State state) {
+        if (state == null) {
+            replaceMetadata(List.of(), List.of(), List.of(), List.of(), Map.of());
+            return;
+        }
+        replaceMetadata(state.worlds(), state.portals(), state.inventoryGroups(), state.signPortals(), state.playerStates());
+    }
+
+    private void validateCandidateMetadata(WorldStateStorage.State state) throws IOException {
+        Set<String> worldKeys = new LinkedHashSet<>();
+        for (WorldRegistryEntry entry : state.worlds()) {
+            if (entry == null || sanitizeWorldName(entry.getWorldName()) == null
+                || !worldKeys.add(worldKey(entry.getWorldName()))) {
+                throw new IOException("World management candidate contains invalid or duplicate world metadata");
+            }
+        }
+        Set<String> portalIds = new LinkedHashSet<>();
+        for (WorldPortal portal : state.portals()) {
+            if (portal == null || portal.getPortalId() == null || portal.getPortalId().isBlank()
+                || !portalIds.add(portal.getPortalId())) {
+                throw new IOException("World management candidate contains invalid or duplicate portal metadata");
+            }
+        }
+        Set<String> groupKeys = new LinkedHashSet<>();
+        for (WorldInventoryGroup group : state.inventoryGroups()) {
+            if (group == null || group.getGroupId() == null || group.getGroupId().isBlank()
+                || !groupKeys.add(groupKey(group.getGroupId()))) {
+                throw new IOException("World management candidate contains invalid or duplicate inventory metadata");
+            }
+        }
+        Set<String> signIds = new LinkedHashSet<>();
+        for (WorldSignPortal signPortal : state.signPortals()) {
+            if (signPortal == null || signPortal.getSignId() == null || signPortal.getSignId().isBlank()
+                || !signIds.add(signPortal.getSignId())) {
+                throw new IOException("World management candidate contains invalid or duplicate sign metadata");
+            }
+        }
+        for (Map<String, WorldPlayerState> states : state.playerStates().values()) {
+            if (states == null) {
+                throw new IOException("World management candidate contains invalid player metadata");
+            }
+            for (Map.Entry<String, WorldPlayerState> entry : states.entrySet()) {
+                if (entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) {
+                    throw new IOException("World management candidate contains invalid player state metadata");
+                }
+            }
+        }
+    }
+
+    private void replaceMetadata(MetadataSnapshot state) {
+        replaceMetadata(state.worlds(), state.portals(), state.inventoryGroups(), state.signPortals(), state.playerStates());
+    }
+
+    private void replaceMetadata(Collection<WorldRegistryEntry> worldEntries, Collection<WorldPortal> portalEntries,
+                                 Collection<WorldInventoryGroup> groupEntries, Collection<WorldSignPortal> signEntries,
+                                 Map<UUID, Map<String, WorldPlayerState>> stateEntries) {
+        Map<String, WorldRegistryEntry> nextWorlds = new LinkedHashMap<>();
+        if (worldEntries != null) {
+            for (WorldRegistryEntry entry : worldEntries) {
+                if (entry == null || entry.getWorldName() == null || entry.getWorldName().isBlank()) {
+                    continue;
+                }
+                nextWorlds.put(worldKey(entry.getWorldName()), entry.copy());
+            }
+        }
+        Map<String, WorldPortal> nextPortals = new LinkedHashMap<>();
+        if (portalEntries != null) {
+            for (WorldPortal portal : portalEntries) {
+                if (portal == null || portal.getPortalId() == null || portal.getPortalId().isBlank()) {
+                    continue;
+                }
+                WorldPortal copy = portal.copy();
+                copy.normalizeBounds();
+                nextPortals.put(copy.getPortalId(), copy);
+            }
+        }
+        Map<String, WorldInventoryGroup> nextGroups = new LinkedHashMap<>();
+        if (groupEntries != null) {
+            for (WorldInventoryGroup group : groupEntries) {
+                if (group == null || group.getGroupId() == null || group.getGroupId().isBlank()) {
+                    continue;
+                }
+                nextGroups.put(groupKey(group.getGroupId()), group.copy());
+            }
+        }
+        Map<String, WorldSignPortal> nextSigns = new LinkedHashMap<>();
+        if (signEntries != null) {
+            for (WorldSignPortal signPortal : signEntries) {
+                if (signPortal == null || signPortal.getSignId() == null || signPortal.getSignId().isBlank()) {
+                    continue;
+                }
+                nextSigns.put(signPortal.getSignId(), signPortal.copy());
+            }
+        }
+        Map<UUID, Map<String, WorldPlayerState>> nextPlayerStates = new LinkedHashMap<>();
+        if (stateEntries != null) {
+            for (Map.Entry<UUID, Map<String, WorldPlayerState>> entry : stateEntries.entrySet()) {
+                if (entry.getKey() == null) {
+                    continue;
+                }
+                Map<String, WorldPlayerState> perWorld = new LinkedHashMap<>();
+                if (entry.getValue() != null) {
+                    for (Map.Entry<String, WorldPlayerState> stateEntry : entry.getValue().entrySet()) {
+                        if (stateEntry.getKey() == null || stateEntry.getKey().isBlank() || stateEntry.getValue() == null) {
+                            continue;
+                        }
+                        perWorld.put(stateEntry.getKey(), stateEntry.getValue().copy());
+                    }
+                }
+                nextPlayerStates.put(entry.getKey(), perWorld);
+            }
+        }
+        worlds.clear();
+        worlds.putAll(nextWorlds);
+        portals.clear();
+        portals.putAll(nextPortals);
+        inventoryGroups.clear();
+        inventoryGroups.putAll(nextGroups);
+        signPortals.clear();
+        signPortals.putAll(nextSigns);
+        playerStates.clear();
+        for (Map.Entry<UUID, Map<String, WorldPlayerState>> entry : nextPlayerStates.entrySet()) {
+            playerStates.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue()));
+        }
+        rebuildPortalIndex();
+    }
+
+    private MetadataSnapshot snapshotMetadata() {
+        List<WorldRegistryEntry> worldEntries = new ArrayList<>();
+        worlds.values().forEach(entry -> worldEntries.add(entry.copy()));
+        List<WorldPortal> portalEntries = new ArrayList<>();
+        portals.values().forEach(portal -> portalEntries.add(portal.copy()));
+        List<WorldInventoryGroup> groupEntries = new ArrayList<>();
+        inventoryGroups.values().forEach(group -> groupEntries.add(group.copy()));
+        List<WorldSignPortal> signEntries = new ArrayList<>();
+        signPortals.values().forEach(signPortal -> signEntries.add(signPortal.copy()));
+        Map<UUID, Map<String, WorldPlayerState>> stateEntries = new LinkedHashMap<>();
+        for (Map.Entry<UUID, Map<String, WorldPlayerState>> entry : playerStates.entrySet()) {
+            Map<String, WorldPlayerState> perWorld = new LinkedHashMap<>();
+            if (entry.getValue() != null) {
+                for (Map.Entry<String, WorldPlayerState> stateEntry : entry.getValue().entrySet()) {
+                    if (stateEntry.getKey() != null && stateEntry.getValue() != null) {
+                        perWorld.put(stateEntry.getKey(), stateEntry.getValue().copy());
+                    }
+                }
+            }
+            stateEntries.put(entry.getKey(), perWorld);
+        }
+        return new MetadataSnapshot(worldEntries, portalEntries, groupEntries, signEntries, stateEntries);
+    }
+
     private void persistWorlds() {
         List<WorldRegistryEntry> entries = new ArrayList<>();
         for (WorldRegistryEntry entry : worlds.values()) {
@@ -2974,7 +3523,7 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             entries.add(entry.copy());
         }
         entries.sort(Comparator.comparing(WorldRegistryEntry::getWorldName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
-        storageExecutor.submit(() -> storage.saveWorlds(entries));
+        submitStorageMutation("persistWorlds", () -> storage.saveWorlds(entries));
     }
 
     private void persistPortals() {
@@ -3037,7 +3586,26 @@ public class WorldManagementManager implements WorldManagementService, Listener 
             }
             copy.put(entry.getKey(), states);
         }
-        storageExecutor.submit(() -> storage.savePlayerStates(copy));
+        submitStorageMutation("persistPlayerStates", () -> storage.savePlayerStates(copy));
+    }
+
+    private void submitStorageMutation(String action, Runnable operation) {
+        EventMutationScope scope = beginEventMutation(action, List.copyOf(worlds.keySet()));
+        if (scope == null) {
+            return;
+        }
+        try {
+            storageExecutor.submitTracked(() -> {
+                try {
+                    operation.run();
+                } finally {
+                    scope.close();
+                }
+            });
+        } catch (RuntimeException exception) {
+            scope.close();
+            throw exception;
+        }
     }
 
     private void persistAll() {
@@ -3150,6 +3718,147 @@ public class WorldManagementManager implements WorldManagementService, Listener 
         } catch (NumberFormatException ignored) {
             return (long) seed.hashCode();
         }
+    }
+
+    private WorldOperationResult guardedWorldMutation(String action, String worldName, Supplier<WorldOperationResult> operation) {
+        return guardedWorldMutation(action, worldName == null ? List.of() : List.of(worldName), operation);
+    }
+
+    private WorldOperationResult guardedWorldMutation(String action, Collection<String> worldNames,
+                                                      Supplier<WorldOperationResult> operation) {
+        List<String> names = worldNames == null ? List.of() : worldNames.stream().distinct().toList();
+        String target = names.isEmpty() ? null : names.getFirst();
+        if (names.isEmpty()) {
+            return WorldOperationResult.failure(action, target, "WorldPersistenceIdentityRejected");
+        }
+        try (WorldExternalPersistenceCapability.MutationLease ignored = externalPersistenceCapability.acquireNormalMutation(action, names)) {
+            return operation.get();
+        } catch (WorldExternalPersistenceCapability.IdentityRejectedException exception) {
+            return WorldOperationResult.failure(action, target, "WorldPersistenceIdentityRejected");
+        } catch (WorldExternalPersistenceCapability.OperationRejectedException exception) {
+            return WorldOperationResult.failure(action, target, exception.code());
+        }
+    }
+
+    private WorldOperationResult guardedWorldCreationMutation(String action, Collection<String> worldNames,
+                                                               Supplier<WorldOperationResult> operation) {
+        List<String> names = worldNames == null ? List.of() : worldNames.stream().distinct().toList();
+        if (names.isEmpty()) {
+            return WorldOperationResult.failure(action, null, "WorldPersistenceIdentityRejected");
+        }
+        List<WorldExternalPersistenceCapability.MutationLease> leases = new ArrayList<>();
+        try {
+            for (String name : names) {
+                leases.add(externalPersistenceCapability.acquireCreation(action, name));
+            }
+            return operation.get();
+        } catch (WorldExternalPersistenceCapability.IdentityRejectedException exception) {
+            return WorldOperationResult.failure(action, names.getFirst(), "WorldPersistenceIdentityRejected");
+        } catch (WorldExternalPersistenceCapability.OperationRejectedException exception) {
+            return WorldOperationResult.failure(action, names.getFirst(), exception.code());
+        } finally {
+            leases.forEach(WorldExternalPersistenceCapability.MutationLease::close);
+        }
+    }
+
+    private EventMutationScope beginEventMutation(String action, Collection<String> worldNames) {
+        List<WorldExternalPersistenceCapability.MutationLease> leases = acquireWorldLeases(action, worldNames);
+        if (leases == null) {
+            return null;
+        }
+        return new EventMutationScope(plugin, leases);
+    }
+
+    private List<WorldExternalPersistenceCapability.MutationLease> acquireWorldLeases(String action,
+                                                                                        Collection<String> worldNames) {
+        if (worldNames == null || worldNames.isEmpty()) {
+            return null;
+        }
+        List<WorldExternalPersistenceCapability.MutationLease> leases = new ArrayList<>();
+        try {
+            for (String worldName : worldNames) {
+                leases.add(externalPersistenceCapability.acquireNormalMutation(action, worldName));
+            }
+            return leases;
+        } catch (WorldExternalPersistenceCapability.IdentityRejectedException | WorldExternalPersistenceCapability.OperationRejectedException exception) {
+            leases.forEach(WorldExternalPersistenceCapability.MutationLease::close);
+            return null;
+        }
+    }
+
+    private List<String> portalWorldNames(String portalIdOrName) {
+        if (portalIdOrName == null || portalIdOrName.isBlank()) {
+            return List.of();
+        }
+        WorldPortal portal = portals.get(portalIdOrName);
+        if (portal == null) {
+            for (WorldPortal candidate : portals.values()) {
+                if (portalIdOrName.equalsIgnoreCase(candidate.getPortalName())) {
+                    portal = candidate;
+                    break;
+                }
+            }
+        }
+        if (portal == null) {
+            return List.of();
+        }
+        return mergeWorldNames(mergeWorldNames(List.of(), portal.getSourceWorld()), portal.getDestinationWorld());
+    }
+
+    private List<String> inventoryGroupWorldNames(String groupId) {
+        WorldInventoryGroup group = groupId == null ? null : inventoryGroups.get(groupKey(groupId));
+        return group == null || group.getWorlds() == null ? List.of() : List.copyOf(group.getWorlds());
+    }
+
+    private String signPortalWorldName(String signId) {
+        WorldSignPortal signPortal = signId == null ? null : signPortals.get(signId);
+        return signPortal == null ? null : signPortal.getWorldName();
+    }
+
+    private static final class EventMutationScope implements AutoCloseable {
+        private final List<WorldExternalPersistenceCapability.MutationLease> leases;
+        private final Plugin plugin;
+        private boolean closed;
+        private boolean deferred;
+        private boolean scheduled;
+
+        private EventMutationScope(Plugin plugin, List<WorldExternalPersistenceCapability.MutationLease> leases) {
+            this.plugin = plugin;
+            this.leases = List.copyOf(leases);
+        }
+
+        private void deferToNextTick() {
+            deferred = true;
+        }
+
+        @Override
+        public void close() {
+            if (closed || (deferred && scheduled)) {
+                return;
+            }
+            if (deferred) {
+                scheduled = true;
+                Bukkit.getScheduler().runTask(plugin, this::releaseNow);
+                return;
+            }
+            releaseNow();
+        }
+
+        private void releaseNow() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            leases.forEach(WorldExternalPersistenceCapability.MutationLease::close);
+        }
+    }
+
+    private List<String> mergeWorldNames(Collection<String> names, String additional) {
+        List<String> merged = new ArrayList<>(names == null ? List.of() : names);
+        if (additional != null) {
+            merged.add(additional);
+        }
+        return merged;
     }
 
     private <T> T callSync(Supplier<T> supplier) {

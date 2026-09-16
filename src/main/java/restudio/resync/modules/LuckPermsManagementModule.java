@@ -1,8 +1,16 @@
 package restudio.resync.modules;
 
 import com.google.gson.Gson;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.ServicePriority;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import restudio.resync.Log;
 import restudio.resync.core.Session;
+import restudio.resync.migration.MigrationPaths;
+import restudio.resync.migration.ReSyncPersistenceCoordinator;
+import restudio.resync.permissions.LuckPermsBackendPersistenceCapability;
+import restudio.resync.permissions.LuckPermsBackendPersistenceParticipant;
+import restudio.resync.permissions.LuckPermsOperationPersistenceParticipant;
 import restudio.resync.permissions.LuckPermsManagementContract;
 import restudio.resync.permissions.LuckPermsManagementContract.Action;
 import restudio.resync.permissions.LuckPermsManagementContract.Invalidation;
@@ -14,7 +22,9 @@ import restudio.resync.protocol.messages.DataMessage;
 import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +39,36 @@ public final class LuckPermsManagementModule implements Module {
     private int channelId;
     private ScheduledExecutorService scheduler;
     private LuckPermsManagementService service;
+    private final LuckPermsBackendPersistenceCapability configuredBackendPersistence;
+    private final LuckPermsBackendPersistenceCapability.Adapter configuredBackendAdapter;
+    private final LuckPermsBackendPersistenceCapability.AdapterProvider configuredBackendProvider;
+    private LuckPermsBackendPersistenceCapability backendPersistence;
+    private LuckPermsBackendPersistenceParticipant backendParticipant;
+    private LuckPermsOperationPersistenceParticipant operationParticipant;
+
+    public LuckPermsManagementModule() {
+        this(null, null, null);
+    }
+
+    public LuckPermsManagementModule(LuckPermsBackendPersistenceCapability backendPersistence) {
+        this(backendPersistence, null, null);
+    }
+
+    public LuckPermsManagementModule(LuckPermsBackendPersistenceCapability.Adapter backendAdapter) {
+        this(null, backendAdapter, null);
+    }
+
+    public LuckPermsManagementModule(LuckPermsBackendPersistenceCapability.AdapterProvider backendProvider) {
+        this(null, null, backendProvider);
+    }
+
+    private LuckPermsManagementModule(LuckPermsBackendPersistenceCapability backendPersistence,
+                                      LuckPermsBackendPersistenceCapability.Adapter backendAdapter,
+                                      LuckPermsBackendPersistenceCapability.AdapterProvider backendProvider) {
+        configuredBackendPersistence = backendPersistence;
+        configuredBackendAdapter = backendAdapter;
+        configuredBackendProvider = backendProvider;
+    }
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -40,17 +80,89 @@ public final class LuckPermsManagementModule implements Module {
         codec = context.getCodec();
         channelId = context.getChannelMuxer().getChannel(getChannelId()).getNumericId();
         scheduler = context.getScheduler();
-        service = new LuckPermsManagementService(context.getPlugin());
+        Path activeRoot = activeDataRoot(context);
+        backendPersistence = resolveBackendPersistence(context);
+        service = new LuckPermsManagementService(context.getPlugin(), backendPersistence, activeRoot);
         service.addListener(this::broadcast);
+        backendParticipant = backendPersistence.adapterConfigured()
+            ? new LuckPermsBackendPersistenceParticipant(activeRoot, backendPersistence) : null;
+        operationParticipant = new LuckPermsOperationPersistenceParticipant(activeRoot, service);
         context.registerService(LuckPermsManagementService.class, service);
+        context.registerService(LuckPermsBackendPersistenceCapability.class, backendPersistence);
+        if (backendParticipant != null) {
+            context.registerService(LuckPermsBackendPersistenceParticipant.class, backendParticipant);
+        }
+        context.registerService(LuckPermsOperationPersistenceParticipant.class, operationParticipant);
+        Bukkit.getServicesManager().register(LuckPermsBackendPersistenceCapability.class, backendPersistence, context.getPlugin(), ServicePriority.Normal);
+    }
+
+    private Path activeDataRoot(ModuleContext context) {
+        ReSyncPersistenceCoordinator persistence = context.getRequiredService(ReSyncPersistenceCoordinator.class);
+        try {
+            return MigrationPaths.requirePath(persistence.activeDataRoot(), "LuckPerms active data root");
+        } catch (IOException exception) {
+            throw new IllegalStateException("LuckPerms active data root could not be resolved", exception);
+        }
     }
 
     @Override
     public void stop(ModuleContext context) {
         sessions.clear();
         if (service != null) {
-            service.close();
+            service.closeForModuleShutdown();
         }
+        if (backendPersistence != null && !backendParticipantRegistered(context)) {
+            try {
+                if (backendParticipant != null && backendPersistence.replacementReady()) {
+                    backendParticipant.close();
+                } else {
+                    backendPersistence.close();
+                }
+            } catch (IOException | RuntimeException exception) {
+                Log.warn("LuckPerms backend persistence could not close during module shutdown: " + exception.getMessage());
+                try {
+                    backendPersistence.close();
+                } catch (IOException | RuntimeException closeFailure) {
+                    exception.addSuppressed(closeFailure);
+                }
+            }
+        }
+        if (backendPersistence != null) {
+            Bukkit.getServicesManager().unregister(LuckPermsBackendPersistenceCapability.class, backendPersistence);
+        }
+    }
+
+    private LuckPermsBackendPersistenceCapability resolveBackendPersistence(ModuleContext context) {
+        if (configuredBackendPersistence != null) {
+            return configuredBackendPersistence;
+        }
+        LuckPermsBackendPersistenceCapability.Adapter adapter = configuredBackendAdapter;
+        LuckPermsBackendPersistenceCapability.AdapterProvider provider = configuredBackendProvider;
+        if (adapter == null && provider == null) {
+            RegisteredServiceProvider<LuckPermsBackendPersistenceCapability.AdapterProvider> providerRegistration =
+                Bukkit.getServicesManager().getRegistration(LuckPermsBackendPersistenceCapability.AdapterProvider.class);
+            provider = providerRegistration == null ? null : providerRegistration.getProvider();
+        }
+        if (adapter == null && provider != null) {
+            try {
+                adapter = provider.create(context.getPlugin());
+            } catch (RuntimeException exception) {
+                Log.warn("LuckPerms backend adapter provider failed: " + exception.getMessage());
+            }
+        }
+        if (adapter == null) {
+            RegisteredServiceProvider<LuckPermsBackendPersistenceCapability.Adapter> adapterRegistration =
+                Bukkit.getServicesManager().getRegistration(LuckPermsBackendPersistenceCapability.Adapter.class);
+            adapter = adapterRegistration == null ? null : adapterRegistration.getProvider();
+        }
+        return adapter == null ? LuckPermsBackendPersistenceCapability.unavailable()
+            : new LuckPermsBackendPersistenceCapability(adapter);
+    }
+
+    private boolean backendParticipantRegistered(ModuleContext context) {
+        ReSyncPersistenceCoordinator persistence = context.getService(ReSyncPersistenceCoordinator.class);
+        return persistence != null && backendParticipant != null
+            && persistence.registeredParticipants().stream().anyMatch(participant -> participant == backendParticipant);
     }
 
     @Override

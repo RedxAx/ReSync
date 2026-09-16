@@ -21,9 +21,40 @@ import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.diagnostics.FlowDebugService;
 import restudio.resync.flow.diagnostics.FlowTraceRecord;
 import restudio.resync.flow.diagnostics.FlowTraceService;
+import restudio.resync.flow.diagnostic.Diagnostic;
+import restudio.resync.flow.function.FunctionDiagnostic;
+import restudio.resync.flow.function.FunctionOutputMap;
+import restudio.resync.flow.function.FunctionResult;
+import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.migration.IdCompatibilityLayer;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
+import restudio.resync.flow.runtime.CompiledRuntimeContext;
+import restudio.resync.flow.handler.event.FlowEventRegistry;
+import restudio.resync.flow.runtime.RuntimeAuthority;
+import restudio.resync.flow.runtime.RuntimeBindingKey;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimeExecutionProvenance;
+import restudio.resync.flow.runtime.RuntimeLeaseInput;
+import restudio.resync.flow.runtime.RuntimePrincipal;
+import restudio.resync.flow.runtime.RuntimePrincipalAuthority;
+import restudio.resync.flow.runtime.RuntimeAuditBoundary;
+import restudio.resync.flow.runtime.RuntimeAuditEvent;
+import restudio.resync.flow.runtime.RuntimeSemantics;
+import restudio.resync.flow.runtime.RuntimeReceiptStore;
+import restudio.resync.flow.runtime.RuntimeResult;
+import restudio.resync.flow.type.TypedValue;
+import restudio.resync.flow.identity.CapabilityId;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.OperationId;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ProviderId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.flow.validation.FlowGraphValidationResult;
 import restudio.resync.flow.validation.FlowGraphValidator;
@@ -33,8 +64,11 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,13 +76,16 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 import java.util.function.Predicate;
+import java.util.function.BiPredicate;
 import java.util.function.Supplier;
 
 public class FlowExecutor {
@@ -66,17 +103,34 @@ public class FlowExecutor {
     private final long maxExecutionDurationMillis;
     private final int maxFunctionCallDepth;
     private final IdCompatibilityLayer idCompatibility;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
+    private volatile FlowExecutionBridge executionBridge;
+    private volatile CompiledFunctionExecutionBridge compiledFunctionExecutionBridge;
+    private volatile RuntimeAuthority compiledFunctionAuthority;
+    private volatile RuntimePrincipalAuthority compiledFunctionPrincipalAuthority;
+    private volatile RuntimeReceiptStore compiledFunctionReceiptStore;
+    private volatile ServerId compiledFunctionServerId;
+    private volatile RuntimePrincipal compiledFunctionDefaultPrincipal;
+    private volatile RuntimeAuditBoundary compiledFunctionAuditBoundary = RuntimeAuditBoundary.unavailable();
+    private final Map<String, FunctionResult> compiledFunctionReplayResults = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<FunctionResult>> compiledFunctionInFlight = new ConcurrentHashMap<>();
     private final Map<String, Object> eventVariables = new ConcurrentHashMap<>();
+    private final Map<CorrelationId, LiveEventScope> liveEvents = new ConcurrentHashMap<>();
     private final Map<String, PendingTask> pendingTasks = new ConcurrentHashMap<>();
     private final Map<String, WallClockTask> wallClockTasks = new ConcurrentHashMap<>();
     private final Map<String, TerminalTask> terminalTasks = new ConcurrentHashMap<>();
     private final ScheduledThreadPoolExecutor wallClockScheduler;
     private final List<FlowExecutionListener> executionListeners = new CopyOnWriteArrayList<>();
     private final Deque<FlowNodeAuditRecord> auditRecords = new ArrayDeque<>();
+    private final Object admissionMonitor = new Object();
+    private final List<CompletableFuture<Void>> drainWaiters = new ArrayList<>();
+    private int activeLegacyExecutions;
+    private int admissionFenceDepth;
     private FlowTraceService traceService;
     private FlowDebugService debugService;
     private FlowGraphValidator graphValidator;
     private Predicate<FlowGraph> executionAuthority = graph -> true;
+    private BiPredicate<FlowGraph, CompiledGraphMetadata> compiledExecutionAuthority = (graph, metadata) -> executionAuthority.test(graph);
     private FlowNodeAuthorizationPolicy authorizationPolicy = (context, node, definition) -> {
         String policy = definition != null ? definition.getAuthorizationPolicy() : "trusted_server_flow";
         return "trusted_server_flow".equals(policy) || "public".equals(policy)
@@ -84,11 +138,152 @@ public class FlowExecutor {
             : FlowNodeAuthorizationPolicy.AuthorizationDecision.deny(policy, node != null ? node.getType() : "");
     };
 
+    public record FunctionInvocationContext(RuntimePrincipal principal, CorrelationId invocationId,
+                                            CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis,
+                                            String sessionReference, String creatorPrincipal,
+                                            String creatorSessionReference) {
+        public FunctionInvocationContext {
+            principal = Objects.requireNonNull(principal, "Function Principal Is Required");
+            invocationId = Objects.requireNonNull(invocationId, "Function Invocation ID Is Required");
+            if (runtimeContext != null && runtimeContext.principal() != null
+                && !principal.canonical().equals(runtimeContext.principal().canonical())) {
+                throw new IllegalArgumentException("Function Runtime Context Principal Must Match Invocation Principal");
+            }
+            if (requestedDeadlineMillis < 0) {
+                throw new IllegalArgumentException("Function Deadline Cannot Be Negative");
+            }
+            sessionReference = sessionReference == null ? null : sessionReference.trim();
+            if (sessionReference != null && sessionReference.isEmpty()) {
+                throw new IllegalArgumentException("Function Session Reference Is Required");
+            }
+            creatorPrincipal = creatorPrincipal == null ? null : creatorPrincipal.trim();
+            creatorSessionReference = creatorSessionReference == null ? null : creatorSessionReference.trim();
+            if (creatorPrincipal != null && creatorPrincipal.isEmpty()) {
+                throw new IllegalArgumentException("Function Creator Principal Is Required");
+            }
+            if (creatorSessionReference != null && creatorSessionReference.isEmpty()) {
+                throw new IllegalArgumentException("Function Creator Session Reference Is Required");
+            }
+            if (creatorPrincipal == null && creatorSessionReference != null) {
+                throw new IllegalArgumentException("Function Creator Session Requires A Creator Principal");
+            }
+        }
+
+        public FunctionInvocationContext(RuntimePrincipal principal, CorrelationId invocationId,
+                                         CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis) {
+            this(principal, invocationId, runtimeContext, requestedDeadlineMillis, null);
+        }
+
+        public FunctionInvocationContext(RuntimePrincipal principal, CorrelationId invocationId,
+                                         CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis,
+                                         String sessionReference) {
+            this(principal, invocationId, runtimeContext, requestedDeadlineMillis, sessionReference, null, null);
+        }
+
+        public FunctionInvocationContext child(String identity) {
+            String normalized = Objects.requireNonNull(identity, "Function Child Identity Is Required").trim();
+            if (normalized.isEmpty()) {
+                throw new IllegalArgumentException("Function Child Identity Is Required");
+            }
+            return new FunctionInvocationContext(principal,
+                CorrelationId.deterministic(invocationId.value(), "compiled-function-child", normalized),
+                runtimeContext, requestedDeadlineMillis, sessionReference, creatorPrincipal, creatorSessionReference);
+        }
+    }
+
     private record PendingTask(String graphId, String runtimeOwner, BukkitTask task, CompletableFuture<Void> completion,
                                long createdAt, long nextFireAt, boolean recurring, String lastFailure) {
     }
 
     private record TerminalTask(ScheduledTaskSnapshot snapshot, long completedAt) {
+    }
+
+    public final class AdmissionFence implements AutoCloseable {
+        private boolean closed;
+
+        private AdmissionFence() {
+        }
+
+        public void awaitDrained() {
+            awaitLegacyExecutions();
+        }
+
+        public boolean awaitDrained(Duration timeout) {
+            Objects.requireNonNull(timeout, "Admission Drain Timeout Is Required");
+            if (timeout.isNegative()) {
+                throw new IllegalArgumentException("Admission Drain Timeout Cannot Be Negative");
+            }
+            long deadline = System.nanoTime() + timeout.toNanos();
+            boolean interrupted = false;
+            synchronized (admissionMonitor) {
+                while (activeLegacyExecutions > 0) {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) {
+                        if (interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return false;
+                    }
+                    try {
+                        TimeUnit.NANOSECONDS.timedWait(admissionMonitor, remaining);
+                    } catch (InterruptedException exception) {
+                        interrupted = true;
+                        break;
+                    }
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            return isDrained();
+        }
+
+        public CompletableFuture<Void> whenDrained() {
+            return awaitLegacyExecutionsAsync();
+        }
+
+        public boolean isDrained() {
+            synchronized (admissionMonitor) {
+                return activeLegacyExecutions == 0;
+            }
+        }
+
+        @Override
+        public void close() {
+            synchronized (admissionMonitor) {
+                if (closed) {
+                    return;
+                }
+                closed = true;
+                admissionFenceDepth = Math.max(0, admissionFenceDepth - 1);
+                admissionMonitor.notifyAll();
+            }
+        }
+    }
+
+    private final class LegacyAdmission implements AutoCloseable {
+        private boolean released;
+
+        @Override
+        public void close() {
+            List<CompletableFuture<Void>> completedWaiters = List.of();
+            synchronized (admissionMonitor) {
+                if (released) {
+                    return;
+                }
+                released = true;
+                activeLegacyExecutions = Math.max(0, activeLegacyExecutions - 1);
+                if (activeLegacyExecutions == 0 && !drainWaiters.isEmpty()) {
+                    completedWaiters = new ArrayList<>(drainWaiters);
+                    drainWaiters.clear();
+                }
+                admissionMonitor.notifyAll();
+            }
+            for (CompletableFuture<Void> waiter : completedWaiters) {
+                waiter.complete(null);
+            }
+        }
     }
 
     private static final class WallClockTask {
@@ -148,12 +343,46 @@ public class FlowExecutor {
         UNKNOWN
     }
 
+    public record CompiledExecutionAuthority(ContentHash bridgeHash, ContentHash catalogHash, ContentHash runtimeHash) {
+        public CompiledExecutionAuthority {
+            bridgeHash = Objects.requireNonNull(bridgeHash, "Compiled Bridge Hash Is Required");
+            catalogHash = Objects.requireNonNull(catalogHash, "Compiled Catalog Hash Is Required");
+            runtimeHash = Objects.requireNonNull(runtimeHash, "Compiled Runtime Hash Is Required");
+        }
+
+        public boolean matches(CompiledCoreFlowExecutionBridge bridge, CompiledGraphMetadata metadata) {
+            return bridge != null
+                && metadata != null
+                && bridgeHash.equals(CompiledCoreFlowExecutionBridge.authorityHash())
+                && catalogHash.equals(metadata.catalogBinding().catalogChecksum())
+                && runtimeHash.equals(metadata.catalogBinding().bindingManifestHash());
+        }
+    }
+
     public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
         this(handlerRegistry, null, typeAdapter, globalVariables, 10000, false, DEFAULT_MAX_EXECUTION_DURATION_MILLIS);
     }
 
+    public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                        FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, null, typeAdapter, globalVariables, 10000, false, DEFAULT_MAX_EXECUTION_DURATION_MILLIS,
+            DEFAULT_MAX_FUNCTION_CALL_DEPTH, executionBridge);
+    }
+
     public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables) {
         this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, 10000, false, DEFAULT_MAX_EXECUTION_DURATION_MILLIS);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter,
+                        Map<String, Object> globalVariables, LegacyRuntimeActivationGate legacyRuntimeGate) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, 10000, false,
+            DEFAULT_MAX_EXECUTION_DURATION_MILLIS, DEFAULT_MAX_FUNCTION_CALL_DEPTH, null, legacyRuntimeGate);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter,
+                        Map<String, Object> globalVariables, FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, 10000, false, DEFAULT_MAX_EXECUTION_DURATION_MILLIS,
+            DEFAULT_MAX_FUNCTION_CALL_DEPTH, executionBridge);
     }
 
     public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
@@ -161,9 +390,22 @@ public class FlowExecutor {
         this(handlerRegistry, null, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, DEFAULT_MAX_EXECUTION_DURATION_MILLIS);
     }
 
+    public FlowExecutor(HandlerRegistry handlerRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                       int maxExecutionSteps, boolean enableDebug, FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, null, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, DEFAULT_MAX_EXECUTION_DURATION_MILLIS,
+            DEFAULT_MAX_FUNCTION_CALL_DEPTH, executionBridge);
+    }
+
     public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
                          int maxExecutionSteps, boolean enableDebug) {
         this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, DEFAULT_MAX_EXECUTION_DURATION_MILLIS);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter,
+                        Map<String, Object> globalVariables, int maxExecutionSteps, boolean enableDebug,
+                        FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, maxExecutionSteps, enableDebug,
+            DEFAULT_MAX_EXECUTION_DURATION_MILLIS, DEFAULT_MAX_FUNCTION_CALL_DEPTH, executionBridge);
     }
 
     public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
@@ -172,8 +414,29 @@ public class FlowExecutor {
             DEFAULT_MAX_FUNCTION_CALL_DEPTH);
     }
 
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter,
+                        Map<String, Object> globalVariables, int maxExecutionSteps, boolean enableDebug, long maxExecutionDurationMillis,
+                        FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, maxExecutionDurationMillis,
+            DEFAULT_MAX_FUNCTION_CALL_DEPTH, executionBridge);
+    }
+
     public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
                         int maxExecutionSteps, boolean enableDebug, long maxExecutionDurationMillis, int maxFunctionCallDepth) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, maxExecutionDurationMillis,
+            maxFunctionCallDepth, null);
+    }
+
+    public FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                        int maxExecutionSteps, boolean enableDebug, long maxExecutionDurationMillis, int maxFunctionCallDepth,
+                        FlowExecutionBridge executionBridge) {
+        this(handlerRegistry, nodeDefinitionRegistry, typeAdapter, globalVariables, maxExecutionSteps, enableDebug, maxExecutionDurationMillis,
+            maxFunctionCallDepth, executionBridge, null);
+    }
+
+    private FlowExecutor(HandlerRegistry handlerRegistry, NodeDefinitionRegistry nodeDefinitionRegistry, TypeAdapterRegistry typeAdapter, Map<String, Object> globalVariables,
+                         int maxExecutionSteps, boolean enableDebug, long maxExecutionDurationMillis, int maxFunctionCallDepth,
+                         FlowExecutionBridge executionBridge, LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.handlerRegistry = handlerRegistry;
         this.nodeDefinitionRegistry = nodeDefinitionRegistry;
         this.typeAdapter = typeAdapter;
@@ -189,9 +452,125 @@ public class FlowExecutor {
         this.enableDebug = enableDebug;
         this.maxExecutionDurationMillis = Math.max(0L, maxExecutionDurationMillis);
         this.maxFunctionCallDepth = Math.max(1, maxFunctionCallDepth);
-        this.idCompatibility = new IdCompatibilityLayer();
+        this.legacyRuntimeGate = legacyRuntimeGate;
+        this.idCompatibility = legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases() ? new IdCompatibilityLayer() : null;
+        this.executionBridge = executionBridge;
         this.wallClockScheduler = new ScheduledThreadPoolExecutor(1, Thread.ofPlatform().daemon().name("ReSync-Flow-WallClock").factory());
         this.wallClockScheduler.setRemoveOnCancelPolicy(true);
+    }
+
+    public void configureExecutionBridge(FlowExecutionBridge executionBridge) {
+        FlowExecutionBridge configuredBridge = Objects.requireNonNull(executionBridge, "Flow Execution Bridge Is Required");
+        synchronized (admissionMonitor) {
+            if (this.executionBridge != null && this.executionBridge != configuredBridge) {
+                throw new IllegalStateException("Flow execution bridge is already configured");
+            }
+            this.executionBridge = configuredBridge;
+        }
+    }
+
+    public void configureCompiledFunctionBridge(CompiledFunctionExecutionBridge compiledFunctionExecutionBridge) {
+        CompiledFunctionExecutionBridge configuredBridge = Objects.requireNonNull(
+            compiledFunctionExecutionBridge, "Compiled Function Execution Bridge Is Required");
+        synchronized (admissionMonitor) {
+            if (this.compiledFunctionExecutionBridge != null && this.compiledFunctionExecutionBridge != configuredBridge) {
+                throw new IllegalStateException("Compiled Function execution bridge is already configured");
+            }
+            this.compiledFunctionExecutionBridge = configuredBridge;
+        }
+    }
+
+    public void configureCompiledFunctionRuntime(RuntimeAuthority authority,
+                                                 RuntimePrincipalAuthority principalAuthority,
+                                                 RuntimeReceiptStore receiptStore) {
+        configureCompiledFunctionRuntime(authority, principalAuthority, receiptStore, null, null, null);
+    }
+
+    public void configureCompiledFunctionRuntime(RuntimeAuthority authority,
+                                                 RuntimePrincipalAuthority principalAuthority,
+                                                 RuntimeReceiptStore receiptStore,
+                                                 ServerId serverId) {
+        configureCompiledFunctionRuntime(authority, principalAuthority, receiptStore, serverId, null);
+    }
+
+    public void configureCompiledFunctionRuntime(RuntimeAuthority authority,
+                                                 RuntimePrincipalAuthority principalAuthority,
+                                                 RuntimeReceiptStore receiptStore,
+                                                 ServerId serverId,
+                                                 RuntimePrincipal defaultPrincipal) {
+        configureCompiledFunctionRuntime(authority, principalAuthority, receiptStore, serverId, defaultPrincipal, null);
+    }
+
+    public void configureCompiledFunctionRuntime(RuntimeAuthority authority,
+                                                 RuntimePrincipalAuthority principalAuthority,
+                                                 RuntimeReceiptStore receiptStore,
+                                                 ServerId serverId,
+                                                 RuntimePrincipal defaultPrincipal,
+                                                 RuntimeAuditBoundary auditBoundary) {
+        this.compiledFunctionAuthority = Objects.requireNonNull(authority, "Compiled Function Runtime Authority Is Required");
+        this.compiledFunctionPrincipalAuthority = Objects.requireNonNull(principalAuthority,
+            "Compiled Function Principal Authority Is Required");
+        this.compiledFunctionReceiptStore = Objects.requireNonNull(receiptStore,
+            "Compiled Function Receipt Store Is Required");
+        this.compiledFunctionServerId = serverId;
+        if (defaultPrincipal != null && !principalAuthority.trusts(defaultPrincipal, authority)) {
+            throw new IllegalArgumentException("Compiled Function Default Principal Is Not Trusted");
+        }
+        this.compiledFunctionDefaultPrincipal = defaultPrincipal;
+        this.compiledFunctionAuditBoundary = auditBoundary == null ? RuntimeAuditBoundary.unavailable() : auditBoundary;
+    }
+
+    public FunctionInvocationContext defaultFunctionInvocationContext(Player player, Event event,
+                                                                       Map<String, Object> eventVariables) {
+        return defaultFunctionInvocationContext(player, event, eventVariables, CorrelationId.random(),
+            RuntimeExecutionContext.NO_DEADLINE);
+    }
+
+    public FunctionInvocationContext defaultFunctionInvocationContext(Player player, Event event,
+                                                                       Map<String, Object> eventVariables,
+                                                                       CorrelationId invocationId,
+                                                                       long requestedDeadlineMillis) {
+        RuntimePrincipal principal = compiledFunctionDefaultPrincipal;
+        if (principal == null || compiledFunctionServerId == null || compiledFunctionExecutionBridge == null) {
+            return null;
+        }
+        return functionInvocationContext(player, event, eventVariables, principal, invocationId, requestedDeadlineMillis);
+    }
+
+    public FunctionInvocationContext functionInvocationContext(Player player, Event event,
+                                                               Map<String, Object> eventVariables,
+                                                               RuntimePrincipal principal,
+                                                               CorrelationId invocationId,
+                                                               long requestedDeadlineMillis) {
+        return functionInvocationContext(player, event, eventVariables, principal, invocationId,
+            requestedDeadlineMillis, null, null);
+    }
+
+    public FunctionInvocationContext functionInvocationContext(Player player, Event event,
+                                                               Map<String, Object> eventVariables,
+                                                               RuntimePrincipal principal,
+                                                               CorrelationId invocationId,
+                                                               long requestedDeadlineMillis,
+                                                               String creatorPrincipal,
+                                                               String creatorSessionReference) {
+        Objects.requireNonNull(principal, "Function Principal Is Required");
+        Objects.requireNonNull(invocationId, "Function Invocation ID Is Required");
+        if (compiledFunctionServerId == null) {
+            throw new IllegalStateException("Compiled Function Server Identity Is Unavailable");
+        }
+        if (compiledFunctionPrincipalAuthority == null || compiledFunctionAuthority == null
+            || !compiledFunctionPrincipalAuthority.trusts(principal, compiledFunctionAuthority)) {
+            throw new IllegalArgumentException("Function Principal Is Not Trusted");
+        }
+        CompiledRuntimeContextAdapter.Result adapted = CompiledRuntimeContextAdapter.adapt(
+            compiledFunctionServerId, principal, player, event, eventVariables == null ? Map.of() : eventVariables);
+        if (!adapted.accepted()) {
+            throw new IllegalArgumentException("Compiled Function Runtime Context Is Unsupported: " + adapted.failure());
+        }
+        String sessionReference = eventVariables != null && eventVariables.get("runtime.sessionId") instanceof String value
+            ? value : null;
+        return new FunctionInvocationContext(principal, invocationId, adapted.context(), requestedDeadlineMillis,
+            sessionReference, creatorPrincipal, creatorSessionReference);
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event) {
@@ -199,6 +578,25 @@ public class FlowExecutor {
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, Player player, Event event, Map<String, Object> eventVars) {
+        return execute(graph, player, event, eventVars, null);
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, Player player, Event event, Map<String, Object> eventVars,
+                                            FlowExecutionBridge.MappingContext mappingContext) {
+        return execute(graph, player, event, eventVars, mappingContext, null);
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, Player player, Event event, Map<String, Object> eventVars,
+                                            FlowExecutionBridge.MappingContext mappingContext,
+                                            CompiledGraphMetadata compiledGraphMetadata) {
+        return withLegacyAdmission(true,
+            () -> executeRootWithoutStart(graph, player, event, eventVars, mappingContext, compiledGraphMetadata));
+    }
+
+    private CompletableFuture<Void> executeRootWithoutStart(FlowGraph graph, Player player, Event event,
+                                                              Map<String, Object> eventVars,
+                                                              FlowExecutionBridge.MappingContext mappingContext,
+                                                              CompiledGraphMetadata compiledGraphMetadata) {
         if (executionBlocked(graph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(graph);
         if (validationFailure != null) {
@@ -214,22 +612,164 @@ public class FlowExecutor {
                 "Add or connect an executable trigger or start node"
             ));
         }
-        return executeValidated(graph, startNodeId, player, event, eventVars);
+        return executeValidated(graph, startNodeId, player, event, eventVars, mappingContext, compiledGraphMetadata);
     }
 
     public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
                                             Map<String, Object> eventVars) {
+        return execute(graph, startNodeId, player, event, eventVars, null);
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
+                                            Map<String, Object> eventVars,
+                                            FlowExecutionBridge.MappingContext mappingContext) {
+        return execute(graph, startNodeId, player, event, eventVars, mappingContext, null);
+    }
+
+    public CompletableFuture<Void> execute(FlowGraph graph, String startNodeId, Player player, Event event,
+                                            Map<String, Object> eventVars,
+                                            FlowExecutionBridge.MappingContext mappingContext,
+                                            CompiledGraphMetadata compiledGraphMetadata) {
+        return withLegacyAdmission(true,
+            () -> executeRoot(graph, startNodeId, player, event, eventVars, mappingContext, compiledGraphMetadata));
+    }
+
+    public CompletableFuture<Void> executeCompiled(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                   Map<String, Object> eventVars,
+                                                   FlowExecutionBridge.MappingContext mappingContext,
+                                                   CompiledGraphMetadata compiledGraphMetadata,
+                                                   CompiledExecutionAuthority authority,
+                                                   CompiledCoreFlowExecutionBridge bridge) {
+        return executeCompiled(graph, startNodeId, player, event, eventVars, mappingContext, compiledGraphMetadata,
+            authority, bridge, CorrelationId.random());
+    }
+
+    public CompletableFuture<Void> executeCompiled(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                   Map<String, Object> eventVars,
+                                                   FlowExecutionBridge.MappingContext mappingContext,
+                                                   CompiledGraphMetadata compiledGraphMetadata,
+                                                   CompiledExecutionAuthority authority,
+                                                   CompiledCoreFlowExecutionBridge bridge,
+                                                   CorrelationId invocationId) {
+        if (compiledGraphMetadata == null) {
+            return bridgeUnsupported("Compiled graph metadata is required", graph, startNodeId);
+        }
+        if (authority == null) {
+            return bridgeUnsupported("Compiled execution authority is required", graph, startNodeId);
+        }
+        if (bridge == null) {
+            return bridgeUnsupported("Compiled Core execution bridge is required", graph, startNodeId);
+        }
+        if (!authority.matches(bridge, compiledGraphMetadata)) {
+            return bridgeFailure("CORE_EXECUTION_UNSUPPORTED", "Compiled execution authority does not match the graph binding",
+                null, graph, startNodeId, "Refresh the compiled graph against the active bridge, catalog, and runtime hashes");
+        }
+        if (graph == null) {
+            return bridgeUnsupported("A legacy graph envelope is required for compiled execution", null, startNodeId);
+        }
+        Objects.requireNonNull(invocationId, "Invocation ID Is Required");
+        return withLegacyAdmission(true,
+            () -> executeCompiledRoot(graph, startNodeId, player, event, eventVars, mappingContext, compiledGraphMetadata,
+                null, bridge, invocationId, RuntimeExecutionContext.NO_DEADLINE));
+    }
+
+    public CompletableFuture<Void> executeCompiled(FlowGraph graph, String startNodeId,
+                                                   CompiledRuntimeContext runtimeContext,
+                                                   FlowExecutionBridge.MappingContext mappingContext,
+                                                   CompiledGraphMetadata compiledGraphMetadata,
+                                                   CompiledExecutionAuthority authority,
+                                                   CompiledCoreFlowExecutionBridge bridge) {
+        return executeCompiled(graph, startNodeId, runtimeContext, mappingContext, compiledGraphMetadata, authority,
+            bridge, CorrelationId.random(), RuntimeExecutionContext.NO_DEADLINE);
+    }
+
+    public CompletableFuture<Void> executeCompiled(FlowGraph graph, String startNodeId,
+                                                   CompiledRuntimeContext runtimeContext,
+                                                   FlowExecutionBridge.MappingContext mappingContext,
+                                                   CompiledGraphMetadata compiledGraphMetadata,
+                                                   CompiledExecutionAuthority authority,
+                                                   CompiledCoreFlowExecutionBridge bridge,
+                                                   CorrelationId invocationId) {
+        return executeCompiled(graph, startNodeId, runtimeContext, mappingContext, compiledGraphMetadata, authority,
+            bridge, invocationId, RuntimeExecutionContext.NO_DEADLINE);
+    }
+
+    public CompletableFuture<Void> executeCompiled(FlowGraph graph, String startNodeId,
+                                                   CompiledRuntimeContext runtimeContext,
+                                                   FlowExecutionBridge.MappingContext mappingContext,
+                                                   CompiledGraphMetadata compiledGraphMetadata,
+                                                   CompiledExecutionAuthority authority,
+                                                   CompiledCoreFlowExecutionBridge bridge,
+                                                   CorrelationId invocationId,
+                                                   long requestedDeadlineMillis) {
+        if (compiledGraphMetadata == null) {
+            return bridgeUnsupported("Compiled graph metadata is required", graph, startNodeId);
+        }
+        if (authority == null) {
+            return bridgeUnsupported("Compiled execution authority is required", graph, startNodeId);
+        }
+        if (bridge == null) {
+            return bridgeUnsupported("Compiled Core execution bridge is required", graph, startNodeId);
+        }
+        if (!authority.matches(bridge, compiledGraphMetadata)) {
+            return bridgeFailure("CORE_EXECUTION_UNSUPPORTED", "Compiled execution authority does not match the graph binding",
+                null, graph, startNodeId, "Refresh the compiled graph against the active bridge, catalog, and runtime hashes");
+        }
+        if (graph == null) {
+            return bridgeUnsupported("A legacy graph envelope is required for compiled execution", null, startNodeId);
+        }
+        if (runtimeContext == null) {
+            return bridgeUnsupported("A typed compiled runtime context is required", graph, startNodeId);
+        }
+        Objects.requireNonNull(invocationId, "Invocation ID Is Required");
+        if (requestedDeadlineMillis < 0) {
+            return bridgeUnsupported("Compiled execution deadline is invalid", graph, startNodeId);
+        }
+        return withLegacyAdmission(true,
+            () -> executeCompiledRoot(graph, startNodeId, null, null, Map.of(), mappingContext, compiledGraphMetadata,
+                runtimeContext, bridge, invocationId, requestedDeadlineMillis));
+    }
+
+    private CompletableFuture<Void> executeCompiledRoot(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                        Map<String, Object> eventVars,
+                                                        FlowExecutionBridge.MappingContext mappingContext,
+                                                        CompiledGraphMetadata compiledGraphMetadata,
+                                                        CompiledRuntimeContext runtimeContext,
+                                                        CompiledCoreFlowExecutionBridge bridge,
+                                                        CorrelationId invocationId,
+                                                        long requestedDeadlineMillis) {
+        if (!graph.isEnabled() || !compiledExecutionAuthority.test(graph, compiledGraphMetadata)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        notifyExecutionListeners(graph, startNodeId, player, event);
+        return executeThroughBridge(bridge, graph, startNodeId, player, event, eventVars, mappingContext,
+            compiledGraphMetadata, runtimeContext, invocationId, requestedDeadlineMillis);
+    }
+
+    private CompletableFuture<Void> executeRoot(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                 Map<String, Object> eventVars,
+                                                 FlowExecutionBridge.MappingContext mappingContext,
+                                                 CompiledGraphMetadata compiledGraphMetadata) {
         if (executionBlocked(graph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(graph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
         }
-        return executeValidated(graph, startNodeId, player, event, eventVars);
+        return executeValidated(graph, startNodeId, player, event, eventVars, mappingContext, compiledGraphMetadata);
     }
 
-    private CompletableFuture<Void> executeValidated(FlowGraph graph, String startNodeId, Player player, Event event, Map<String, Object> eventVars) {
-        notifyExecutionListeners(graph, startNodeId, player, event);
-        FlowRuntime runtime = new FlowRuntime(graph, typeAdapter, globalVariables, eventVars, nodeDefinitionRegistry);
+    private CompletableFuture<Void> executeValidated(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                     Map<String, Object> eventVars,
+                                                     FlowExecutionBridge.MappingContext mappingContext,
+                                                     CompiledGraphMetadata compiledGraphMetadata) {
+        FlowGraph executionGraph = graph != null ? graph.copy() : null;
+        notifyExecutionListeners(executionGraph, startNodeId, player, event);
+        FlowExecutionBridge configuredBridge = executionBridge;
+        if (configuredBridge != null) {
+            return executeThroughBridge(configuredBridge, executionGraph, startNodeId, player, event, eventVars,
+                mappingContext, compiledGraphMetadata, null);
+        }
+        FlowRuntime runtime = new FlowRuntime(executionGraph, typeAdapter, globalVariables, eventVars, nodeDefinitionRegistry, legacyRuntimeGate);
         runtime.openEventMutationWindow(event != null);
         CompletableFuture<Void> future;
         try {
@@ -241,14 +781,154 @@ public class FlowExecutor {
         return future;
     }
 
+    private CompletableFuture<Void> executeThroughBridge(FlowGraph graph, String startNodeId, Player player, Event event,
+                                                         Map<String, Object> eventVars,
+                                                         FlowExecutionBridge.MappingContext mappingContext,
+                                                         CompiledGraphMetadata compiledGraphMetadata,
+                                                         CompiledRuntimeContext runtimeContext) {
+        return executeThroughBridge(executionBridge, graph, startNodeId, player, event, eventVars, mappingContext,
+            compiledGraphMetadata, runtimeContext, CorrelationId.random());
+    }
+
+    private CompletableFuture<Void> executeThroughBridge(FlowExecutionBridge bridge, FlowGraph graph, String startNodeId,
+                                                          Player player, Event event, Map<String, Object> eventVars,
+                                                          FlowExecutionBridge.MappingContext mappingContext,
+                                                          CompiledGraphMetadata compiledGraphMetadata,
+                                                          CompiledRuntimeContext runtimeContext) {
+        return executeThroughBridge(bridge, graph, startNodeId, player, event, eventVars, mappingContext,
+            compiledGraphMetadata, runtimeContext, CorrelationId.random());
+    }
+
+    private CompletableFuture<Void> executeThroughBridge(FlowExecutionBridge bridge, FlowGraph graph, String startNodeId,
+                                                          Player player, Event event, Map<String, Object> eventVars,
+                                                           FlowExecutionBridge.MappingContext mappingContext,
+                                                           CompiledGraphMetadata compiledGraphMetadata,
+                                                           CompiledRuntimeContext runtimeContext,
+                                                           CorrelationId invocationId) {
+        return executeThroughBridge(bridge, graph, startNodeId, player, event, eventVars, mappingContext,
+            compiledGraphMetadata, runtimeContext, invocationId, RuntimeExecutionContext.NO_DEADLINE);
+    }
+
+    private CompletableFuture<Void> executeThroughBridge(FlowExecutionBridge bridge, FlowGraph graph, String startNodeId,
+                                                          Player player, Event event, Map<String, Object> eventVars,
+                                                          FlowExecutionBridge.MappingContext mappingContext,
+                                                          CompiledGraphMetadata compiledGraphMetadata,
+                                                          CompiledRuntimeContext runtimeContext,
+                                                          CorrelationId invocationId,
+                                                          long requestedDeadlineMillis) {
+        FlowExecutionBridge.Context context;
+        try {
+            CompiledRuntimeContext legacyRuntimeContext = player == null && event == null
+                && (eventVars == null || eventVars.isEmpty()) ? CompiledRuntimeContext.empty() : null;
+            context = runtimeContext == null
+                ? new FlowExecutionBridge.Context(graph, startNodeId, player, event, eventVars, mappingContext,
+                    compiledGraphMetadata, legacyRuntimeContext, invocationId, requestedDeadlineMillis)
+                : new FlowExecutionBridge.Context(graph, startNodeId, null, null, Map.of(), mappingContext,
+                    compiledGraphMetadata, runtimeContext, invocationId, requestedDeadlineMillis);
+        } catch (Throwable failure) {
+            return bridgeFailure("CORE_EXECUTION_FAILED", "Unable to create the compiled Core execution context", failure, graph, startNodeId,
+                "Repair the legacy execution context before enabling the compiled Core bridge");
+        }
+        Optional<String> mappingFailure = context.mappingFailure();
+        if (mappingFailure.isPresent()) {
+            return bridgeUnsupported(mappingFailure.get(), graph, startNodeId);
+        }
+
+        CompletionStage<FlowExecutionBridge.Result> resultStage;
+        try {
+            resultStage = bridge.execute(context);
+        } catch (Throwable failure) {
+            return bridgeFailure("CORE_EXECUTION_FAILED", "Compiled Core execution bridge failed", failure, graph, startNodeId,
+                "Inspect the compiled Core execution bridge");
+        }
+        if (resultStage == null) {
+            return bridgeFailure("CORE_EXECUTION_FAILED", "Compiled Core execution bridge returned no result", null, graph, startNodeId,
+                "Return an explicit compiled Core execution result");
+        }
+
+        try {
+            return resultStage.handle((result, failure) -> {
+                if (failure != null) {
+                    return bridgeFailure("CORE_EXECUTION_FAILED", "Compiled Core execution failed", unwrapBridgeFailure(failure), graph, startNodeId,
+                        "Inspect the compiled Core execution failure");
+                }
+                return bridgeResult(result, graph, startNodeId);
+            }).thenCompose(result -> result).toCompletableFuture();
+        } catch (Throwable failure) {
+            return bridgeFailure("CORE_EXECUTION_FAILED", "Compiled Core execution bridge failed", failure, graph, startNodeId,
+                "Inspect the compiled Core execution bridge");
+        }
+    }
+
+    private CompletableFuture<Void> bridgeResult(FlowExecutionBridge.Result result, FlowGraph graph, String startNodeId) {
+        if (result == null) {
+            return bridgeFailure("CORE_EXECUTION_FAILED", "Compiled Core execution bridge returned no result", null, graph, startNodeId,
+                "Return an explicit compiled Core execution result");
+        }
+        String reason = result.reason();
+        return switch (result.status()) {
+            case EXECUTED -> CompletableFuture.completedFuture(null);
+            case UNSUPPORTED -> bridgeFailure(
+                "CORE_EXECUTION_UNSUPPORTED", bridgeReason(reason, "Compiled Core execution is unsupported for this graph"), result.failure(), graph, startNodeId,
+                "Migrate the graph to the compiled Core graph contract", result.diagnostics());
+            case FAILED -> bridgeFailure(
+                "CORE_EXECUTION_FAILED", bridgeReason(reason, "Compiled Core execution failed"), result.failure(), graph, startNodeId,
+                "Inspect the compiled Core execution failure", result.diagnostics());
+            case TIMEOUT -> bridgeFailure(
+                "CORE_EXECUTION_TIMEOUT", bridgeReason(reason, "Compiled Core execution timed out"), result.failure(), graph, startNodeId,
+                "Inspect the compiled Core execution deadline", result.diagnostics());
+            case CANCELLED -> bridgeFailure(
+                "CORE_EXECUTION_CANCELLED", bridgeReason(reason, "Compiled Core execution was cancelled"), result.failure(), graph,
+                startNodeId, "Inspect the compiled Core execution cancellation", result.diagnostics());
+        };
+    }
+
+    private CompletableFuture<Void> bridgeFailure(String code, String message, Throwable failure, FlowGraph graph, String startNodeId,
+                                                  String remediation) {
+        return bridgeFailure(code, message, failure, graph, startNodeId, remediation, List.of());
+    }
+
+    private CompletableFuture<Void> bridgeFailure(String code, String message, Throwable failure, FlowGraph graph, String startNodeId,
+                                                  String remediation, List<Diagnostic> diagnostics) {
+        String graphId = graph != null && graph.getId() != null ? graph.getId() : "";
+        String nodeId = startNodeId != null ? startNodeId : "";
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("graphId", graphId);
+        details.put("bridge", "compiled-core");
+        details.put("diagnostics", diagnostics == null ? List.of() : diagnostics.stream().map(Diagnostic::toMap).toList());
+        return CompletableFuture.failedFuture(new FlowExecutionException(
+            code, message, failure, nodeId, remediation,
+            details));
+    }
+
+    private String bridgeReason(String reason, String fallback) {
+        return reason != null && !reason.isBlank() ? reason : fallback;
+    }
+
+    private Throwable unwrapBridgeFailure(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof CompletionException || current instanceof ExecutionException) && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
     public CompletableFuture<Object> executeSubFlow(FlowGraph subGraph, String startNodeId, String outputNodeId, String outputPin,
                                                       Player player, Event event, Map<String, Object> localInputs) {
+        if (executionBridge != null) {
+            return compiledSubFlowUnavailable(subGraph, startNodeId, "FlowExecutor.executeSubFlow");
+        }
+        return withLegacyAdmission(true, () -> executeSubFlowRoot(subGraph, startNodeId, outputNodeId, outputPin, player, event, localInputs));
+    }
+
+    private CompletableFuture<Object> executeSubFlowRoot(FlowGraph subGraph, String startNodeId, String outputNodeId, String outputPin,
+                                                           Player player, Event event, Map<String, Object> localInputs) {
         if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
         FlowGraphValidationException validationFailure = validationFailure(subGraph);
         if (validationFailure != null) {
             return CompletableFuture.failedFuture(validationFailure);
         }
-        FlowRuntime runtime = new FlowRuntime(subGraph, typeAdapter, globalVariables, new HashMap<>(), nodeDefinitionRegistry);
+        FlowRuntime runtime = new FlowRuntime(subGraph, typeAdapter, globalVariables, new HashMap<>(), nodeDefinitionRegistry, legacyRuntimeGate);
         if (localInputs != null) {
             runtime.getLocalVariables().putAll(localInputs);
         }
@@ -266,23 +946,38 @@ public class FlowExecutor {
 
     public CompletableFuture<Object> executeSubFlow(FlowGraph subGraph, String outputNodeId, String outputPin,
                                                      Player player, Event event, Map<String, Object> localInputs) {
-        if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
-        FlowGraphValidationException validationFailure = validationFailure(subGraph);
-        if (validationFailure != null) {
-            return CompletableFuture.failedFuture(validationFailure);
+        if (executionBridge != null) {
+            return compiledSubFlowUnavailable(subGraph, null, "FlowExecutor.executeSubFlow");
         }
-        String startNodeId = findStartNode(subGraph);
-        if (startNodeId == null) {
-            return CompletableFuture.failedFuture(new FlowExecutionException(
-                "SUBFLOW_START_MISSING", "Subflow has no executable start node", null, null,
-                "Connect an executable subflow entry"
-            ));
-        }
-        return executeSubFlow(subGraph, startNodeId, outputNodeId, outputPin, player, event, localInputs);
+        return withLegacyAdmission(true, () -> {
+            if (executionBlocked(subGraph)) return CompletableFuture.completedFuture(null);
+            FlowGraphValidationException validationFailure = validationFailure(subGraph);
+            if (validationFailure != null) {
+                return CompletableFuture.failedFuture(validationFailure);
+            }
+            String startNodeId = findStartNode(subGraph);
+            if (startNodeId == null) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "SUBFLOW_START_MISSING", "Subflow has no executable start node", null, null,
+                    "Connect an executable subflow entry"
+                ));
+            }
+            return executeSubFlowRoot(subGraph, startNodeId, outputNodeId, outputPin, player, event, localInputs);
+        });
     }
 
     public CompletableFuture<Object> executeSubFlow(FlowRuntime parentRuntime, FlowGraph subGraph, String outputNodeId, String outputPin,
                                                      Player player, Event event, Map<String, Object> localInputs) {
+        if (executionBridge != null) {
+            return compiledSubFlowUnavailable(subGraph, null, "FlowExecutor.executeSubFlow");
+        }
+        return withLegacyAdmission(true, () -> executeSubFlowFromRuntime(parentRuntime, subGraph, outputNodeId, outputPin,
+            player, event, localInputs));
+    }
+
+    private CompletableFuture<Object> executeSubFlowFromRuntime(FlowRuntime parentRuntime, FlowGraph subGraph, String outputNodeId,
+                                                                  String outputPin, Player player, Event event,
+                                                                  Map<String, Object> localInputs) {
         if (parentRuntime == null) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "SUBFLOW_RUNTIME_UNAVAILABLE", "Parent Flow runtime is unavailable", null, null,
@@ -312,6 +1007,113 @@ public class FlowExecutor {
 
     public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
                                                                    Map<String, Object> inputs, Map<String, Object> eventVars) {
+        return withLegacyAdmission(true, () -> executeFunctionRoot(functionGraph, player, event, inputs, eventVars));
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
+                                                                   Map<String, Object> inputs, Map<String, Object> eventVars,
+                                                                   RuntimePrincipal principal, CorrelationId invocationId,
+                                                                   CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis) {
+        return executeFunction(functionGraph, player, event, inputs, eventVars, principal, invocationId, runtimeContext,
+            requestedDeadlineMillis, null, null);
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
+                                                                   Map<String, Object> inputs, Map<String, Object> eventVars,
+                                                                   RuntimePrincipal principal, CorrelationId invocationId,
+                                                                   CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis,
+                                                                   String creatorPrincipal, String creatorSessionReference) {
+        if (principal == null || invocationId == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_AUTHORIZATION_DENIED",
+                "An authenticated compiled Function principal and invocation ID are required",
+                null, null, "Authenticate the client and provide a canonical invocation ID"));
+        }
+        if (compiledFunctionPrincipalAuthority != null && compiledFunctionAuthority != null
+            && !compiledFunctionPrincipalAuthority.trusts(principal, compiledFunctionAuthority)) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_AUTHORIZATION_DENIED",
+                "The compiled Function principal is not trusted by the runtime authority",
+                null, null, "Use the authenticated client principal issued by the active runtime authority"));
+        }
+        CompiledFunctionExecutionBridge bridge = compiledFunctionExecutionBridge;
+        if (bridge != null && bridge.hasTypedFunctionProviders()) {
+            return executeTypedFunctionGraph(functionGraph, player, event, inputs, eventVars, principal, invocationId,
+                runtimeContext, requestedDeadlineMillis, creatorPrincipal, creatorSessionReference, bridge);
+        }
+        return withLegacyAdmission(true, () -> executeFunctionRoot(functionGraph, player, event, inputs, eventVars));
+    }
+
+    public CompletableFuture<Map<String, Object>> executeFunction(FlowGraph functionGraph, Player player, Event event,
+                                                                   Map<String, Object> inputs, Map<String, Object> eventVars,
+                                                                   FunctionInvocationContext invocationContext) {
+        Objects.requireNonNull(invocationContext, "Function Invocation Context Is Required");
+        Map<String, Object> contextVariables = new LinkedHashMap<>();
+        if (eventVars != null) {
+            contextVariables.putAll(eventVars);
+        }
+        if (invocationContext.sessionReference() != null) {
+            contextVariables.put("runtime.sessionId", invocationContext.sessionReference());
+        }
+        return executeFunction(functionGraph, player, event, inputs, contextVariables, invocationContext.principal(),
+            invocationContext.invocationId(), invocationContext.runtimeContext(), invocationContext.requestedDeadlineMillis(),
+            invocationContext.creatorPrincipal(), invocationContext.creatorSessionReference());
+    }
+
+    private CompletableFuture<Map<String, Object>> executeTypedFunctionGraph(
+        FlowGraph functionGraph,
+        Player player,
+        Event event,
+        Map<String, Object> inputs,
+        Map<String, Object> eventVars,
+        RuntimePrincipal principal,
+        CorrelationId invocationId,
+        CompiledRuntimeContext runtimeContext,
+        long requestedDeadlineMillis,
+        String creatorPrincipal,
+        String creatorSessionReference,
+        CompiledFunctionExecutionBridge bridge
+    ) {
+        ServerId serverId = compiledFunctionServerId;
+        RuntimeAuthority authority = compiledFunctionAuthority;
+        if (serverId == null || authority == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_COMPILED_EXECUTION_UNAVAILABLE",
+                "The compiled Function runtime identity is unavailable",
+                null, null, "Restore the compiled Function runtime before invoking this Function"));
+        }
+        CompiledFunctionExecutionRequest request;
+        try {
+            request = bridge.requestForLegacyGraph(functionGraph, player, event, inputs, eventVars, serverId, authority,
+                principal, invocationId, runtimeContext, requestedDeadlineMillis, creatorPrincipal,
+                creatorSessionReference);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_COMPILED_EXECUTION_UNSUPPORTED",
+                "The legacy Function graph cannot be admitted to the compiled Function boundary",
+                failure, null, "Correct the Function signature and active catalog binding"));
+        }
+        return executeCompiledFunction(request, bridge).thenCompose(result -> {
+            if (!result.successful()) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_COMPILED_EXECUTION_FAILED",
+                    "Compiled Function execution failed",
+                    null, null, "Inspect the typed Function diagnostics",
+                    Map.of("status", result.status().wireName(), "diagnosticCount", result.diagnostics().size())));
+            }
+            try {
+                return CompletableFuture.completedFuture(bridge.outputsForLegacyGraph(functionGraph, result));
+            } catch (RuntimeException failure) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_COMPILED_EXECUTION_FAILED",
+                    "Compiled Function outputs do not match the Function graph",
+                    failure, null, "Correct the Function output signature"));
+            }
+        });
+    }
+
+    private CompletableFuture<Map<String, Object>> executeFunctionRoot(FlowGraph functionGraph, Player player, Event event,
+                                                                          Map<String, Object> inputs, Map<String, Object> eventVars) {
         if (functionGraph == null || !functionGraph.isFunction()) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_INVALID",
@@ -329,7 +1131,8 @@ public class FlowExecutor {
             return CompletableFuture.failedFuture(validationFailure);
         }
         FlowGraph callable = FlowSerializer.deserialize(FlowSerializer.serialize(functionGraph));
-        String startNodeId = FlowRuntime.findFunctionStartNodeId(callable);
+        callable.adaptLegacyFunctionParameterIds();
+        String startNodeId = findFunctionStartNodeId(callable);
         if (startNodeId == null) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_START_MISSING", "Function has no executable start node", null, null,
@@ -337,13 +1140,21 @@ public class FlowExecutor {
             ));
         }
         Map<String, Object> callInputs = new LinkedHashMap<>(inputs != null ? inputs : Map.of());
-        FlowExecutionException inputFailure = validateFunctionInputs(callable, callInputs, startNodeId);
+        Map<FunctionParameterId, Object> inputFrame;
+        try {
+            inputFrame = adaptLegacyFunctionInputFrame(callable, callInputs, true);
+        } catch (IllegalArgumentException failure) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_ARGUMENT_UNKNOWN", failure.getMessage(), failure, startNodeId,
+                "Remove the unknown arguments or update the function signature"));
+        }
+        FlowExecutionException inputFailure = validateFunctionInputFrame(callable, inputFrame, startNodeId);
         if (inputFailure != null) {
             return CompletableFuture.failedFuture(inputFailure);
         }
-        FlowRuntime runtime = new FlowRuntime(new FlowGraph(), typeAdapter, globalVariables, eventVars, nodeDefinitionRegistry);
+        FlowRuntime runtime = new FlowRuntime(new FlowGraph(), typeAdapter, globalVariables, eventVars, nodeDefinitionRegistry, legacyRuntimeGate);
         String callerNodeId = "__function_call";
-        runtime.callFunction(callable, callerNodeId, callInputs);
+        runtime.callFunctionById(callable, callerNodeId, inputFrame);
         runtime.openEventMutationWindow(event != null);
         CompletableFuture<Void> future;
         try {
@@ -355,16 +1166,342 @@ public class FlowExecutor {
             while (runtime.getCallDepth() > 0) {
                 runtime.returnFromFunction(Collections.emptyMap());
             }
-            Map<String, Object> outputs = new HashMap<>();
-            if (callable.getFunctionOutputs() != null) {
-                for (FlowGraph.FunctionParameter output : callable.getFunctionOutputs()) {
-                    if (output != null && output.getName() != null && !output.getName().isBlank()) {
-                        outputs.put(output.getName(), runtime.getNodeOutput(callerNodeId, output.getName()));
+            return legacyFunctionOutputs(callable, runtime.getFunctionOutputsById());
+        }).whenComplete((result, ex) -> runtime.cleanupThreadLocals());
+    }
+
+    private Map<String, Object> functionOutputs(FlowGraph functionGraph, FunctionResult result) {
+        Map<FunctionParameterId, String> names = new LinkedHashMap<>();
+        List<FlowGraph.FunctionParameter> declared = functionGraph != null && functionGraph.getFunctionOutputs() != null
+            ? functionGraph.getFunctionOutputs() : List.of();
+        for (FlowGraph.FunctionParameter parameter : declared) {
+            if (parameter != null && parameter.getParameterId() != null) {
+                names.put(parameter.getParameterId(), parameter.getName());
+            }
+        }
+        Map<String, Object> outputs = new LinkedHashMap<>();
+        Set<String> outputNames = new HashSet<>();
+        result.outputs().values().forEach((key, value) -> {
+            String name = names.get(key);
+            String outputKey = name != null && !name.isBlank() ? name : key.canonicalText();
+            if (!outputNames.add(outputKey)) {
+                throw new IllegalArgumentException("Function output display name is ambiguous: " + outputKey);
+            }
+            outputs.put(outputKey, value.value());
+        });
+        return outputs;
+    }
+
+    public CompletableFuture<FunctionResult> executeCompiledFunction(
+        CompiledFunctionExecutionRequest request,
+        CompiledFunctionExecutionBridge bridge
+    ) {
+        return withLegacyAdmission(true, () -> executeCompiledFunctionAdmitted(request, bridge));
+    }
+
+    private CompletableFuture<FunctionResult> executeCompiledFunctionAdmitted(
+        CompiledFunctionExecutionRequest request,
+        CompiledFunctionExecutionBridge bridge
+    ) {
+        if (request == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_COMPILED_EXECUTION_UNAVAILABLE",
+                "A compiled Function execution request is required",
+                null,
+                null,
+                "Provide the typed Function signature, catalog binding, and capability fingerprint"
+            ));
+        }
+        if (bridge == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_COMPILED_EXECUTION_UNAVAILABLE",
+                "The compiled Function execution bridge is unavailable",
+                null,
+                null,
+                "Initialize the replacement-owned compiled Function bridge before execution"
+            ));
+        }
+        RuntimeAuthority authority = request.authority() != null ? request.authority() : compiledFunctionAuthority;
+        RuntimePrincipal principal = request.principal();
+        if (principal != null) {
+            RuntimePrincipalAuthority principalAuthority = compiledFunctionPrincipalAuthority;
+            if (authority == null || principalAuthority == null || !principalAuthority.trusts(principal, authority)) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_AUTHORIZATION_DENIED",
+                    "The compiled Function principal is not trusted by the runtime authority",
+                    null, null, "Use the authenticated client principal issued by the active runtime authority"));
+            }
+            if (request.runtimeContext() != null && request.runtimeContext().principal() != null
+                && !principal.canonical().equals(request.runtimeContext().principal().canonical())) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_AUTHORIZATION_DENIED",
+                    "The compiled Function runtime context principal does not match the request principal",
+                    null, null, "Use one authenticated principal throughout the Function invocation"));
+            }
+            return executeCompiledFunctionDurably(request, bridge, authority, principal);
+        }
+        try {
+            return CompletableFuture.completedFuture(bridge.execute(request));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_COMPILED_EXECUTION_FAILED",
+                "Compiled Function execution failed",
+                failure,
+                null,
+                "Inspect the typed Function source and capability binding"
+            ));
+        }
+    }
+
+    private CompletableFuture<FunctionResult> executeCompiledFunctionDurably(
+        CompiledFunctionExecutionRequest request,
+        CompiledFunctionExecutionBridge bridge,
+        RuntimeAuthority authority,
+        RuntimePrincipal principal
+    ) {
+        RuntimeReceiptStore store = compiledFunctionReceiptStore;
+        if (store == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_DURABILITY_UNAVAILABLE", "The compiled Function receipt store is unavailable", null,
+                null, "Restore the runtime receipt authority before executing authenticated Functions"));
+        }
+        if (request.catalogBinding() == null || request.capabilityFingerprint() == null) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_INVALID_INVOCATION", "The authenticated Function request has no complete catalog binding", null,
+                null, "Provide the active typed Function catalog binding and capability fingerprint"));
+        }
+        RuntimeReceiptStore.InvocationLease invocationLease;
+        try {
+            invocationLease = store.acquireInvocationLease();
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(new FlowExecutionException(
+                "FUNCTION_DURABILITY_UNAVAILABLE", "The compiled Function receipt store rejected the invocation lease",
+                failure, null, "Restore the runtime receipt authority before retrying"));
+        }
+        try {
+            RuntimeReceiptStore.Key key = functionReceiptKey(request, authority, principal);
+            ContentHash inputHash = functionInputHash(request, principal);
+            RuntimeExecutionProvenance provenance = functionProvenance(request, authority, principal, key, inputHash);
+            RuntimeLeaseInput.AuditEvent auditAttempt = functionAuditEvent(key, authority, provenance,
+                RuntimeResult.Status.FAILURE, "attempt");
+            RuntimeReceiptStore.Claim claim;
+            try {
+                claim = store.claim(key, inputHash);
+            } catch (RuntimeException failure) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_DURABILITY_UNAVAILABLE", "The compiled Function receipt store rejected the invocation",
+                    failure, null, "Restore the runtime receipt authority before retrying"));
+            }
+            if (!claim.principalMatches()) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_AUTHORIZATION_DENIED", "The invocation ID belongs to another authenticated principal", null,
+                    null, "Use a new invocation ID for a different authenticated client"));
+            }
+            String replayKey = functionReplayKey(key, inputHash);
+            if (!claim.owner()) {
+                FunctionResult cached = compiledFunctionReplayResults.get(replayKey);
+                if (cached != null) {
+                    return CompletableFuture.completedFuture(cached);
+                }
+                CompletableFuture<FunctionResult> inFlight = compiledFunctionInFlight.get(replayKey);
+                if (inFlight != null) {
+                    return inFlight;
+                }
+                if (!claim.inputMatches()) {
+                    return CompletableFuture.failedFuture(new FlowExecutionException(
+                        "FUNCTION_INVALID_INVOCATION", "The invocation ID was reused with different Function inputs", null,
+                        null, "Retry with the original canonical Function request or use a new invocation ID"));
+                }
+                if (claim.outcome().isDone()) {
+                    try {
+                        FunctionResult recovered = functionResultFromReceipt(request, claim.outcome().join());
+                        if (recovered != null) {
+                            compiledFunctionReplayResults.put(replayKey, recovered);
+                            return CompletableFuture.completedFuture(recovered);
+                        }
+                    } catch (RuntimeException ignored) {
                     }
                 }
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "FUNCTION_REPLAY_RECOVERED", "The Function invocation was already durably reserved", null,
+                    null, "Inspect the durable Function receipt before retrying"));
             }
-            return outputs;
-        }).whenComplete((result, ex) -> runtime.cleanupThreadLocals());
+            CompletableFuture<FunctionResult> running = new CompletableFuture<>();
+            CompletableFuture<FunctionResult> previous = compiledFunctionInFlight.putIfAbsent(replayKey, running);
+            if (previous != null) {
+                return previous;
+            }
+            try {
+                store.reserve(key, inputHash, provenance, auditAttempt);
+            } catch (RuntimeException failure) {
+                compiledFunctionInFlight.remove(replayKey, running);
+                FlowExecutionException reservationFailure = new FlowExecutionException(
+                    "FUNCTION_DURABILITY_UNAVAILABLE", "The compiled Function reservation could not be persisted", failure,
+                    null, "Restore the runtime receipt authority before executing authenticated Functions");
+                running.completeExceptionally(reservationFailure);
+                return running;
+            }
+            try {
+                FunctionResult result = bridge.execute(request);
+                RuntimeResult persisted = functionReceiptResult(result);
+                RuntimeLeaseInput.AuditEvent auditEvent = functionAuditEvent(key, authority, provenance,
+                    persisted.status(), "outcome");
+                store.complete(key, persisted, provenance, auditEvent);
+                deliverFunctionAudit(store, key, provenance, auditEvent);
+                compiledFunctionReplayResults.put(replayKey, result);
+                running.complete(result);
+            } catch (Throwable failure) {
+                FunctionDiagnostic diagnostic = FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE", "execution",
+                    "Compiled Function execution failed", null);
+                FunctionResult failed = FunctionResult.failure(request.execution().signature(), List.of(diagnostic), 0);
+                try {
+                    RuntimeResult persisted = functionReceiptResult(failed);
+                    RuntimeLeaseInput.AuditEvent auditEvent = functionAuditEvent(key, authority, provenance,
+                        persisted.status(), "outcome");
+                    store.complete(key, persisted, provenance, auditEvent);
+                    deliverFunctionAudit(store, key, provenance, auditEvent);
+                } catch (RuntimeException ignored) {
+                }
+                FlowExecutionException executionFailure = new FlowExecutionException(
+                    "FUNCTION_COMPILED_EXECUTION_FAILED", "Compiled Function execution failed", failure,
+                    null, "Inspect the typed Function source and capability binding");
+                running.completeExceptionally(executionFailure);
+            } finally {
+                compiledFunctionInFlight.remove(replayKey, running);
+            }
+            return running;
+        } finally {
+            invocationLease.close();
+        }
+    }
+
+    private RuntimeLeaseInput.AuditEvent functionAuditEvent(RuntimeReceiptStore.Key key, RuntimeAuthority authority,
+                                                             RuntimeExecutionProvenance provenance,
+                                                             RuntimeResult.Status status, String phase) {
+        return RuntimeAuditEvent.create(provenance.leaseId(), authority, key.binding(), key.idempotencyKey(), status,
+            true, phase, provenance).leaseEvent();
+    }
+
+    private void deliverFunctionAudit(RuntimeReceiptStore store, RuntimeReceiptStore.Key key,
+                                      RuntimeExecutionProvenance provenance, RuntimeLeaseInput.AuditEvent event) {
+        RuntimeAuditBoundary boundary = compiledFunctionAuditBoundary;
+        try {
+            if (!boundary.available(RuntimeSemantics.Audit.FULL_REDACTED)) {
+                store.recordPendingAudit(key, provenance, event,
+                    new IllegalStateException("Compiled Function audit boundary is unavailable"));
+                return;
+            }
+            boundary.record(event);
+            store.markAuditRecorded(key, event);
+        } catch (RuntimeException | Error failure) {
+            try {
+                store.recordPendingAudit(key, provenance, event, failure);
+            } catch (RuntimeException | Error ignored) {
+            }
+        }
+    }
+
+    private RuntimeReceiptStore.Key functionReceiptKey(CompiledFunctionExecutionRequest request,
+                                                        RuntimeAuthority authority, RuntimePrincipal principal) {
+        OwnerId owner = new OwnerId("resync");
+        ContractRef<ProviderId> provider = ContractRef.of(owner, ProviderId.of("compiled-function"));
+        RuntimeBindingKey binding = new RuntimeBindingKey(
+            ContractRef.of(owner, CapabilityId.of("function-execution")),
+            ContractRef.of(owner, OperationId.of("test-run")));
+        ContentHash plan = ContentHash.of(CanonicalJson.sha256("compiled-function-plan", Map.of(
+            "function", request.function().canonicalText(), "revision", request.revision().value(),
+            "catalog", request.catalogBinding() == null ? "" : request.catalogBinding().canonicalText())));
+        return new RuntimeReceiptStore.Key(provider, plan, binding, request.capabilityFingerprint(), authority.identity(),
+            request.execution().invocationId().toString(), principal.canonical(), RuntimeReceiptStore.IdempotencyKind.MUTATION_ID);
+    }
+
+    private ContentHash functionInputHash(CompiledFunctionExecutionRequest request, RuntimePrincipal principal) {
+        return ContentHash.of(CanonicalJson.sha256("compiled-function-invocation", Map.of(
+            "request", request.execution().canonicalValue(),
+            "context", request.runtimeContext() == null ? Map.of() : request.runtimeContext().canonicalValue(),
+            "deadlineMillis", request.requestedDeadlineMillis(),
+            "session", request.sessionReference() == null ? "" : request.sessionReference(),
+            "principal", principal.canonical(),
+            "creatorPrincipal", request.creatorPrincipal() == null ? "" : request.creatorPrincipal(),
+            "creatorSession", request.creatorSessionReference() == null ? "" : request.creatorSessionReference())));
+    }
+
+    private RuntimeExecutionProvenance functionProvenance(CompiledFunctionExecutionRequest request,
+                                                           RuntimeAuthority authority, RuntimePrincipal principal,
+                                                           RuntimeReceiptStore.Key key, ContentHash inputHash) {
+        ContentHash contextHash = ContentHash.of(CanonicalJson.sha256("runtime-context",
+            request.runtimeContext() == null ? Map.of() : request.runtimeContext().canonicalValue()));
+        return new RuntimeExecutionProvenance(authority.identity(), principal, key.binding(), key.provider(),
+            "compiled-function", request.catalogBinding().generation(), request.catalogBinding().bindingManifestHash(),
+            request.catalogBinding().generation(), request.catalogBinding().catalogChecksum(), key.planFingerprint(),
+            key.executionFingerprint(), key.idempotencyKey(), CorrelationId.of(request.execution().invocationId()),
+            key.idempotencyKey(), inputHash, contextHash, request.requestedDeadlineMillis(),
+            UUID.nameUUIDFromBytes(("compiled-function-lease:" + key.idempotencyKey()).getBytes(StandardCharsets.UTF_8)),
+            request.sessionReference(), request.creatorPrincipal(), request.creatorSessionReference());
+    }
+
+    private RuntimeResult functionReceiptResult(FunctionResult result) {
+        if (result.successful()) {
+            Map<PinId, TypedValue> outputs = new LinkedHashMap<>();
+            result.outputs().values().forEach((key, value) -> outputs.put(functionOutputPin(key), value));
+            return RuntimeResult.success(outputs, null);
+        }
+        if (result.diagnostics().isEmpty()) {
+            return RuntimeResult.failure(new restudio.resync.flow.runtime.RuntimeFailure(
+                Diagnostic.builder("RUNTIME.HANDLER_FAILURE", restudio.resync.flow.diagnostic.DiagnosticSeverity.ERROR,
+                    restudio.resync.flow.diagnostic.DiagnosticPhase.ENVIRONMENT, "execution")
+                    .messageKey(new ContractRef<>(new OwnerId("resync"), new CapabilityId("runtime-handler-failure")))
+                    .message("Compiled Function execution failed")
+                    .remediation("Inspect the compiled Function diagnostics")
+                    .correlationId(UUID.randomUUID()).build(), false));
+        }
+        return RuntimeResult.failure(new restudio.resync.flow.runtime.RuntimeFailure(
+            result.diagnostics().getFirst().diagnostic(), false));
+    }
+
+    private FunctionResult functionResultFromReceipt(CompiledFunctionExecutionRequest request, RuntimeResult receipt) {
+        if (receipt == null) {
+            return null;
+        }
+        if (receipt.successful()) {
+            Map<FunctionParameterId, TypedValue> outputs = new LinkedHashMap<>();
+            receipt.outputs().forEach((key, value) -> outputs.put(functionOutputId(key), value));
+            return FunctionResult.success(request.execution().signature(), new FunctionOutputMap(outputs), 0);
+        }
+        Diagnostic diagnostic = receipt.failure() == null ? null : receipt.failure().diagnostic();
+        FunctionDiagnostic functionDiagnostic;
+        try {
+            functionDiagnostic = diagnostic == null
+                ? FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE", "execution", "The Function execution failed", null)
+                : FunctionDiagnostic.fromCanonical(diagnostic.toMap());
+        } catch (RuntimeException ignored) {
+            functionDiagnostic = FunctionDiagnostic.error("FUNCTION.EXECUTION_FAILURE", "execution", "The Function execution failed", null);
+        }
+        return receipt.status() == RuntimeResult.Status.CANCELLED
+            ? FunctionResult.cancelled(request.execution().signature(), functionDiagnostic, 0)
+            : FunctionResult.failure(request.execution().signature(), List.of(functionDiagnostic), 0);
+    }
+
+    private static PinId functionOutputPin(FunctionParameterId id) {
+        return PinId.of("function-output-" + id.canonicalText());
+    }
+
+    private static FunctionParameterId functionOutputId(PinId pin) {
+        String prefix = "function-output-";
+        String value = pin.canonicalText();
+        if (!value.startsWith(prefix)) {
+            throw new IllegalArgumentException("Invalid persisted function output pin: " + value);
+        }
+        return FunctionParameterId.parseCanonicalText(value.substring(prefix.length()));
+    }
+
+    private static String functionReplayKey(RuntimeReceiptStore.Key key, ContentHash inputHash) {
+        return key.authorityIdentity() + "|" + key.principalReference() + "|" + key.idempotencyKey() + "|"
+            + inputHash.canonicalText();
+    }
+
+    public CompletableFuture<FunctionResult> executeCompiledFunction(CompiledFunctionExecutionRequest request) {
+        return executeCompiledFunction(request, compiledFunctionExecutionBridge);
     }
 
     public void addExecutionListener(FlowExecutionListener listener) {
@@ -391,6 +1528,123 @@ public class FlowExecutor {
 
     public void setExecutionAuthority(Predicate<FlowGraph> executionAuthority) {
         this.executionAuthority = executionAuthority != null ? executionAuthority : graph -> true;
+        this.compiledExecutionAuthority = (graph, metadata) -> this.executionAuthority.test(graph);
+    }
+
+    public void setCompiledExecutionAuthority(BiPredicate<FlowGraph, CompiledGraphMetadata> executionAuthority) {
+        this.compiledExecutionAuthority = Objects.requireNonNull(executionAuthority, "Compiled Execution Authority Is Required");
+    }
+
+    public AdmissionFence fenceAdmissions() {
+        synchronized (admissionMonitor) {
+            admissionFenceDepth++;
+            return new AdmissionFence();
+        }
+    }
+
+    public LiveEventScope liveEventScope(CompiledRuntimeContext context, CorrelationId invocationId) {
+        LiveEventScope scope = invocationId == null ? null : liveEvents.get(invocationId);
+        return scope != null && scope.event(context, invocationId) != null ? scope : null;
+    }
+
+    public String eventBindingContext(String nodeType) {
+        return nodeDefinitionRegistry == null ? null : FlowEventRegistry.bindingContext(nodeDefinitionRegistry.get(nodeType));
+    }
+
+    <T> CompletableFuture<T> withLiveEventScope(CompiledRuntimeContext context, CorrelationId invocationId,
+                                               Event event, Supplier<CompletableFuture<T>> operation) {
+        return withLiveEventScope(context, invocationId, event, null, operation);
+    }
+
+    public <T> CompletableFuture<T> withInheritedLiveEventScope(CompiledRuntimeContext context, CorrelationId parentId,
+                                                               CorrelationId invocationId, Supplier<CompletableFuture<T>> operation) {
+        LiveEventScope parent = liveEventScope(context, parentId);
+        return withLiveEventScope(context, invocationId, parent == null ? null : parent.event(context, parentId), parent, operation);
+    }
+
+    private <T> CompletableFuture<T> withLiveEventScope(CompiledRuntimeContext context, CorrelationId invocationId,
+                                                       Event event, LiveEventScope parent, Supplier<CompletableFuture<T>> operation) {
+        if (event == null) {
+            return operation.get();
+        }
+        LiveEventScope scope = new LiveEventScope(context, invocationId, event, parent);
+        if (liveEvents.putIfAbsent(invocationId, scope) != null) {
+            scope.close();
+            throw new IllegalStateException("A live event invocation is already active");
+        }
+        try (scope) {
+            return operation.get();
+        } finally {
+            liveEvents.remove(invocationId, scope);
+        }
+    }
+
+    private <T> CompletableFuture<T> withLegacyAdmission(boolean required, Supplier<CompletableFuture<T>> operation) {
+        if (!required) {
+            return invokeAdmissionOperation(operation);
+        }
+        LegacyAdmission admission;
+        synchronized (admissionMonitor) {
+            if (admissionFenceDepth > 0) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "EXECUTION_FENCED",
+                    "Flow execution is temporarily fenced",
+                    null,
+                    null,
+                    "Wait for the Flow runtime lifecycle operation to finish"
+                ));
+            }
+            activeLegacyExecutions++;
+            admission = new LegacyAdmission();
+        }
+        try {
+            CompletableFuture<T> future = operation.get();
+            if (future == null) {
+                admission.close();
+                return CompletableFuture.failedFuture(new IllegalStateException("Flow execution returned no completion"));
+            }
+            future.whenComplete((result, failure) -> admission.close());
+            return future;
+        } catch (Throwable failure) {
+            admission.close();
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private <T> CompletableFuture<T> invokeAdmissionOperation(Supplier<CompletableFuture<T>> operation) {
+        try {
+            CompletableFuture<T> future = operation.get();
+            return future != null ? future : CompletableFuture.failedFuture(new IllegalStateException("Flow execution returned no completion"));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private void awaitLegacyExecutions() {
+        boolean interrupted = false;
+        synchronized (admissionMonitor) {
+            while (activeLegacyExecutions > 0) {
+                try {
+                    admissionMonitor.wait();
+                } catch (InterruptedException exception) {
+                    interrupted = true;
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private CompletableFuture<Void> awaitLegacyExecutionsAsync() {
+        synchronized (admissionMonitor) {
+            if (activeLegacyExecutions == 0) {
+                return CompletableFuture.completedFuture(null);
+            }
+            CompletableFuture<Void> completion = new CompletableFuture<>();
+            drainWaiters.add(completion);
+            return completion;
+        }
     }
 
     public void setAuthorizationPolicy(FlowNodeAuthorizationPolicy authorizationPolicy) {
@@ -468,7 +1722,13 @@ public class FlowExecutor {
                 player,
                 event,
                 null,
-                this
+                this,
+                null,
+                null,
+                null,
+                null,
+                restudio.resync.flow.runtime.RuntimeExecutionContext.NO_DEADLINE,
+                node
         );
         context.setDeferredOutputDispatcher(outputPin -> dispatchDeferredOutput(runtime, startNodeId, outputPin, player, event, steps));
 
@@ -552,6 +1812,9 @@ public class FlowExecutor {
                     outputPins = merged;
                 }
             }
+            outputPins = outputPins.stream()
+                .map(pin -> runtime.normalizeOutputPin(node, pin))
+                .toList();
 
             CompletableFuture<Void> result;
             if (!outputPins.isEmpty()) {
@@ -577,6 +1840,7 @@ public class FlowExecutor {
                                                            int steps, long traceStarted, CompletableFuture<Void> execution) {
         return execution.handle((ignored, failure) -> {
             runtime.endFlowExecution(graph, nodeId);
+            runtime.clearDataDependencies(nodeId);
             Throwable effectiveFailure = failure;
             if (effectiveFailure == null && !runtime.isWithinElapsedBudget(maxExecutionDurationMillis)) {
                 effectiveFailure = new FlowExecutionException(
@@ -648,6 +1912,12 @@ public class FlowExecutor {
         ));
     }
 
+    private CompletableFuture<Void> bridgeUnsupported(String reason, FlowGraph graph, String startNodeId) {
+        return bridgeFailure("CORE_EXECUTION_UNSUPPORTED", bridgeReason(reason,
+            "Compiled Core execution is unsupported for this graph"), null, graph, startNodeId,
+            "Provide a complete canonical mapping context before enabling the compiled Core bridge");
+    }
+
     private CompletableFuture<Void> pendingOperations(FlowContext context) {
         return pendingOperations(context, new HashSet<>());
     }
@@ -690,6 +1960,9 @@ public class FlowExecutor {
 
         CompletableFuture<Void> completion = new CompletableFuture<>();
         Runnable continuation = () -> {
+            if (completion.isDone()) {
+                return;
+            }
             try {
                 executeTriggeredOutputs(runtime, currentNodeId, List.of(outputPin), player, event, steps)
                     .whenComplete((ignored, failure) -> {
@@ -737,13 +2010,18 @@ public class FlowExecutor {
 
         CompletableFuture<Void> completion = new CompletableFuture<>();
         String taskId = "thread_policy_" + UUID.randomUUID();
-        Runnable scheduledAction = () -> invokeExecutionAction(action).whenComplete((ignored, failure) -> {
-            if (failure == null) {
-                completion.complete(null);
-            } else {
-                completion.completeExceptionally(unwrapCompletionFailure(failure));
+        Runnable scheduledAction = () -> {
+            if (completion.isDone()) {
+                return;
             }
-        });
+            invokeExecutionAction(action).whenComplete((ignored, failure) -> {
+                if (failure == null) {
+                    completion.complete(null);
+                } else {
+                    completion.completeExceptionally(unwrapCompletionFailure(failure));
+                }
+            });
+        };
         BukkitTask task;
         try {
             task = resolved == NodeHandler.ThreadPolicy.MAIN
@@ -778,9 +2056,10 @@ public class FlowExecutor {
             if (outputPin == null || outputPin.isBlank()) {
                 continue;
             }
+            String normalizedPin = runtime.normalizeOutputPin(currentNodeId, outputPin);
             future = future.thenCompose(ignored -> loopControlRequested(runtime)
                 ? CompletableFuture.completedFuture(null)
-                : findNextAndExecute(runtime, currentNodeId, outputPin, player, event, steps));
+                : findNextAndExecute(runtime, currentNodeId, normalizedPin, player, event, steps));
         }
         return future;
     }
@@ -804,15 +2083,17 @@ public class FlowExecutor {
         }
 
         FlowGraph graph = runtime.getGraph();
-        List<String> nextNodeIds = findTargetNodes(graph, currentNodeId, outputPin);
+        outputPin = runtime.normalizeOutputPin(currentNodeId, outputPin);
+        List<String> nextNodeIds = findTargetNodes(runtime, graph, currentNodeId, outputPin);
         traceTraversedConnections(runtime, graph, currentNodeId, outputPin, steps);
 
         if (nextNodeIds.isEmpty()) {
-            if ("next".equals(outputPin)) {
-                nextNodeIds = findTargetNodes(graph, currentNodeId, "flow");
+            FlowNode sourceNode = graph.getNodes().get(currentNodeId);
+            if (runtime.outputPinMatches(sourceNode, outputPin, "next")) {
+                nextNodeIds = findTargetNodes(runtime, graph, currentNodeId, "flow");
                 traceTraversedConnections(runtime, graph, currentNodeId, "flow", steps);
-            } else if ("flow".equals(outputPin)) {
-                nextNodeIds = findTargetNodes(graph, currentNodeId, "next");
+            } else if (runtime.outputPinMatches(sourceNode, outputPin, "flow")) {
+                nextNodeIds = findTargetNodes(runtime, graph, currentNodeId, "next");
                 traceTraversedConnections(runtime, graph, currentNodeId, "next", steps);
             }
         }
@@ -826,7 +2107,8 @@ public class FlowExecutor {
             return;
         }
         for (FlowConnection connection : graph.getConnectionsFromSource(currentNodeId)) {
-            if (outputPin.equals(connection.getSourcePin())) {
+            FlowNode source = graph.getNodes().get(currentNodeId);
+            if (runtime.outputPinMatches(source, connection.getSourcePin(), outputPin)) {
                 debugger.connectionTraversed(runtime, graph, connection, steps);
             }
         }
@@ -861,37 +2143,53 @@ public class FlowExecutor {
             Map<String, Object> results = Map.of();
             runtime.setNodeOutput(startNodeId, "results", results);
             runtime.setNodeOutput(startNodeId, "result", FlowOperationResult.success(results));
-            return executeTargets(runtime, findTargetNodes(runtime.getGraph(), startNodeId, "flow"), player, event, steps + 1);
+            return executeTargets(runtime, findTargetNodes(runtime, runtime.getGraph(), startNodeId, "flow"), player, event, steps + 1);
         }
         FlowGraphValidationException functionValidationFailure = validationFailure(functionGraph);
         if (functionValidationFailure != null) {
             return CompletableFuture.failedFuture(functionValidationFailure);
         }
         functionGraph = FlowSerializer.deserialize(FlowSerializer.serialize(functionGraph));
-        String functionStartNodeId = FlowRuntime.findFunctionStartNodeId(functionGraph);
+        functionGraph.adaptLegacyFunctionParameterIds();
+        FlowGraph calledFunction = functionGraph;
+        String functionStartNodeId = findFunctionStartNodeId(functionGraph);
         if (functionStartNodeId == null) {
             return CompletableFuture.failedFuture(new FlowExecutionException(
                 "FUNCTION_START_MISSING", "Function has no executable start node", null, startNodeId,
                 "Add a Function Start node to " + functionId));
         }
 
-        FlowExecutionException contractFailure = validateFunctionCallContract(node, functionGraph, startNodeId);
+        FlowExecutionException contractFailure = validateFunctionCallContractById(node, functionGraph, startNodeId);
         if (contractFailure != null) {
             return CompletableFuture.failedFuture(contractFailure);
         }
-        Map<String, Object> callInputs;
+        Map<FunctionParameterId, Object> callInputs;
         try {
-            callInputs = resolveFunctionInputs(runtime, node, startNodeId, functionGraph);
+            callInputs = resolveFunctionInputFrame(runtime, node, startNodeId, functionGraph);
         } catch (FlowExecutionException exception) {
             return CompletableFuture.failedFuture(exception);
         }
-        FlowExecutionException inputFailure = validateFunctionInputs(functionGraph, callInputs, startNodeId);
+        FlowExecutionException inputFailure = validateFunctionInputFrame(functionGraph, callInputs, startNodeId);
         if (inputFailure != null) {
             return CompletableFuture.failedFuture(inputFailure);
         }
+        if (executionBridge != null) {
+            FunctionInvocationContext invocation = defaultFunctionInvocationContext(player, event,
+                runtime.getEventVariables(), runtime.getInvocationId(), RuntimeExecutionContext.NO_DEADLINE);
+            if (invocation == null) {
+                return compiledFunctionUnavailable(runtime.getGraph(), startNodeId,
+                    "FlowExecutor.executeFunctionCallNode");
+            }
+            FunctionInvocationContext child = invocation.child("legacy-call|" + startNodeId + "|" + functionId + "|" + steps);
+            return executeFunction(functionGraph, player, event, legacyFunctionInputs(functionGraph, callInputs), runtime.getEventVariables(), child)
+                .thenCompose(results -> {
+                    runtime.setNodeOutput(startNodeId, "results", results);
+                    runtime.setNodeOutput(startNodeId, "result", FlowOperationResult.success(results));
+                    return executeTargets(runtime, findTargetNodes(runtime, runtime.getGraph(), startNodeId, "flow"), player, event, steps + 1);
+                });
+        }
         int depthBefore = runtime.getCallDepth();
-        List<FlowGraph.FunctionParameter> functionOutputs = functionGraph.getFunctionOutputs() != null ? List.copyOf(functionGraph.getFunctionOutputs()) : List.of();
-        runtime.callFunction(functionGraph, startNodeId, callInputs);
+        runtime.callFunctionById(functionGraph, startNodeId, callInputs);
         CompletableFuture<Void> functionExecution = execute(runtime, functionStartNodeId, player, event, steps + 1);
 
         return functionExecution.thenCompose(v -> {
@@ -905,75 +2203,110 @@ public class FlowExecutor {
                 callerNodeId = startNodeId;
             }
 
-            Map<String, Object> results = new HashMap<>();
-            for (FlowGraph.FunctionParameter output : functionOutputs) {
-                if (output != null && output.getName() != null && !output.getName().isBlank()) {
-                    results.put(output.getName(), runtime.getNodeOutput(callerNodeId, output.getName()));
-                }
-            }
+            Map<String, Object> results = legacyFunctionOutputs(calledFunction, runtime.getReturnedFunctionOutputsById());
             runtime.setNodeOutput(callerNodeId, "results", results);
             runtime.setNodeOutput(callerNodeId, "result", FlowOperationResult.success(results));
 
-            List<String> nextNodeIds = findTargetNodes(runtime.getGraph(), callerNodeId, "flow");
+            List<String> nextNodeIds = findTargetNodes(runtime, runtime.getGraph(), callerNodeId, "flow");
             return executeTargets(runtime, nextNodeIds, player, event, steps + 1);
         });
     }
 
-    private Map<String, Object> resolveFunctionInputs(FlowRuntime runtime, FlowNode node, String nodeId,
-                                                      FlowGraph functionGraph) throws FlowExecutionException {
-        Map<String, Object> callInputs = new HashMap<>();
+    private Map<FunctionParameterId, Object> resolveFunctionInputFrame(FlowRuntime runtime, FlowNode node, String nodeId,
+                                                                       FlowGraph functionGraph) throws FlowExecutionException {
+        return resolveFunctionInputFrame(runtime, node, nodeId, functionGraph, false);
+    }
+
+    private Map<FunctionParameterId, Object> resolveLegacyFunctionInputFrame(FlowRuntime runtime, FlowNode node, String nodeId,
+                                                                               FlowGraph functionGraph) throws FlowExecutionException {
+        boolean legacyGraph = hasLegacyFunctionParameters(functionGraph);
+        functionGraph.adaptLegacyFunctionParameterIds();
+        return resolveFunctionInputFrame(runtime, node, nodeId, functionGraph, legacyGraph);
+    }
+
+    private Map<FunctionParameterId, Object> resolveFunctionInputFrame(FlowRuntime runtime, FlowNode node, String nodeId,
+                                                                       FlowGraph functionGraph, boolean legacyGraph)
+            throws FlowExecutionException {
+        Map<FunctionParameterId, Object> callInputs = new LinkedHashMap<>();
         Object dynamicArguments = runtime.resolveInput(node, "arguments");
         if (dynamicArguments instanceof Map<?, ?> arguments) {
             for (Map.Entry<?, ?> argument : arguments.entrySet()) {
-                if (argument.getKey() != null) {
-                    callInputs.put(argument.getKey().toString(), argument.getValue());
+                if (argument.getKey() == null) {
+                    continue;
                 }
+                FunctionParameterId id = legacyGraph
+                    ? legacyFunctionParameterId(functionGraph, argument.getKey(), true)
+                    : functionParameterId(argument.getKey());
+                if (id == null) {
+                    throw new FlowExecutionException("FUNCTION_ARGUMENT_UNKNOWN",
+                        "Function argument is not declared: " + argument.getKey(), null, nodeId,
+                        "Remove the unknown argument or update the function signature",
+                        Map.of("argument", argument.getKey().toString(), "function", functionGraph.getId()));
+                }
+                callInputs.put(id, argument.getValue());
             }
         } else if (dynamicArguments != null) {
-            List<FlowGraph.FunctionParameter> declared = functionGraph.getFunctionInputs() != null
-                ? functionGraph.getFunctionInputs().stream()
-                    .filter(input -> input != null && input.getName() != null && !input.getName().isBlank())
-                    .toList()
-                : List.of();
+            List<FlowGraph.FunctionParameter> declared = functionParameters(functionGraph);
             if (declared.size() != 1) {
                 throw new FlowExecutionException("FUNCTION_ARGUMENTS_NEED_NAMES",
                     "This function has multiple inputs, so each value needs an argument name", null, nodeId,
                     "Add named arguments to Call Function",
                     Map.of("function", functionGraph.getId(), "inputCount", declared.size()));
             }
-            callInputs.put(declared.getFirst().getName(), dynamicArguments);
+            callInputs.put(requireFunctionParameterId(declared.getFirst()), dynamicArguments);
         }
-        if (functionGraph.getFunctionInputs() != null) {
-            for (FlowGraph.FunctionParameter input : functionGraph.getFunctionInputs()) {
-                if (input == null || input.getName() == null || input.getName().isBlank()) {
-                    continue;
-                }
-                if (FUNCTION_CALL_RESERVED_INPUTS.contains(input.getName())) {
-                    callInputs.putIfAbsent(input.getName(), null);
-                    continue;
-                }
-                boolean hasLiteral = node.getInputValues() != null && node.getInputValues().containsKey(input.getName());
-                boolean hasConnection = runtime.getGraph().getConnectionsToTarget(nodeId).stream()
-                    .anyMatch(connection -> input.getName().equals(connection.getTargetPin()));
-                if (hasLiteral || hasConnection || !callInputs.containsKey(input.getName())) {
-                    callInputs.put(input.getName(), runtime.resolveInput(node, input.getName()));
-                }
+        for (FlowGraph.FunctionParameter input : functionParameters(functionGraph)) {
+            if (input == null || input.getName() == null || input.getName().isBlank()) {
+                continue;
+            }
+            FunctionParameterId id = requireFunctionParameterId(input);
+            if (FUNCTION_CALL_RESERVED_INPUTS.contains(input.getName())) {
+                callInputs.putIfAbsent(id, null);
+                continue;
+            }
+            String inputPin = legacyGraph ? input.getName() : FunctionCallSupport.parameterPinKey(input, true);
+            boolean hasLiteral = node.getInputValues() != null && node.getInputValues().containsKey(inputPin);
+            boolean hasConnection = runtime.getGraph().getConnectionsToTarget(nodeId).stream()
+                .anyMatch(connection -> runtime.inputPinMatches(node, connection.getTargetPin(), inputPin));
+            if (hasLiteral || hasConnection || !callInputs.containsKey(id)) {
+                callInputs.put(id, runtime.resolveInput(node, inputPin));
             }
         }
-        return callInputs;
+        Map<FunctionParameterId, Object> orderedInputs = new LinkedHashMap<>();
+        for (FlowGraph.FunctionParameter input : functionParameters(functionGraph)) {
+            FunctionParameterId id = requireFunctionParameterId(input);
+            if (callInputs.containsKey(id)) {
+                orderedInputs.put(id, callInputs.get(id));
+            }
+        }
+        callInputs.forEach(orderedInputs::putIfAbsent);
+        return orderedInputs;
     }
 
-    private FlowExecutionException validateFunctionCallContract(FlowNode node, FlowGraph functionGraph, String nodeId) {
+    private Map<String, Object> resolveFunctionInputs(FlowRuntime runtime, FlowNode node, String nodeId,
+                                                      FlowGraph functionGraph) throws FlowExecutionException {
+        return legacyFunctionInputs(functionGraph, resolveLegacyFunctionInputFrame(runtime, node, nodeId, functionGraph));
+    }
+
+    private FlowExecutionException validateFunctionCallContractById(FlowNode node, FlowGraph functionGraph, String nodeId) {
         if (node.getInputValues() == null || !(node.getInputValues().get(CALL_PARAMETERS_KEY) instanceof Iterable<?> values)) {
             return null;
         }
-        Map<String, FlowTypeRef> declared = new LinkedHashMap<>();
+        functionGraph.adaptLegacyFunctionParameterIds();
+        Map<FunctionParameterId, FlowTypeRef> declared = new LinkedHashMap<>();
+        Map<FunctionParameterId, String> declaredNames = new LinkedHashMap<>();
         for (Object value : values) {
-            if (!(value instanceof Map<?, ?> entry) || entry.get("name") == null || entry.get("type") == null) {
+            if (!(value instanceof Map<?, ?> entry) || entry.get("type") == null) {
                 return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_INVALID", "Function argument needs a name and type", null, nodeId,
                     "Remove the invalid argument and add it again", Map.of("function", functionGraph.getId()));
             }
-            String name = entry.get("name").toString().trim();
+            String name = entry.get("name") != null ? entry.get("name").toString().trim() : "";
+            Object rawId = entry.get("parameterId") != null ? entry.get("parameterId") : entry.get("id");
+            FunctionParameterId id = functionParameterId(rawId);
+            if (id == null) {
+                return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_UNKNOWN", "Function argument is not declared: " + name, null, nodeId,
+                    "Match the argument ID to the function input", Map.of("argument", name, "function", functionGraph.getId()));
+            }
             FlowTypeRef type;
             try {
                 type = FlowTypeRef.parse(entry.get("type").toString()).normalizedGenerics();
@@ -981,24 +2314,28 @@ public class FlowExecutor {
                 return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_TYPE_INVALID", "Function argument type is invalid: " + name, exception, nodeId,
                     "Choose the type expected by the called function", Map.of("argument", name, "function", functionGraph.getId()));
             }
-            if (declared.putIfAbsent(name, type) != null) {
+            if (declared.putIfAbsent(id, type) != null) {
                 return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_DUPLICATE", "Function argument is declared more than once: " + name, null, nodeId,
                     "Remove or rename the duplicate argument", Map.of("argument", name, "function", functionGraph.getId()));
             }
+            declaredNames.put(id, displayName(functionGraph, id, name));
         }
         if (declared.isEmpty()) {
             return null;
         }
-        Map<String, FlowTypeRef> expected = new LinkedHashMap<>();
-        if (functionGraph.getFunctionInputs() != null) {
-            for (FlowGraph.FunctionParameter parameter : functionGraph.getFunctionInputs()) {
-                if (parameter != null && parameter.getName() != null && !parameter.getName().isBlank()) {
-                    expected.put(parameter.getName(), parameter.getTypeRef().normalizedGenerics());
-                }
+        Map<FunctionParameterId, FlowTypeRef> expected = new LinkedHashMap<>();
+        Map<FunctionParameterId, String> expectedNames = new LinkedHashMap<>();
+        for (FlowGraph.FunctionParameter parameter : functionParameters(functionGraph)) {
+            if (parameter != null && parameter.getName() != null && !parameter.getName().isBlank()) {
+                FunctionParameterId id = requireFunctionParameterId(parameter);
+                expected.put(id, parameter.getTypeRef().normalizedGenerics());
+                expectedNames.put(id, parameter.getName());
             }
         }
-        List<String> missing = expected.keySet().stream().filter(name -> !declared.containsKey(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
-        List<String> unknown = declared.keySet().stream().filter(name -> !expected.containsKey(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        List<String> missing = expected.keySet().stream().filter(id -> !declared.containsKey(id))
+            .map(expectedNames::get).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        List<String> unknown = declared.keySet().stream().filter(id -> !expected.containsKey(id))
+            .map(id -> declaredNames.getOrDefault(id, id.canonicalText())).sorted(String.CASE_INSENSITIVE_ORDER).toList();
         if (!missing.isEmpty() || !unknown.isEmpty()) {
             return new FlowExecutionException("FUNCTION_CALL_ARGUMENTS_DO_NOT_MATCH", "Function arguments do not match the selected function", null, nodeId,
                 "Match the argument names to the function inputs", Map.of(
@@ -1007,13 +2344,15 @@ public class FlowExecutor {
                     "unknown", unknown
                 ));
         }
-        for (Map.Entry<String, FlowTypeRef> argument : declared.entrySet()) {
+        for (Map.Entry<FunctionParameterId, FlowTypeRef> argument : declared.entrySet()) {
             FlowTypeRef expectedType = expected.get(argument.getKey());
             if (!expectedType.equals(argument.getValue())) {
                 return new FlowExecutionException("FUNCTION_CALL_ARGUMENT_TYPE_MISMATCH",
-                    "Argument " + argument.getKey() + " is " + argument.getValue() + " but the function expects " + expectedType, null, nodeId,
+                    "Argument " + displayName(functionGraph, argument.getKey(), declaredNames.get(argument.getKey())) + " is "
+                        + argument.getValue() + " but the function expects " + expectedType, null, nodeId,
                     "Choose the same type as the function input", Map.of(
-                        "argument", argument.getKey(),
+                        "argument", displayName(functionGraph, argument.getKey(), declaredNames.get(argument.getKey())),
+                        "parameterId", argument.getKey().canonicalText(),
                         "declaredType", argument.getValue().toString(),
                         "expectedType", expectedType.toString(),
                         "function", functionGraph.getId()
@@ -1023,16 +2362,60 @@ public class FlowExecutor {
         return null;
     }
 
-    private FlowExecutionException validateFunctionInputs(FlowGraph functionGraph, Map<String, Object> inputs, String nodeId) {
-        Set<String> declared = new HashSet<>();
-        List<FlowGraph.FunctionParameter> parameters = functionGraph.getFunctionInputs() != null ? functionGraph.getFunctionInputs() : List.of();
-        for (FlowGraph.FunctionParameter parameter : parameters) {
+    private FlowExecutionException validateFunctionCallContract(FlowNode node, FlowGraph functionGraph, String nodeId) {
+        if (node.getInputValues() == null
+                || !(node.getInputValues().get(CALL_PARAMETERS_KEY) instanceof Iterable<?> values)) {
+            return validateFunctionCallContractById(node, functionGraph, nodeId);
+        }
+        functionGraph.adaptLegacyFunctionParameterIds();
+        List<Object> adaptedValues = new ArrayList<>();
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> entry)) {
+                adaptedValues.add(value);
+                continue;
+            }
+            Map<String, Object> adapted = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> item : entry.entrySet()) {
+                if (item.getKey() != null) {
+                    adapted.put(item.getKey().toString(), item.getValue());
+                }
+            }
+            Object rawId = adapted.get("parameterId") != null ? adapted.get("parameterId") : adapted.get("id");
+            if (functionParameterId(rawId) == null) {
+                Object legacyKey = adapted.get("name") != null ? adapted.get("name") : rawId;
+                FunctionParameterId id = legacyFunctionParameterId(functionGraph, legacyKey, true);
+                if (id != null) {
+                    adapted.put("parameterId", id.canonicalText());
+                }
+            }
+            adaptedValues.add(adapted);
+        }
+        boolean hadValues = node.getInputValues().containsKey(CALL_PARAMETERS_KEY);
+        Object previousValues = node.getInputValues().put(CALL_PARAMETERS_KEY, adaptedValues);
+        try {
+            return validateFunctionCallContractById(node, functionGraph, nodeId);
+        } finally {
+            if (hadValues) {
+                node.getInputValues().put(CALL_PARAMETERS_KEY, previousValues);
+            } else {
+                node.getInputValues().remove(CALL_PARAMETERS_KEY);
+            }
+        }
+    }
+
+    private FlowExecutionException validateFunctionInputFrame(FlowGraph functionGraph, Map<FunctionParameterId, Object> inputs, String nodeId) {
+        Map<FunctionParameterId, FlowGraph.FunctionParameter> declared = new LinkedHashMap<>();
+        for (FlowGraph.FunctionParameter parameter : functionParameters(functionGraph)) {
             if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
                 continue;
             }
+            declared.put(requireFunctionParameterId(parameter), parameter);
+        }
+        for (Map.Entry<FunctionParameterId, FlowGraph.FunctionParameter> entry : declared.entrySet()) {
+            FunctionParameterId id = entry.getKey();
+            FlowGraph.FunctionParameter parameter = entry.getValue();
             String name = parameter.getName();
-            declared.add(name);
-            Object value = inputs.get(name);
+            Object value = inputs.get(id);
             if (value == null && parameter.getDefaultValue() != null && !parameter.getDefaultValue().isBlank()) {
                 value = parameter.getDefaultValue();
             }
@@ -1047,19 +2430,157 @@ public class FlowExecutor {
                 return new FlowExecutionException("FUNCTION_ARGUMENT_TYPE_MISMATCH", "Function argument has the wrong type: " + name, null, nodeId,
                     "Provide a value compatible with " + parameter.getTypeRef(), Map.of(
                         "argument", name,
+                        "parameterId", id.canonicalText(),
                         "expectedType", parameter.getTypeRef().toString(),
                         "actualType", value.getClass().getSimpleName(),
                         "function", functionGraph.getId()
-                    ));
+                ));
             }
-            inputs.put(name, adapted);
+            inputs.put(id, adapted);
         }
-        List<String> unknown = inputs.keySet().stream().filter(name -> !declared.contains(name)).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        List<String> unknown = inputs.keySet().stream().filter(id -> !declared.containsKey(id))
+            .map(id -> id != null ? id.canonicalText() : "null").sorted(String.CASE_INSENSITIVE_ORDER).toList();
         if (!unknown.isEmpty()) {
             return new FlowExecutionException("FUNCTION_ARGUMENT_UNKNOWN", "Function arguments are not declared: " + String.join(", ", unknown), null, nodeId,
                 "Remove the unknown arguments or update the function signature", Map.of("arguments", unknown, "function", functionGraph.getId()));
         }
         return null;
+    }
+
+    private FlowExecutionException validateFunctionInputs(FlowGraph functionGraph, Map<String, Object> inputs, String nodeId) {
+        try {
+            boolean legacyGraph = hasLegacyFunctionParameters(functionGraph);
+            functionGraph.adaptLegacyFunctionParameterIds();
+            Map<FunctionParameterId, Object> frame = adaptLegacyFunctionInputFrame(functionGraph, inputs, legacyGraph);
+            FlowExecutionException failure = validateFunctionInputFrame(functionGraph, frame, nodeId);
+            if (failure == null) {
+                inputs.clear();
+                inputs.putAll(legacyFunctionInputs(functionGraph, frame));
+            }
+            return failure;
+        } catch (IllegalArgumentException failure) {
+            return new FlowExecutionException("FUNCTION_ARGUMENT_UNKNOWN", failure.getMessage(), failure, nodeId,
+                "Remove the unknown arguments or update the function signature");
+        }
+    }
+
+    private List<FlowGraph.FunctionParameter> functionParameters(FlowGraph functionGraph) {
+        if (functionGraph == null || functionGraph.getFunctionInputs() == null) {
+            return List.of();
+        }
+        return functionGraph.getFunctionInputs().stream()
+            .filter(parameter -> parameter != null && parameter.getName() != null && !parameter.getName().isBlank())
+            .toList();
+    }
+
+    private FunctionParameterId requireFunctionParameterId(FlowGraph.FunctionParameter parameter) {
+        FunctionParameterId id = parameter != null ? parameter.getParameterId() : null;
+        if (id == null) {
+            throw new IllegalArgumentException("Function parameter ID is required: "
+                + (parameter != null ? parameter.getName() : ""));
+        }
+        return id;
+    }
+
+    private boolean hasLegacyFunctionParameters(FlowGraph functionGraph) {
+        if (functionGraph == null) {
+            return false;
+        }
+        return (functionGraph.getFunctionInputs() != null && functionGraph.getFunctionInputs().stream()
+            .anyMatch(parameter -> parameter != null && parameter.getParameterId() == null))
+            || (functionGraph.getFunctionOutputs() != null && functionGraph.getFunctionOutputs().stream()
+            .anyMatch(parameter -> parameter != null && parameter.getParameterId() == null));
+    }
+
+    private FunctionParameterId functionParameterId(Object rawKey) {
+        if (rawKey instanceof FunctionParameterId id) {
+            return id;
+        }
+        if (rawKey == null) {
+            return null;
+        }
+        String key = rawKey.toString().trim();
+        if (key.isEmpty()) {
+            return null;
+        }
+        try {
+            return FunctionParameterId.parseCanonicalText(key);
+        } catch (IllegalArgumentException ignored) {
+        }
+        return null;
+    }
+
+    private FunctionParameterId legacyFunctionParameterId(FlowGraph functionGraph, Object rawKey, boolean legacyGraph) {
+        FunctionParameterId direct = functionParameterId(rawKey);
+        if (direct != null || !legacyGraph || rawKey == null) {
+            return direct;
+        }
+        String name = rawKey.toString().trim();
+        if (name.isEmpty()) {
+            return null;
+        }
+        FlowGraph.FunctionParameter parameter = CustomFunctionNodeDefinitions.parameterForKey(functionGraph, name,
+            NodeDefinition.PinDirection.INPUT, true);
+        return parameter != null ? requireFunctionParameterId(parameter) : null;
+    }
+
+    private String displayName(FlowGraph functionGraph, FunctionParameterId id, String fallback) {
+        for (FlowGraph.FunctionParameter parameter : functionParameters(functionGraph)) {
+            if (id.equals(parameter.getParameterId())) {
+                return parameter.getName();
+            }
+        }
+        return fallback != null && !fallback.isBlank() ? fallback : id.canonicalText();
+    }
+
+    private Map<FunctionParameterId, Object> adaptLegacyFunctionInputFrame(FlowGraph functionGraph,
+                                                                            Map<String, Object> inputs,
+                                                                            boolean allowDisplayNames) {
+        if (functionGraph == null || inputs == null || inputs.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        Map<FunctionParameterId, Object> frame = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : inputs.entrySet()) {
+            FunctionParameterId id = allowDisplayNames
+                ? legacyFunctionParameterId(functionGraph, entry.getKey(), true)
+                : functionParameterId(entry.getKey());
+            if (id == null) {
+                throw new IllegalArgumentException("Function argument is not declared: " + entry.getKey());
+            }
+            frame.put(id, entry.getValue());
+        }
+        return frame;
+    }
+
+    private Map<String, Object> legacyFunctionInputs(FlowGraph functionGraph, Map<FunctionParameterId, Object> frame) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        if (frame == null) {
+            return values;
+        }
+        for (FlowGraph.FunctionParameter parameter : functionParameters(functionGraph)) {
+            FunctionParameterId id = parameter.getParameterId();
+            if (id != null && frame.containsKey(id)) {
+                values.put(parameter.getName(), frame.get(id));
+            }
+        }
+        return values;
+    }
+
+    private Map<String, Object> legacyFunctionOutputs(FlowGraph functionGraph, Map<FunctionParameterId, Object> frame) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        if (functionGraph == null || functionGraph.getFunctionOutputs() == null || frame == null) {
+            return values;
+        }
+        for (FlowGraph.FunctionParameter parameter : functionGraph.getFunctionOutputs()) {
+            if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
+                continue;
+            }
+            FunctionParameterId id = parameter.getParameterId();
+            if (id != null && frame.containsKey(id)) {
+                values.put(parameter.getName(), frame.get(id));
+            }
+        }
+        return values;
     }
 
     private boolean isRecoverableFunctionCall(FlowRuntime runtime, FlowNode node) {
@@ -1087,7 +2608,7 @@ public class FlowExecutor {
             executionFailure.getMessage(),
             executionFailure.getDetails()
         ));
-        return executeTargets(runtime, findTargetNodes(runtime.getGraph(), nodeId, "flow"), player, event, steps + 1);
+        return executeTargets(runtime, findTargetNodes(runtime, runtime.getGraph(), nodeId, "flow"), player, event, steps + 1);
     }
 
     private CompletableFuture<Void> executeLoopNode(FlowRuntime runtime, FlowNode loopNode, String operation, Player player, Event event, int steps) {
@@ -1126,8 +2647,8 @@ public class FlowExecutor {
         runtime.beginLoopControl();
         runtime.setNodeOutput(nodeId, "completed", false);
 
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
         for (int i = 0; i < iterations; i++) {
@@ -1165,8 +2686,8 @@ public class FlowExecutor {
         runtime.beginLoopControl();
         runtime.setNodeOutput(nodeId, "completed", false);
 
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
         for (int i = 0; i < list.size(); i++) {
@@ -1201,8 +2722,8 @@ public class FlowExecutor {
         runtime.beginLoopControl();
         runtime.setNodeOutput(nodeId, "completed", false);
 
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
         for (int i = 0; i < players.size(); i++) {
@@ -1250,8 +2771,8 @@ public class FlowExecutor {
 
         List<Entity> entities = new ArrayList<>(
             center.getWorld().getNearbyEntities(center, radius, radius, radius));
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
 
         CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
         for (int i = 0; i < entities.size(); i++) {
@@ -1291,8 +2812,8 @@ public class FlowExecutor {
         runtime.beginLoopControl();
         runtime.setNodeOutput(nodeId, "completed", false);
 
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
         CompletableFuture<Void> iterations = executeLoopIntervalIteration(runtime, nodeId, loopTargets, player, event, steps, 0, intervalTicks, maxIterations);
         return iterations.whenComplete((result, failure) -> runtime.endLoopControl())
             .thenCompose(v -> executeLoopCompletion(runtime, nodeId, completedTargets, player, event, steps));
@@ -1333,8 +2854,8 @@ public class FlowExecutor {
         runtime.beginLoopControl();
         runtime.setNodeOutput(nodeId, "completed", false);
 
-        List<String> loopTargets = findLoopTargets(graph, nodeId);
-        List<String> completedTargets = findTargetNodes(graph, nodeId, "completed");
+        List<String> loopTargets = findLoopTargets(runtime, graph, nodeId);
+        List<String> completedTargets = findTargetNodes(runtime, graph, nodeId, "completed");
         CompletableFuture<Void> iterations = executeLoopWhileIteration(runtime, loopNode, nodeId, loopTargets, player, event,
             steps, 0, intervalTicks, maxIterations);
         return iterations.whenComplete((result, failure) -> runtime.endLoopControl())
@@ -1387,7 +2908,7 @@ public class FlowExecutor {
     private CompletableFuture<Void> executeLoopCompletion(FlowRuntime runtime, String nodeId, List<String> completedTargets,
                                                           Player player, Event event, int steps) {
         runtime.setNodeOutput(nodeId, "completed", true);
-        List<String> doneTargets = findTargetNodes(runtime.getGraph(), nodeId, "done");
+        List<String> doneTargets = findTargetNodes(runtime, runtime.getGraph(), nodeId, "done");
         runtime.resetFlowExecutionPath();
         return executeTargets(runtime, doneTargets.isEmpty() ? completedTargets : doneTargets, player, event, steps);
     }
@@ -1397,11 +2918,15 @@ public class FlowExecutor {
     }
 
     private CompletableFuture<Void> executionBudgetFailure(FlowRuntime runtime, String nodeId) {
+        return CompletableFuture.failedFuture(executionBudgetFailureException(runtime, nodeId));
+    }
+
+    private FlowExecutionException executionBudgetFailureException(FlowRuntime runtime, String nodeId) {
         boolean operationBudgetExceeded = runtime.isWithinElapsedBudget(maxExecutionDurationMillis);
         String message = operationBudgetExceeded
             ? "Flow execution exceeded maximum operations: " + maxExecutionSteps
             : "Flow execution exceeded maximum duration: " + maxExecutionDurationMillis + "ms";
-        return CompletableFuture.failedFuture(new FlowExecutionException(
+        return new FlowExecutionException(
             operationBudgetExceeded ? "EXECUTION_OPERATION_BUDGET" : "EXECUTION_DURATION_BUDGET",
             message,
             null,
@@ -1409,7 +2934,7 @@ public class FlowExecutor {
             operationBudgetExceeded
                 ? "Reduce loop or fan-out work, or raise the configured operation budget"
                 : "Reduce long-running work, or raise the configured duration budget"
-        ));
+        );
     }
 
     private CompletableFuture<Void> invalidLoopConfiguration(String nodeId, String message) {
@@ -1454,14 +2979,35 @@ public class FlowExecutor {
         if (targetNodeIds == null || targetNodeIds.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
+        if (targetNodeIds.size() == 1) {
+            return execute(runtime, targetNodeIds.getFirst(), player, event, steps + 1);
+        }
         List<CompletableFuture<Void>> executions = new ArrayList<>(targetNodeIds.size());
+        List<FlowRuntime> branches = new ArrayList<>(targetNodeIds.size());
         for (String nodeId : targetNodeIds) {
             if (loopControlRequested(runtime)) {
                 break;
             }
-            executions.add(execute(runtime, nodeId, player, event, steps + 1));
+            FlowRuntime branch = runtime.forkBranch();
+            branches.add(branch);
+            CompletableFuture<Void> execution = execute(branch, nodeId, player, event, steps + 1);
+            execution.whenComplete((result, failure) -> branch.cleanupThreadLocals());
+            executions.add(execution);
         }
-        return CompletableFuture.allOf(executions.toArray(CompletableFuture[]::new));
+        return CompletableFuture.allOf(executions.toArray(CompletableFuture[]::new)).thenCompose(ignored -> {
+            try {
+                runtime.mergeCompletedBranches(branches);
+                return CompletableFuture.completedFuture(null);
+            } catch (IllegalStateException failure) {
+                return CompletableFuture.failedFuture(new FlowExecutionException(
+                    "EXECUTION_BRANCH_FRAME_DIVERGED",
+                    failure.getMessage(),
+                    failure,
+                    null,
+                    "Reconnect parallel targets so every branch finishes in the same function and loop frame"
+                ));
+            }
+        });
     }
 
     private boolean loopControlRequested(FlowRuntime runtime) {
@@ -1473,8 +3019,9 @@ public class FlowExecutor {
             return;
         }
         for (String targetNodeId : targetNodeIds) {
+            FlowNode targetNode = graph.getNodes().get(targetNodeId);
             for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
-                if ("flow".equals(conn.getTargetPin())) {
+                if (runtime.inputPinMatches(targetNode, conn.getTargetPin(), "flow")) {
                     continue;
                 }
                 clearDependencyOutputs(runtime, graph, targetNodeId, conn.getTargetPin());
@@ -1491,8 +3038,9 @@ public class FlowExecutor {
         if (targetNodeId == null) {
             return;
         }
+        FlowNode targetNode = graph.getNodes().get(targetNodeId);
         for (FlowConnection conn : graph.getConnectionsToTarget(targetNodeId)) {
-            if (!conn.getTargetPin().equals(pinName)) {
+            if (!runtime.inputPinMatches(targetNode, conn.getTargetPin(), pinName)) {
                 continue;
             }
             String editorSourceId = conn.getEditorSourceNodeId() != null && !conn.getEditorSourceNodeId().isBlank()
@@ -1510,8 +3058,9 @@ public class FlowExecutor {
             return;
         }
         runtime.clearNodeOutputs(sourceId);
+        FlowNode sourceNode = graph.getNodes().get(sourceId);
         for (FlowConnection sourceConn : graph.getConnectionsToTarget(sourceId)) {
-            if (!"flow".equals(sourceConn.getTargetPin())) {
+            if (!runtime.inputPinMatches(sourceNode, sourceConn.getTargetPin(), "flow")) {
                 clearDependencyOutputs(runtime, graph, sourceId, sourceConn.getTargetPin(), visited);
             }
         }
@@ -1544,15 +3093,20 @@ public class FlowExecutor {
             if (name == null || name.isBlank()) {
                 continue;
             }
-            if (eventVars.containsKey(name)) {
-                runtime.setNodeOutput(nodeId, name, eventVars.get(name));
+            String runtimeName = output.getRuntimeName();
+            Object value = eventVars.containsKey(name) ? eventVars.get(name) : eventVars.get(runtimeName);
+            if (value != null || eventVars.containsKey(name) || eventVars.containsKey(runtimeName)) {
+                runtime.setNodeOutput(nodeId, name, value);
             }
         }
     }
 
     private boolean hasIncomingFlowConnection(FlowGraph graph, String nodeId) {
+        FlowNode targetNode = graph.getNodes().get(nodeId);
         for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
-            if ("flow".equals(conn.getTargetPin()) || "next".equals(conn.getTargetPin())) {
+            NodeDefinition definition = resolveDefinition(targetNode);
+            if (FlowRuntime.inputPinMatches(definition, conn.getTargetPin(), "flow")
+                || FlowRuntime.inputPinMatches(definition, conn.getTargetPin(), "next")) {
                 return true;
             }
         }
@@ -1621,21 +3175,59 @@ public class FlowExecutor {
             return CompletableFuture.completedFuture(null);
         }
 
+        return ensureInputNodesReady(runtime, node, player, event, Set.of(nodeId), nodeId);
+    }
+
+    private CompletableFuture<Void> ensureInputNodesReady(FlowRuntime runtime, FlowNode node, Player player, Event event,
+                                                           Set<String> dependencyPath, String dependencyOwnerNodeId) {
+        FlowGraph graph = runtime.getGraph();
+        String nodeId = graph.findNodeId(node);
+        if (nodeId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         CompletableFuture<Void> ready = CompletableFuture.completedFuture(null);
+        FlowNode targetNode = graph.getNodes().get(nodeId);
         for (FlowConnection conn : graph.getConnectionsToTarget(nodeId)) {
-            if ("flow".equals(conn.getTargetPin())) {
+            if (runtime.inputPinMatches(targetNode, conn.getTargetPin(), "flow")) {
                 continue;
             }
-            ready = ready.thenCompose(ignored -> runtime.hasNodeOutput(conn.getSourceNodeId(), conn.getSourcePin())
-                ? CompletableFuture.completedFuture(null)
-                : executeDataNode(runtime, conn.getSourceNodeId(), player, event));
+            ready = ready.thenCompose(ignored -> ensureDataDependency(runtime, conn.getSourceNodeId(), conn.getSourcePin(),
+                player, event, dependencyPath, dependencyOwnerNodeId));
         }
         return ready;
     }
 
-    private CompletableFuture<Void> executeDataNode(FlowRuntime runtime, String nodeId, Player player, Event event) {
-        if (nodeId == null || runtime.isEvaluating(nodeId)) {
+    private CompletableFuture<Void> ensureDataDependency(FlowRuntime runtime, String nodeId, String pinName,
+                                                          Player player, Event event, Set<String> dependencyPath,
+                                                          String dependencyOwnerNodeId) {
+        if (nodeId == null || nodeId.isBlank()) {
             return CompletableFuture.completedFuture(null);
+        }
+        if (dependencyPath.contains(nodeId)) {
+            return dataDependencyCycle(nodeId);
+        }
+        CompletableFuture<Void> dataEvaluation = runtime.currentDataEvaluation(nodeId);
+        if (dataEvaluation == null && runtime.hasNodeOutput(nodeId, pinName)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (!runtime.registerDataDependency(dependencyOwnerNodeId, nodeId)) {
+            return dataDependencyCycle(nodeId);
+        }
+        CompletableFuture<Void> pendingEvaluation = dataEvaluation != null ? dataEvaluation : runtime.awaitDataEvaluation(nodeId);
+        return pendingEvaluation
+            .thenCompose(ignored -> runtime.hasNodeOutput(nodeId, pinName)
+                ? CompletableFuture.completedFuture(null)
+                : executeDataNode(runtime, nodeId, player, event, dependencyPath));
+    }
+
+    private CompletableFuture<Void> executeDataNode(FlowRuntime runtime, String nodeId, Player player, Event event,
+                                                    Set<String> dependencyPath) {
+        if (nodeId == null || nodeId.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (dependencyPath.contains(nodeId)) {
+            return dataDependencyCycle(nodeId);
         }
         FlowNode sourceNode = runtime.getGraph().getNodes().get(nodeId);
         if (sourceNode == null) {
@@ -1647,29 +3239,39 @@ public class FlowExecutor {
                 "Reconnect the input to an existing data node"
             ));
         }
+        FlowRuntime.DataEvaluation dataEvaluation = runtime.beginDataEvaluation(nodeId);
+        if (!dataEvaluation.owner()) {
+            return dataEvaluation.completion();
+        }
         NodeHandler handler = resolveHandler(sourceNode);
         if (handler == null) {
-            return CompletableFuture.failedFuture(new FlowExecutionException(
+            FlowExecutionException failure = new FlowExecutionException(
                 "DATA_HANDLER_UNAVAILABLE",
                 "No handler registered for data node type: " + sourceNode.getType(),
                 null,
                 nodeId,
                 "Install the required capability or replace the unavailable data node"
-            ));
+            );
+            runtime.completeDataEvaluation(nodeId, dataEvaluation, failure);
+            return dataEvaluation.completion();
         }
         FlowExecutionException operationFailure = validateHandlerOperation(sourceNode, nodeId);
         if (operationFailure != null) {
-            return CompletableFuture.failedFuture(operationFailure);
+            runtime.completeDataEvaluation(nodeId, dataEvaluation, operationFailure);
+            return dataEvaluation.completion();
         }
         if (!acquireExecutionBudget(runtime)) {
-            return executionBudgetFailure(runtime, nodeId);
+            FlowExecutionException failure = executionBudgetFailureException(runtime, nodeId);
+            runtime.completeDataEvaluation(nodeId, dataEvaluation, failure);
+            return dataEvaluation.completion();
         }
 
-        runtime.beginEvaluating(nodeId);
-        CompletableFuture<Void> evaluation = ensureInputNodesReady(runtime, sourceNode, player, event)
+        Set<String> nextDependencyPath = new HashSet<>(dependencyPath);
+        nextDependencyPath.add(nodeId);
+        CompletableFuture<Void> evaluation = ensureInputNodesReady(runtime, sourceNode, player, event, Set.copyOf(nextDependencyPath), nodeId)
             .thenCompose(ignored -> executeWithThreadPolicy(runtime, handler.getThreadPolicy(),
                 () -> executeDataHandler(runtime, sourceNode, nodeId, player, event, handler)));
-        return evaluation.handle((ignored, failure) -> {
+        CompletableFuture<Void> result = evaluation.handle((ignored, failure) -> {
                 if (failure == null) {
                     return (Void) null;
                 }
@@ -1684,15 +3286,28 @@ public class FlowExecutor {
                         "Inspect the data node inputs and the underlying handler failure"
                     );
                 throw new CompletionException(exception);
-            })
-            .whenComplete((ignored, failure) -> runtime.endEvaluating(nodeId));
+            });
+        result.whenComplete((ignored, failure) -> runtime.completeDataEvaluation(nodeId, dataEvaluation,
+            failure != null ? unwrapCompletionFailure(failure) : null));
+        return result;
+    }
+
+    private CompletableFuture<Void> dataDependencyCycle(String nodeId) {
+        return CompletableFuture.failedFuture(new FlowExecutionException(
+            "DATA_DEPENDENCY_CYCLE",
+            "Data dependency cycle detected at node: " + nodeId,
+            null,
+            nodeId,
+            "Break the data dependency cycle or use explicit state and sequencing"
+        ));
     }
 
     private CompletableFuture<Void> executeDataHandler(FlowRuntime runtime, FlowNode sourceNode, String nodeId, Player player,
                                                        Event event, NodeHandler handler) {
         String previousPin = runtime.getTriggeredOutputPin();
         runtime.setTriggeredOutputPin(null);
-        FlowContext context = new FlowContext(runtime, player, event, ignored -> {}, this);
+        FlowContext context = new FlowContext(runtime, player, event, ignored -> {}, this, null, null, null, null,
+            restudio.resync.flow.runtime.RuntimeExecutionContext.NO_DEADLINE, sourceNode);
         try {
             handler.execute(context, sourceNode);
             context.finishSynchronousCapture();
@@ -1720,26 +3335,28 @@ public class FlowExecutor {
     }
 
     private String findTargetNode(FlowGraph graph, String nodeId, String pinName) {
+        FlowNode sourceNode = graph.getNodes().get(nodeId);
         for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
-            if (conn.getSourcePin().equals(pinName)) {
+            if (FlowRuntime.outputPinMatches(resolveDefinition(sourceNode), conn.getSourcePin(), pinName)) {
                 return conn.getTargetNodeId();
             }
         }
         return null;
     }
 
-    private List<String> findLoopTargets(FlowGraph graph, String nodeId) {
-        List<String> targets = findTargetNodes(graph, nodeId, "flow");
+    private List<String> findLoopTargets(FlowRuntime runtime, FlowGraph graph, String nodeId) {
+        List<String> targets = findTargetNodes(runtime, graph, nodeId, "flow");
         if (targets.isEmpty()) {
-            targets = findTargetNodes(graph, nodeId, "loop");
+            targets = findTargetNodes(runtime, graph, nodeId, "loop");
         }
         return targets;
     }
 
-    private List<String> findTargetNodes(FlowGraph graph, String nodeId, String pinName) {
+    private List<String> findTargetNodes(FlowRuntime runtime, FlowGraph graph, String nodeId, String pinName) {
         List<String> targets = new ArrayList<>();
+        FlowNode sourceNode = graph.getNodes().get(nodeId);
         for (FlowConnection conn : graph.getConnectionsFromSource(nodeId)) {
-            if (conn.getSourcePin().equals(pinName)) {
+            if (runtime.outputPinMatches(sourceNode, conn.getSourcePin(), pinName)) {
                 targets.add(conn.getTargetNodeId());
             }
         }
@@ -2063,8 +3680,94 @@ public class FlowExecutor {
     }
 
     public void shutdown() {
+        liveEvents.values().forEach(LiveEventScope::close);
+        liveEvents.clear();
+        AdmissionFence admissionFence = fenceAdmissions();
         cancelPendingTasks();
-        wallClockScheduler.shutdownNow();
+        boolean primaryThread = Bukkit.getServer() != null && Bukkit.isPrimaryThread();
+        if (!primaryThread) {
+            try {
+                admissionFence.awaitDrained();
+            } finally {
+                try {
+                    wallClockScheduler.shutdownNow();
+                } finally {
+                    admissionFence.close();
+                }
+            }
+            return;
+        }
+        CompletableFuture<Void> drained = admissionFence.whenDrained();
+        if (drained.isDone()) {
+            try {
+                wallClockScheduler.shutdownNow();
+            } finally {
+                admissionFence.close();
+            }
+            return;
+        }
+        drained.whenComplete((ignored, failure) -> {
+            try {
+                wallClockScheduler.shutdownNow();
+            } finally {
+                admissionFence.close();
+            }
+        });
+    }
+
+    private <T> CompletableFuture<T> compiledFunctionUnavailable(FlowGraph graph, String nodeId, String entryPoint) {
+        String graphId = graph != null && graph.getId() != null ? graph.getId() : "";
+        String normalizedNodeId = nodeId != null ? nodeId : "";
+        String normalizedEntryPoint = entryPoint != null && !entryPoint.isBlank() ? entryPoint : "FlowExecutor";
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("code", "FUNCTION_COMPILED_EXECUTION_UNAVAILABLE");
+        diagnostic.put("phase", "capability");
+        diagnostic.put("stage", "function-execution");
+        diagnostic.put("entryPoint", normalizedEntryPoint);
+        diagnostic.put("graphId", graphId);
+        diagnostic.put("nodeId", normalizedNodeId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("graphId", graphId);
+        details.put("nodeId", normalizedNodeId);
+        details.put("bridge", "compiled-core");
+        details.put("entryPoint", normalizedEntryPoint);
+        details.put("diagnostics", List.of(diagnostic));
+        return CompletableFuture.failedFuture(new FlowExecutionException(
+            "FUNCTION_COMPILED_EXECUTION_UNAVAILABLE",
+            "Compiled Function execution is unavailable",
+            null,
+            normalizedNodeId,
+            "Initialize the compiled Function runtime before executing this function",
+            details));
+    }
+
+    private CompletableFuture<Object> compiledSubFlowUnavailable(FlowGraph graph, String nodeId, String entryPoint) {
+        if (graph != null && graph.isFunction()) {
+            return compiledFunctionUnavailable(graph, nodeId, entryPoint);
+        }
+        String graphId = graph != null && graph.getId() != null ? graph.getId() : "";
+        String normalizedNodeId = nodeId != null ? nodeId : "";
+        String normalizedEntryPoint = entryPoint != null && !entryPoint.isBlank() ? entryPoint : "FlowExecutor.executeSubFlow";
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("code", "SUBFLOW_COMPILED_EXECUTION_UNAVAILABLE");
+        diagnostic.put("phase", "capability");
+        diagnostic.put("stage", "subflow-execution");
+        diagnostic.put("entryPoint", normalizedEntryPoint);
+        diagnostic.put("graphId", graphId);
+        diagnostic.put("nodeId", normalizedNodeId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("graphId", graphId);
+        details.put("nodeId", normalizedNodeId);
+        details.put("bridge", "compiled-core");
+        details.put("entryPoint", normalizedEntryPoint);
+        details.put("diagnostics", List.of(diagnostic));
+        return CompletableFuture.failedFuture(new FlowExecutionException(
+            "SUBFLOW_COMPILED_EXECUTION_UNAVAILABLE",
+            "Compiled subflow execution is unavailable",
+            null,
+            normalizedNodeId,
+            "Initialize the compiled subflow runtime before executing this subflow",
+            details));
     }
 
     private String graphId(FlowRuntime runtime) {
@@ -2072,7 +3775,7 @@ public class FlowExecutor {
         return graph != null && graph.getId() != null ? graph.getId() : "";
     }
 
-    private String findStartNode(FlowGraph graph) {
+    public String findStartNode(FlowGraph graph) {
         if (graph == null || graph.getNodes() == null || graph.getNodes().isEmpty()) {
             return null;
         }
@@ -2103,18 +3806,43 @@ public class FlowExecutor {
         if (nodeDefinitionRegistry == null || node == null || node.getType() == null) {
             return null;
         }
-        return nodeDefinitionRegistry.get(idCompatibility.mapToNew(node.getType()));
+        return nodeDefinitionRegistry.get(idCompatibility != null ? idCompatibility.mapToNew(node.getType()) : node.getType());
     }
 
     private boolean isFunctionStartType(String type) {
-        return "function_start".equals(type) || "function.start".equals(type) || "function.function_start".equals(type);
+        return FlowRuntime.isFunctionStartType(type);
+    }
+
+    private String findFunctionStartNodeId(FlowGraph graph) {
+        if (graph == null || graph.getNodes() == null) {
+            return null;
+        }
+        return graph.getNodes().entrySet().stream()
+            .filter(entry -> entry.getValue() != null && (isFunctionStartType(entry.getValue().getType())
+                || hasHandlerOperation(resolveDefinition(entry.getValue()), "function_start")))
+            .map(Map.Entry::getKey)
+            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .findFirst()
+            .orElse(null);
+    }
+
+    private boolean hasHandlerOperation(NodeDefinition definition, String operation) {
+        return definition != null && definition.getHandlerConfig() != null
+            && operation.equals(definition.getHandlerConfig().get("operation"));
     }
 
     private boolean hasOutgoingExecutionConnection(FlowGraph graph, String nodeId) {
+        FlowNode sourceNode = graph.getNodes().get(nodeId);
+        NodeDefinition definition = resolveDefinition(sourceNode);
         for (FlowConnection connection : graph.getConnectionsFromSource(nodeId)) {
             String pin = connection.getSourcePin();
-            if (pin != null && ("flow".equals(pin) || "next".equals(pin) || "loop".equals(pin) || "done".equals(pin)
-                || "true".equals(pin) || "false".equals(pin) || pin.startsWith("branch_"))) {
+            if (pin != null && (FlowRuntime.outputPinMatches(definition, pin, "flow")
+                || FlowRuntime.outputPinMatches(definition, pin, "next")
+                || FlowRuntime.outputPinMatches(definition, pin, "loop")
+                || FlowRuntime.outputPinMatches(definition, pin, "done")
+                || FlowRuntime.outputPinMatches(definition, pin, "true")
+                || FlowRuntime.outputPinMatches(definition, pin, "false")
+                || pin.startsWith("branch_"))) {
                 return true;
             }
         }
@@ -2139,14 +3867,16 @@ public class FlowExecutor {
             return null;
         }
 
-        String mappedType = idCompatibility.mapToNew(nodeType);
+        String mappedType = idCompatibility != null ? idCompatibility.mapToNew(nodeType) : nodeType;
         nodeType = mappedType;
 
         if (nodeDefinitionRegistry != null) {
             NodeDefinition definition = nodeDefinitionRegistry.get(nodeType);
             if (definition != null) {
                 node.setType(nodeType);
-                node.setHandlerConfig(definition.getHandlerConfig());
+                Map<String, Object> authoredConfig = node.getHandlerConfigValues();
+                node.setHandlerConfig(ItemStackPropertySelector.runtimeHandlerConfig(
+                    nodeType, definition.getHandlerConfig(), node.getInputValues(), authoredConfig));
                 String handlerName = definition.getHandler();
                 if (handlerName != null && !handlerName.isBlank()) {
                     NodeHandler handler = handlerRegistry.getHandler(handlerName);

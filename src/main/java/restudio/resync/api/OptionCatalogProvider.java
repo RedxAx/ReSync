@@ -7,7 +7,22 @@ import java.util.Objects;
 import java.util.Set;
 
 public interface OptionCatalogProvider {
+    enum CaptureAffinity {
+        CALLER,
+        SERVER_MAIN,
+        IO,
+        UNSUPPORTED
+    }
+
     String sourceId();
+
+    default CaptureAffinity captureAffinity() {
+        return CaptureAffinity.UNSUPPORTED;
+    }
+
+    default OptionCatalogCapture capture(OptionCatalogQuery query) {
+        throw new UnsupportedOperationException("Option catalog provider does not expose a coherent capture");
+    }
 
     default String providerId() {
         String sourceId = sourceId();

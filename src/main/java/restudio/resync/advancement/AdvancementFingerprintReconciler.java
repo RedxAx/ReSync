@@ -8,6 +8,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class AdvancementFingerprintReconciler {
     private static final String DELETED = "deleted";
@@ -23,18 +25,33 @@ public class AdvancementFingerprintReconciler {
     private final Gson gson = new Gson();
     private final NamespacedKey metadataKey;
     private final AdvancementService service;
+    private final PaperPlayerDataMutationAdmission playerDataAdmission;
 
     public AdvancementFingerprintReconciler(JavaPlugin plugin, AdvancementService service) {
+        this(plugin, service, PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public AdvancementFingerprintReconciler(JavaPlugin plugin, AdvancementService service,
+                                            PaperPlayerDataMutationAdmission playerDataAdmission) {
         metadataKey = new NamespacedKey(plugin, "advancement_criteria");
         this.service = service;
+        this.playerDataAdmission = Objects.requireNonNull(playerDataAdmission, "playerDataAdmission");
     }
 
     public void reconcile(Player player, Map<String, JsonObject> trees) {
-        revokeChanged(player, trees);
-        commit(player, trees);
+        try (PaperPlayerDataMutationAdmission.Lease ignored = admission(player, "advancement-fingerprint-reconcile")) {
+            revokeChangedInternal(player, trees);
+            commitInternal(player, trees);
+        }
     }
 
     public void revokeChanged(Player player, Map<String, JsonObject> trees) {
+        try (PaperPlayerDataMutationAdmission.Lease ignored = admission(player, "advancement-fingerprint-revoke")) {
+            revokeChangedInternal(player, trees);
+        }
+    }
+
+    private void revokeChangedInternal(Player player, Map<String, JsonObject> trees) {
         Map<String, String> previous = metadata(player);
         Map<String, String> current = fingerprints(trees);
         for (Map.Entry<String, String> entry : previous.entrySet()) {
@@ -48,11 +65,25 @@ public class AdvancementFingerprintReconciler {
     }
 
     public void commit(Player player, Map<String, JsonObject> trees) {
+        try (PaperPlayerDataMutationAdmission.Lease ignored = admission(player, "advancement-fingerprint-commit")) {
+            commitInternal(player, trees);
+        }
+    }
+
+    private void commitInternal(Player player, Map<String, JsonObject> trees) {
         Map<String, String> current = fingerprints(trees);
         Map<String, String> committed = new LinkedHashMap<>(metadata(player));
         committed.replaceAll((key, value) -> current.containsKey(key) ? current.get(key) : DELETED);
         committed.putAll(current);
         player.getPersistentDataContainer().set(metadataKey, PersistentDataType.STRING, gson.toJson(committed));
+    }
+
+    private PaperPlayerDataMutationAdmission.Lease admission(Player player, String operation) {
+        Objects.requireNonNull(player, "player");
+        if (player.getWorld() == null || player.getWorld().getWorldFolder() == null) {
+            throw new IllegalStateException("Advancement Player World Root Is Unavailable");
+        }
+        return playerDataAdmission.acquirePdc(operation, player.getUniqueId(), player.getWorld().getWorldFolder().toPath());
     }
 
     private Map<String, String> metadata(Player player) {

@@ -6,6 +6,8 @@ import restudio.resync.protocol.messages.SubscribeRequest;
 import restudio.resync.protocol.messages.UnsubscribeRequest;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 public interface Module {
     ModuleMetadata getMetadata();
@@ -33,6 +35,19 @@ public interface Module {
     }
 
     default void stop(ModuleContext context) {
+    }
+
+    default void prepareStop(ModuleContext context) {
+        stop(context);
+    }
+
+    default CompletionStage<Void> finishStopAsync(ModuleContext context) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    default CompletionStage<Void> stopAsync(ModuleContext context) {
+        prepareStop(context);
+        return finishStopAsync(context);
     }
 
     default void onSubscribe(Session session, SubscribeRequest req) {

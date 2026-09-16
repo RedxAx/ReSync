@@ -1,0 +1,3942 @@
+[
+  {
+    "id": "player.properties",
+    "displayName": "Player Properties",
+    "category": "PLAYER",
+    "handler": "player",
+    "inputs": [
+      {
+        "name": "target",
+        "description": "Target player",
+        "pinType": "DATA",
+        "dataType": "player"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "location",
+          "health",
+          "max_health",
+          "food_level",
+          "gamemode",
+          "sneak",
+          "fly",
+          "name",
+          "uuid",
+          "world",
+          "inventory",
+          "item_in_hand",
+          "display_name",
+          "xp_level",
+          "walk_speed",
+          "fly_speed",
+          "exp",
+          "total_exp",
+          "exp_to_level",
+          "allow_flight",
+          "on_ground",
+          "sleeping",
+          "bed_spawn_location",
+          "last_damage",
+          "killer",
+          "ping",
+          "player_list_name",
+          "op",
+          "offhand_item",
+          "saturation",
+          "exhaustion",
+          "sprint",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "xp_progress",
+          "compass_target",
+          "ip",
+          "is_flying",
+          "online",
+          "whitelisted",
+          "banned",
+          "sleep_ticks",
+          "locale",
+          "view_distance",
+          "is_op",
+          "item_in_offhand",
+          "armor"
+        ],
+        "defaultValue": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "name": "location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "location"
+        }
+      },
+      {
+        "name": "health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "name": "max_health",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "name": "food_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "food_level"
+        }
+      },
+      {
+        "name": "gamemode",
+        "dataType": "gamemode",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gamemode"
+        }
+      },
+      {
+        "name": "sneak",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sneak"
+        }
+      },
+      {
+        "name": "fly",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly"
+        }
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "name": "uuid",
+        "dataType": "uuid",
+        "visibleWhen": {
+          "action": "get",
+          "property": "uuid"
+        }
+      },
+      {
+        "name": "world",
+        "dataType": "world",
+        "visibleWhen": {
+          "action": "get",
+          "property": "world"
+        }
+      },
+      {
+        "name": "inventory",
+        "dataType": "inventory",
+        "visibleWhen": {
+          "action": "get",
+          "property": "inventory"
+        }
+      },
+      {
+        "name": "item_in_hand",
+        "dataType": "itemstack",
+        "visibleWhen": {
+          "action": "get",
+          "property": "item_in_hand"
+        }
+      },
+      {
+        "name": "display_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "display_name"
+        }
+      },
+      {
+        "name": "xp_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp_level"
+        }
+      },
+      {
+        "name": "walk_speed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "walk_speed"
+        }
+      },
+      {
+        "name": "fly_speed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly_speed"
+        }
+      },
+      {
+        "name": "exp",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exp"
+        }
+      },
+      {
+        "name": "total_exp",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "total_exp"
+        }
+      },
+      {
+        "name": "exp_to_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exp_to_level"
+        }
+      },
+      {
+        "name": "allow_flight",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "allow_flight"
+        }
+      },
+      {
+        "name": "on_ground",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "on_ground"
+        }
+      },
+      {
+        "name": "sleeping",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sleeping"
+        }
+      },
+      {
+        "name": "bed_spawn_location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "bed_spawn_location"
+        }
+      },
+      {
+        "name": "last_damage",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "last_damage"
+        }
+      },
+      {
+        "name": "killer",
+        "dataType": "player",
+        "visibleWhen": {
+          "action": "get",
+          "property": "killer"
+        }
+      },
+      {
+        "name": "ping",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ping"
+        }
+      },
+      {
+        "name": "player_list_name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "player_list_name"
+        }
+      },
+      {
+        "name": "op",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "op"
+        }
+      },
+      {
+        "name": "offhand_item",
+        "dataType": "itemstack",
+        "visibleWhen": {
+          "action": "get",
+          "property": "offhand_item"
+        }
+      },
+      {
+        "name": "saturation",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "saturation"
+        }
+      },
+      {
+        "name": "exhaustion",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exhaustion"
+        }
+      },
+      {
+        "name": "sprint",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sprint"
+        }
+      },
+      {
+        "name": "vanish",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "vanish"
+        }
+      },
+      {
+        "name": "glowing",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "name": "invulnerable",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "name": "fire_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fire_ticks"
+        }
+      },
+      {
+        "name": "freeze_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "freeze_ticks"
+        }
+      },
+      {
+        "name": "no_damage_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "no_damage_ticks"
+        }
+      },
+      {
+        "name": "remaining_air",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "remaining_air"
+        }
+      },
+      {
+        "name": "max_air",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_air"
+        }
+      },
+      {
+        "name": "xp_progress",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp_progress"
+        }
+      },
+      {
+        "name": "compass_target",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "compass_target"
+        }
+      },
+      {
+        "name": "ip",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ip"
+        }
+      },
+      {
+        "name": "is_flying",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_flying"
+        }
+      },
+      {
+        "name": "online",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "online"
+        }
+      },
+      {
+        "name": "whitelisted",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "whitelisted"
+        }
+      },
+      {
+        "name": "banned",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "banned"
+        }
+      },
+      {
+        "name": "sleep_ticks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sleep_ticks"
+        }
+      },
+      {
+        "name": "locale",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "locale"
+        }
+      },
+      {
+        "name": "view_distance",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "view_distance"
+        }
+      },
+      {
+        "name": "is_op",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_op"
+        }
+      },
+      {
+        "name": "item_in_offhand",
+        "dataType": "itemstack",
+        "visibleWhen": {
+          "action": "get",
+          "property": "item_in_offhand"
+        }
+      },
+      {
+        "name": "armor",
+        "dataType": "list<item>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "armor"
+        }
+      }
+    ],
+    "kind": "QUERY"
+  },
+  {
+    "id": "player.actions",
+    "displayName": "Player Actions",
+    "category": "PLAYER",
+    "handler": "player",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target player",
+        "pinType": "DATA",
+        "dataType": "player"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "location",
+          "health",
+          "max_health",
+          "food_level",
+          "gamemode",
+          "sneak",
+          "fly",
+          "name",
+          "uuid",
+          "world",
+          "inventory",
+          "item_in_hand",
+          "display_name",
+          "xp_level",
+          "walk_speed",
+          "fly_speed",
+          "exp",
+          "total_exp",
+          "exp_to_level",
+          "allow_flight",
+          "on_ground",
+          "sleeping",
+          "bed_spawn_location",
+          "last_damage",
+          "killer",
+          "ping",
+          "player_list_name",
+          "op",
+          "offhand_item",
+          "saturation",
+          "exhaustion",
+          "sprint",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "xp_progress",
+          "compass_target",
+          "ip",
+          "is_flying",
+          "online",
+          "whitelisted",
+          "banned",
+          "sleep_ticks",
+          "locale",
+          "view_distance",
+          "is_op",
+          "item_in_offhand",
+          "armor"
+        ],
+        "defaultValue": "location"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "kind": "FAMILY"
+  },
+  {
+    "id": "player.location",
+    "displayName": "Player Location",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "location"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "location",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.health",
+    "displayName": "Player Health",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "health"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.max_health",
+    "displayName": "Player Max Health",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "max_health"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.food_level",
+    "displayName": "Player Food Level",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "food_level"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.gamemode",
+    "displayName": "Player Gamemode",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "gamemode"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.sneak",
+    "displayName": "Player Sneak",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "sneak"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.fly",
+    "displayName": "Player Fly",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "fly"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.name",
+    "displayName": "Player Name",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "name"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.uuid",
+    "displayName": "Player Uuid",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "uuid"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.world",
+    "displayName": "Player World",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "world"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "world",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.inventory",
+    "displayName": "Player Inventory",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "inventory"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "inventory",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.item_in_hand",
+    "displayName": "Player Item In Hand",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "item_in_hand"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "itemstack",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "itemstack",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.display_name",
+    "displayName": "Player Display Name",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "display_name"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.xp_level",
+    "displayName": "Player Xp Level",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "xp_level"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.walk_speed",
+    "displayName": "Player Walk Speed",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "walk_speed"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.fly_speed",
+    "displayName": "Player Fly Speed",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "fly_speed"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.exp",
+    "displayName": "Player Exp",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "exp"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.total_exp",
+    "displayName": "Player Total Exp",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "total_exp"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.exp_to_level",
+    "displayName": "Player Exp To Level",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "exp_to_level"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.allow_flight",
+    "displayName": "Player Allow Flight",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "allow_flight"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.on_ground",
+    "displayName": "Player On Ground",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "on_ground"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.sleeping",
+    "displayName": "Player Sleeping",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "sleeping"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.bed_spawn_location",
+    "displayName": "Player Bed Spawn Location",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "bed_spawn_location"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.last_damage",
+    "displayName": "Player Last Damage",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "last_damage"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.killer",
+    "displayName": "Player Killer",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "killer"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "player",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.ping",
+    "displayName": "Player Ping",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "ping"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_list_name",
+    "displayName": "Player Player List Name",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "player_list_name"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.op",
+    "displayName": "Player Op",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "op"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.offhand_item",
+    "displayName": "Player Offhand Item",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "offhand_item"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "itemstack",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "itemstack",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.saturation",
+    "displayName": "Saturation",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "saturation"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.exhaustion",
+    "displayName": "Exhaustion",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "exhaustion"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.sprint",
+    "displayName": "Sprint",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "sprint"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.vanish",
+    "displayName": "Vanish",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "vanish"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.glowing",
+    "displayName": "Glowing",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "glowing"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.invulnerable",
+    "displayName": "Invulnerable",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "invulnerable"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.fire_ticks",
+    "displayName": "Fire Ticks",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "fire_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.freeze_ticks",
+    "displayName": "Freeze Ticks",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "freeze_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.no_damage_ticks",
+    "displayName": "No Damage Ticks",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "no_damage_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.remaining_air",
+    "displayName": "Remaining Air",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "remaining_air"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.max_air",
+    "displayName": "Max Air",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "max_air"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.xp_progress",
+    "displayName": "Xp Progress",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "xp_progress"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.compass_target",
+    "displayName": "Compass Target",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "compass_target"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "location",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.ip",
+    "displayName": "Ip",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "ip"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.is_flying",
+    "displayName": "Is Flying",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "is_flying"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.online",
+    "displayName": "Online",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "online"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.whitelisted",
+    "displayName": "Whitelisted",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "whitelisted"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.banned",
+    "displayName": "Banned",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "banned"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.sleep_ticks",
+    "displayName": "Sleep Ticks",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "sleep_ticks"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.locale",
+    "displayName": "Locale",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "locale"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.view_distance",
+    "displayName": "View Distance",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "view_distance"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.is_op",
+    "displayName": "Is Op",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "is_op"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.item_in_offhand",
+    "displayName": "Item In Offhand",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "item_in_offhand"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "itemstack",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "itemstack",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "flow",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "DATA"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.armor",
+    "displayName": "Armor",
+    "category": "PLAYER",
+    "handler": "player",
+    "handlerConfig": {
+      "property": "armor"
+    },
+    "inputs": [
+      {
+        "dataType": "player",
+        "description": "Target player",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list<any>",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "player.properties"
+  }
+]

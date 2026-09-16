@@ -1,0 +1,716 @@
+[
+  {
+    "id": "list_slice",
+    "displayName": "List Slice",
+    "description": "Return a shallow copy from start to exclusive end. Missing or null list uses empty; missing start defaults to 0 and end to the list size. Negative indices count from the end and clamp. Invalid indices fail; inputs and results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "slice", "transform"],
+    "legacyIds": ["list.slice"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "slice"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "start_index", "displayName": "Start Index", "name": "start_index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Start index. Missing or null input uses 0; negative values count from the end, and the finite whole number is clamped to the list size."},
+      {"id": "end_index", "displayName": "End Index", "name": "end_index", "pinType": "DATA", "dataType": "number", "description": "Exclusive end index. Missing or null input uses the list size; negative values count from the end, and the finite whole number is clamped to the list size."}
+    ],
+    "outputs": [
+      {"id": "slice_list", "displayName": "Slice", "name": "slice_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy of the selected values in their original order; an empty range returns an empty list and results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_reverse",
+    "displayName": "List Reverse",
+    "description": "Return a shallow copy in reverse order. Missing or null list uses an empty list, null values are retained, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "reverse", "transform"],
+    "legacyIds": ["list.reverse"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "reverse"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to reverse. Missing or null input uses an empty list; values and nested objects are retained without mutation, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "reversed_list", "displayName": "Reversed List", "name": "reversed_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy in reverse order; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_unique",
+    "displayName": "List Unique",
+    "description": "Return a shallow copy with only the first occurrence of each value. Missing or null list uses an empty list, equality retains one null value, original order is preserved, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "unique", "transform"],
+    "legacyIds": ["list.unique"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "unique"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to deduplicate. Missing or null input uses an empty list; equality keeps the first value, including one null, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "unique_list", "displayName": "Unique List", "name": "unique_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy with duplicate values removed, preserving first-occurrence order; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_flatten",
+    "displayName": "List Flatten",
+    "description": "Flatten one list level into a shallow copy. Missing or null list uses an empty list, nested list items stay in order, non-list and null values remain, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "flatten", "transform"],
+    "legacyIds": ["list.flatten"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "flatten"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "List to flatten by one level. Missing or null input uses an empty list; nested lists are read shallowly without mutation, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "flattened_list", "displayName": "Flattened List", "name": "flattened_list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow one-level flattening in source order, retaining non-list and null values; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_intersect",
+    "displayName": "List Intersect",
+    "description": "Return a shallow copy of values present in both lists. Missing or null inputs use empty lists, equality supports null values, first-list order is preserved, duplicate matches appear once, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "intersect", "transform"],
+    "legacyIds": ["list.intersect"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "intersect"},
+    "inputs": [
+      {"id": "list1", "displayName": "List 1", "name": "list1", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "First list whose order is preserved. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "list2", "displayName": "List 2", "name": "list2", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Second list used for equality membership, including null values. Missing or null input uses an empty list; inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "intersection_list", "displayName": "Intersection", "name": "intersection_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy of first-list values found in the second list, preserving first-list order and keeping each match once; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_difference",
+    "displayName": "List Difference",
+    "description": "Return a shallow copy of first-list values absent from the second list. Missing or null inputs use empty lists, equality supports null values, first-list order and duplicate occurrences are preserved, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "difference", "transform"],
+    "legacyIds": ["list.difference"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "difference"},
+    "inputs": [
+      {"id": "list1", "displayName": "List 1", "name": "list1", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "First list to filter. Missing or null input uses an empty list; order and duplicate values are retained, and inputs over 65536 items fail before output."},
+      {"id": "list2", "displayName": "List 2", "name": "list2", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Second list whose values are excluded, including null values. Missing or null input uses an empty list; inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "difference_list", "displayName": "Difference", "name": "difference_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy of first-list values absent from the second list, preserving order and duplicate occurrences; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_zip",
+    "displayName": "List Zip",
+    "description": "Pair two lists by index. Missing or null inputs use empty lists, pairs stop at the shorter list, order is preserved, each pair contains first and second values including null, and inputs or results over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "zip", "transform"],
+    "legacyIds": ["list.zip"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "zip"},
+    "inputs": [
+      {"id": "list1", "displayName": "List 1", "name": "list1", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "First list of pair values. Missing or null input uses an empty list; values and order are retained, and inputs over 65536 items fail before output."},
+      {"id": "list2", "displayName": "List 2", "name": "list2", "pinType": "DATA", "dataType": "list<type:u>", "constraints": {"min": 0, "max": 65536}, "description": "Second list of pair values. Missing or null input uses an empty list; values and order are retained, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "pairs_list", "displayName": "Pairs", "name": "pairs_list", "pinType": "DATA", "dataType": "list<map<string,any>>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow list of maps in index order through the shorter input; each map has first and second values, and results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_concat",
+    "displayName": "List Concat",
+    "description": "Return a shallow copy with List A followed by List B. Missing or null inputs use empty lists, order and duplicates are preserved, and inputs or a combined result over 65536 items fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "concat", "transform"],
+    "legacyIds": ["list.concat"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "concat"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "listA", "target": "lista"},
+        {"direction": "input", "source": "listB", "target": "listb"},
+        {"direction": "output", "source": "list", "target": "list"}
+      ]
+    },
+    "inputs": [
+      {"id": "lista", "displayName": "List A", "name": "listA", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "First list to copy. Missing or null input uses an empty list; values, order, and duplicates are preserved, and inputs over 65536 items fail before output."},
+      {"id": "listb", "displayName": "List B", "name": "listB", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Second list to append. Missing or null input uses an empty list; values, order, and duplicates are preserved, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Shallow copy with List A followed by List B; the combined result over 65536 items fails before output."}
+    ]
+  },
+  {
+    "id": "list_filter",
+    "displayName": "List Filter",
+    "description": "Keep values that match a property predicate while preserving their order and element type. Missing or null list input uses an empty list, and a blank property compares each value directly.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "filter", "predicate", "transform"],
+    "legacyIds": ["list.filter"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "filter"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to filter. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property to inspect. Missing or blank input compares each list value directly."},
+      {"id": "operator", "displayName": "Operator", "name": "operator", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "contains", "contains_ignore_case", "starts_with", "ends_with", "is_null", "is_not_null", "is_empty", "is_not_empty"], "defaultValue": "equals", "description": "Predicate used to compare each value."},
+      {"id": "compare_value", "displayName": "Compare Value", "name": "compare_value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value used by operators that compare against a target. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "filtered_list", "displayName": "Filtered List", "name": "filtered_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shallow list containing only matching values in their original order."}
+    ]
+  },
+  {
+    "id": "list_map",
+    "displayName": "List Map",
+    "description": "Transform every value in a list while preserving list order. Missing or null list input uses an empty list, and the transformation can convert values, read a property, or measure size.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "map", "transform"],
+    "legacyIds": ["list.map"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "map"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Values to transform. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "transformation_type", "displayName": "Transformation", "name": "transformation_type", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Transformation such as string, number, length, size, or property:name. Blank input converts each value to text."}
+    ],
+    "outputs": [
+      {"id": "transformed_list", "displayName": "Transformed List", "name": "transformed_list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Returns the transformed values in their original order."}
+    ]
+  },
+  {
+    "id": "list_reduce",
+    "displayName": "List Reduce",
+    "description": "Reduce a list by numeric sum or text concatenation. Missing or null list input uses an empty list, non-number values are ignored for sum, and the separator is used for concatenation.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "reduce", "aggregate"],
+    "legacyIds": ["list.reduce"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "reduce"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Values to reduce. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "operation", "displayName": "Operation", "name": "operation", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["sum", "concat"], "defaultValue": "sum", "description": "Reduction to perform: sum numeric values or concatenate text values."},
+      {"id": "separator", "displayName": "Separator", "name": "separator", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Text placed between values for concat. Missing or null input uses an empty separator."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "any", "description": "Returns the numeric sum or concatenated text result."}
+    ]
+  },
+  {
+    "id": "list_shuffle",
+    "displayName": "List Shuffle",
+    "description": "Return a randomly shuffled shallow copy of a list. Missing or null list input uses an empty list, values are retained, and the source list is not changed.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "shuffle", "transform"],
+    "legacyIds": ["list.shuffle"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "shuffle"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to shuffle. Missing or null input uses an empty list; inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "shuffled_list", "displayName": "Shuffled List", "name": "shuffled_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shuffled shallow copy containing the same values."}
+    ]
+  },
+  {
+    "id": "list_sublist",
+    "displayName": "Sublist",
+    "description": "Return a shallow list segment starting at an index for a requested count. Missing or null list input uses an empty list, start defaults to 0, count defaults to 1, and bounds are clamped.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "sublist", "slice", "transform"],
+    "legacyIds": ["list.sublist"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "sublist"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "start", "target": "start"},
+        {"direction": "input", "source": "count", "target": "count"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy from. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "start", "displayName": "Start", "name": "start", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based start index. Missing or null input uses 0; negative values count from the end and bounds are clamped."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number of values to return. Missing or null input uses 1; the end is limited to the list size."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns the selected shallow copy in source order."}
+    ]
+  },
+  {
+    "id": "list_join",
+    "displayName": "List Join",
+    "description": "Join list values into text. Missing or null list input uses an empty list, values use their text form, and the separator defaults to a comma.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "join", "transform", "text"],
+    "legacyIds": ["list.join"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "join"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Values to join. Missing or null input uses an empty list."},
+      {"id": "separator", "displayName": "Separator", "name": "separator", "pinType": "DATA", "dataType": "string", "defaultValue": ",", "description": "Text inserted between values. Missing or null input uses a comma."}
+    ],
+    "outputs": [
+      {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Returns the joined text."}
+    ]
+  },
+  {
+    "id": "list_map_string",
+    "displayName": "Map String",
+    "description": "Convert every list value to its text form. Missing or null list input uses an empty list, null values remain null, and source order is preserved.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "map", "string", "transform"],
+    "legacyIds": ["list.map_string"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "map_string"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Values to convert. Missing or null input uses an empty list; inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<string>", "constraints": {"min": 0, "max": 65536}, "description": "Returns text values in the original order; null input values remain null."}
+    ]
+  },
+  {
+    "id": "list_filter_type",
+    "displayName": "Filter Type",
+    "description": "Keep values whose runtime type matches a requested type. Missing or null list input uses an empty list, and an empty type name matches no values.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "filter", "type", "transform"],
+    "legacyIds": ["list.filter_type"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "filter_type"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "type_name", "target": "type_name"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Values to inspect. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "type_name", "displayName": "Type", "name": "type_name", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Type name such as string, number, boolean, list, map, or null."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns matching values in their original order."}
+    ]
+  },
+  {
+    "id": "list_group_by",
+    "displayName": "List Group By",
+    "description": "Group values by a selected property while preserving list order inside each group. Missing or null list input uses an empty list, and a blank property groups by each value itself.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "group", "property", "transform"],
+    "legacyIds": ["list.group_by"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "group_by"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Values to group. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property used as the group key. Blank input uses each value as its own key."}
+    ],
+    "outputs": [
+      {"id": "groups", "displayName": "Groups", "name": "groups", "pinType": "DATA", "dataType": "map<string,list<type:t>>", "description": "Returns groups keyed by text form of the selected property, preserving list order within each group."}
+    ]
+  },
+  {
+    "id": "list_chunk",
+    "displayName": "List Chunk",
+    "description": "Split a list into consecutive chunks of a requested size. Missing or null list input uses an empty list, size defaults to 1, and non-positive sizes return no chunks.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "chunk", "partition", "transform"],
+    "legacyIds": ["list.chunk"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "chunk"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to split. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "size", "displayName": "Size", "name": "size", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Maximum values in each chunk. Missing or null input uses 1; a non-positive size returns no chunks."}
+    ],
+    "outputs": [
+      {"id": "chunks", "displayName": "Chunks", "name": "chunks", "pinType": "DATA", "dataType": "list<list<type:t>>", "constraints": {"min": 0, "max": 65536}, "description": "Returns consecutive shallow chunks in source order."}
+    ]
+  },
+  {
+    "id": "list_partition",
+    "displayName": "List Partition",
+    "description": "Split a list into consecutive partitions of a requested size. Missing or null list input uses an empty list, size defaults to 1, and non-positive sizes return no partitions.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "partition", "transform"],
+    "legacyIds": ["list.partition"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "partition"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to split. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "size", "displayName": "Size", "name": "size", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Maximum values in each partition. Missing or null input uses 1; a non-positive size returns no partitions."}
+    ],
+    "outputs": [
+      {"id": "partitions", "displayName": "Partitions", "name": "partitions", "pinType": "DATA", "dataType": "list<list<type:t>>", "constraints": {"min": 0, "max": 65536}, "description": "Returns consecutive shallow partitions in source order."}
+    ]
+  },
+  {
+    "id": "list_range",
+    "displayName": "List Range",
+    "description": "Return the numeric range of a list. Missing or null list input uses an empty list, null and non-number values are ignored, and an empty list or a list with no numeric value returns 0.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "range", "number"],
+    "legacyIds": ["list.range"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "range"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect. Missing or null input uses an empty list; null and non-number values are ignored, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "range", "displayName": "Range", "name": "range", "pinType": "DATA", "dataType": "number", "description": "Returns maximum minus minimum, or 0 when no numeric value is present."}
+    ]
+  },
+  {
+    "id": "list_union",
+    "displayName": "List Union",
+    "description": "Return a shallow copy containing List A followed by values unique to List B. Missing or null inputs use empty lists, first-list order is preserved, and duplicate values are removed from the appended portion.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "union", "transform"],
+    "legacyIds": ["list.union"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "union"},
+    "inputs": [
+      {"id": "lista", "displayName": "List A", "name": "listA", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "First list to copy. Missing or null input uses an empty list; values and duplicates are preserved."},
+      {"id": "listb", "displayName": "List B", "name": "listB", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Second list whose new values are appended. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns List A followed by values from List B that were not already present."}
+    ]
+  },
+  {
+    "id": "list_take_first",
+    "displayName": "Take First",
+    "description": "Return the first requested number of values from a list. Missing or null list input uses an empty list, count defaults to 1, and a count beyond the list size returns the whole list.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "take", "transform"],
+    "legacyIds": ["list.take_first"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "take_first"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy from. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number of values to take from the start. Missing or null input uses 1."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shallow copy of the selected leading values."}
+    ]
+  },
+  {
+    "id": "list_take_last",
+    "displayName": "Take Last",
+    "description": "Return the last requested number of values from a list. Missing or null list input uses an empty list, count defaults to 1, and a count beyond the list size returns the whole list.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "take", "transform"],
+    "legacyIds": ["list.take_last"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "take_last"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy from. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number of values to take from the end. Missing or null input uses 1."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shallow copy of the selected trailing values in source order."}
+    ]
+  },
+  {
+    "id": "list_drop_first",
+    "displayName": "Drop First",
+    "description": "Remove the first requested number of values from a list. Missing or null list input uses an empty list, count defaults to 1, and dropping beyond the list size returns an empty list.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "drop", "transform"],
+    "legacyIds": ["list.drop_first"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "drop_first"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy from. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number of values to drop from the start. Missing or null input uses 1."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shallow copy without the selected leading values."}
+    ]
+  },
+  {
+    "id": "list_drop_last",
+    "displayName": "Drop Last",
+    "description": "Remove the last requested number of values from a list. Missing or null list input uses an empty list, count defaults to 1, and dropping beyond the list size returns an empty list.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "drop", "transform"],
+    "legacyIds": ["list.drop_last"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "drop_last"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to copy from. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number of values to drop from the end. Missing or null input uses 1."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a shallow copy without the selected trailing values."}
+    ]
+  },
+  {
+    "id": "list_random",
+    "displayName": "List Random",
+    "description": "Return a random value from a list. Missing or null list input uses an empty list, and an empty list returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "random", "query"],
+    "legacyIds": ["list.random"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "random"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to choose from. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "item", "displayName": "Item", "name": "item", "pinType": "DATA", "dataType": "type:t", "description": "Returns a randomly selected value, or null when the list is missing, null, or empty."}
+    ]
+  }
+]

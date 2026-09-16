@@ -19,4 +19,32 @@ class ReSyncProtocolInventoryTest {
         assertTrue(inventory.stream().allMatch(item -> "shared-contract".equals(item.get("owner"))));
         assertTrue(inventory.stream().allMatch(item -> item.get("requirements") instanceof List<?> requirements && requirements.contains("PROTO-001")));
     }
+
+    @Test
+    void exposesGenericEnvelopeWireAuthorityAlongsideLegacyMappings() {
+        Map<String, Object> envelope = ReSyncProtocolInventory.snapshot().stream()
+            .filter(item -> "MESSAGE_PROTOCOL_ENVELOPE".equals(item.get("id")))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals("message", envelope.get("kind"));
+        assertEquals(9, envelope.get("value"));
+        assertEquals("generic-envelope", envelope.get("authority"));
+        assertEquals("supported", envelope.get("disposition"));
+        assertEquals("server-durable-when-advertised", envelope.get("resourceAuthority"));
+        assertEquals(Map.of("generation", 1, "minor", 2), envelope.get("resourceContractVersion"));
+        assertEquals(List.of("resource_activation", "resource_create_presentation"),
+            envelope.get("resourceCapabilities"));
+        assertEquals(Map.of("read", "compatibility-projection", "save", "blocked", "delete", "blocked"),
+            envelope.get("legacyResourceRoutes"));
+        assertEquals(Map.of("read", List.of("list", "query", "load"),
+                "mutate", List.of("create", "save", "delete", "duplicate", "activate"),
+                "unsupported", List.of("rename", "move", "subscribe")), envelope.get("resourceOperations"));
+        Map<String, Object> legacy = ReSyncProtocolInventory.snapshot().stream()
+            .filter(item -> "FLOW_PACKET_REQUEST".equals(item.get("id")))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("packet", legacy.get("kind"));
+        assertEquals(1, legacy.get("value"));
+    }
 }

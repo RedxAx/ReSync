@@ -1,0 +1,79 @@
+[
+  {
+    "id": "text.lines",
+    "displayName": "Text List",
+    "description": "Load the ordered values from a saved Text resource.",
+    "domain": "text",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "text.resource",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "lines", "resource"],
+    "examples": ["Select a Text resource and connect Lines to a list input."],
+    "handler": "TextResourceHandler",
+    "handlerConfig": {"operation": "lines"},
+    "inputs": [
+      {"id": "text_id", "displayName": "Text", "name": "text_id", "dataType": "text_template_id", "optionsSource": "server:resync:text_template", "description": "Selects the saved Text resource."}
+    ],
+    "outputs": [
+      {"id": "lines", "displayName": "Lines", "name": "lines", "dataType": "list<string>", "description": "Returns the ordered Text values."}
+    ]
+  },
+  {
+    "id": "text.entries",
+    "displayName": "Text Map",
+    "description": "Load the ordered key and value pairs from a saved Text resource.",
+    "domain": "text",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "text.resource",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "entries", "resource"],
+    "examples": ["Select a Text resource and connect Entries to a map input."],
+    "handler": "TextResourceHandler",
+    "handlerConfig": {"operation": "entries"},
+    "inputs": [
+      {"id": "text_id", "displayName": "Text", "name": "text_id", "dataType": "text_template_id", "optionsSource": "server:resync:text_template", "description": "Selects the saved Text resource."}
+    ],
+    "outputs": [
+      {"id": "entries", "displayName": "Entries", "name": "entries", "dataType": "map<string,string>", "description": "Returns the ordered Text key and value pairs."}
+    ]
+  },
+  {
+    "id": "text.lookup",
+    "displayName": "Text Lookup",
+    "description": "Find a value in a saved Text map without depending on letter case.",
+    "domain": "text",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "text.resource",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "lookup", "resource"],
+    "examples": ["Select a Text resource, provide a key, and use Value in a connected expression."],
+    "handler": "TextResourceHandler",
+    "handlerConfig": {"operation": "lookup"},
+    "inputs": [
+      {"id": "text_id", "displayName": "Text", "name": "text_id", "dataType": "text_template_id", "optionsSource": "server:resync:text_template", "description": "Selects the saved Text resource."},
+      {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "Provides the key to find."},
+      {"id": "fallback", "displayName": "Fallback", "name": "fallback", "dataType": "string", "defaultValue": "", "description": "Provides the value to use when the key is not found."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "string", "description": "Returns the matching value or fallback text."}
+    ]
+  }
+]

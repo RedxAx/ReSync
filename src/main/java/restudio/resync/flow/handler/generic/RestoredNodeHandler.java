@@ -16,6 +16,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +66,7 @@ public class RestoredNodeHandler implements NodeHandler {
         "player_is_op",
         "player_get_allowed_flight"
     );
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public void registerTo(HandlerRegistry registry) {
         for (String id : RESTORED_IDS) {
@@ -73,7 +75,22 @@ public class RestoredNodeHandler implements NodeHandler {
     }
 
     @Override
+    public Set<String> getSupportedOperations() {
+        return RESTORED_IDS;
+    }
+
+    @Override
     public void execute(FlowContext ctx, FlowNode node) {
+        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        if (entity instanceof Player player) {
+            playerDataAdmission.mutatePlayer("flow-restored-node:" + node.getType(), player,
+                () -> executeAdmitted(ctx, node));
+            return;
+        }
+        executeAdmitted(ctx, node);
+    }
+
+    private void executeAdmitted(FlowContext ctx, FlowNode node) {
         switch (node.getType()) {
             case "entity_mount" -> entityMount(ctx, node);
             case "entity_dismount" -> entityDismount(ctx, node);

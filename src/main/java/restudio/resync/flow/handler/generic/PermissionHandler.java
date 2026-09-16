@@ -2,6 +2,7 @@ package restudio.resync.flow.handler.generic;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.context.ImmutableContextSet;
+import net.luckperms.api.model.PermissionHolder;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.Node;
@@ -21,6 +22,7 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.permissions.LuckPermsBackendPersistenceCapability;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,11 +31,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 public class PermissionHandler implements NodeHandler {
+    private static final LuckPermsBackendPersistenceCapability UNAVAILABLE_BACKEND =
+        LuckPermsBackendPersistenceCapability.unavailable("LuckPerms management module is unavailable");
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public PermissionHandler() {
@@ -109,9 +114,7 @@ public class PermissionHandler implements NodeHandler {
                 return;
             }
             Node permNode = PermissionNode.builder(permission).build();
-            user.data().add(permNode);
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+            mutateUser(ctx, node, lp, user, () -> user.data().add(permNode));
         });
 
         operations.put("perm_remove", (ctx, node) -> {
@@ -140,9 +143,7 @@ public class PermissionHandler implements NodeHandler {
                 return;
             }
             Node permNode = PermissionNode.builder(permission).build();
-            user.data().remove(permNode);
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+            mutateUser(ctx, node, lp, user, () -> user.data().remove(permNode));
         });
 
         operations.put("perm_get_groups", (ctx, node) -> {
@@ -247,14 +248,12 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "error", "Group not found");
                 return;
             }
-            Result result = user.setPrimaryGroup(group);
-            if (!result.wasSuccessful()) {
-                ctx.setOutput(node, "success", false);
-                ctx.setOutput(node, "error", "Primary group change was rejected");
-                return;
-            }
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+            mutateUser(ctx, node, lp, user, () -> {
+                Result result = user.setPrimaryGroup(group);
+                if (!result.wasSuccessful()) {
+                    throw new IllegalStateException("Primary group change was rejected");
+                }
+            });
         });
 
         operations.put("perm_add_temp", (ctx, node) -> {
@@ -284,9 +283,7 @@ public class PermissionHandler implements NodeHandler {
                 return;
             }
             Node permNode = PermissionNode.builder(permission).expiry(duration, TimeUnit.SECONDS).build();
-            user.data().add(permNode);
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+            mutateUser(ctx, node, lp, user, () -> user.data().add(permNode));
         });
 
         operations.put("perm_get_prefix", (ctx, node) -> {
@@ -415,12 +412,12 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "error", "User not found");
                 return;
             }
-            user.getNodes().stream().filter(MetaNode.class::isInstance).map(MetaNode.class::cast)
-                    .filter(existing -> existing.getMetaKey().equalsIgnoreCase(key)).toList().forEach(existing -> user.data().remove(existing));
             Node metaNode = MetaNode.builder(key, value).build();
-            user.data().add(metaNode);
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+            mutateUser(ctx, node, lp, user, () -> {
+                user.getNodes().stream().filter(MetaNode.class::isInstance).map(MetaNode.class::cast)
+                    .filter(existing -> existing.getMetaKey().equalsIgnoreCase(key)).toList().forEach(existing -> user.data().remove(existing));
+                user.data().add(metaNode);
+            });
         });
 
         operations.put("perm_remove_meta", (ctx, node) -> {
@@ -448,17 +445,17 @@ public class PermissionHandler implements NodeHandler {
                 ctx.setOutput(node, "error", "User not found");
                 return;
             }
-            List<Node> toRemove = new ArrayList<>();
-            for (Node n : user.getNodes()) {
-                if (n instanceof MetaNode && ((MetaNode) n).getMetaKey().equals(key)) {
-                    toRemove.add(n);
+            mutateUser(ctx, node, lp, user, () -> {
+                List<Node> toRemove = new ArrayList<>();
+                for (Node n : user.getNodes()) {
+                    if (n instanceof MetaNode && ((MetaNode) n).getMetaKey().equals(key)) {
+                        toRemove.add(n);
+                    }
                 }
-            }
-            for (Node n : toRemove) {
-                user.data().remove(n);
-            }
-            persistUser(ctx, lp, user);
-            ctx.setOutput(node, "success", true);
+                for (Node n : toRemove) {
+                    user.data().remove(n);
+                }
+            });
         });
 
         operations.put("perm_get_all_perms", (ctx, node) -> {
@@ -563,9 +560,7 @@ public class PermissionHandler implements NodeHandler {
                 fail(ctx, node, "Group not found");
                 return;
             }
-            user.data().add(InheritanceNode.builder(groupObj).build());
-            persistUser(ctx, lp, user);
-            succeed(ctx, node);
+            mutateUser(ctx, node, lp, user, () -> user.data().add(InheritanceNode.builder(groupObj).build()));
         });
 
         operations.put("perm_remove_group", (ctx, node) -> {
@@ -583,9 +578,7 @@ public class PermissionHandler implements NodeHandler {
             if (user == null) {
                 return;
             }
-            user.data().remove(InheritanceNode.builder(group).build());
-            persistUser(ctx, lp, user);
-            succeed(ctx, node);
+            mutateUser(ctx, node, lp, user, () -> user.data().remove(InheritanceNode.builder(group).build()));
         });
 
         operations.put("perm_has_group", (ctx, node) -> {
@@ -678,9 +671,7 @@ public class PermissionHandler implements NodeHandler {
                 fail(ctx, node, "Group not found");
                 return;
             }
-            groupObj.data().add(PermissionNode.builder(permission).build());
-            persistGroup(ctx, lp, groupObj);
-            succeed(ctx, node);
+            mutateGroup(ctx, node, lp, groupObj, () -> groupObj.data().add(PermissionNode.builder(permission).build()));
         });
 
         operations.put("perm_group_has_permission", (ctx, node) -> {
@@ -723,9 +714,7 @@ public class PermissionHandler implements NodeHandler {
                 fail(ctx, node, "Group not found");
                 return;
             }
-            groupObj.data().remove(PermissionNode.builder(permission).build());
-            persistGroup(ctx, lp, groupObj);
-            succeed(ctx, node);
+            mutateGroup(ctx, node, lp, groupObj, () -> groupObj.data().remove(PermissionNode.builder(permission).build()));
         });
 
         operations.put("perm_get_group_permissions", (ctx, node) -> {
@@ -765,12 +754,12 @@ public class PermissionHandler implements NodeHandler {
             if (user == null) {
                 return;
             }
-            user.getNodes().stream().filter(PrefixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
-            if (!prefix.isEmpty()) {
-                user.data().add(PrefixNode.builder(prefix, 100).build());
-            }
-            persistUser(ctx, lp, user);
-            succeed(ctx, node);
+            mutateUser(ctx, node, lp, user, () -> {
+                user.getNodes().stream().filter(PrefixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
+                if (!prefix.isEmpty()) {
+                    user.data().add(PrefixNode.builder(prefix, 100).build());
+                }
+            });
         });
 
         operations.put("perm_set_suffix", (ctx, node) -> {
@@ -788,12 +777,12 @@ public class PermissionHandler implements NodeHandler {
             if (user == null) {
                 return;
             }
-            user.getNodes().stream().filter(SuffixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
-            if (!suffix.isEmpty()) {
-                user.data().add(SuffixNode.builder(suffix, 100).build());
-            }
-            persistUser(ctx, lp, user);
-            succeed(ctx, node);
+            mutateUser(ctx, node, lp, user, () -> {
+                user.getNodes().stream().filter(SuffixNode.class::isInstance).toList().forEach(existing -> user.data().remove(existing));
+                if (!suffix.isEmpty()) {
+                    user.data().add(SuffixNode.builder(suffix, 100).build());
+                }
+            });
         });
 
         operations.put("perm_list_tracks", (ctx, node) -> {
@@ -879,16 +868,14 @@ public class PermissionHandler implements NodeHandler {
             ctx.triggerOutput("failure_flow");
             return;
         }
-        Result result = promote ? track.promote(user, getQueryOptions(lp, user).context()) : track.demote(user, getQueryOptions(lp, user).context());
-        ctx.setOutput(node, "result", result.toString());
-        if (!result.wasSuccessful()) {
-            ctx.setOutput(node, "success", false);
-            ctx.triggerOutput("failure_flow");
-            return;
-        }
-        persistUser(ctx, lp, user);
-        ctx.setOutput(node, "success", true);
-        ctx.triggerOutput("success_flow");
+        mutateUser(ctx, node, lp, user, () -> {
+            Result result = promote ? track.promote(user, getQueryOptions(lp, user).context())
+                : track.demote(user, getQueryOptions(lp, user).context());
+            ctx.setOutput(node, "result", result.toString());
+            if (!result.wasSuccessful()) {
+                throw new IllegalStateException("Track mutation was rejected");
+            }
+        }, () -> ctx.triggerOutput("success_flow"));
     }
 
     private LuckPerms getLuckPerms() {
@@ -922,12 +909,151 @@ public class PermissionHandler implements NodeHandler {
         ctx.setOutput(node, "error", error);
     }
 
-    private void persistUser(FlowContext ctx, LuckPerms luckPerms, User user) {
-        ctx.runAsyncBeforeContinuation(() -> luckPerms.getUserManager().saveUser(user).join());
+    private void mutateUser(FlowContext ctx, FlowNode node, LuckPerms luckPerms, User user, Runnable mutation) {
+        mutateUser(ctx, node, luckPerms, user, mutation, () -> succeed(ctx, node));
     }
 
-    private void persistGroup(FlowContext ctx, LuckPerms luckPerms, Group group) {
-        ctx.runAsyncBeforeContinuation(() -> luckPerms.getGroupManager().saveGroup(group).join());
+    private void mutateUser(FlowContext ctx, FlowNode node, LuckPerms luckPerms, User user, Runnable mutation,
+                            Runnable committed) {
+        ctx.runAsyncBeforeContinuation(() -> {
+            try (LuckPermsBackendPersistenceCapability.Admission ignored = backendPersistence()
+                .acquire("permission-handler-user-mutation")) {
+                List<Node> before = List.copyOf(user.data().toCollection());
+                String previousPrimaryGroup = user.getPrimaryGroup();
+                boolean saveAttempted = false;
+                try {
+                    mutation.run();
+                    saveAttempted = true;
+                    luckPerms.getUserManager().saveUser(user).join();
+                } catch (RuntimeException failure) {
+                    RuntimeException surfaced = failure;
+                    boolean restored = restoreUser(user, before, previousPrimaryGroup, failure);
+                    if (!restored) {
+                        surfaced = compensationFailure("User permission mutation compensation could not be proven", failure);
+                    } else if (saveAttempted) {
+                        try {
+                            saveUserWithoutCompensation(luckPerms, user);
+                        } catch (RuntimeException compensationFailure) {
+                            surfaced = compensationFailure("User permission mutation compensation could not be proven",
+                                failure, compensationFailure);
+                        }
+                    }
+                    fail(ctx, node, message(surfaced, "User permission mutation failed"));
+                    throw surfaced;
+                }
+                committed.run();
+            } catch (RuntimeException failure) {
+                fail(ctx, node, message(failure, "User permission mutation was rejected"));
+                throw failure;
+            }
+        });
+    }
+
+    private void mutateGroup(FlowContext ctx, FlowNode node, LuckPerms luckPerms, Group group, Runnable mutation) {
+        ctx.runAsyncBeforeContinuation(() -> {
+            try (LuckPermsBackendPersistenceCapability.Admission ignored = backendPersistence()
+                .acquire("permission-handler-group-mutation")) {
+                List<Node> before = List.copyOf(group.data().toCollection());
+                boolean saveAttempted = false;
+                try {
+                    mutation.run();
+                    saveAttempted = true;
+                    luckPerms.getGroupManager().saveGroup(group).join();
+                } catch (RuntimeException failure) {
+                    RuntimeException surfaced = failure;
+                    boolean restored = restoreNodes(group, before, failure);
+                    if (!restored) {
+                        surfaced = compensationFailure("Group permission mutation compensation could not be proven", failure);
+                    } else if (saveAttempted) {
+                        try {
+                            saveGroupWithoutCompensation(luckPerms, group);
+                        } catch (RuntimeException compensationFailure) {
+                            surfaced = compensationFailure("Group permission mutation compensation could not be proven",
+                                failure, compensationFailure);
+                        }
+                    }
+                    fail(ctx, node, message(surfaced, "Group permission mutation failed"));
+                    throw surfaced;
+                }
+                succeed(ctx, node);
+            } catch (RuntimeException failure) {
+                fail(ctx, node, message(failure, "Group permission mutation was rejected"));
+                throw failure;
+            }
+        });
+    }
+
+    private boolean restoreUser(User user, List<Node> before, String previousPrimaryGroup, RuntimeException failure) {
+        boolean restored = restoreNodes(user, before, failure);
+        try {
+            if (!Objects.equals(previousPrimaryGroup, user.getPrimaryGroup())) {
+                Result result = user.setPrimaryGroup(previousPrimaryGroup);
+                if (result == null || !result.wasSuccessful()) {
+                    throw new IllegalStateException("Primary group restoration was rejected");
+                }
+            }
+            return restored && Objects.equals(previousPrimaryGroup, user.getPrimaryGroup());
+        } catch (RuntimeException rollbackFailure) {
+            suppress(failure, rollbackFailure);
+            return false;
+        }
+    }
+
+    private boolean restoreNodes(PermissionHolder holder, List<Node> before, RuntimeException failure) {
+        try {
+            holder.data().clear();
+            for (Node node : before) {
+                var result = holder.data().add(node);
+                if (result != null && !result.wasSuccessful()) {
+                    throw new IllegalStateException("Permission node restoration was rejected");
+                }
+            }
+            Collection<Node> restored = holder.data().toCollection();
+            if (restored == null || restored.size() != before.size()
+                || !restored.containsAll(before) || !before.containsAll(restored)) {
+                throw new IllegalStateException("Permission node restoration could not be verified");
+            }
+            return true;
+        } catch (RuntimeException rollbackFailure) {
+            suppress(failure, rollbackFailure);
+            return false;
+        }
+    }
+
+    private void saveUserWithoutCompensation(LuckPerms luckPerms, User user) {
+        var save = Objects.requireNonNull(luckPerms.getUserManager().saveUser(user), "User compensation save returned null");
+        save.join();
+    }
+
+    private void saveGroupWithoutCompensation(LuckPerms luckPerms, Group group) {
+        var save = Objects.requireNonNull(luckPerms.getGroupManager().saveGroup(group), "Group compensation save returned null");
+        save.join();
+    }
+
+    private RuntimeException compensationFailure(String message, RuntimeException failure) {
+        return new IllegalStateException(message, failure);
+    }
+
+    private RuntimeException compensationFailure(String message, RuntimeException failure, RuntimeException compensationFailure) {
+        suppress(failure, compensationFailure);
+        return compensationFailure(message, failure);
+    }
+
+    private void suppress(RuntimeException failure, RuntimeException secondary) {
+        if (failure != secondary) {
+            failure.addSuppressed(secondary);
+        }
+    }
+
+    private String message(RuntimeException failure, String fallback) {
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? fallback : message;
+    }
+
+    private LuckPermsBackendPersistenceCapability backendPersistence() {
+        RegisteredServiceProvider<LuckPermsBackendPersistenceCapability> registration =
+            Bukkit.getServicesManager().getRegistration(LuckPermsBackendPersistenceCapability.class);
+        return registration == null || registration.getProvider() == null ? UNAVAILABLE_BACKEND : registration.getProvider();
     }
 
     private QueryOptions getQueryOptions(LuckPerms lp, User user) {

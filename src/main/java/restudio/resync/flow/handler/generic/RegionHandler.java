@@ -1,6 +1,12 @@
 package restudio.resync.flow.handler.generic;
 
-import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -14,24 +20,34 @@ import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.structure.ReSyncStructure;
 import restudio.resync.structure.StructureLibrary;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class RegionHandler implements NodeHandler {
     private static final long MAX_REGION_BLOCKS = 1_000_000L;
-    private static final Gson GSON = new Gson();
-    private static final Map<String, ClipboardData> clipboards = new ConcurrentHashMap<>();
+    private static final List<String> CLIPBOARD_KEYS = List.of(
+        "blockTypes", "blockDataStrings", "minX", "minY", "minZ", "sizeX", "sizeY", "sizeZ");
+    private final Map<String, ClipboardData> clipboards = new ConcurrentHashMap<>();
+    private volatile boolean detached;
 
     private static class ClipboardData {
         final String[][][] blockTypes;
@@ -71,6 +87,7 @@ public class RegionHandler implements NodeHandler {
     }
 
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private volatile RegionPersistenceParticipant persistenceParticipant;
 
     public RegionHandler() {
         operations.put("region_create", (ctx, node) -> {
@@ -408,14 +425,7 @@ public class RegionHandler implements NodeHandler {
             }
             validateClipboardData(data);
             Path file = resolveRegionFile(filePath);
-            ctx.runAsyncBeforeContinuation(() -> {
-                try {
-                    Files.createDirectories(file.getParent());
-                    Files.writeString(file, GSON.toJson(data), StandardCharsets.UTF_8);
-                } catch (IOException exception) {
-                    throw new IllegalStateException("Failed to save region clipboard: " + file.getFileName(), exception);
-                }
-            });
+            ctx.awaitBeforeContinuation(saveClipboard(file, serializeClipboardJson(data)));
         });
 
         operations.put("region_load", (ctx, node) -> {
@@ -423,20 +433,26 @@ public class RegionHandler implements NodeHandler {
             String clipboardId = ctx.getInputValue(node, "clipboard_id", String.class, "loaded");
 
             Path file = resolveRegionFile(filePath);
-            if (!Files.isRegularFile(file)) {
-                throw new IllegalArgumentException("Region clipboard file not found: " + file.getFileName());
-            }
-            ctx.runAsyncBeforeContinuation(() -> {
-                try {
-                    ClipboardData data = GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), ClipboardData.class);
-                    validateClipboardData(data);
-                    clipboards.put(clipboardId, data);
-                } catch (IOException exception) {
-                    throw new IllegalStateException("Failed to load region clipboard: " + file.getFileName(), exception);
-                } catch (RuntimeException exception) {
-                    throw new IllegalArgumentException("Region clipboard file is invalid: " + file.getFileName(), exception);
+            CompletableFuture<Void> load = loadClipboard(file).thenAccept(content -> {
+                ClipboardData data = parseClipboardJson(content);
+                clipboards.put(clipboardId, data);
+            }).handle((ignored, failure) -> {
+                if (failure == null) {
+                    return null;
                 }
+                Throwable cause = failure;
+                while (cause instanceof CompletionException && cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                if (cause instanceof IOException) {
+                    throw new IllegalArgumentException("Region clipboard file not found: " + file.getFileName(), cause);
+                }
+                if (cause instanceof RuntimeException runtimeException) {
+                    throw new IllegalArgumentException("Region clipboard file is invalid: " + file.getFileName(), runtimeException);
+                }
+                throw new CompletionException(cause);
             });
+            ctx.awaitBeforeContinuation(load);
         });
 
         operations.put("structure_save", (ctx, node) -> {
@@ -479,8 +495,8 @@ public class RegionHandler implements NodeHandler {
         });
 
         operations.put("structure_delete", (ctx, node) -> {
-            String structureId = ctx.getInputValue(node, "structure_id", String.class, "");
-            if (structureId.isBlank()) throw new IllegalArgumentException("Structure ID is required");
+            ServerResourceLocator structure = requireStructureLocator(ctx.getInputValue(node, "structure_id"), currentServerId());
+            String structureId = structure.id();
             ctx.setOutput(node, "deleted", StructureLibrary.get(ReSync.getInstance()).delete(structureId));
         });
 
@@ -1181,23 +1197,151 @@ public class RegionHandler implements NodeHandler {
         registry.register("RegionHandler", this);
     }
 
-    private static Path resolveRegionFile(String requestedPath) {
+    public synchronized RegionPersistenceParticipant bindPersistence(Path dataRoot) throws IOException {
+        if (detached) {
+            throw new IllegalStateException("Region Handler Is Detached");
+        }
+        Path scope = dataRoot.toAbsolutePath().normalize();
+        RegionPersistenceParticipant current = persistenceParticipant;
+        if (current != null) {
+            if (current.isClosed()) {
+                throw new IllegalStateException("Region Handler Persistence Is Closed");
+            }
+            if (!current.rebindScope().equals(scope)) {
+                throw new IllegalStateException("Region Handler Persistence Is Already Bound To Another Root");
+            }
+            return current;
+        }
+        return new RegionPersistenceParticipant(scope, this);
+    }
+
+    public RegionPersistenceParticipant persistenceParticipant() {
+        return persistenceParticipant;
+    }
+
+    void detachPersistence() {
+        RegionPersistenceParticipant participant;
+        synchronized (this) {
+            detached = true;
+            participant = persistenceParticipant;
+        }
+        if (participant != null) {
+            participant.detachHandler();
+        }
+    }
+
+    void attachPersistence(RegionPersistenceParticipant participant) {
+        Objects.requireNonNull(participant, "participant");
+        synchronized (this) {
+            if (persistenceParticipant != null && persistenceParticipant != participant) {
+                throw new IllegalStateException("Region Handler Persistence Is Already Bound");
+            }
+            if (detached) {
+                throw new IllegalStateException("Region Handler Is Detached");
+            }
+            persistenceParticipant = participant;
+        }
+    }
+
+    private RegionPersistenceParticipant persistence() {
+        RegionPersistenceParticipant current = persistenceParticipant;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            current = persistenceParticipant;
+            if (current != null) {
+                return current;
+            }
+            ReSync plugin = ReSync.getInstance();
+            if (plugin == null) {
+                throw new IllegalStateException("ReSync plugin is unavailable");
+            }
+            try {
+                return bindPersistence(plugin.getDataFolder().toPath());
+            } catch (IOException exception) {
+                throw new IllegalStateException("Failed to initialize flow region persistence", exception);
+            }
+        }
+    }
+
+    private Path resolveRegionFile(String requestedPath) {
         if (requestedPath == null || requestedPath.isBlank()) {
             throw new IllegalArgumentException("Region clipboard file path is required");
         }
-        ReSync plugin = ReSync.getInstance();
-        if (plugin == null) {
-            throw new IllegalStateException("ReSync plugin is unavailable");
-        }
-        Path root = plugin.getDataFolder().toPath().resolve("flow-regions").toAbsolutePath().normalize();
-        Path resolved = root.resolve(requestedPath).toAbsolutePath().normalize();
-        if (!resolved.startsWith(root)) {
-            throw new IllegalArgumentException("Region clipboard path escapes the flow-regions directory");
-        }
-        return resolved;
+        return persistence().resolve(requestedPath);
     }
 
-    private static void validateClipboardData(ClipboardData data) {
+    CompletableFuture<Void> saveClipboard(Path file, String content) {
+        RegionPersistenceParticipant participant = persistence();
+        participant.requireMutationAdmission();
+        return participant.save(file, content);
+    }
+
+    CompletableFuture<String> loadClipboard(Path file) {
+        RegionPersistenceParticipant participant = persistence();
+        participant.requireMutationAdmission();
+        return participant.load(file);
+    }
+
+    static void validateClipboardJson(String content) {
+        parseClipboardJson(content);
+    }
+
+    static ClipboardData parseClipboardJson(String content) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("Region clipboard JSON is empty");
+        }
+        JsonObject object = new JsonObject();
+        try (JsonReader reader = new JsonReader(new StringReader(content))) {
+            reader.setLenient(false);
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+                throw new IllegalArgumentException("Region clipboard JSON must be an object");
+            }
+            reader.beginObject();
+            int index = 0;
+            while (reader.hasNext()) {
+                String name = reader.nextName();
+                if (index >= CLIPBOARD_KEYS.size() || !CLIPBOARD_KEYS.get(index).equals(name)) {
+                    throw new IllegalArgumentException("Region clipboard JSON contains an unknown, duplicate, or out-of-order key: " + name);
+                }
+                object.add(name, JsonParser.parseReader(reader));
+                index++;
+            }
+            reader.endObject();
+            if (index != CLIPBOARD_KEYS.size() || reader.peek() != JsonToken.END_DOCUMENT) {
+                throw new IllegalArgumentException("Region clipboard JSON keys are incomplete or trailing data is present");
+            }
+        } catch (IOException | RuntimeException exception) {
+            if (exception instanceof IllegalArgumentException illegalArgumentException) {
+                throw illegalArgumentException;
+            }
+            throw new IllegalArgumentException("Region clipboard JSON is invalid", exception);
+        }
+        ClipboardData data = new ClipboardData(
+            readClipboardArray(object.get("blockTypes"), "block types"),
+            readClipboardArray(object.get("blockDataStrings"), "block data"),
+            readClipboardInt(object.get("minX"), "minX"),
+            readClipboardInt(object.get("minY"), "minY"),
+            readClipboardInt(object.get("minZ"), "minZ"),
+            readClipboardInt(object.get("sizeX"), "sizeX"),
+            readClipboardInt(object.get("sizeY"), "sizeY"),
+            readClipboardInt(object.get("sizeZ"), "sizeZ"));
+        validateClipboardData(data);
+        ClipboardData normalized = normalizeClipboardData(data);
+        String canonical = canonicalClipboardJson(normalized);
+        if (!content.equals(canonical)) {
+            throw new IllegalArgumentException("Region clipboard JSON is not canonical");
+        }
+        return normalized;
+    }
+
+    static String serializeClipboardJson(ClipboardData data) {
+        validateClipboardData(data);
+        return canonicalClipboardJson(normalizeClipboardData(data));
+    }
+
+    static void validateClipboardData(ClipboardData data) {
         if (data == null || data.sizeX <= 0 || data.sizeY <= 0 || data.sizeZ <= 0) {
             throw new IllegalArgumentException("Region clipboard dimensions are invalid");
         }
@@ -1210,8 +1354,144 @@ public class RegionHandler implements NodeHandler {
         if (blockCount > MAX_REGION_BLOCKS) {
             throw new IllegalArgumentException("Region clipboard exceeds the " + MAX_REGION_BLOCKS + " block limit");
         }
+        long maxX = (long) data.minX + data.sizeX - 1L;
+        long maxY = (long) data.minY + data.sizeY - 1L;
+        long maxZ = (long) data.minZ + data.sizeZ - 1L;
+        if (maxX > Integer.MAX_VALUE || maxY > Integer.MAX_VALUE || maxZ > Integer.MAX_VALUE
+            || maxX < Integer.MIN_VALUE || maxY < Integer.MIN_VALUE || maxZ < Integer.MIN_VALUE) {
+            throw new IllegalArgumentException("Region clipboard bounds overflow");
+        }
         validateClipboardArray(data.blockTypes, data.sizeX, data.sizeY, data.sizeZ, "block types");
         validateClipboardArray(data.blockDataStrings, data.sizeX, data.sizeY, data.sizeZ, "block data");
+    }
+
+    private static int readClipboardInt(JsonElement value, String name) {
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new IllegalArgumentException("Region clipboard " + name + " must be an integer");
+        }
+        String text = value.getAsString();
+        if (!text.matches("-?(0|[1-9][0-9]*)")) {
+            throw new IllegalArgumentException("Region clipboard " + name + " must be an integer");
+        }
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Region clipboard " + name + " is outside the integer range", exception);
+        }
+    }
+
+    private static String[][][] readClipboardArray(JsonElement value, String name) {
+        if (value == null || !value.isJsonArray()) {
+            throw new IllegalArgumentException("Region clipboard " + name + " must be an array");
+        }
+        JsonArray layers = value.getAsJsonArray();
+        if (layers.size() > MAX_REGION_BLOCKS) {
+            throw new IllegalArgumentException("Region clipboard " + name + " exceeds the block limit");
+        }
+        String[][][] result = new String[layers.size()][][];
+        for (int y = 0; y < layers.size(); y++) {
+            JsonElement layerValue = layers.get(y);
+            if (!layerValue.isJsonArray()) {
+                throw new IllegalArgumentException("Region clipboard " + name + " has an invalid layer");
+            }
+            JsonArray layer = layerValue.getAsJsonArray();
+            if (layer.size() > MAX_REGION_BLOCKS) {
+                throw new IllegalArgumentException("Region clipboard " + name + " exceeds the block limit");
+            }
+            result[y] = new String[layer.size()][];
+            for (int x = 0; x < layer.size(); x++) {
+                JsonElement rowValue = layer.get(x);
+                if (!rowValue.isJsonArray()) {
+                    throw new IllegalArgumentException("Region clipboard " + name + " has an invalid row");
+                }
+                JsonArray row = rowValue.getAsJsonArray();
+                if (row.size() > MAX_REGION_BLOCKS) {
+                    throw new IllegalArgumentException("Region clipboard " + name + " exceeds the block limit");
+                }
+                result[y][x] = new String[row.size()];
+                for (int z = 0; z < row.size(); z++) {
+                    JsonElement cell = row.get(z);
+                    if (!cell.isJsonPrimitive() || !cell.getAsJsonPrimitive().isString()) {
+                        throw new IllegalArgumentException("Region clipboard " + name + " contains a non-string value");
+                    }
+                    result[y][x][z] = cell.getAsString();
+                }
+            }
+        }
+        return result;
+    }
+
+    private static ClipboardData normalizeClipboardData(ClipboardData data) {
+        String[][][] blockTypes = copy(data.blockTypes);
+        String[][][] blockDataStrings = copy(data.blockDataStrings);
+        for (int y = 0; y < data.sizeY; y++) {
+            for (int x = 0; x < data.sizeX; x++) {
+                for (int z = 0; z < data.sizeZ; z++) {
+                    Material material = Material.matchMaterial(blockTypes[y][x][z]);
+                    if (material == null) {
+                        throw new IllegalArgumentException("Unknown clipboard material: " + blockTypes[y][x][z]);
+                    }
+                    String blockDataString = canonicalBlockData(material, blockDataStrings[y][x][z]);
+                    blockTypes[y][x][z] = material.name();
+                    blockDataStrings[y][x][z] = blockDataString;
+                }
+            }
+        }
+        return new ClipboardData(blockTypes, blockDataStrings, data.minX, data.minY, data.minZ,
+            data.sizeX, data.sizeY, data.sizeZ);
+    }
+
+    private static String canonicalBlockData(Material material, String value) {
+        if (Bukkit.getServer() == null) {
+            String canonicalMaterial = "minecraft:" + material.name().toLowerCase(Locale.ROOT);
+            String normalized = value.toLowerCase(Locale.ROOT);
+            if (normalized.equals(material.name().toLowerCase(Locale.ROOT))) {
+                return canonicalMaterial;
+            }
+            if (!normalized.equals(canonicalMaterial)) {
+                throw new IllegalArgumentException("Clipboard material and block data disagree");
+            }
+            return normalized;
+        }
+        BlockData blockData;
+        try {
+            blockData = Bukkit.createBlockData(value);
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Invalid clipboard block data: " + value, exception);
+        }
+        if (blockData.getMaterial() != material) {
+            throw new IllegalArgumentException("Clipboard material and block data disagree");
+        }
+        return blockData.getAsString();
+    }
+
+    private static String canonicalClipboardJson(ClipboardData data) {
+        JsonObject object = new JsonObject();
+        object.add("blockTypes", clipboardArray(data.blockTypes));
+        object.add("blockDataStrings", clipboardArray(data.blockDataStrings));
+        object.add("minX", new JsonPrimitive(data.minX));
+        object.add("minY", new JsonPrimitive(data.minY));
+        object.add("minZ", new JsonPrimitive(data.minZ));
+        object.add("sizeX", new JsonPrimitive(data.sizeX));
+        object.add("sizeY", new JsonPrimitive(data.sizeY));
+        object.add("sizeZ", new JsonPrimitive(data.sizeZ));
+        return object.toString();
+    }
+
+    private static JsonArray clipboardArray(String[][][] values) {
+        JsonArray layers = new JsonArray();
+        for (String[][] layer : values) {
+            JsonArray rows = new JsonArray();
+            for (String[] row : layer) {
+                JsonArray cells = new JsonArray();
+                for (String cell : row) {
+                    cells.add(new JsonPrimitive(cell));
+                }
+                rows.add(cells);
+            }
+            layers.add(rows);
+        }
+        return layers;
     }
 
     private static void validateClipboardArray(String[][][] values, int sizeX, int sizeY, int sizeZ, String label) {
@@ -1244,6 +1524,37 @@ public class RegionHandler implements NodeHandler {
         structure.setBlockTypes(copy(data.blockTypes));
         structure.setBlockDataStrings(copy(data.blockDataStrings));
         return structure;
+    }
+
+    static ServerResourceLocator requireStructureLocator(Object value, ServerId serverId) {
+        if (!(value instanceof ServerResourceLocator locator)) {
+            throw new IllegalArgumentException("Structure reference must contain server, type, and ID");
+        }
+        if (serverId == null || !serverId.equals(locator.serverId())) {
+            throw new IllegalArgumentException("Structure reference server does not match this server");
+        }
+        if (!OwnerId.of(ReSyncResourceCatalog.STRUCTURE_OWNER).equals(locator.owner())) {
+            throw new IllegalArgumentException("Structure reference owner must be restudio.resync");
+        }
+        if (!ResourceTypeId.of(ReSyncResourceCatalog.STRUCTURE).equals(locator.resourceType())) {
+            throw new IllegalArgumentException("Structure reference type must be structure");
+        }
+        if (locator.id() == null || locator.id().isBlank()) {
+            throw new IllegalArgumentException("Structure reference ID is required");
+        }
+        return locator;
+    }
+
+    private static ServerId currentServerId() {
+        ReSync plugin = ReSync.getInstance();
+        if (plugin == null || plugin.getReSyncServer() == null) {
+            throw new IllegalStateException("ReSync server identity is unavailable");
+        }
+        String serverId = plugin.getReSyncServer().getCanonicalServerId();
+        if (serverId == null || serverId.isBlank()) {
+            throw new IllegalStateException("ReSync server identity is unavailable");
+        }
+        return ServerId.parseCanonicalText(serverId);
     }
 
     private ClipboardData fromStructure(ReSyncStructure structure) {
@@ -1291,7 +1602,7 @@ public class RegionHandler implements NodeHandler {
         task.run();
     }
 
-    private String[][][] copy(String[][][] source) {
+    private static String[][][] copy(String[][][] source) {
         if (source == null) {
             return new String[0][][];
         }
@@ -1319,6 +1630,7 @@ public class RegionHandler implements NodeHandler {
 
     @Override
     public void shutdown() {
+        detachPersistence();
         clipboards.clear();
     }
 

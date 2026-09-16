@@ -17,9 +17,25 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowControlHandlerTest {
+    @Test
+    void ifTriggersTrueBranchWhenConditionIsTrue() {
+        TestFlowContext context = executeIf(true);
+
+        assertEquals("true", context.triggeredOutput);
+    }
+
+    @Test
+    void ifTriggersFalseBranchWhenConditionIsFalse() {
+        TestFlowContext context = executeIf(false);
+
+        assertEquals("false", context.triggeredOutput);
+    }
+
     @Test
     void switchCaseContinuesFlowWithMatchedIndex() {
         TestFlowContext context = executeSwitchCase("second", List.of("first", "second", "third"));
@@ -75,6 +91,16 @@ class FlowControlHandlerTest {
         }
     }
 
+    @Test
+    void compiledLoopCountAdmissionHasNoHandlerSideEffects() {
+        assertCompiledLoopAdmission("loop_count", Map.of("count", 3));
+    }
+
+    @Test
+    void compiledLoopForEachAdmissionHasNoHandlerSideEffects() {
+        assertCompiledLoopAdmission("loop_for_each", Map.of("list", List.of("first", "second")));
+    }
+
     private TestFlowContext executeSwitchCase(Object value, List<?> cases) {
         HandlerRegistry registry = new HandlerRegistry();
         new FlowControlHandler().registerTo(registry);
@@ -84,6 +110,18 @@ class FlowControlHandlerTest {
         TestFlowContext context = new TestFlowContext(Map.of("value", value, "cases", cases));
 
         handler.execute(context, node);
+
+        return context;
+    }
+
+    private TestFlowContext executeIf(boolean condition) {
+        HandlerRegistry registry = new HandlerRegistry();
+        new FlowControlHandler().registerTo(registry);
+        FlowNode node = new FlowNode("if", 0, 0, Map.of());
+        node.setHandlerConfig(Map.of("operation", "if"));
+        TestFlowContext context = new TestFlowContext(Map.of("condition", condition));
+
+        registry.getHandler("FlowControlHandler").execute(context, node);
 
         return context;
     }
@@ -115,10 +153,32 @@ class FlowControlHandlerTest {
         return context;
     }
 
+    private void assertCompiledLoopAdmission(String operation, Map<String, Object> inputs) {
+        HandlerRegistry handlers = new HandlerRegistry();
+        new FlowControlHandler().registerTo(handlers);
+        FlowRuntime runtime = new FlowRuntime(new FlowGraph(), new TypeAdapterRegistry(), Map.of(), Map.of(), new NodeDefinitionRegistry());
+        runtime.beginLoopControl();
+        runtime.setContinueLoopRequested(true);
+        FlowNode node = new FlowNode("flow." + operation, 0, 0, inputs);
+        node.setHandlerConfig(Map.of("operation", operation));
+        TestFlowContext context = new TestFlowContext(runtime, inputs);
+
+        handlers.getHandler("FlowControlHandler").execute(context, node);
+
+        assertTrue(context.outputs.isEmpty());
+        assertNull(context.triggeredOutput);
+        assertFalse(context.isContinuationHalted());
+        assertFalse(runtime.isBreakLoopRequested());
+        assertTrue(runtime.isContinueLoopRequested());
+        assertEquals(0, context.inputReads);
+        runtime.endLoopControl();
+    }
+
     private static class TestFlowContext extends FlowContext {
         private final Map<String, Object> inputs;
         private final Map<String, Object> outputs = new HashMap<>();
         private String triggeredOutput;
+        private int inputReads;
 
         private TestFlowContext(Map<String, Object> inputs) {
             this(null, inputs);
@@ -131,6 +191,7 @@ class FlowControlHandlerTest {
 
         @Override
         public <T> T getInputValue(FlowNode node, String pinName, Class<T> type, T defaultValue) {
+            inputReads++;
             Object value = inputs.get(pinName);
             return value != null ? type.cast(value) : defaultValue;
         }

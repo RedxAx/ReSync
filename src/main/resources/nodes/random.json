@@ -1,0 +1,455 @@
+[
+  {
+    "id": "random_int",
+    "displayName": "Random Integer",
+    "description": "Choose an integer uniformly between the inclusive minimum and maximum values.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "integer", "number"],
+    "aliases": ["Random Int", "Random Whole Number"],
+    "legacyIds": ["utility.random_int"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_int"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "min", "target": "min"},
+        {"direction": "input", "source": "max", "target": "max"},
+        {"direction": "output", "source": "number", "target": "number"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the random integer operation."},
+      {"id": "min", "displayName": "Minimum", "name": "min", "dataType": "number", "defaultValue": 0, "description": "Inclusive lower bound for the generated integer."},
+      {"id": "max", "displayName": "Maximum", "name": "max", "dataType": "number", "defaultValue": 10, "description": "Inclusive upper bound for the generated integer."}
+    ],
+    "outputs": [
+      {"id": "number", "displayName": "Number", "name": "number", "dataType": "number", "description": "Generated inclusive-range integer."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the integer has been generated."}
+    ]
+  },
+  {
+    "id": "random_double",
+    "displayName": "Random Decimal",
+    "description": "Choose a decimal value between the minimum and maximum values using a uniform random sample.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "decimal", "number"],
+    "aliases": ["Random Double", "Random Number"],
+    "legacyIds": ["utility.random_double"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_double"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "min", "target": "min"},
+        {"direction": "input", "source": "max", "target": "max"},
+        {"direction": "output", "source": "number", "target": "number"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the random decimal operation."},
+      {"id": "min", "displayName": "Minimum", "name": "min", "dataType": "number", "defaultValue": 0.0, "description": "Lower bound for the generated decimal."},
+      {"id": "max", "displayName": "Maximum", "name": "max", "dataType": "number", "defaultValue": 1.0, "description": "Upper bound for the generated decimal."}
+    ],
+    "outputs": [
+      {"id": "number", "displayName": "Number", "name": "number", "dataType": "number", "description": "Generated decimal value."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the decimal has been generated."}
+    ]
+  },
+  {
+    "id": "random_boolean",
+    "displayName": "Random Boolean",
+    "description": "Return true with the selected percentage chance and false otherwise.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "boolean", "chance"],
+    "aliases": ["Random Chance", "Chance"],
+    "legacyIds": ["utility.random_boolean"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_boolean"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "chance_0_to_100", "target": "chance_0_to_100"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the chance operation."},
+      {"id": "chance_0_to_100", "displayName": "Chance Percent", "name": "chance_0_to_100", "dataType": "number", "defaultValue": 50.0, "constraints": {"min": 0, "max": 100}, "description": "Percentage from 0 to 100 used as the chance of true."}
+    ],
+    "outputs": [
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when the random chance succeeds."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the boolean has been generated."}
+    ]
+  },
+  {
+    "id": "random_choice",
+    "displayName": "Random Choice",
+    "description": "Select one element uniformly from a list, or return no element when the list is empty.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "choice", "list"],
+    "aliases": ["Pick Random Element", "Choose Random Item"],
+    "legacyIds": ["random.choice"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_choice"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "output", "source": "element", "target": "element"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the list selection."},
+      {"id": "list", "displayName": "List", "name": "list", "dataType": "list<any>", "optional": true, "description": "List whose elements should be sampled."}
+    ],
+    "outputs": [
+      {"id": "element", "displayName": "Element", "name": "element", "dataType": "any", "optional": true, "description": "Randomly selected element, or no value when the list is absent or empty."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the list selection has completed."}
+    ]
+  },
+  {
+    "id": "random_shuffle",
+    "displayName": "Random Shuffle",
+    "description": "Create a shuffled copy of a list without changing the input list.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "shuffle", "list"],
+    "aliases": ["Shuffle List", "Randomize List"],
+    "legacyIds": ["utility.random_shuffle"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_shuffle"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "output", "source": "shuffled_list", "target": "shuffled_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the list shuffle."},
+      {"id": "list", "displayName": "List", "name": "list", "dataType": "list<any>", "optional": true, "description": "List to copy and shuffle."}
+    ],
+    "outputs": [
+      {"id": "shuffled_list", "displayName": "Shuffled List", "name": "shuffled_list", "dataType": "list<any>", "description": "A new list containing the input values in random order."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the shuffled copy has been created."}
+    ]
+  },
+  {
+    "id": "random_gaussian",
+    "displayName": "Random Gaussian",
+    "description": "Generate a normally distributed decimal value using the selected mean and standard deviation.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "gaussian", "distribution"],
+    "aliases": ["Normal Distribution", "Random Normal"],
+    "legacyIds": ["utility.random_gaussian"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_gaussian"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "mean", "target": "mean"},
+        {"direction": "input", "source": "stddev", "target": "stddev"},
+        {"direction": "output", "source": "number", "target": "number"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts Gaussian sampling."},
+      {"id": "mean", "displayName": "Mean", "name": "mean", "dataType": "number", "defaultValue": 0.0, "description": "Mean of the normal distribution."},
+      {"id": "stddev", "displayName": "Standard Deviation", "name": "stddev", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0}, "description": "Standard deviation applied to the generated Gaussian sample."}
+    ],
+    "outputs": [
+      {"id": "number", "displayName": "Number", "name": "number", "dataType": "number", "description": "Generated normally distributed decimal value."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after Gaussian sampling."}
+    ]
+  },
+  {
+    "id": "random_uuid",
+    "displayName": "Random UUID",
+    "description": "Generate a new random UUID string.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "uuid", "identity"],
+    "aliases": ["Generate Random UUID", "Random Identifier"],
+    "legacyIds": ["random.uuid"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_uuid"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "uuid", "target": "uuid"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts UUID generation."}
+    ],
+    "outputs": [
+      {"id": "uuid", "displayName": "UUID", "name": "uuid", "dataType": "string", "description": "New UUID in canonical lowercase string form."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after UUID generation."}
+    ]
+  },
+  {
+    "id": "random_hex",
+    "displayName": "Random Hex",
+    "description": "Generate a hexadecimal string with the requested number of random digits.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "hex", "string"],
+    "aliases": ["Random Hexadecimal", "Hex Token"],
+    "legacyIds": ["utility.random_hex"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_hex"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "length", "target": "length"},
+        {"direction": "output", "source": "hex", "target": "hex"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts hexadecimal generation."},
+      {"id": "length", "displayName": "Length", "name": "length", "dataType": "number", "defaultValue": 8, "constraints": {"min": 0, "max": 256, "step": 1}, "description": "Whole number of hexadecimal digits to generate."}
+    ],
+    "outputs": [
+      {"id": "hex", "displayName": "Hex", "name": "hex", "dataType": "string", "description": "Generated lowercase hexadecimal string."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after hexadecimal generation."}
+    ]
+  },
+  {
+    "id": "random_number",
+    "displayName": "Random Number",
+    "description": "Choose an integer using the inclusive minimum and maximum bounds.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "number", "range"],
+    "aliases": ["Random Range", "Random Integer"],
+    "legacyIds": ["random.number"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_number"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "min", "target": "min"},
+        {"direction": "input", "source": "max", "target": "max"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts integer range generation."},
+      {"id": "min", "displayName": "Minimum", "name": "min", "dataType": "number", "defaultValue": 0, "description": "Inclusive lower bound."},
+      {"id": "max", "displayName": "Maximum", "name": "max", "dataType": "number", "defaultValue": 100, "description": "Inclusive upper bound."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "number", "description": "Generated integer from the requested range."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after range generation."}
+    ]
+  },
+  {
+    "id": "random_item",
+    "displayName": "Random Item",
+    "description": "Select one value uniformly from a list, or publish no value when the list is empty.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.values",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "item", "list"],
+    "aliases": ["Pick Random Item", "Random List Item"],
+    "legacyIds": ["random.item"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_item"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "items", "target": "items"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts item selection."},
+      {"id": "items", "displayName": "Items", "name": "items", "dataType": "list<any>", "optional": true, "description": "List from which one value should be selected."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "any", "optional": true, "description": "Selected list value, or no value when the list is absent or empty."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after item selection."}
+    ]
+  },
+  {
+    "id": "random_player",
+    "displayName": "Random Player",
+    "description": "Select a random online player from a world or from the complete online player set.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.players",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "player", "online"],
+    "aliases": ["Pick Random Player", "Random Online Player"],
+    "legacyIds": ["random.player"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_player"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "world", "target": "world"},
+        {"direction": "output", "source": "player", "target": "player"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts player selection."},
+      {"id": "world", "displayName": "World", "name": "world", "dataType": "world", "optional": true, "description": "Optional world whose online players should be sampled. Leave blank to use all online players."}
+    ],
+    "outputs": [
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Randomly selected online player, or no value when no eligible player exists."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after player selection."}
+    ]
+  },
+  {
+    "id": "random_color",
+    "displayName": "Random Color",
+    "description": "Create a random RGB color by choosing each channel from 0 through 255.",
+    "domain": "core",
+    "family": "random",
+    "lifecycle": "active",
+    "handlerCapability": "random.color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["random", "color", "rgb"],
+    "aliases": ["Generate Random Color", "Random RGB"],
+    "legacyIds": ["random.color"],
+    "handler": "RandomHandler",
+    "handlerConfig": {"operation": "random_color"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "color", "target": "color"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts RGB color generation."}
+    ],
+    "outputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "rgb_color", "description": "New random RGB color."},
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after color generation."}
+    ]
+  }
+]

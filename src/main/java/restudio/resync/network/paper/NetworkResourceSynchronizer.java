@@ -18,7 +18,9 @@ import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourceConflictPo
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourcePolicy;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -38,49 +40,160 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     private final FlowResourceRegistry registry;
     private final ResourcePolicy policy;
     private final NetworkResourceManifestStore manifest;
+    private final NetworkPersistenceDrainController persistenceDrain;
+    private final NetworkPersistenceDrainController.Registration manifestRegistration;
+    private final NetworkPersistenceDrainController.Registration producerRegistration;
     private final Consumer<NetworkResource> refresh;
     private final Map<String, CompletableFuture<Void>> work = new ConcurrentHashMap<>();
     private final Map<String, PendingMutation> pending = new ConcurrentHashMap<>();
+    private final Object lifecycleMonitor = new Object();
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
     private final ThreadLocal<Boolean> applying = ThreadLocal.withInitial(() -> false);
     private volatile boolean ready;
+    private volatile String startupFailure;
 
     public NetworkResourceSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, FlowResourceRegistry registry, ResourcePolicy policy, Path dataDirectory, Consumer<NetworkResource> refresh) {
+        this(plugin, agent, registry, policy, dataDirectory, refresh, agent == null ? null : agent.persistenceDrain());
+    }
+
+    public NetworkResourceSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, FlowResourceRegistry registry, ResourcePolicy policy, Path dataDirectory, Consumer<NetworkResource> refresh, NetworkPersistenceDrainController persistenceDrain) {
         this.plugin = plugin;
         this.agent = agent;
         this.registry = registry;
         this.policy = policy == null ? ResourcePolicy.disabled() : policy;
         this.manifest = new NetworkResourceManifestStore(dataDirectory);
+        this.persistenceDrain = persistenceDrain;
+        NetworkPersistenceDrainController.Registration registeredManifest = null;
+        NetworkPersistenceDrainController.Registration registeredProducer = null;
+        if (persistenceDrain != null) {
+            try {
+                registeredManifest = persistenceDrain.register(manifest.persistenceComponent("resource-manifest"));
+                registeredProducer = persistenceDrain.registerProducer(new NetworkPersistenceDrainController.Producer() {
+                    @Override
+                    public String owner() {
+                        return "resource-synchronizer";
+                    }
+
+                    @Override
+                    public void closeAdmission() {
+                        closeAdmissionForDrain();
+                    }
+
+                    @Override
+                    public void resumeAdmission() {
+                        resumeAdmissionAfterDrain();
+                    }
+                });
+            } catch (RuntimeException exception) {
+                if (registeredProducer != null) {
+                    registeredProducer.close();
+                }
+                if (registeredManifest != null) {
+                    registeredManifest.close();
+                }
+                throw exception;
+            }
+        }
+        manifestRegistration = registeredManifest;
+        producerRegistration = registeredProducer;
         this.refresh = refresh != null ? refresh : ignored -> {
         };
     }
 
     public void start() {
+        requirePrimaryThread();
         if (!policy.enabled()) {
             return;
         }
-        registry.setMutationListener(this);
-        agent.addListener(this);
-        if (agent.connected()) {
-            synchronize();
+        try {
+            manifest.healthCheck();
+        } catch (IOException | RuntimeException exception) {
+            startupFailure = rootMessage(exception);
+            prepareForShutdown();
+            Log.warn("ReSync network resource persistence is unavailable: " + startupFailure);
+            return;
+        }
+        try {
+            registry.setMutationListener(this);
+            agent.addListener(this);
+            if (agent.connected()) {
+                synchronize();
+            }
+        } catch (RuntimeException exception) {
+            shutdown();
+            throw exception;
         }
     }
 
     public void shutdown() {
-        if (!closed.compareAndSet(false, true)) {
+        requirePrimaryThread();
+        prepareForShutdown();
+        finalizeShutdown();
+    }
+
+    public void prepareForShutdown() {
+        requirePrimaryThread();
+        synchronized (lifecycleMonitor) {
+            closeAdmissionForDrain();
+            closed.set(true);
+            prepareBukkitAdmission();
+        }
+    }
+
+    public void finalizeShutdown() {
+        if (producerRegistration != null) {
+            producerRegistration.close();
+        }
+        if (manifestRegistration != null) {
+            manifestRegistration.close();
+        }
+    }
+
+    public void flushPersistence() throws IOException {
+        manifest.flush();
+    }
+
+    public void quiescePersistence() throws IOException {
+        closeAdmissionForDrain();
+        if (!persistenceQuiesced.compareAndSet(false, true)) {
             return;
         }
-        ready = false;
-        agent.removeListener(this);
-        registry.setMutationListener(FlowResourceMutationListener.NONE);
-        work.clear();
-        pending.clear();
+        try {
+            manifest.quiesce();
+        } catch (IOException | RuntimeException exception) {
+            persistenceQuiesced.set(false);
+            throw exception;
+        }
+    }
+
+    public void resumePersistence() throws IOException {
+        if (!persistenceQuiesced.get()) {
+            return;
+        }
+        manifest.resume();
+        persistenceQuiesced.set(false);
+        resumeAdmissionAfterDrain();
+    }
+
+    public void rebindPersistence(Path networkRoot) throws IOException {
+        if (!persistenceQuiesced.get()) {
+            throw new IOException("ReSync network resource persistence must be quiesced before rebind");
+        }
+        manifest.rebind(networkRoot);
+    }
+
+    public void healthCheckPersistence() throws IOException {
+        if (startupFailure != null) {
+            throw new IOException("ReSync network resource synchronization startup failed: " + startupFailure);
+        }
+        manifest.healthCheck();
     }
 
     @Override
     public void saved(String type, String resourceId, String payload) {
-        if (closed.get() || applying.get() || !policy.includes(type)) {
+        if (closed.get() || applying.get() || persistenceQuiesced.get() || !policy.includes(type)) {
             return;
         }
         submitLocal(new PendingMutation(type, resourceId, payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8), false));
@@ -88,7 +201,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
 
     @Override
     public void deleted(String type, String resourceId) {
-        if (closed.get() || applying.get() || !policy.includes(type)) {
+        if (closed.get() || applying.get() || persistenceQuiesced.get() || !policy.includes(type)) {
             return;
         }
         submitLocal(new PendingMutation(type, resourceId, new byte[0], true));
@@ -101,7 +214,7 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
 
     @Override
     public void onResourceChanged(NetworkResource resource) {
-        if (closed.get() || !policy.includes(resource.type()) || resource.originNodeId().equals(agent.nodeId())) {
+        if (closed.get() || persistenceQuiesced.get() || !policy.includes(resource.type()) || resource.originNodeId().equals(agent.nodeId())) {
             return;
         }
         NetworkResourceManifestStore.Entry known = manifest.get(resource.type(), resource.resourceId());
@@ -121,12 +234,20 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     private void synchronize() {
-        if (closed.get() || !agent.connected() || !synchronizing.compareAndSet(false, true)) {
+        if (closed.get() || persistenceQuiesced.get() || !agent.connected() || !synchronizing.compareAndSet(false, true)) {
+            return;
+        }
+        NetworkPersistenceDrainController.Lease lease = admit("resource-synchronization");
+        if (persistenceDrain != null && lease == null) {
+            synchronizing.set(false);
             return;
         }
         ready = false;
         fetchRemote(NetworkResourceQuery.firstPage(), new ArrayList<>()).thenCompose(remote -> snapshotLocal().thenCompose(local -> reconcile(remote, local))).whenComplete((unused, throwable) -> {
             synchronizing.set(false);
+            if (lease != null) {
+                lease.close();
+            }
             if (throwable != null) {
                 Log.warn("ReSync network resource synchronization failed: " + rootMessage(throwable));
                 return;
@@ -148,29 +269,38 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
 
     private CompletableFuture<Map<String, LocalResource>> snapshotLocal() {
         CompletableFuture<Map<String, LocalResource>> result = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        synchronized (lifecycleMonitor) {
+            if (closed.get() || persistenceQuiesced.get()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
+            }
             try {
-                Map<String, LocalResource> resources = new LinkedHashMap<>();
-                for (FlowResourceAdapter<?> adapter : registry.adapters()) {
-                    if (!syncable(adapter)) {
-                        continue;
-                    }
+                Bukkit.getScheduler().runTask(plugin, () -> {
                     try {
-                        for (String id : adapter.listIds()) {
-                            LocalResource resource = local(adapter, id);
-                            if (resource != null) {
-                                resources.put(resource.key(), resource);
+                        Map<String, LocalResource> resources = new LinkedHashMap<>();
+                        for (FlowResourceAdapter<?> adapter : registry.adapters()) {
+                            if (!syncable(adapter)) {
+                                continue;
+                            }
+                            try {
+                                for (String id : adapter.listIds()) {
+                                    LocalResource resource = local(adapter, id);
+                                    if (resource != null) {
+                                        resources.put(resource.key(), resource);
+                                    }
+                                }
+                            } catch (RuntimeException exception) {
+                                Log.warn("Read ReSync resource catalog failed for " + adapter.descriptor().typeId() + ": " + rootMessage(exception));
                             }
                         }
+                        result.complete(Map.copyOf(resources));
                     } catch (RuntimeException exception) {
-                        Log.warn("Read ReSync resource catalog failed for " + adapter.descriptor().typeId() + ": " + rootMessage(exception));
+                        result.completeExceptionally(exception);
                     }
-                }
-                result.complete(Map.copyOf(resources));
+                });
             } catch (RuntimeException exception) {
                 result.completeExceptionally(exception);
             }
-        });
+        }
         return result;
     }
 
@@ -241,6 +371,9 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision, int conflictAttempts) {
+        if (persistenceQuiesced.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
+        }
         if (!agent.connected()) {
             pending.put(mutation.key(), mutation);
             return CompletableFuture.completedFuture(null);
@@ -270,41 +403,53 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     private CompletableFuture<Void> apply(NetworkResource resource) {
+        if (persistenceQuiesced.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
+        }
         CompletableFuture<Void> result = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            FlowResourceAdapter<?> adapter = registry.get(resource.type());
-            if (!syncable(adapter)) {
-                result.complete(null);
-                return;
+        synchronized (lifecycleMonitor) {
+            if (closed.get() || persistenceQuiesced.get()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("ReSync network resource persistence is quiesced"));
             }
-            applying.set(true);
             try {
-                if (resource.deleted()) {
-                    if (adapter.get(resource.resourceId()) != null) {
-                        FlowOperationResult<?> deleted = registry.delete(resource.type(), resource.resourceId(), FlowResourceMutationContext.system());
-                        if (!deleted.success()) {
-                            throw new IllegalStateException(deleted.message());
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    FlowResourceAdapter<?> adapter = registry.get(resource.type());
+                    if (!syncable(adapter)) {
+                        result.complete(null);
+                        return;
+                    }
+                    applying.set(true);
+                    try {
+                        if (resource.deleted()) {
+                            if (adapter.get(resource.resourceId()) != null) {
+                                FlowOperationResult<?> deleted = registry.delete(resource.type(), resource.resourceId(), FlowResourceMutationContext.system());
+                                if (!deleted.success()) {
+                                    throw new IllegalStateException(deleted.message());
+                                }
+                            }
+                        } else {
+                            Object value = adapter.deserialize(new String(resource.payload(), StandardCharsets.UTF_8));
+                            if (value == null || !resource.resourceId().equals(id(adapter, value))) {
+                                throw new IllegalArgumentException("Shared Resource ID Does Not Match Its Payload");
+                            }
+                            FlowOperationResult<?> saved = registry.save(resource.type(), value, FlowResourceMutationContext.system());
+                            if (!saved.success()) {
+                                throw new IllegalStateException(saved.message());
+                            }
                         }
+                        refresh.accept(resource);
+                        manifest.put(resource.metadata());
+                        result.complete(null);
+                    } catch (RuntimeException exception) {
+                        result.completeExceptionally(exception);
+                    } finally {
+                        applying.remove();
                     }
-                } else {
-                    Object value = adapter.deserialize(new String(resource.payload(), StandardCharsets.UTF_8));
-                    if (value == null || !resource.resourceId().equals(id(adapter, value))) {
-                        throw new IllegalArgumentException("Shared Resource ID Does Not Match Its Payload");
-                    }
-                    FlowOperationResult<?> saved = registry.save(resource.type(), value, FlowResourceMutationContext.system());
-                    if (!saved.success()) {
-                        throw new IllegalStateException(saved.message());
-                    }
-                }
-                refresh.accept(resource);
-                manifest.put(resource.metadata());
-                result.complete(null);
+                });
             } catch (RuntimeException exception) {
                 result.completeExceptionally(exception);
-            } finally {
-                applying.remove();
             }
-        });
+        }
         return result;
     }
 
@@ -313,6 +458,10 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
     }
 
     private void enqueue(String key, Supplier<CompletableFuture<Void>> operation) {
+        NetworkPersistenceDrainController.Lease lease = admit("resource-operation:" + key);
+        if (persistenceDrain != null && lease == null) {
+            return;
+        }
         work.compute(key, (ignored, previous) -> {
             CompletableFuture<Void> base = previous == null ? CompletableFuture.completedFuture(null) : previous.handle((unused, throwable) -> null);
             CompletableFuture<Void> next = base.thenCompose(unused -> {
@@ -327,12 +476,64 @@ public final class NetworkResourceSynchronizer implements ReSyncNetworkAgent.Lis
             });
             next.whenComplete((unused, throwable) -> {
                 work.remove(key, next);
+                if (lease != null) {
+                    lease.close();
+                }
                 if (throwable != null) {
                     Log.warn("ReSync shared resource operation failed: " + rootMessage(throwable));
                 }
             });
             return next;
         });
+    }
+
+    private NetworkPersistenceDrainController.Lease admit(String operation) {
+        if (persistenceDrain == null) {
+            return null;
+        }
+        try {
+            return persistenceDrain.tryAcquire(operation, Duration.ZERO).orElse(null);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    private void closeAdmissionForDrain() {
+        ready = false;
+        persistenceQuiesced.set(true);
+    }
+
+    private void prepareBukkitAdmission() {
+        if (agent != null) {
+            agent.removeListener(this);
+        }
+        if (registry != null) {
+            registry.setMutationListener(FlowResourceMutationListener.NONE);
+        }
+    }
+
+    private void resumeAdmissionAfterDrain() {
+        if (closed.get()) {
+            return;
+        }
+        persistenceQuiesced.set(false);
+        if (registry != null) {
+            registry.setMutationListener(this);
+        }
+        if (agent == null) {
+            return;
+        }
+        agent.addListener(this);
+        if (agent.connected()) {
+            synchronize();
+        }
+    }
+
+    private static void requirePrimaryThread() {
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Network resource synchronizer lifecycle must run on the Bukkit main thread");
+        }
     }
 
     private LocalResource local(FlowResourceAdapter<?> adapter, String id) {

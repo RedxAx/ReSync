@@ -1,0 +1,83 @@
+[
+  {
+    "id": "string_pad_left",
+    "displayName": "Pad Left",
+    "description": "Pad text on the left to a target character count. Missing or null text uses empty text, missing or null length uses zero, and the first character of pad_char is repeated; missing, null, or empty pad characters use a space. Values outside 0 through 65536 fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "padding", "text"],
+    "legacyIds": ["string.pad_left"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "pad_left"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to pad. Missing or null input uses empty text."},
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "constraints": {"min": 0, "max": 65536}, "description": "Target character count from 0 to 65536 inclusive. Missing or null input uses zero; zero leaves the text unchanged; values outside 0 through 65536 fail before output."},
+      {"id": "pad_char", "displayName": "Pad Character", "name": "pad_char", "pinType": "DATA", "dataType": "string", "description": "Character to repeat. Only the first character is used; missing, null, or empty input uses a space."}
+    ],
+    "outputs": [
+      {"id": "padded", "displayName": "Padded", "name": "padded", "pinType": "DATA", "dataType": "string", "description": "Text padded on the left to the target character count, or the original text when it is already long enough."}
+    ]
+  },
+  {
+    "id": "string_pad_right",
+    "displayName": "Pad Right",
+    "description": "Pad text on the right to a target character count. Missing or null text uses empty text, missing or null length uses zero, and the first character of pad_char is repeated; missing, null, or empty pad characters use a space. Values outside 0 through 65536 fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "padding", "text"],
+    "legacyIds": ["string.pad_right"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "pad_right"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to pad. Missing or null input uses empty text."},
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "constraints": {"min": 0, "max": 65536}, "description": "Target character count from 0 to 65536 inclusive. Missing or null input uses zero; zero leaves the text unchanged; values outside 0 through 65536 fail before output."},
+      {"id": "pad_char", "displayName": "Pad Character", "name": "pad_char", "pinType": "DATA", "dataType": "string", "description": "Character to repeat. Only the first character is used; missing, null, or empty input uses a space."}
+    ],
+    "outputs": [
+      {"id": "padded", "displayName": "Padded", "name": "padded", "pinType": "DATA", "dataType": "string", "description": "Text padded on the right to the target character count, or the original text when it is already long enough."}
+    ]
+  },
+  {
+    "id": "string_truncate",
+    "displayName": "Truncate",
+    "description": "Limit text to a target character count. Missing or null text uses empty text, missing or null length uses zero; zero leaves text unchanged, and an ellipsis is added only when requested with a target length greater than three. Values outside 0 through 65536 fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "truncate", "text"],
+    "legacyIds": ["string.truncate"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "truncate"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to limit. Missing or null input uses empty text."},
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "constraints": {"min": 0, "max": 65536}, "description": "Maximum character count from 0 to 65536 inclusive. Missing or null input uses zero; zero leaves the text unchanged; values outside 0 through 65536 fail before output."},
+      {"id": "add_ellipsis", "displayName": "Add Ellipsis", "name": "add_ellipsis", "pinType": "DATA", "dataType": "boolean", "description": "Whether to append three dots when truncating. Missing or null input uses false; ellipsis is applied only when the target length is greater than three."}
+    ],
+    "outputs": [
+      {"id": "truncated", "displayName": "Truncated", "name": "truncated", "pinType": "DATA", "dataType": "string", "description": "Text limited to the target character count, with an ellipsis when requested and the target length allows it."}
+    ]
+  }
+]

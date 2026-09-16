@@ -1,5 +1,6 @@
 package restudio.resync.modules;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
@@ -13,7 +14,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.CanonicalProjectMetadataFixture;
+
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -23,24 +30,48 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class RecipeModuleStartupTest {
     private JavaPlugin plugin;
     private RecipeModule module;
+    private ReSyncJsonResourceStorage writer;
+    private ReSyncJsonResourceStorage runtimeStorage;
+    private AssetPersistenceGate assetsGate;
+    private AssetTransactionCoordinator coordinator;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        assetsGate = new AssetPersistenceGate(scope);
+        coordinator = new AssetTransactionCoordinator(scope.resolve("assets"), new Gson());
+        CanonicalProjectMetadataFixture.seed(coordinator);
     }
 
     @AfterEach
-    void tearDown() {
-        if (module != null) {
-            module.stop(null);
+    void tearDown() throws Exception {
+        try {
+            if (module != null) {
+                module.stop(null);
+            }
+            if (runtimeStorage != null) {
+                runtimeStorage.closePersistence();
+            }
+            if (writer != null) {
+                writer.closePersistence();
+            }
+            if (assetsGate != null) {
+                assetsGate.quiesce();
+            }
+            if (coordinator != null) {
+                coordinator.close();
+            }
+        } finally {
+            MockBukkit.unmock();
         }
-        MockBukkit.unmock();
     }
 
     @Test
     void persistedValidRecipeRegistersAfterRestartEvenWhenAnEarlierRecipeIsMalformed() {
-        ReSyncJsonResourceStorage writer = new ReSyncJsonResourceStorage(plugin);
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        writer = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
         writer.save(ReSyncResourceCatalog.RECIPE_DEFINITION, recipe("""
             {
               "id": "a_invalid",
@@ -61,7 +92,7 @@ class RecipeModuleStartupTest {
             }
             """));
 
-        ReSyncJsonResourceStorage runtimeStorage = new ReSyncJsonResourceStorage(plugin);
+        runtimeStorage = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
         module = new RecipeModule(plugin, runtimeStorage);
         module.startRecipeLifecycle();
 

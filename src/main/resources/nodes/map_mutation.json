@@ -1,0 +1,204 @@
+[
+  {
+    "id": "core.map.create",
+    "displayName": "Create",
+    "description": "Create an empty ordered string-keyed map.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.create"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["map", "create", "mutation"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "create"},
+    "outputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,any>", "description": "Returns the new empty map."}
+    ]
+  },
+  {
+    "id": "core.map.set",
+    "displayName": "Map Set",
+    "description": "Return a copy of a map with one key set to a value.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.set"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "map", "target": "map"},
+        {"direction": "input", "source": "key", "target": "key"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "map", "target": "output_map"}
+      ]
+    },
+    "tags": ["map", "set", "mutation"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "set"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Map to copy before setting the key."},
+      {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "String key to set."},
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Value to store at the key."}
+    ],
+    "outputs": [
+      {"id": "output_map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Copy of the map with the key set."}
+    ]
+  },
+  {
+    "id": "core.map.remove",
+    "displayName": "Map Remove",
+    "description": "Return a copy of a map without one key.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.remove"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "map", "target": "map"},
+        {"direction": "input", "source": "key", "target": "key"},
+        {"direction": "output", "source": "map", "target": "output_map"}
+      ]
+    },
+    "tags": ["map", "remove", "mutation"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "remove"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Map to copy before removing the key."},
+      {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "String key to remove."}
+    ],
+    "outputs": [
+      {"id": "output_map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Copy of the map without the key."}
+    ]
+  },
+  {
+    "id": "core.map.clear",
+    "displayName": "Map Clear",
+    "description": "Return an empty copy of a map.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.clear"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "map", "target": "map"},
+        {"direction": "output", "source": "map", "target": "output_map"}
+      ]
+    },
+    "tags": ["map", "clear", "mutation"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "clear"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Map to copy before clearing its entries."}
+    ],
+    "outputs": [
+      {"id": "output_map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Empty copy of the supplied map."}
+    ]
+  },
+  {
+    "id": "core.map.merge",
+    "displayName": "Merge",
+    "description": "Merge two maps, with values from the second map replacing duplicate keys.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.merge"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["map", "merge", "mutation"],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "mapA", "target": "map_a"},
+        {"direction": "input", "source": "mapB", "target": "map_b"},
+        {"direction": "output", "source": "map", "target": "output_map"}
+      ]
+    },
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "merge"},
+    "inputs": [
+      {"id": "map_a", "displayName": "Map A", "name": "mapA", "dataType": "map<string,type:t>", "description": "First map to copy into the merged result."},
+      {"id": "map_b", "displayName": "Map B", "name": "mapB", "dataType": "map<string,type:t>", "description": "Second map whose values replace duplicate keys."}
+    ],
+    "outputs": [
+      {"id": "output_map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Merged map with values from Map B taking precedence."}
+    ]
+  },
+  {
+    "id": "core.map.put_all",
+    "displayName": "Put All",
+    "description": "Return a copy of a map with every entry from another map.",
+    "domain": "core",
+    "family": "map",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "typed-map",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["map.put_all"],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "map", "target": "map"},
+        {"direction": "input", "source": "other", "target": "other"},
+        {"direction": "output", "source": "map", "target": "output_map"}
+      ]
+    },
+    "tags": ["map", "put-all", "mutation"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "put_all"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Map to copy before adding entries."},
+      {"id": "other", "displayName": "Other", "name": "other", "dataType": "map<string,type:t>", "description": "Map whose entries are added to the copy."}
+    ],
+    "outputs": [
+      {"id": "output_map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Copy of the map with every entry from Other."}
+    ]
+  }
+]

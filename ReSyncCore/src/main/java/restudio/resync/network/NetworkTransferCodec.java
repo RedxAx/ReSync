@@ -108,13 +108,38 @@ public final class NetworkTransferCodec {
             output.writeInt(chunk.chunkIndex());
             output.writeInt(chunk.chunkCount());
             writeBytes(output, chunk.payload());
+            if (chunk.pinned()) {
+                output.writeByte(1);
+            }
         });
     }
 
     public static NetworkSnapshotChunk decodeChunk(byte[] payload) {
         return read(payload, input -> {
             requireVersion(input);
-            NetworkSnapshotChunk chunk = new NetworkSnapshotChunk(readString(input, false), readString(input, false), readString(input, false), readUuid(input), input.readLong(), readString(input, false), readString(input, false), input.readInt(), input.readInt(), readString(input, false), input.readLong(), input.readInt(), input.readInt(), input.readInt(), readBytes(input));
+            String transferId = readString(input, false);
+            String snapshotId = readString(input, false);
+            String networkId = readString(input, false);
+            UUID playerId = readUuid(input);
+            long fenceEpoch = input.readLong();
+            String family = readString(input, false);
+            String payloadHash = readString(input, false);
+            int schemaVersion = input.readInt();
+            int dataVersion = input.readInt();
+            String originNodeId = readString(input, false);
+            long createdAt = input.readLong();
+            int totalBytes = input.readInt();
+            int chunkIndex = input.readInt();
+            int chunkCount = input.readInt();
+            byte[] chunkPayload = readBytes(input);
+            boolean pinned = false;
+            if (input.available() > 0) {
+                if (input.readUnsignedByte() != 1) {
+                    throw new IllegalArgumentException("Network Snapshot Pinned Flag Is Invalid");
+                }
+                pinned = true;
+            }
+            NetworkSnapshotChunk chunk = new NetworkSnapshotChunk(transferId, snapshotId, networkId, playerId, fenceEpoch, family, payloadHash, schemaVersion, dataVersion, originNodeId, createdAt, totalBytes, chunkIndex, chunkCount, chunkPayload, pinned);
             requireEnd(input);
             if (chunk.totalBytes() > MAXIMUM_SNAPSHOT_BYTES || chunk.chunkCount() > MAXIMUM_CHUNKS) {
                 throw new IllegalArgumentException("Network Snapshot Exceeds Transfer Limits");
@@ -132,7 +157,7 @@ public final class NetworkTransferCodec {
         for (int index = 0; index < chunkCount; index++) {
             int start = index * MAXIMUM_CHUNK_BYTES;
             int end = Math.min(totalBytes, start + MAXIMUM_CHUNK_BYTES);
-            chunks.add(new NetworkSnapshotChunk(transferId, snapshot.snapshotId(), snapshot.networkId(), snapshot.playerId(), snapshot.fenceEpoch(), snapshot.family(), snapshot.payloadHash(), snapshot.schemaVersion(), snapshot.dataVersion(), snapshot.originNodeId(), snapshot.createdAt(), totalBytes, index, chunkCount, Arrays.copyOfRange(payload, start, end)));
+            chunks.add(new NetworkSnapshotChunk(transferId, snapshot.snapshotId(), snapshot.networkId(), snapshot.playerId(), snapshot.fenceEpoch(), snapshot.family(), snapshot.payloadHash(), snapshot.schemaVersion(), snapshot.dataVersion(), snapshot.originNodeId(), snapshot.createdAt(), totalBytes, index, chunkCount, Arrays.copyOfRange(payload, start, end), snapshot.pinned()));
         }
         return List.copyOf(chunks);
     }
@@ -158,11 +183,11 @@ public final class NetworkTransferCodec {
         if (value.length != first.totalBytes() || !NetworkPayloads.sha256(value).equalsIgnoreCase(first.payloadHash())) {
             throw new IllegalArgumentException("Network Snapshot Payload Hash Does Not Match");
         }
-        return new PlayerStateSnapshot(first.snapshotId(), first.networkId(), first.playerId(), first.fenceEpoch(), first.family(), value, first.payloadHash().toLowerCase(), first.schemaVersion(), first.dataVersion(), first.originNodeId(), first.createdAt(), false);
+        return new PlayerStateSnapshot(first.snapshotId(), first.networkId(), first.playerId(), first.fenceEpoch(), first.family(), value, first.payloadHash().toLowerCase(), first.schemaVersion(), first.dataVersion(), first.originNodeId(), first.createdAt(), first.pinned());
     }
 
     private static boolean sameSnapshot(NetworkSnapshotChunk expected, NetworkSnapshotChunk actual) {
-        return expected.transferId().equals(actual.transferId()) && expected.snapshotId().equals(actual.snapshotId()) && expected.networkId().equals(actual.networkId()) && expected.playerId().equals(actual.playerId()) && expected.fenceEpoch() == actual.fenceEpoch() && expected.family().equals(actual.family()) && expected.payloadHash().equalsIgnoreCase(actual.payloadHash()) && expected.schemaVersion() == actual.schemaVersion() && expected.dataVersion() == actual.dataVersion() && expected.originNodeId().equals(actual.originNodeId()) && expected.createdAt() == actual.createdAt() && expected.totalBytes() == actual.totalBytes() && expected.chunkCount() == actual.chunkCount();
+        return expected.transferId().equals(actual.transferId()) && expected.snapshotId().equals(actual.snapshotId()) && expected.networkId().equals(actual.networkId()) && expected.playerId().equals(actual.playerId()) && expected.fenceEpoch() == actual.fenceEpoch() && expected.family().equals(actual.family()) && expected.payloadHash().equalsIgnoreCase(actual.payloadHash()) && expected.schemaVersion() == actual.schemaVersion() && expected.dataVersion() == actual.dataVersion() && expected.originNodeId().equals(actual.originNodeId()) && expected.createdAt() == actual.createdAt() && expected.totalBytes() == actual.totalBytes() && expected.chunkCount() == actual.chunkCount() && expected.pinned() == actual.pinned();
     }
 
     private static int statusCode(NetworkTransferStatus status) {

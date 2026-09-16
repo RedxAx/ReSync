@@ -1,0 +1,215 @@
+[
+  {
+    "id": "title.send",
+    "displayName": "Send Title",
+    "description": "Send a title and optional subtitle to a player with explicit fade timings.",
+    "domain": "title",
+    "family": "title",
+    "lifecycle": "active",
+    "handlerCapability": "title.display",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["title", "player", "display"],
+    "examples": ["Connect Flow, provide title text, and optionally choose a Player and Subtitle."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "TitleHandler",
+    "handlerConfig": {"operation": "title_send"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "title", "target": "title"},
+        {"direction": "input", "source": "subtitle", "target": "subtitle"},
+        {"direction": "input", "source": "fade_in", "target": "fade_in"},
+        {"direction": "input", "source": "stay", "target": "stay"},
+        {"direction": "input", "source": "fade_out", "target": "fade_out"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the title display when execution reaches this node."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "direction": "input", "description": "Selects the player who sees the title; when omitted, the current Flow player is used."},
+      {"id": "title", "displayName": "Title", "name": "title", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the main title text. At least a title or subtitle must contain text."},
+      {"id": "subtitle", "displayName": "Subtitle", "name": "subtitle", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides optional subtitle text shown beneath the title."},
+      {"id": "fade_in", "displayName": "Fade In", "name": "fade_in", "dataType": "integer", "defaultValue": 10, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the title fade-in duration in server ticks."},
+      {"id": "stay", "displayName": "Stay", "name": "stay", "dataType": "integer", "defaultValue": 70, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets how long the title remains visible in server ticks."},
+      {"id": "fade_out", "displayName": "Fade Out", "name": "fade_out", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the title fade-out duration in server ticks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the title has been sent."}
+    ]
+  },
+  {
+    "id": "title.clear",
+    "displayName": "Clear Title",
+    "description": "Clear the current title, subtitle, and title timing for a player.",
+    "domain": "title",
+    "family": "title",
+    "lifecycle": "active",
+    "handlerCapability": "title.display",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["title", "clear", "player"],
+    "examples": ["Connect Flow and optionally choose a Player to clear the active title."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "TitleHandler",
+    "handlerConfig": {"operation": "title_clear"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts clearing the title."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "direction": "input", "description": "Selects the player whose title should clear; when omitted, the current Flow player is used."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the title has been cleared."}
+    ]
+  },
+  {
+    "id": "title.action.bar",
+    "displayName": "Send Actionbar",
+    "description": "Send text to a player's action bar and refresh it for a bounded duration.",
+    "domain": "title",
+    "family": "title",
+    "lifecycle": "active",
+    "handlerCapability": "title.display",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["title", "actionbar", "player"],
+    "examples": ["Connect Flow, provide actionbar text, and optionally choose a Player and display duration."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "TitleHandler",
+    "handlerConfig": {"operation": "actionbar_send"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "text", "target": "text"},
+        {"direction": "input", "source": "duration_ticks", "target": "duration_ticks"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the actionbar display."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "direction": "input", "description": "Selects the player who sees the actionbar; when omitted, the current Flow player is used."},
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the MiniMessage or legacy actionbar text."},
+      {"id": "duration_ticks", "displayName": "Duration Ticks", "name": "duration_ticks", "dataType": "integer", "defaultValue": 60, "constraints": {"min": 1, "max": 6000}, "direction": "input", "description": "Sets how long the actionbar remains refreshed in server ticks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the actionbar refresh has been scheduled."}
+    ]
+  },
+  {
+    "id": "title.times",
+    "displayName": "Set Title Times",
+    "description": "Update title fade-in, stay, and fade-out timing for a player without changing its text.",
+    "domain": "title",
+    "family": "title",
+    "lifecycle": "active",
+    "handlerCapability": "title.display",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["title", "timing", "player"],
+    "examples": ["Connect Flow, optionally choose a Player, and provide the three title timing values."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "TitleHandler",
+    "handlerConfig": {"operation": "times"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "fade_in", "target": "fade_in"},
+        {"direction": "input", "source": "stay", "target": "stay"},
+        {"direction": "input", "source": "fade_out", "target": "fade_out"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts updating title timing."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "direction": "input", "description": "Selects the player whose title timing changes; when omitted, the current Flow player is used."},
+      {"id": "fade_in", "displayName": "Fade In", "name": "fade_in", "dataType": "integer", "defaultValue": 10, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the fade-in duration in server ticks."},
+      {"id": "stay", "displayName": "Stay", "name": "stay", "dataType": "integer", "defaultValue": 70, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets how long the title remains visible in server ticks."},
+      {"id": "fade_out", "displayName": "Fade Out", "name": "fade_out", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the fade-out duration in server ticks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after title timing has been updated."}
+    ]
+  },
+  {
+    "id": "title.subtitle",
+    "displayName": "Send Subtitle",
+    "description": "Send a subtitle with explicit title timing while leaving the main title empty.",
+    "domain": "title",
+    "family": "title",
+    "lifecycle": "active",
+    "handlerCapability": "title.display",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["title", "subtitle", "player"],
+    "examples": ["Connect Flow, provide subtitle text, and optionally choose a Player and title timing."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "TitleHandler",
+    "handlerConfig": {"operation": "subtitle"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "subtitle", "target": "subtitle"},
+        {"direction": "input", "source": "fade_in", "target": "fade_in"},
+        {"direction": "input", "source": "stay", "target": "stay"},
+        {"direction": "input", "source": "fade_out", "target": "fade_out"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the subtitle display."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "direction": "input", "description": "Selects the player who sees the subtitle; when omitted, the current Flow player is used."},
+      {"id": "subtitle", "displayName": "Subtitle", "name": "subtitle", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the subtitle text. This value must not be blank."},
+      {"id": "fade_in", "displayName": "Fade In", "name": "fade_in", "dataType": "integer", "defaultValue": 10, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the subtitle fade-in duration in server ticks."},
+      {"id": "stay", "displayName": "Stay", "name": "stay", "dataType": "integer", "defaultValue": 70, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets how long the subtitle remains visible in server ticks."},
+      {"id": "fade_out", "displayName": "Fade Out", "name": "fade_out", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 0, "max": 72000}, "direction": "input", "description": "Sets the subtitle fade-out duration in server ticks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the subtitle has been sent."}
+    ]
+  }
+]

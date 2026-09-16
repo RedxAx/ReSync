@@ -1,0 +1,201 @@
+[
+  {
+    "id": "and",
+    "displayName": "And",
+    "description": "Returns true when both Boolean inputs are true.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "and"],
+    "legacyIds": ["logic.logic_and"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "and"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "boolean", "description": "Provides the first Boolean value."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "boolean", "description": "Provides the second Boolean value."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns true only when both inputs are true."}
+    ]
+  },
+  {
+    "id": "or",
+    "displayName": "Or",
+    "description": "Returns true when either Boolean input is true.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "or"],
+    "legacyIds": ["logic.logic_or"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "or"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "boolean", "description": "Provides the first Boolean value."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "boolean", "description": "Provides the second Boolean value."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when at least one input is true."}
+    ]
+  },
+  {
+    "id": "not",
+    "displayName": "Not",
+    "description": "Returns the opposite of the supplied Boolean value.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "not"],
+    "legacyIds": ["logic.logic_not"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "not"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "boolean", "description": "Provides the Boolean value to invert."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns the opposite Boolean value."}
+    ]
+  },
+  {
+    "id": "xor",
+    "displayName": "Xor",
+    "description": "Returns true when exactly one Boolean input is true.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "xor"],
+    "legacyIds": ["logic.logic_xor"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "xor"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "boolean", "description": "Provides the first Boolean value."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "boolean", "description": "Provides the second Boolean value."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when exactly one input is true."}
+    ]
+  },
+  {
+    "id": "nand",
+    "displayName": "Nand",
+    "description": "Returns false only when both Boolean inputs are true.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "nand"],
+    "legacyIds": ["logic.logic_nand"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "nand"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "boolean", "description": "Provides the first Boolean value."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "boolean", "description": "Provides the second Boolean value."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns the negated conjunction of both inputs."}
+    ]
+  },
+  {
+    "id": "nor",
+    "displayName": "Nor",
+    "description": "Returns true only when both Boolean inputs are false.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "nor"],
+    "legacyIds": ["logic.logic_nor"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "nor"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "boolean", "description": "Provides the first Boolean value."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "boolean", "description": "Provides the second Boolean value."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when neither input is true."}
+    ]
+  },
+  {
+    "id": "true",
+    "displayName": "True",
+    "description": "Returns the Boolean value true.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "constant"],
+    "legacyIds": ["logic.logic_true"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "true"},
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "boolean", "description": "Provides the Boolean value true."}
+    ]
+  },
+  {
+    "id": "false",
+    "displayName": "False",
+    "description": "Returns the Boolean value false.",
+    "domain": "logic",
+    "family": "boolean",
+    "lifecycle": "active",
+    "handlerCapability": "logic.boolean",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "boolean", "constant"],
+    "legacyIds": ["logic.logic_false"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "false"},
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "boolean", "description": "Provides the Boolean value false."}
+    ]
+  }
+]

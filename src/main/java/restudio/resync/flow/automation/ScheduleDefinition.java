@@ -1,8 +1,14 @@
 package restudio.resync.flow.automation;
 
 import com.google.gson.JsonObject;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 
 import java.util.Locale;
+import java.util.Objects;
 
 public record ScheduleDefinition(String id, String name, String description, TargetType targetType, String targetId,
                                  TimingMode timingMode, double duration, TimerDefinition.TimeUnit unit, double initialDelay,
@@ -11,7 +17,8 @@ public record ScheduleDefinition(String id, String name, String description, Tar
                                  OfflinePolicy offlinePolicy, MissedRunPolicy missedRunPolicy) implements AutomationDefinition {
     public enum TargetType {
         FUNCTION,
-        FLOW
+        FLOW,
+        COMMAND
     }
 
     public enum TimingMode {
@@ -80,14 +87,28 @@ public record ScheduleDefinition(String id, String name, String description, Tar
         }
     }
 
+    public String targetResourceType() {
+        return switch (targetType) {
+            case FLOW -> "flow";
+            case FUNCTION -> "function";
+            case COMMAND -> "command";
+        };
+    }
+
+    public ServerResourceLocator targetLocator(ServerId serverId) {
+        Objects.requireNonNull(serverId, "Schedule target server ID is required");
+        return new ServerResourceLocator(serverId,
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(targetResourceType())), targetId);
+    }
+
     public static ScheduleDefinition from(JsonObject json, String fallbackId) {
         JsonObject value = json != null ? json : new JsonObject();
         JsonObject timing = value.has("timing") && value.get("timing").isJsonObject() ? value.getAsJsonObject("timing") : value;
-        JsonObject target = value.has("target") && value.get("target").isJsonObject() ? value.getAsJsonObject("target") : value;
+        JsonObject target = value.has("target") && value.get("target").isJsonObject() ? value.getAsJsonObject("target") : null;
         String id = string(value, "id", fallbackId);
         return new ScheduleDefinition(id, string(value, "name", string(value, "displayName", id)),
-            string(value, "description", ""), enumeration(TargetType.class, string(value, "targetType", string(target, "type", "function"))),
-            string(value, "targetId", string(target, "id", "")),
+            string(value, "description", ""), enumeration(TargetType.class, targetType(value, target)),
+            targetId(value, target),
             enumeration(TimingMode.class, string(value, "timingMode", string(timing, "mode", "after_delay"))),
             number(timing, "duration", 0D), TimerDefinition.TimeUnit.parse(string(timing, "unit", "seconds")),
             number(timing, "initialDelay", 0D), string(timing, "dateTime", ""), string(timing, "timeZone", "UTC"),
@@ -99,13 +120,55 @@ public record ScheduleDefinition(String id, String name, String description, Tar
             enumeration(MissedRunPolicy.class, string(value, "missedRunPolicy", "run_once")));
     }
 
+    private static String targetType(JsonObject value, JsonObject target) {
+        if (target != null && target.has("type") && target.get("type").isJsonObject()) {
+            JsonObject type = target.getAsJsonObject("type");
+            String ownerId = optionalString(type, "ownerId");
+            if (ownerId != null && !"restudio.resync".equals(ownerId)) {
+                throw new IllegalArgumentException("Schedule target must belong to the Core graph owner");
+            }
+            String localId = optionalString(type, "localId");
+            if (localId != null) {
+                String declared = optionalString(value, "targetType");
+                if (declared != null) {
+                    return declared;
+                }
+                return localId;
+            }
+        }
+        String declared = optionalString(value, "targetType");
+        if (declared != null) {
+            return declared;
+        }
+        return string(target, "type", "function");
+    }
+
+    private static String targetId(JsonObject value, JsonObject target) {
+        String declared = optionalTargetId(value, "targetId");
+        String nested = optionalTargetId(target, "id");
+        if (declared != null && nested != null && !declared.equals(nested)) {
+            throw new IllegalArgumentException("Schedule target ID fields conflict");
+        }
+        return declared != null ? declared : nested != null ? nested : "";
+    }
+
     private static <E extends Enum<E>> E enumeration(Class<E> type, String value) {
         String normalized = value == null ? "" : value.trim().replace(' ', '_').replace('-', '_').toUpperCase(Locale.ROOT);
         return Enum.valueOf(type, normalized);
     }
 
     private static String string(JsonObject json, String key, String fallback) {
-        return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : fallback;
+        return json != null && json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : fallback;
+    }
+
+    private static String optionalString(JsonObject json, String key) {
+        return json != null && json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : null;
+    }
+
+    private static String optionalTargetId(JsonObject json, String key) {
+        String value = optionalString(json, key);
+        value = value != null ? value.trim() : null;
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static boolean bool(JsonObject json, String key, boolean fallback) {

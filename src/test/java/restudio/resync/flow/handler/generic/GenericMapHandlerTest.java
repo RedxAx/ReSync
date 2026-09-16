@@ -19,7 +19,30 @@ class GenericMapHandlerTest {
         TestFlowContext context = execute("set", Map.of("map", source, "key", "second", "value", 2));
 
         assertEquals(Map.of("first", 1), source);
-        assertEquals(Map.of("first", 1, "second", 2), context.outputs.get("map"));
+        assertEquals(Map.of("first", 1, "second", 2), context.outputs.get("output_map"));
+    }
+
+    @Test
+    void mergeReadsAuthoredInputIdsAndPublishesOutputMapResult() {
+        TestFlowContext context = execute("merge", Map.of(
+            "map_a", Map.of("first", 1),
+            "map_b", Map.of("second", 2)
+        ));
+
+        assertEquals(Map.of("first", 1, "second", 2), context.outputs.get("output_map"));
+    }
+
+    @Test
+    void mapMutationOperationsPublishAuthoredOutputId() {
+        assertEquals(Map.of("first", 1), execute("remove", Map.of(
+            "map", Map.of("first", 1, "second", 2), "key", "second"
+        )).outputs.get("output_map"));
+        assertEquals(Map.of(), execute("clear", Map.of(
+            "map", Map.of("first", 1)
+        )).outputs.get("output_map"));
+        assertEquals(Map.of("first", 1, "second", 2), execute("put_all", Map.of(
+            "map", Map.of("first", 1), "other", Map.of("second", 2)
+        )).outputs.get("output_map"));
     }
 
     @Test
@@ -38,7 +61,7 @@ class GenericMapHandlerTest {
         HandlerRegistry registry = new HandlerRegistry();
         new GenericMapHandler().registerTo(registry);
         NodeHandler handler = registry.getHandler("GenericMapHandler");
-        FlowNode node = new FlowNode("map." + operation, 0, 0, Map.of());
+        FlowNode node = new FlowNode("core.map." + operation, 0, 0, Map.of());
         node.setHandlerConfig(Map.of("operation", operation));
         TestFlowContext context = new TestFlowContext(inputs);
         handler.execute(context, node);

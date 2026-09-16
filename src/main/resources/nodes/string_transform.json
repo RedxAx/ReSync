@@ -1,0 +1,184 @@
+[
+  {
+    "id": "string_starts_with",
+    "displayName": "Starts With",
+    "description": "Check whether text begins with a prefix. Missing or null inputs use empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "prefix"],
+    "legacyIds": ["string.starts_with"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "starts_with"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to inspect. Missing or null input uses empty text."},
+      {"id": "prefix", "displayName": "Prefix", "name": "prefix", "pinType": "DATA", "dataType": "string", "description": "Text that the value must begin with. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "True when the value begins with the prefix."}
+    ]
+  },
+  {
+    "id": "string_ends_with",
+    "displayName": "Ends With",
+    "description": "Check whether text ends with a suffix. Missing or null inputs use empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "suffix"],
+    "legacyIds": ["string.ends_with"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "ends_with"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to inspect. Missing or null input uses empty text."},
+      {"id": "suffix", "displayName": "Suffix", "name": "suffix", "pinType": "DATA", "dataType": "string", "description": "Text that the value must end with. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "True when the value ends with the suffix."}
+    ]
+  },
+  {
+    "id": "string_replace",
+    "displayName": "Replace",
+    "description": "Replace every literal occurrence of target text with replacement text. The target is treated as plain text, not a regular expression.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "replace", "text"],
+    "legacyIds": ["string.replace"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "replace"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to modify. Missing or null input uses empty text."},
+      {"id": "target", "displayName": "Target", "name": "target", "pinType": "DATA", "dataType": "string", "description": "Literal text to find. Missing or null input uses empty text."},
+      {"id": "replacement", "displayName": "Replacement", "name": "replacement", "pinType": "DATA", "dataType": "string", "description": "Literal text to insert for every target occurrence. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "The value after every literal target occurrence is replaced."}
+    ]
+  },
+  {
+    "id": "string_replace_regex",
+    "displayName": "Replace Regex",
+    "description": "Replace every regular-expression match in text. Missing or null inputs use empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "replace", "regex"],
+    "legacyIds": ["string.replace_regex"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "replace_regex"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to modify. Missing or null input uses empty text."},
+      {"id": "pattern", "displayName": "Pattern", "name": "pattern", "pinType": "DATA", "dataType": "string", "description": "Regular expression to find. Missing or null input uses an empty pattern."},
+      {"id": "replacement", "displayName": "Replacement", "name": "replacement", "pinType": "DATA", "dataType": "string", "description": "Text inserted for each regular-expression match. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "The value after every regular-expression match is replaced."}
+    ]
+  },
+  {
+    "id": "string_base64_encode",
+    "displayName": "Base64 Encode",
+    "description": "Encode text as Base64 using its UTF-8 bytes. Missing or null input uses empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "encoding", "base64"],
+    "legacyIds": ["string.base64_encode"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "base64_encode"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to encode using UTF-8 bytes. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "encoded", "displayName": "Encoded", "name": "encoded", "pinType": "DATA", "dataType": "string", "description": "Base64 text produced from the input's UTF-8 bytes."}
+    ]
+  },
+  {
+    "id": "string_url_encode",
+    "displayName": "URL Encode",
+    "description": "Encode text for a URL using UTF-8. Missing or null input uses empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "encoding", "url"],
+    "legacyIds": ["string.url_encode"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "url_encode"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to encode using UTF-8. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "encoded", "displayName": "Encoded", "name": "encoded", "pinType": "DATA", "dataType": "string", "description": "URL-encoded text produced from the input using UTF-8."}
+    ]
+  },
+  {
+    "id": "string_join",
+    "displayName": "String Join",
+    "description": "Join a list of strings with a separator. Missing or null lists are empty, and a missing or null separator uses a comma.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "join", "list"],
+    "legacyIds": ["string.join"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "join"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<string>", "description": "Strings to join in order. Missing or null input uses an empty list."},
+      {"id": "separator", "displayName": "Separator", "name": "separator", "pinType": "DATA", "dataType": "string", "description": "Text placed between items. Missing or null input uses a comma."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "The list items joined in order with the separator."}
+    ]
+  }
+]

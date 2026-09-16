@@ -3,6 +3,7 @@ package restudio.resync.flow.handler.generic;
 import org.bukkit.entity.Player;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowResourceReference;
+import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.PersistentVariableStore;
 import restudio.resync.flow.automation.AutomationReferences;
@@ -11,23 +12,34 @@ import restudio.resync.flow.automation.VariableService;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public class VariableScopeHandler implements NodeHandler {
     private static final String GLOBAL_PREFIX = "server.";
+    private static final String MODERN_VARIABLE_NODE = "automation.variable";
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private final VariableService variables;
+    private final PersistentVariableStore persistentStore;
 
     public VariableScopeHandler() {
-        this(null);
+        this(null, new PersistentVariableStore(ReSync.getInstance() != null
+            ? ReSync.getInstance().getDataFolder().toPath() : Path.of(".")));
     }
 
     public VariableScopeHandler(VariableService variables) {
+        this(variables, variables != null ? variables.persistentStore() : new PersistentVariableStore(
+            ReSync.getInstance() != null ? ReSync.getInstance().getDataFolder().toPath() : Path.of(".")));
+    }
+
+    public VariableScopeHandler(VariableService variables, PersistentVariableStore persistentStore) {
         this.variables = variables;
+        this.persistentStore = Objects.requireNonNull(persistentStore, "persistentStore");
         operations.put("variable_access", (ctx, node) -> {
             String definitionId = AutomationReferences.id(ctx.getInputValue(node, "variable", Object.class, null));
             if (this.variables != null && !definitionId.isBlank()) {
@@ -58,16 +70,16 @@ public class VariableScopeHandler implements NodeHandler {
                 case "get" -> {
                 }
                 case "set" -> {
-                    setVariable(ctx, normalizedScope, name, value, player);
                     if (persistent) {
                         persistVariable(ctx, normalizedScope, name, value, player);
                     }
+                    setVariable(ctx, normalizedScope, name, value, player);
                 }
                 case "delete" -> {
-                    deleteVariable(ctx, normalizedScope, name, player);
                     if (persistent) {
                         deletePersistentVariable(ctx, normalizedScope, name, player);
                     }
+                    deleteVariable(ctx, normalizedScope, name, player);
                 }
                 case "exists" -> {
                 }
@@ -98,9 +110,12 @@ public class VariableScopeHandler implements NodeHandler {
                     : valueOutput != null || variableExists(ctx, normalizedScope, name, player);
             }
 
-            ctx.setOutput(node, "value", valueOutput);
+            ctx.setOutput(node, outputPin(node, "output_value", "value"), valueOutput);
             ctx.setOutput(node, "exists", existsOutput);
             ctx.setOutput(node, "variables", variablesOutput);
+            if (isModernVariableNode(node)) {
+                ctx.setOutput(node, "output_variable", null);
+            }
         });
 
         operations.put("variable_set_global", (ctx, node) -> {
@@ -241,8 +256,8 @@ public class VariableScopeHandler implements NodeHandler {
             value = value != null || "get".equals(action) ? value : variables.get(context, definition, owner);
             exists = variables.exists(context, definition, owner);
         }
-        context.setOutput(node, "variable", variables.reference(definition));
-        context.setOutput(node, "value", value);
+        context.setOutput(node, outputPin(node, "output_variable", "variable"), variables.reference(definition));
+        context.setOutput(node, outputPin(node, "output_value", "value"), value);
         context.setOutput(node, "exists", exists);
         context.setOutput(node, "variables", listed);
     }
@@ -254,12 +269,23 @@ public class VariableScopeHandler implements NodeHandler {
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
+        if (isModernVariableNode(node) && !"variable_access".equals(operation)) {
+            throw new IllegalArgumentException("Unknown variable scope operation: " + operation);
+        }
         BiConsumer<FlowContext, FlowNode> op = operation != null ? operations.get(operation) : null;
         if (op == null) {
             throw new IllegalArgumentException("Unknown variable scope operation: " + operation);
         }
         op.accept(ctx, node);
-        ctx.triggerOutput("flow");
+        ctx.triggerOutput(outputPin(node, "output_flow", "flow"));
+    }
+
+    private static boolean isModernVariableNode(FlowNode node) {
+        return node != null && MODERN_VARIABLE_NODE.equals(node.getType());
+    }
+
+    private static String outputPin(FlowNode node, String modernPin, String legacyPin) {
+        return isModernVariableNode(node) ? modernPin : legacyPin;
     }
 
     private static Object resolveVariable(FlowContext ctx, String scope, String name, Player player) {
@@ -357,51 +383,54 @@ public class VariableScopeHandler implements NodeHandler {
         });
     }
 
-    private static Object resolvePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
+    private Object resolvePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
         String key = buildPersistentKey(ctx, scope, name, player);
         if (key == null) {
             return null;
         }
-        PersistentVariableStore store = PersistentVariableStore.getInstance();
-        if (!store.contains(key)) {
+        if (!persistentStore.contains(key)) {
             return null;
         }
-        Object value = store.get(key);
+        Object value = persistentStore.get(key);
         setVariable(ctx, scope, name, value, player);
         return value;
     }
 
-    private static boolean persistentVariableExists(FlowContext ctx, String scope, String name, Player player) {
+    private boolean persistentVariableExists(FlowContext ctx, String scope, String name, Player player) {
         String key = buildPersistentKey(ctx, scope, name, player);
         if (key == null) {
             return false;
         }
-        return PersistentVariableStore.getInstance().contains(key);
+        return persistentStore.contains(key);
     }
 
-    private static void persistVariable(FlowContext ctx, String scope, String name, Object value, Player player) {
+    private void persistVariable(FlowContext ctx, String scope, String name, Object value, Player player) {
         String key = buildPersistentKey(ctx, scope, name, player);
         if (key == null) {
             return;
         }
-        PersistentVariableStore.getInstance().set(key, value);
+        if (value == null) {
+            persistentStore.remove(key);
+        } else {
+            persistentStore.set(key, value);
+        }
     }
 
-    private static void deletePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
+    private void deletePersistentVariable(FlowContext ctx, String scope, String name, Player player) {
         String key = buildPersistentKey(ctx, scope, name, player);
         if (key == null) {
             return;
         }
-        PersistentVariableStore.getInstance().remove(key);
+        persistentStore.remove(key);
     }
 
-    private static List<String> listPersistentVariables(FlowContext ctx, String scope, Player player) {
+    private List<String> listPersistentVariables(FlowContext ctx, String scope, Player player) {
         String prefix = buildPersistentPrefix(ctx, scope, player);
         if (prefix == null) {
             return List.of();
         }
         List<String> names = new ArrayList<>();
-        for (String key : PersistentVariableStore.getInstance().getAll().keySet()) {
+        for (String key : persistentStore.getAll().keySet()) {
             if (key.startsWith(prefix)) {
                 names.add(key.substring(prefix.length()));
             }
@@ -409,13 +438,12 @@ public class VariableScopeHandler implements NodeHandler {
         return names;
     }
 
-    private static void updateNumericPersistent(FlowContext ctx, String mode, String scope, String name, double amount, Player player) {
+    private void updateNumericPersistent(FlowContext ctx, String mode, String scope, String name, double amount, Player player) {
         String key = buildPersistentKey(ctx, scope, name, player);
         if (key == null) {
             return;
         }
-        PersistentVariableStore store = PersistentVariableStore.getInstance();
-        Object current = store.get(key);
+        Object current = persistentStore.get(key);
         double base = current instanceof Number ? ((Number) current).doubleValue() : 0.0;
         double result = switch (mode) {
             case "decrement" -> base - amount;
@@ -423,8 +451,8 @@ public class VariableScopeHandler implements NodeHandler {
             case "divide" -> amount == 0 ? base : base / amount;
             default -> base + amount;
         };
+        persistentStore.set(key, result);
         setVariable(ctx, scope, name, result, player);
-        store.set(key, result);
     }
 
     private static String buildPersistentKey(FlowContext ctx, String scope, String name, Player player) {

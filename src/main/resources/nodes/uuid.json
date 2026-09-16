@@ -1,0 +1,125 @@
+[
+  {
+    "id": "uuid_from_string",
+    "displayName": "UUID From String",
+    "description": "Parse a canonical UUID string into a UUID value. Blank or malformed input fails with an Invalid UUID error.",
+    "domain": "core",
+    "family": "uuid",
+    "lifecycle": "active",
+    "handlerCapability": "uuid",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["uuid", "parse", "string"],
+    "legacyIds": ["uuid.from.string"],
+    "handler": "UuidHandler",
+    "handlerConfig": {"operation": "uuid_from_string"},
+    "inputs": [
+      {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Canonical UUID text to parse; blank or malformed text causes an Invalid UUID error."}
+    ],
+    "outputs": [
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "Returns the parsed UUID value when the input is valid."}
+    ]
+  },
+  {
+    "id": "uuid_to_string",
+    "displayName": "UUID To String",
+    "description": "Convert a UUID value into its canonical string form. Missing UUID input fails with a UUID is required error.",
+    "domain": "core",
+    "family": "uuid",
+    "lifecycle": "active",
+    "handlerCapability": "uuid",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["uuid", "format", "string"],
+    "legacyIds": ["uuid.to.string"],
+    "handler": "UuidHandler",
+    "handlerConfig": {"operation": "uuid_to_string"},
+    "inputs": [
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to format; missing input causes a UUID is required error."}
+    ],
+    "outputs": [
+      {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "description": "Returns the UUID in canonical lowercase string form."}
+    ]
+  },
+  {
+    "id": "uuid_generate",
+    "displayName": "Generate UUID",
+    "description": "Generate a new random UUID in canonical string form. UUID generation does not require inputs and fails only if the runtime cannot create a UUID.",
+    "domain": "core",
+    "family": "uuid",
+    "lifecycle": "active",
+    "handlerCapability": "uuid",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["uuid", "generate", "random"],
+    "legacyIds": ["utility.uuid_generate", "uuid.random"],
+    "handler": "UuidHandler",
+    "handlerConfig": {"operation": "uuid_generate"},
+    "inputs": [],
+    "outputs": [
+      {"id": "uuid_string", "displayName": "UUID String", "name": "uuid_string", "pinType": "DATA", "dataType": "string", "description": "Returns a newly generated random UUID in canonical string form."}
+    ]
+  },
+  {
+    "id": "uuid_version",
+    "displayName": "UUID Version",
+    "description": "Read the version number from a UUID. Missing UUID input fails with a UUID is required error.",
+    "domain": "core",
+    "family": "uuid",
+    "lifecycle": "active",
+    "handlerCapability": "uuid",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["uuid", "version", "inspect"],
+    "legacyIds": ["utility.uuid_version"],
+    "handler": "UuidHandler",
+    "handlerConfig": {"operation": "uuid_version"},
+    "inputs": [
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "UUID value to inspect; missing input causes a UUID is required error."}
+    ],
+    "outputs": [
+      {"id": "version", "displayName": "Version", "name": "version", "pinType": "DATA", "dataType": "number", "description": "Returns the UUID version number."}
+    ]
+  },
+  {
+    "id": "uuid_timestamp",
+    "displayName": "UUID Timestamp",
+    "description": "Read the timestamp from a time-based UUID. Missing UUID input fails with a UUID is required error, and non-time-based UUIDs fail because they have no UUID timestamp.",
+    "domain": "core",
+    "family": "uuid",
+    "lifecycle": "active",
+    "handlerCapability": "uuid",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["uuid", "timestamp", "inspect"],
+    "legacyIds": ["utility.uuid_timestamp"],
+    "handler": "UuidHandler",
+    "handlerConfig": {"operation": "uuid_timestamp"},
+    "inputs": [
+      {"id": "uuid_object", "displayName": "UUID", "name": "uuid_object", "pinType": "DATA", "dataType": "uuid", "description": "Time-based UUID to inspect; missing input causes a UUID is required error."}
+    ],
+    "outputs": [
+      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "pinType": "DATA", "dataType": "number", "description": "Returns the UUID timestamp; non-time-based UUIDs fail because they do not provide one."}
+    ]
+  }
+]

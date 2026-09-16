@@ -1,10 +1,12 @@
 package restudio.resync.worldgen.registry;
 
 import restudio.flow.data.FlowDataType;
+import restudio.resync.flow.identity.PinId;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class WorldGenNodeDefinition {
     private final String id;
@@ -69,8 +71,16 @@ public class WorldGenNodeDefinition {
         return inputs.stream().filter(pin -> pin.name().equals(name)).findFirst().orElse(null);
     }
 
+    public PinDefinition input(PinId id) {
+        return inputs.stream().filter(pin -> pin.id().equals(id)).findFirst().orElse(null);
+    }
+
     public PinDefinition output(String name) {
         return outputs.stream().filter(pin -> pin.name().equals(name)).findFirst().orElse(null);
+    }
+
+    public PinDefinition output(PinId id) {
+        return outputs.stream().filter(pin -> pin.id().equals(id)).findFirst().orElse(null);
     }
 
     public static Builder builder(String id, String displayName) {
@@ -99,23 +109,62 @@ public class WorldGenNodeDefinition {
         }
 
         public Builder input(String name, FlowDataType dataType, Object defaultValue, String widgetType) {
-            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null, List.of()));
-            return this;
+            return input(generatedPinId(name, PinDirection.INPUT), name, dataType, defaultValue, widgetType);
         }
 
         public Builder input(String name, FlowDataType dataType, Object defaultValue, String widgetType, List<String> options) {
-            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null, options != null ? options : List.of()));
-            return this;
+            return input(generatedPinId(name, PinDirection.INPUT), name, dataType, defaultValue, widgetType, options);
         }
 
         public Builder input(String name, FlowDataType dataType, Object defaultValue, String widgetType, List<String> options, String description) {
-            inputs.add(new PinDefinition(name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), description, null, options != null ? options : List.of()));
+            return input(generatedPinId(name, PinDirection.INPUT), name, dataType, defaultValue, widgetType, options, description);
+        }
+
+        public Builder input(PinId id, String name, FlowDataType dataType, Object defaultValue, String widgetType) {
+            inputs.add(new PinDefinition(id, name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null, List.of()));
+            return this;
+        }
+
+        public Builder input(PinId id, String name, FlowDataType dataType, Object defaultValue, String widgetType,
+                             List<String> options) {
+            inputs.add(new PinDefinition(id, name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), "", null,
+                options != null ? options : List.of()));
+            return this;
+        }
+
+        public Builder input(PinId id, String name, FlowDataType dataType, Object defaultValue, String widgetType,
+                             List<String> options, String description) {
+            inputs.add(new PinDefinition(id, name, dataType, PinDirection.INPUT, defaultValue, widgetType, Map.of(), description,
+                null, options != null ? options : List.of()));
             return this;
         }
 
         public Builder output(String name, FlowDataType dataType) {
-            outputs.add(new PinDefinition(name, dataType, PinDirection.OUTPUT, null, null, Map.of(), "", null, List.of()));
+            return output(generatedPinId(name, PinDirection.OUTPUT), name, dataType);
+        }
+
+        public Builder output(PinId id, String name, FlowDataType dataType) {
+            outputs.add(new PinDefinition(id, name, dataType, PinDirection.OUTPUT, null, null, Map.of(), "", null, List.of()));
             return this;
+        }
+
+        private PinId generatedPinId(String name, PinDirection direction) {
+            PinId candidate = PinId.of(name);
+            if (!containsPinId(candidate)) {
+                return candidate;
+            }
+            String prefix = direction == PinDirection.OUTPUT ? "output_" : "input_";
+            candidate = PinId.of(prefix + name);
+            int suffix = 2;
+            while (containsPinId(candidate)) {
+                candidate = PinId.of(prefix + name + "_" + suffix++);
+            }
+            return candidate;
+        }
+
+        private boolean containsPinId(PinId id) {
+            return inputs.stream().anyMatch(pin -> pin.id().equals(id))
+                || outputs.stream().anyMatch(pin -> pin.id().equals(id));
         }
 
         public Builder color(int color) {
@@ -191,7 +240,32 @@ public class WorldGenNodeDefinition {
         OUTPUT
     }
 
-    public record PinDefinition(String name, FlowDataType dataType, PinDirection direction, Object defaultValue, String widgetType,
+    public record PinDefinition(PinId id, String name, FlowDataType dataType, PinDirection direction, Object defaultValue, String widgetType,
                                 Map<String, Object> constraints, String description, String visibleWhen, List<String> options) {
+        public PinDefinition(String name, FlowDataType dataType, PinDirection direction, Object defaultValue, String widgetType,
+                             Map<String, Object> constraints, String description, String visibleWhen, List<String> options) {
+            this(PinId.of(name), name, dataType, direction, defaultValue, widgetType, constraints, description, visibleWhen, options);
+        }
+
+        public PinDefinition {
+            id = Objects.requireNonNull(id, "Pin ID is required");
+            name = name != null && !name.isBlank() ? name : id.value();
+        }
+
+        public PinId pinId() {
+            return id;
+        }
+
+        public String displayName() {
+            return name;
+        }
+
+        public PinId getId() {
+            return id;
+        }
+
+        public String getDisplayName() {
+            return name;
+        }
     }
 }

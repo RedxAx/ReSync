@@ -29,6 +29,7 @@ import restudio.resync.modules.FlowModule;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.server.ReSyncServer;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,6 +58,7 @@ public class GuiManager implements Listener {
     private final Map<UUID, String> updateTaskIds = new ConcurrentHashMap<>();
     private final Set<UUID> activeUpdates = ConcurrentHashMap.newKeySet();
     private final Set<UUID> refreshingPlayers = ConcurrentHashMap.newKeySet();
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public GuiManager(ReSyncServer server, FlowStorage storage, FlowExecutor executor, FlowModule flowModule) {
         this.server = server;
@@ -594,16 +596,20 @@ public class GuiManager implements Listener {
     }
 
     private void clearPlayerInventory(Player player) {
-        player.getInventory().setStorageContents(new ItemStack[PLAYER_INVENTORY_SLOTS]);
-        player.updateInventory();
+        playerDataAdmission.mutatePlayer("gui-clear-player-inventory:" + player.getUniqueId(), player, () -> {
+            player.getInventory().setStorageContents(new ItemStack[PLAYER_INVENTORY_SLOTS]);
+            player.updateInventory();
+        });
     }
 
     private void restorePlayerInventory(Player player) {
-        ItemStack[] saved = savedPlayerInventories.remove(player.getUniqueId());
-        if (saved != null) {
-            player.getInventory().setStorageContents(saved);
-            player.updateInventory();
-        }
+        playerDataAdmission.mutatePlayer("gui-restore-player-inventory:" + player.getUniqueId(), player, () -> {
+            ItemStack[] saved = savedPlayerInventories.remove(player.getUniqueId());
+            if (saved != null) {
+                player.getInventory().setStorageContents(saved);
+                player.updateInventory();
+            }
+        });
     }
 
     private ItemStack[] cloneInventory(ItemStack[] contents) {
@@ -625,6 +631,7 @@ public class GuiManager implements Listener {
             return;
         }
         int targetSlot = offset >= 27 ? offset - 27 : offset + 9;
-        player.getInventory().setItem(targetSlot, item);
+        playerDataAdmission.mutatePlayer("gui-set-player-inventory-slot:" + player.getUniqueId(), player,
+            () -> player.getInventory().setItem(targetSlot, item));
     }
 }

@@ -8,10 +8,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TimeHandlerTest {
     @Test
@@ -114,8 +117,8 @@ class TimeHandlerTest {
             "time_zone", "Europe/Berlin"
         ));
 
-        assertEquals(Instant.parse("2026-03-29T12:00:00Z").toEpochMilli(), day.outputs.get("time"));
-        assertEquals(Instant.parse("2026-04-28T11:00:00Z").toEpochMilli(), month.outputs.get("time"));
+        assertEquals(Instant.parse("2026-03-29T12:00:00Z").toEpochMilli(), day.outputs.get("output_time"));
+        assertEquals(Instant.parse("2026-04-28T11:00:00Z").toEpochMilli(), month.outputs.get("output_time"));
     }
 
     @Test
@@ -161,6 +164,69 @@ class TimeHandlerTest {
         assertFalse(String.valueOf(context.outputs.get("error")).isBlank());
     }
 
+    @Test
+    void firstFiveOperationsPublishOnlyDeclaredDataAndNoFlow() {
+        Map<String, Set<String>> expectedOutputs = Map.of(
+            "time_format", Set.of("string", "valid", "error"),
+            "time_parse", Set.of("time", "valid", "error"),
+            "time_add", Set.of("output_time", "valid", "error"),
+            "time_diff", Set.of("diff", "signed_diff", "unit_diff", "valid", "error"),
+            "time_to_ticks", Set.of("ticks", "valid", "error"));
+        Map<String, Map<String, Object>> inputs = Map.of(
+            "time_format", Map.of("time", 0L),
+            "time_parse", Map.of("string", "1970-01-01 00:00:00"),
+            "time_add", Map.of("time", 0L),
+            "time_diff", Map.of("time1", 0L, "time2", 1L),
+            "time_to_ticks", Map.of("seconds", 1L));
+
+        for (Map.Entry<String, Set<String>> entry : expectedOutputs.entrySet()) {
+            TestFlowContext context = execute(entry.getKey(), inputs.get(entry.getKey()));
+
+            assertEquals(entry.getValue(), context.outputs.keySet(), entry.getKey());
+            assertTrue(context.triggeredOutputs.isEmpty(), entry.getKey() + " should not trigger flow");
+        }
+    }
+
+    @Test
+    void timeAddUsesCanonicalOutputAndRejectsInvalidAmounts() {
+        TestFlowContext success = execute("time_add", Map.of("time", 1000L, "amount", 2.0, "unit", "seconds"));
+        TestFlowContext fractional = execute("time_add", Map.of("time", 1000L, "amount", 0.5, "unit", "seconds"));
+        TestFlowContext nonFinite = execute("time_add", Map.of("time", 1000L, "amount", Double.NaN, "unit", "seconds"));
+        TestFlowContext overflow = execute("time_add", Map.of("time", 1000L, "amount", Long.MAX_VALUE, "unit", "ticks"));
+
+        assertEquals(3000L, success.outputs.get("output_time"));
+        assertFalse(success.outputs.containsKey("time"));
+        assertEquals(false, fractional.outputs.get("valid"));
+        assertEquals(1000L, fractional.outputs.get("output_time"));
+        assertFalse(String.valueOf(fractional.outputs.get("error")).isBlank());
+        assertEquals(false, nonFinite.outputs.get("valid"));
+        assertEquals(1000L, nonFinite.outputs.get("output_time"));
+        assertFalse(String.valueOf(nonFinite.outputs.get("error")).isBlank());
+        assertEquals(false, overflow.outputs.get("valid"));
+        assertEquals(1000L, overflow.outputs.get("output_time"));
+        assertEquals("long overflow", overflow.outputs.get("error"));
+    }
+
+    @Test
+    void timeToTicksAcceptsFiniteSecondsOnlyWhenTheResultIsWholeAndInRange() {
+        TestFlowContext success = execute("time_to_ticks", Map.of("seconds", 0.05));
+        TestFlowContext fractional = execute("time_to_ticks", Map.of("seconds", 0.01));
+        TestFlowContext nonFinite = execute("time_to_ticks", Map.of("seconds", Double.POSITIVE_INFINITY));
+        TestFlowContext overflow = execute("time_to_ticks", Map.of("seconds", Long.MAX_VALUE));
+
+        assertEquals(1L, success.outputs.get("ticks"));
+        assertEquals(true, success.outputs.get("valid"));
+        assertEquals(false, fractional.outputs.get("valid"));
+        assertEquals(Long.MAX_VALUE, fractional.outputs.get("ticks"));
+        assertFalse(String.valueOf(fractional.outputs.get("error")).isBlank());
+        assertEquals(false, nonFinite.outputs.get("valid"));
+        assertEquals(Long.MAX_VALUE, nonFinite.outputs.get("ticks"));
+        assertFalse(String.valueOf(nonFinite.outputs.get("error")).isBlank());
+        assertEquals(false, overflow.outputs.get("valid"));
+        assertEquals(Long.MAX_VALUE, overflow.outputs.get("ticks"));
+        assertEquals("long overflow", overflow.outputs.get("error"));
+    }
+
     private TestFlowContext execute(String operation, Map<String, Object> inputs) {
         TimeHandler handler = new TimeHandler(Clock.fixed(Instant.ofEpochMilli(123456789L), ZoneOffset.UTC));
         FlowNode node = new FlowNode("time.test", 0, 0, Map.of());
@@ -175,6 +241,7 @@ class TimeHandlerTest {
     private static class TestFlowContext extends FlowContext {
         private final Map<String, Object> inputs;
         private final Map<String, Object> outputs = new HashMap<>();
+        private final Set<String> triggeredOutputs = new HashSet<>();
 
         private TestFlowContext(Map<String, Object> inputs) {
             super(null, null, null);
@@ -194,6 +261,7 @@ class TimeHandlerTest {
 
         @Override
         public void triggerOutput(String pinName) {
+            triggeredOutputs.add(pinName);
         }
     }
 }

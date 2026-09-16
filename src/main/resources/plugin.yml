@@ -18,8 +18,16 @@ permissions:
   resync.command:
     description: Allows use of /resync command
     default: op
+  resync.authority.export:
+    description: Allows exporting the production authority bundle
+    default: false
+  resync.authority.anchor:
+    description: Allows exporting the production authority trust anchor
+    default: false
+  resync.authority.grant:
+    description: Allows issuing signed authority use grants
+    default: false
 commands:
   resync:
     description: Manage ReSync systems
-    usage: /resync <status|network|scoreboard|tab|world|portal|flow|item|resource|npc|trade> ...
-    permission: resync.command
+    usage: /resync <status|network|authority|scoreboard|tab|world|portal|flow|item|resource|npc|trade> ...

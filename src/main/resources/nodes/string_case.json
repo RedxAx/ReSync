@@ -1,0 +1,177 @@
+[
+  {
+    "id": "string_slugify",
+    "displayName": "Slugify",
+    "description": "Convert text to a lowercase URL slug. Missing or null text uses empty text; only ASCII letters, digits, whitespace, and hyphens remain, whitespace becomes hyphens, and repeated hyphens collapse. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "slug", "text"],
+    "legacyIds": ["string.slugify"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "slugify"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "slug", "displayName": "Slug", "name": "slug", "pinType": "DATA", "dataType": "string", "description": "Returns the lowercase slug with punctuation removed, whitespace and repeated hyphens normalized, and leading or trailing hyphens removed; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_camel_case",
+    "displayName": "Camel Case",
+    "description": "Convert text to lower camel case. Missing or null text uses empty text; punctuation becomes word separators, the first word is lowercase, and later words start uppercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "camel"],
+    "legacyIds": ["string.camel_case"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "camel_case"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "camel_case", "displayName": "Camel Case", "name": "camel_case", "pinType": "DATA", "dataType": "string", "description": "Returns lower camel case with punctuation treated as word separators and no separators between words; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_pascal_case",
+    "displayName": "Pascal Case",
+    "description": "Convert text to Pascal case. Missing or null text uses empty text; punctuation becomes word separators, and every word starts uppercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "pascal"],
+    "legacyIds": ["string.pascal_case"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "pascal_case"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "pascal_case", "displayName": "Pascal Case", "name": "pascal_case", "pinType": "DATA", "dataType": "string", "description": "Returns Pascal case with punctuation treated as word separators and no separators between words; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_snake_case",
+    "displayName": "Snake Case",
+    "description": "Convert text to snake case. Missing or null text uses empty text; punctuation and camel-case boundaries become separators, separator runs become one underscore, and output is lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "snake"],
+    "legacyIds": ["string.snake_case"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "snake_case"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "snake_case", "displayName": "Snake Case", "name": "snake_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by underscores, with punctuation and camel-case boundaries treated as separators; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_kebab_case",
+    "displayName": "Kebab Case",
+    "description": "Convert text to kebab case. Missing or null text uses empty text; punctuation and camel-case boundaries become separators, separator runs become one hyphen, and output is lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "kebab"],
+    "legacyIds": ["string.kebab_case"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "kebab_case"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to convert. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "kebab_case", "displayName": "Kebab Case", "name": "kebab_case", "pinType": "DATA", "dataType": "string", "description": "Returns lowercase words joined by hyphens, with punctuation and camel-case boundaries treated as separators; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_template",
+    "displayName": "Template",
+    "description": "Return template text unchanged. Missing or null template uses empty text. This operation currently does not interpolate variables or placeholders. Input or result values longer than 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "template", "text"],
+    "legacyIds": ["string.template"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "template"},
+    "inputs": [
+      {"id": "template", "displayName": "Template", "name": "template", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Template text to return. Missing or null input uses empty text; placeholders are not interpolated; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the template input unchanged without variable interpolation; results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_capitalize",
+    "displayName": "Capitalize",
+    "description": "Capitalize whitespace-delimited words. Missing/null value uses empty text; whitespace runs collapse to single spaces and edges trim, each word starts uppercase, and remaining characters are lowercase. locale-independent. Inputs/results over 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "capitalize"],
+    "legacyIds": ["string.capitalize"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "capitalize"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to capitalize. Missing or null input uses empty text; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns words joined by single spaces with each word's first character uppercase and remaining characters lowercase; results longer than 65536 characters fail before output."}
+    ]
+  }
+]

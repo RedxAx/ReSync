@@ -49,11 +49,11 @@ public final class TimerHandler implements NodeHandler {
             default -> tasks.check(key);
         };
         Map<String, Object> value = snapshot.value();
-        context.setOutput(node, "timer", definitions.reference(definition));
+        context.setOutput(node, "output_timer", definitions.reference(definition));
         context.setOutput(node, "state", value.get("state"));
         context.setOutput(node, "remaining", value.get("remaining"));
         context.setOutput(node, "elapsed", value.get("elapsed"));
-        context.setOutput(node, "duration", value.get("duration"));
+        context.setOutput(node, "output_duration", value.get("duration"));
         context.setOutput(node, "progress", value.get("progress"));
         context.setOutput(node, "progress_percent", value.get("progressPercent"));
         context.triggerOutput(switch (snapshot.state()) {

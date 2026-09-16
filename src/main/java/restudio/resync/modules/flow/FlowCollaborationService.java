@@ -1,19 +1,23 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import restudio.resync.core.CollaborationIdentity;
 import restudio.resync.core.Session;
+import restudio.resync.flow.protocol.ResourceActivationState;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class FlowCollaborationService implements FlowResourceCommitListener {
+    private static final Gson CORE_MUTATION_GSON = new GsonBuilder().serializeNulls().create();
     private static final int[] COLORS = {
         0xFFE85D75, 0xFF4D96FF, 0xFF6BCB77, 0xFFFFB84C, 0xFF9D4EDD, 0xFF00B4D8, 0xFFF28482, 0xFF43AA8B
     };
@@ -106,6 +110,33 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
         }
     }
 
+    public void publishCoreMutation(CoreResourceMutationTransition transition) {
+        String json = coreResourcePayload(transition);
+        for (Session session : sessions) {
+            if (!supports(session, "resource_events")) {
+                continue;
+            }
+            if (transition.deleted()) {
+                sender.sendResourceDeleted(session, json);
+            } else {
+                sender.sendResourceChanged(session, json);
+            }
+        }
+    }
+
+    static CoreResourceEvent coreResourceEvent(CoreResourceMutationTransition transition) {
+        CoreResourceMutationTransition mutation = Objects.requireNonNull(
+            transition, "Core resource mutation transition is required");
+        return new CoreResourceEvent(mutation.locator().resourceType().value(), mutation.locator().id(),
+            mutation.revision(), mutation.mutationId().toString(), mutation.deleted(),
+            mutation.activationState(), mutation.canonicalEnvelope(),
+            mutation.author(), System.currentTimeMillis());
+    }
+
+    static String coreResourcePayload(CoreResourceMutationTransition transition) {
+        return CORE_MUTATION_GSON.toJson(coreResourceEvent(transition));
+    }
+
     @Override
     public void saved(String type, String resourceId, String payload) {
         publishResource(actor.get(), false, type, resourceId, payload);
@@ -141,13 +172,35 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
         List<Presence> snapshot = List.copyOf(collaborators);
         for (Session session : sessions) {
             if (supports(session, "collaboration_presence")) {
-                List<String> selfSessionIds = List.of(session.getSessionId());
+                String linkedClientId = linkedClientId(session.getClientId(), session.getCollaborationIdentity());
+                List<String> selfSessionIds = snapshot.stream()
+                    .filter(value -> linkedClientId.equals(linkedClientId(value.clientId(), value.identity())))
+                    .map(Presence::sessionId)
+                    .toList();
                 List<Presence> remote = snapshot.stream()
-                    .filter(value -> !value.sessionId().equals(session.getSessionId()))
+                    .filter(value -> !selfSessionIds.contains(value.sessionId()))
                     .toList();
                 sender.sendPresenceSnapshot(session, gson.toJson(new Snapshot(session.getSessionId(), session.getCollaborationIdentity(), selfSessionIds, remote)));
             }
         }
+    }
+
+    private String linkedClientId(String clientId, CollaborationIdentity identity) {
+        String value = clientId != null ? clientId.trim() : "";
+        if (identity == null || !"minecraft".equals(identity.source()) || !value.startsWith("bridge:")) {
+            return value;
+        }
+        int separator = value.indexOf(':', "bridge:".length());
+        if (separator < 0) {
+            return value;
+        }
+        try {
+            UUID.fromString(value.substring("bridge:".length(), separator));
+        } catch (IllegalArgumentException exception) {
+            return value;
+        }
+        String directClientId = value.substring(separator + 1);
+        return directClientId.isBlank() ? value : directClientId;
     }
 
     private void publishResource(Session source, boolean deleted, String type, String resourceId, String payload) {
@@ -204,5 +257,9 @@ public final class FlowCollaborationService implements FlowResourceCommitListene
 
     private record ResourceEvent(String type, String resourceId, String payload, String authorSessionId,
                                  CollaborationIdentity author, long changedAt) {
+    }
+
+    record CoreResourceEvent(String type, String resourceId, long revision, String mutationId, boolean deleted,
+                             ResourceActivationState activationState, String canonicalEnvelope, String author, long changedAt) {
     }
 }

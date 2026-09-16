@@ -26,6 +26,10 @@ public interface RuntimeDataAdapter<T> {
         return id();
     }
 
+    default OptionCatalogProvider categoryCatalog() {
+        return null;
+    }
+
     List<RuntimeDataRecord> records(RuntimeDataQuery query);
 
     T resolve(RuntimeDataRecord record, int amount);

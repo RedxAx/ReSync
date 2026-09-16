@@ -1,0 +1,614 @@
+[
+  {
+    "id": "math_clamp",
+    "displayName": "Clamp",
+    "description": "Limits a number to the inclusive range from min to max. Values below min become min, values above max become max, and when min is greater than max the handler returns min. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "range", "clamp"],
+    "legacyIds": ["math.clamp"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "clamp"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number to limit to the inclusive range. Non-finite numeric inputs fail before a result is published."},
+      {"id": "min", "displayName": "Min", "name": "min", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Inclusive lower bound for the result. Non-finite numeric inputs fail before a result is published."},
+      {"id": "max", "displayName": "Max", "name": "max", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Inclusive upper bound for the result. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "clamped", "displayName": "Clamped", "name": "clamped", "pinType": "DATA", "dataType": "number", "description": "Returns the value limited to the inclusive min-to-max range."}
+    ]
+  },
+  {
+    "id": "math_lerp",
+    "displayName": "Lerp",
+    "description": "Interpolates between A and B using T, clamped to the inclusive range from 0 to 1. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "interpolation", "lerp"],
+    "legacyIds": ["math.lerp"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "lerp"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Starting number for the interpolation. Non-finite numeric inputs fail before a result is published."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Ending number for the interpolation. Non-finite numeric inputs fail before a result is published."},
+      {"id": "t", "displayName": "T", "name": "t", "pinType": "DATA", "dataType": "number", "defaultValue": 0.5, "description": "Interpolation amount, clamped to the inclusive range from 0 to 1. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the interpolated number between A and B."}
+    ]
+  },
+  {
+    "id": "math_round",
+    "displayName": "Round",
+    "description": "Rounds a number to the requested number of decimal places. Decimal places are clamped to [-15, 15] before rounding. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "rounding"],
+    "legacyIds": ["math.round"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "round"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number to round. Non-finite numeric inputs fail before a result is published."},
+      {"id": "decimal_places", "displayName": "Decimal Places", "name": "decimal_places", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number of decimal places to retain. Decimal places are clamped to [-15, 15] before rounding. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "rounded", "displayName": "Rounded", "name": "rounded", "pinType": "DATA", "dataType": "number", "description": "Returns the rounded number."}
+    ]
+  },
+  {
+    "id": "math_asin",
+    "displayName": "Arc Sin",
+    "description": "Returns the arcsine of a number as an angle in degrees. Values outside -1 to 1 are clamped before calculation. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "arcsine", "degrees", "radians"],
+    "legacyIds": ["math.asin"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "asin"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose arcsine should be returned. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "description": "Returns the arcsine angle measured in degrees."}
+    ]
+  },
+  {
+    "id": "math_acos",
+    "displayName": "Arc Cos",
+    "description": "Returns the arccosine of a number as an angle in degrees. Values outside -1 to 1 are clamped before calculation. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "arccosine", "degrees", "radians"],
+    "legacyIds": ["math.acos"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "acos"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose arccosine should be returned. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "description": "Returns the arccosine angle measured in degrees."}
+    ]
+  },
+  {
+    "id": "math_atan2",
+    "displayName": "Arc Tan2",
+    "description": "Returns the angle in degrees from the X axis to the point defined by X and Y, preserving the signs of both coordinates. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "arctangent", "degrees", "radians"],
+    "legacyIds": ["math.atan2"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "atan2"},
+    "inputs": [
+      {"id": "y", "displayName": "Y", "name": "y", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Vertical coordinate of the point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "x", "displayName": "X", "name": "x", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Horizontal coordinate of the point. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "description": "Returns the angle measured in degrees from the X axis."}
+    ]
+  },
+  {
+    "id": "math_distance",
+    "displayName": "Distance",
+    "description": "Calculates the three-dimensional Euclidean distance between two points. Non-finite numeric inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "geometry", "distance"],
+    "legacyIds": ["math.distance"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "distance"},
+    "inputs": [
+      {"id": "x1", "displayName": "X1", "name": "x1", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Horizontal coordinate of the first point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "y1", "displayName": "Y1", "name": "y1", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Vertical coordinate of the first point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "z1", "displayName": "Z1", "name": "z1", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Depth coordinate of the first point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "x2", "displayName": "X2", "name": "x2", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Horizontal coordinate of the second point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "y2", "displayName": "Y2", "name": "y2", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Vertical coordinate of the second point. Non-finite numeric inputs fail before a result is published."},
+      {"id": "z2", "displayName": "Z2", "name": "z2", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Depth coordinate of the second point. Non-finite numeric inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the Euclidean distance between the two points."}
+    ]
+  },
+  {
+    "id": "math_random_range",
+    "displayName": "Random Range",
+    "description": "Generates a random number from min through max. The lower bound is inclusive, the upper bound is exclusive, and the defaults are 0 and 1.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "number", "random", "range"],
+    "legacyIds": ["math.random_range", "random.range"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "random_range"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "min", "target": "min"},
+        {"direction": "input", "source": "max", "target": "max"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "min", "displayName": "Min", "name": "min", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Inclusive lower bound for the generated number."},
+      {"id": "max", "displayName": "Max", "name": "max", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Exclusive upper bound for the generated number."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns a random number between the configured bounds."}
+    ]
+  },
+  {
+    "id": "math_vector_min",
+    "displayName": "Vector Minimum",
+    "description": "Returns a vector containing the smaller component from each matching pair of input components.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "range", "minimum"],
+    "legacyIds": ["math.vector_min"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_min"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector to compare."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector to compare."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise minimum of the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_max",
+    "displayName": "Vector Maximum",
+    "description": "Returns a vector containing the larger component from each matching pair of input components.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "range", "maximum"],
+    "legacyIds": ["math.vector_max"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_max"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector to compare."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector to compare."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise maximum of the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_floor",
+    "displayName": "Vector Floor",
+    "description": "Rounds each vector component down to the nearest whole number.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "range", "floor"],
+    "legacyIds": ["math.vector_floor"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_floor"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose components should be rounded down."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector with each component floored."}
+    ]
+  },
+  {
+    "id": "math_vector_ceil",
+    "displayName": "Vector Ceil",
+    "description": "Rounds each vector component up to the nearest whole number.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "range", "ceil"],
+    "legacyIds": ["math.vector_ceil"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_ceil"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose components should be rounded up."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector with each component ceiled."}
+    ]
+  },
+  {
+    "id": "math_vector_round",
+    "displayName": "Vector Round",
+    "description": "Rounds each vector component to the nearest whole number.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "range", "round"],
+    "legacyIds": ["math.vector_round"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_round"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose components should be rounded."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector with each component rounded."}
+    ]
+  },
+  {
+    "id": "math_vector_distance",
+    "displayName": "Vector Distance",
+    "description": "Returns the Euclidean distance between two vectors.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "distance", "range"],
+    "legacyIds": ["math.vector_distance"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_distance"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "distance", "target": "distance"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector in the distance calculation."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector in the distance calculation."}
+    ],
+    "outputs": [
+      {"id": "distance", "displayName": "Distance", "name": "distance", "pinType": "DATA", "dataType": "number", "description": "Returns the straight-line distance between the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_angle_between",
+    "displayName": "Vector Angle Between",
+    "description": "Returns the angle between two vectors in degrees. The normalized dot product is clamped to the valid inverse-cosine range.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "angle", "range"],
+    "legacyIds": ["math.vector_angle_between"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_angle_between"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "angle", "target": "angle"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector used to calculate the angle."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector used to calculate the angle."}
+    ],
+    "outputs": [
+      {"id": "angle", "displayName": "Angle", "name": "angle", "pinType": "DATA", "dataType": "number", "description": "Returns the angle between the vectors in degrees."}
+    ]
+  },
+  {
+    "id": "math_vector_midpoint",
+    "displayName": "Vector Midpoint",
+    "description": "Returns the point halfway between two vectors.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "midpoint", "range"],
+    "legacyIds": ["math.vector_midpoint"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_midpoint"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "midpoint_vector", "target": "midpoint_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First endpoint of the segment."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second endpoint of the segment."}
+    ],
+    "outputs": [
+      {"id": "midpoint_vector", "displayName": "Midpoint Vector", "name": "midpoint_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the midpoint between the two inputs."}
+    ]
+  },
+  {
+    "id": "math_vector_rotate_x",
+    "displayName": "Vector Rotate X",
+    "description": "Rotates a vector around the x axis by the supplied number of degrees.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "rotation", "x"],
+    "legacyIds": ["math.vector_rotate_x"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_rotate_x"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "degrees", "target": "degrees"},
+        {"direction": "output", "source": "rotated_vector", "target": "rotated_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to rotate around the x axis."},
+      {"id": "degrees", "displayName": "Degrees", "name": "degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Rotation angle in degrees."}
+    ],
+    "outputs": [
+      {"id": "rotated_vector", "displayName": "Rotated Vector", "name": "rotated_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector rotated around the x axis."}
+    ]
+  },
+  {
+    "id": "math_vector_rotate_y",
+    "displayName": "Vector Rotate Y",
+    "description": "Rotates a vector around the y axis by the supplied number of degrees.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "rotation", "y"],
+    "legacyIds": ["math.vector_rotate_y"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_rotate_y"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "degrees", "target": "degrees"},
+        {"direction": "output", "source": "rotated_vector", "target": "rotated_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to rotate around the y axis."},
+      {"id": "degrees", "displayName": "Degrees", "name": "degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Rotation angle in degrees."}
+    ],
+    "outputs": [
+      {"id": "rotated_vector", "displayName": "Rotated Vector", "name": "rotated_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector rotated around the y axis."}
+    ]
+  },
+  {
+    "id": "math_vector_rotate_z",
+    "displayName": "Vector Rotate Z",
+    "description": "Rotates a vector around the z axis by the supplied number of degrees.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "rotation", "z"],
+    "legacyIds": ["math.vector_rotate_z"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_rotate_z"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "degrees", "target": "degrees"},
+        {"direction": "output", "source": "rotated_vector", "target": "rotated_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to rotate around the z axis."},
+      {"id": "degrees", "displayName": "Degrees", "name": "degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Rotation angle in degrees."}
+    ],
+    "outputs": [
+      {"id": "rotated_vector", "displayName": "Rotated Vector", "name": "rotated_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector rotated around the z axis."}
+    ]
+  }
+]

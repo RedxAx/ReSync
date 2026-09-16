@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,29 @@ class AutomationTaskServiceTest {
         restored.restorePersistentTimers(ignored -> definition);
 
         assertEquals(AutomationTaskService.State.INACTIVE, restored.check(key).state());
+        restored.shutdown();
+    }
+
+    @Test
+    void failedTimerRestorationRemainsDurableForRetry() {
+        Path file = temporaryDirectory.resolve("automation-retry.json");
+        TimerDefinition definition = timer("retry", true);
+        AutomationOwner owner = new AutomationOwner("server", null);
+        AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
+        AutomationTaskService first = service(Instant.parse("2026-07-28T12:00:00Z"), file);
+        first.startTimer(definition, owner, 60_000L, 0L);
+        first.shutdown();
+
+        AutomationTaskService failed = service(Instant.parse("2026-07-28T12:00:01Z"), file);
+        failed.restorePersistentTimers(ignored -> {
+            throw new IllegalStateException("definitions are not ready");
+        });
+        assertEquals(AutomationTaskService.State.INACTIVE, failed.check(key).state());
+        failed.shutdown();
+
+        AutomationTaskService restored = service(Instant.parse("2026-07-28T12:00:02Z"), file);
+        restored.restorePersistentTimers(ignored -> definition);
+        assertEquals(AutomationTaskService.State.ACTIVE, restored.check(key).state());
         restored.shutdown();
     }
 
@@ -190,6 +214,28 @@ class AutomationTaskServiceTest {
         assertEquals(2, scheduler.schedules.get());
         assertEquals(1_000L, scheduler.requestedDelay);
         assertThrows(IllegalStateException.class, service::shutdown);
+    }
+
+    @Test
+    void inFlightScheduleCompletionCannotMutateAfterQuiesce() throws Exception {
+        Path file = temporaryDirectory.resolve("automation-quiesce.json");
+        CountingScheduler scheduler = new CountingScheduler();
+        AutomationTaskService service = new AutomationTaskService(null, null,
+            Clock.fixed(Instant.parse("2026-07-28T12:00:00Z"), ZoneOffset.UTC), scheduler, new AutomationTaskStore(file));
+        ScheduleDefinition definition = schedule("quiesced-completion");
+        AutomationOwner owner = new AutomationOwner("server", null);
+        CompletableFuture<Object> invocation = new CompletableFuture<>();
+
+        service.startSchedule(new AutomationTaskService.ScheduleRequest(definition, owner, 0L, 0L, null,
+            () -> invocation, Map.of(), 1));
+        scheduler.command.run();
+        service.quiescePersistence();
+
+        invocation.complete("late");
+
+        service.healthCheckPersistence();
+        assertNull(service.snapshots().getFirst().lastResult());
+        service.shutdown();
     }
 
     private AutomationTaskService service(Instant instant, Path file) {

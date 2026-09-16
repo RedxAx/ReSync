@@ -6,6 +6,7 @@ import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenStage;
 import restudio.resync.worldgen.registry.WorldGenNodeDefinition;
 import restudio.resync.worldgen.registry.WorldGenNodeRegistry;
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -20,12 +21,21 @@ final class PipelineValidator {
     }
 
     static void validateTerrainStage(WorldGenGraph graph) {
-        validateStage(graph, WorldGenStage.TERRAIN, Set.of(), false);
-        boolean hasTerrainOutput = graph.getNodes().values().stream().anyMatch(node -> "output_height".equals(node.getType()) || "output_density".equals(node.getType()));
+        validateTerrainStage(graph, false);
+    }
+
+    static void validateTerrainStage(WorldGenGraph graph, boolean legacyCompatibility) {
+        validateStage(graph, WorldGenStage.TERRAIN, Set.of(), false, legacyCompatibility);
+        boolean hasTerrainOutput = graph.getNodes().values().stream().anyMatch(node -> "output_height".equals(localType(node, legacyCompatibility)) || "output_density".equals(localType(node, legacyCompatibility)));
         if (!hasTerrainOutput) throw new CompilationException("TERRAIN Output Missing");
     }
 
     static void validateStage(WorldGenGraph graph, WorldGenStage stage, Set<String> requiredOutputs, boolean allowEmpty) {
+        validateStage(graph, stage, requiredOutputs, allowEmpty, false);
+    }
+
+    static void validateStage(WorldGenGraph graph, WorldGenStage stage, Set<String> requiredOutputs, boolean allowEmpty,
+                              boolean legacyCompatibility) {
         if (graph == null) {
             if (allowEmpty) return;
             throw new CompilationException(stage.name() + " Graph Missing");
@@ -35,13 +45,13 @@ final class PipelineValidator {
         }
         WorldGenNodeRegistry registry = WorldGenNodeRegistry.getInstance();
         graph.rebuildIndices();
-        validateDefinitions(graph, registry);
+        validateDefinitions(graph, registry, legacyCompatibility);
         validateDag(graph);
-        validateTypes(graph, registry);
+        validateTypes(graph, registry, legacyCompatibility);
         validateSingleInputConnections(graph);
-        validateSingleOutputs(graph, stage);
+        validateSingleOutputs(graph, stage, legacyCompatibility);
         for (String requiredOutput : requiredOutputs) {
-            boolean found = graph.getNodes().values().stream().anyMatch(node -> requiredOutput.equals(node.getType()));
+            boolean found = graph.getNodes().values().stream().anyMatch(node -> requiredOutput.equals(localType(node, legacyCompatibility)));
             if (!found) throw new CompilationException(stage.name() + " Output Missing");
         }
     }
@@ -71,12 +81,16 @@ final class PipelineValidator {
     }
 
     static void validateTypes(WorldGenGraph graph, WorldGenNodeRegistry registry) {
+        validateTypes(graph, registry, false);
+    }
+
+    static void validateTypes(WorldGenGraph graph, WorldGenNodeRegistry registry, boolean legacyCompatibility) {
         for (WorldGenConnection connection : graph.getConnections()) {
             WorldGenNode sourceNode = graph.getNodes().get(connection.getSourceNodeId());
             WorldGenNode targetNode = graph.getNodes().get(connection.getTargetNodeId());
             if (sourceNode == null || targetNode == null) throw new CompilationException("Connection Node Missing");
-            WorldGenNodeDefinition sourceDefinition = registry.getDefinition(sourceNode.getType());
-            WorldGenNodeDefinition targetDefinition = registry.getDefinition(targetNode.getType());
+            WorldGenNodeDefinition sourceDefinition = registry.getDefinitionByLocalId(localType(sourceNode, legacyCompatibility));
+            WorldGenNodeDefinition targetDefinition = registry.getDefinitionByLocalId(localType(targetNode, legacyCompatibility));
             if (sourceDefinition == null || targetDefinition == null) throw new CompilationException("Node Definition Missing");
             WorldGenNodeDefinition.PinDefinition sourcePin = sourceDefinition.output(connection.getSourcePin());
             WorldGenNodeDefinition.PinDefinition targetPin = targetDefinition.input(connection.getTargetPin());
@@ -85,10 +99,10 @@ final class PipelineValidator {
         }
     }
 
-    private static void validateDefinitions(WorldGenGraph graph, WorldGenNodeRegistry registry) {
+    private static void validateDefinitions(WorldGenGraph graph, WorldGenNodeRegistry registry, boolean legacyCompatibility) {
         for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
             WorldGenNode node = entry.getValue();
-            if (node == null || registry.getDefinition(node.getType()) == null) throw new CompilationException("Unsupported Node " + (node == null ? entry.getKey() : node.getType()));
+            if (node == null || registry.getDefinitionByLocalId(localType(node, legacyCompatibility)) == null) throw new CompilationException("Unsupported Node " + (node == null ? entry.getKey() : node.getType()));
         }
     }
 
@@ -100,7 +114,7 @@ final class PipelineValidator {
         }
     }
 
-    private static void validateSingleOutputs(WorldGenGraph graph, WorldGenStage stage) {
+    private static void validateSingleOutputs(WorldGenGraph graph, WorldGenStage stage, boolean legacyCompatibility) {
         Set<String> outputTypes = switch (stage) {
             case TERRAIN -> Set.of("output_height", "output_density", "output_continentalness", "output_erosion", "output_weirdness", "output_depth", "output_temperature", "output_humidity");
             case BIOME -> Set.of("output_biome");
@@ -112,10 +126,22 @@ final class PipelineValidator {
         };
         Map<String, Integer> counts = new HashMap<>();
         for (WorldGenNode node : graph.getNodes().values()) {
-            if (node != null && outputTypes.contains(node.getType())) {
-                int count = counts.compute(node.getType(), (key, value) -> value == null ? 1 : value + 1);
-                if (count > 1) throw new CompilationException(stage.name() + " Duplicate Output " + node.getType());
+            String type = node == null ? "" : localType(node, legacyCompatibility);
+            if (node != null && outputTypes.contains(type)) {
+                int count = counts.compute(type, (key, value) -> value == null ? 1 : value + 1);
+                if (count > 1) throw new CompilationException(stage.name() + " Duplicate Output " + type);
             }
+        }
+    }
+
+    private static String localType(WorldGenNode node, boolean legacyCompatibility) {
+        if (node == null) {
+            return "";
+        }
+        try {
+            return WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility);
+        } catch (RuntimeException exception) {
+            throw new CompilationException(exception.getMessage());
         }
     }
 }

@@ -12,7 +12,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
-import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.core.Session;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.CustomEventManager;
@@ -20,6 +19,7 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.player.PlayerSessionLinkService;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
@@ -44,6 +44,7 @@ public class DialogService {
     private final FlowExecutor flowExecutor;
     private final EditTargetStateSender editTargetStateSender;
     private final PlayerSessionLinkService sessionLinkService;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private final Map<UUID, String> activeDialogs = new ConcurrentHashMap<>();
     private final DialogApi api;
     private String lastError = "";
@@ -54,12 +55,19 @@ public class DialogService {
 
     public DialogService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, FlowStorage flowStorage, FlowExecutor flowExecutor,
                          EditTargetStateSender editTargetStateSender, PlayerSessionLinkService sessionLinkService) {
+        this(plugin, storage, flowStorage, flowExecutor, editTargetStateSender, sessionLinkService, null);
+    }
+
+    public DialogService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, FlowStorage flowStorage, FlowExecutor flowExecutor,
+                         EditTargetStateSender editTargetStateSender, PlayerSessionLinkService sessionLinkService,
+                         LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.plugin = plugin;
         this.storage = storage;
         this.flowStorage = flowStorage;
         this.flowExecutor = flowExecutor;
         this.editTargetStateSender = editTargetStateSender;
         this.sessionLinkService = sessionLinkService;
+        this.legacyRuntimeGate = legacyRuntimeGate;
         this.api = DialogApi.load();
     }
 
@@ -101,7 +109,7 @@ public class DialogService {
     }
 
     private Object buildDialog(Player player, String dialogId, JsonObject dialog) throws ReflectiveOperationException {
-        ReSyncProtocolContract.DialogResource resource = ReSyncProtocolContract.dialogResource(dialog, dialogId);
+        DialogResource resource = new DialogResource(dialog, dialogId);
         Object base = api.dialogBaseCreate.invoke(null,
             Component.text(resource.title()),
             externalTitle(resource),
@@ -142,7 +150,7 @@ public class DialogService {
         }
     }
 
-    private Component externalTitle(ReSyncProtocolContract.DialogResource resource) {
+    private Component externalTitle(DialogResource resource) {
         String title = resource.externalTitle();
         return title.isBlank() ? null : Component.text(title);
     }
@@ -156,11 +164,11 @@ public class DialogService {
         return Enum.valueOf(api.afterActionClass.asSubclass(Enum.class), name);
     }
 
-    private boolean pause(ReSyncProtocolContract.DialogResource resource) {
+    private boolean pause(DialogResource resource) {
         return !"none".equalsIgnoreCase(resource.afterAction()) && resource.pause();
     }
 
-    private List<Object> body(ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
+    private List<Object> body(DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
         for (JsonObject block : resource.body()) {
             String type = text(block, "type", "minecraft:plain_message");
@@ -199,7 +207,7 @@ public class DialogService {
         return api.dialogBodyPlain.invoke(null, Component.text(text == null ? "" : text), Math.clamp(width, 1, 1024));
     }
 
-    private List<Object> inputs(ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
+    private List<Object> inputs(DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
         for (JsonObject input : resource.inputs()) {
             String type = text(input, "type", "minecraft:text");
@@ -249,7 +257,7 @@ public class DialogService {
         return api.multilineCreate.invoke(null, maxLines, height);
     }
 
-    private Object dialogType(Player player, String dialogId, ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
+    private Object dialogType(Player player, String dialogId, DialogResource resource) throws ReflectiveOperationException {
         List<Object> actions = actions(player, dialogId, resource);
         String type = resource.type();
         if ("minecraft:notice".equals(type)) {
@@ -270,7 +278,7 @@ public class DialogService {
         return actionButton(player, dialogId, dialog, action, index);
     }
 
-    private List<Object> actions(Player player, String dialogId, ReSyncProtocolContract.DialogResource resource) throws ReflectiveOperationException {
+    private List<Object> actions(Player player, String dialogId, DialogResource resource) throws ReflectiveOperationException {
         List<Object> values = new ArrayList<>();
         JsonObject dialog = resource.json();
         List<JsonObject> configured = resource.actions();
@@ -371,7 +379,13 @@ public class DialogService {
         }
         String mode = text(resync, "actionMode", text(action, "actionMode", ""));
         switch (mode) {
-            case "Run Flow" -> runFlow(text(resync, "flowId", ""), player, vars);
+            case "Run Flow" -> {
+                if (legacyAllowed()) {
+                    runFlow(text(resync, "flowId", ""), player, vars);
+                } else {
+                    recordBlockedLegacyAction(dialogId, "Run Flow");
+                }
+            }
             case "Run Function" -> FunctionCallSupport.execute(flowStorage, flowExecutor, object(resync, "action"), player, null, vars);
             case "Run Command" -> runCommands(player, resync, vars);
             case "Open Dialog" -> show(player, text(resync, "dialogId", ""));
@@ -379,7 +393,11 @@ public class DialogService {
             default -> {
                 JsonObject legacyAction = object(action, "action");
                 if (legacyAction != null) {
-                    FunctionCallSupport.execute(flowStorage, flowExecutor, legacyAction, player, null, vars);
+                    if (legacyAllowed()) {
+                        FunctionCallSupport.execute(flowStorage, flowExecutor, legacyAction, player, null, vars);
+                    } else {
+                        recordBlockedLegacyAction(dialogId, "legacy action");
+                    }
                 }
             }
         }
@@ -388,6 +406,10 @@ public class DialogService {
     private boolean predicatePass(Player player, JsonObject resync, Map<String, Object> vars) {
         String mode = text(resync, "predicateMode", "None");
         if ("Flow".equals(mode)) {
+            if (!legacyAllowed()) {
+                recordBlockedLegacyAction("predicate", "Flow predicate");
+                return false;
+            }
             return FlowPredicateSupport.evaluate(flowStorage, flowExecutor, text(resync, "predicateFlowId", ""), player, null, vars);
         }
         if ("Function".equals(mode)) {
@@ -404,6 +426,16 @@ public class DialogService {
         String start = startNode(graph);
         if (graph != null && start != null) {
             flowExecutor.execute(graph, start, player, null, vars);
+        }
+    }
+
+    private boolean legacyAllowed() {
+        return legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyRuntime();
+    }
+
+    private void recordBlockedLegacyAction(String dialogId, String operation) {
+        if (legacyRuntimeGate != null) {
+            legacyRuntimeGate.recordBlocked("Dialog " + dialogId + " " + operation + " legacy action fallback");
         }
     }
 
@@ -539,6 +571,87 @@ public class DialogService {
 
     private double decimal(JsonObject object, String key, double fallback) {
         return object != null && object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsDouble() : fallback;
+    }
+
+    private static final class DialogResource {
+        private final JsonObject json;
+        private final String fallbackId;
+
+        private DialogResource(JsonObject json, String fallbackId) {
+            this.json = json != null ? json : new JsonObject();
+            this.fallbackId = fallbackId == null || fallbackId.isBlank() ? "dialog" : fallbackId;
+        }
+
+        JsonObject json() {
+            return json;
+        }
+
+        String displayName() {
+            return text("displayName", text("id", fallbackId));
+        }
+
+        String title() {
+            return text("title", displayName());
+        }
+
+        String externalTitle() {
+            return text("external_title", displayName());
+        }
+
+        String type() {
+            return text("type", "minecraft:multi_action");
+        }
+
+        boolean canCloseWithEscape() {
+            return bool("can_close_with_escape", true);
+        }
+
+        boolean pause() {
+            return bool("pause", true);
+        }
+
+        String afterAction() {
+            return text("after_action", "close");
+        }
+
+        int columns() {
+            return integer("columns", 1);
+        }
+
+        List<JsonObject> body() {
+            return objectArray("body");
+        }
+
+        List<JsonObject> inputs() {
+            return objectArray("inputs");
+        }
+
+        List<JsonObject> actions() {
+            return objectArray("actions");
+        }
+
+        private List<JsonObject> objectArray(String key) {
+            List<JsonObject> values = new ArrayList<>();
+            JsonArray array = json.has(key) && json.get(key).isJsonArray() ? json.getAsJsonArray(key) : new JsonArray();
+            for (JsonElement element : array) {
+                if (element != null && element.isJsonObject()) {
+                    values.add(element.getAsJsonObject());
+                }
+            }
+            return values;
+        }
+
+        private String text(String key, String fallback) {
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsString() : fallback;
+        }
+
+        private boolean bool(String key, boolean fallback) {
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsBoolean() : fallback;
+        }
+
+        private int integer(String key, int fallback) {
+            return json.has(key) && !json.get(key).isJsonNull() ? json.get(key).getAsInt() : fallback;
+        }
     }
 
     private record DialogApi(

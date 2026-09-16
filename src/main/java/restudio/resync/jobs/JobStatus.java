@@ -1,6 +1,6 @@
 package restudio.resync.jobs;
 
-import restudio.resync.contracts.ReSyncProtocolContract;
+import restudio.resync.protocol.ReSyncProtocolContract;
 
 public enum JobStatus {
     PENDING(ReSyncProtocolContract.JOB_PENDING),

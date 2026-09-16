@@ -1,0 +1,39 @@
+{
+  "kind":"contribution",
+  "ownerId":"example.reference",
+  "version":"1.0.0",
+  "contractRange":{"minimum":{"generation":1,"minor":3},"maximum":{"generation":1,"minor":3}},
+  "dependencies":[],
+  "definitions":[{
+    "id":"task",
+    "schemaVersion":1,
+    "lifecycle":"active",
+    "domain":"reference",
+    "family":"task",
+    "displayName":"Reference Task",
+    "description":"Runs the selected reference task, reports whether it completed, and exposes failures without changing the graph.",
+    "category":{"ownerId":"restudio","localId":"extension"},
+    "pins":[
+      {"id":"target","direction":"input","type":{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}},"displayName":"Target","description":"Task resource to run. A target is required before this node can execute.","requirement":"required","editor":{"ownerId":"restudio","localId":"resource-selector"},"visibility":{"kind":"always"},"repeatable":{"enabled":false,"minimum":0,"maximum":0,"ordered":false},"resourceRole":"Selects the task resource used by this operation."},
+      {"id":"completed","direction":"output","type":{"kind":"named","type":{"ownerId":"restudio","localId":"boolean"},"arguments":[]},"displayName":"Completed","description":"Whether the selected task completed successfully before its timeout.","requirement":"optional","editor":{"ownerId":"restudio","localId":"read-only"},"visibility":{"kind":"always"},"repeatable":{"enabled":false,"minimum":0,"maximum":0,"ordered":false}}
+    ],
+    "modes":[],"branches":[],"repeatables":[],
+    "inspector":{"intent":"generic","sections":[{"id":"task-settings","title":"Task Settings","description":"Controls the selected task, retry policy, and labels stored with this node.","rows":[{"id":"target","kind":"selector","title":"Target","description":"Task resource selected for this node. The value is required before execution.","valueType":{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}},"editor":{"ownerId":"restudio","localId":"resource-selector"},"visibility":{"kind":"always"},"fallback":"read-only-field"},{"id":"retry-policy","kind":"scalar","title":"Retry Policy","description":"Retry behavior for a failed task. This provider supports no automatic retry.","valueType":{"kind":"named","type":{"ownerId":"restudio","localId":"string"},"arguments":[]},"editor":{"ownerId":"restudio","localId":"text"},"visibility":{"kind":"always"},"fallback":"generic"},{"id":"labels","kind":"repeatable","title":"Labels","description":"Ordered labels stored with this node. Removing one label keeps every other element identity.","valueType":{"kind":"list","element":{"kind":"named","type":{"ownerId":"restudio","localId":"string"},"arguments":[]}},"editor":{"ownerId":"restudio","localId":"repeatable"},"visibility":{"kind":"always"},"fallback":"read-only-node"}] } ]},
+    "preview":{"intent":"text","capability":{"ownerId":"restudio","localId":"text-preview"},"fallback":{"ownerId":"restudio","localId":"summary"},"readOnly":true},
+    "handler":{"capability":{"ownerId":"example.reference","localId":"task-handler"},"operation":{"ownerId":"example.reference","localId":"run"}},
+    "semantics":{"effect":"state-mutating","thread":"main","authorization":{"ownerId":"example.reference","localId":"task.edit"},"cancellation":"cooperative","timeoutMillis":10000,"drainDeadlineMillis":5000,"hardDeadlineMillis":10000,"unloadPolicy":"drain","retry":"never","idempotency":"mutation-id","audit":"full-redacted","confirmation":"none","sensitiveData":"redacted","determinism":"nondeterministic","success":["completed"],"failure":["failed","timed-out"],"cancelled":["cancelled"],"failureContract":{"payloadType":{"kind":"named","type":{"ownerId":"restudio","localId":"diagnostic"},"arguments":[]},"diagnosticCodes":["RUNTIME.HANDLER_FAILURE","RUNTIME.EXECUTION_TIMEOUT","RUNTIME.EXECUTION_CANCELLED"],"branches":["failed","timed-out","cancelled"],"commitBoundary":"atomic"},"resourceReads":[{"ownerId":"example.reference","localId":"task"}],"resourceWrites":[{"ownerId":"example.reference","localId":"task"}]},
+    "requiredCapabilities":[{"ownerId":"restudio","localId":"resource-selector"},{"ownerId":"restudio","localId":"repeatable"},{"ownerId":"restudio","localId":"text-preview"}]
+  }],
+  "types":[{"id":"task-reference","displayName":"Task Reference","expression":{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}},"literalSchema":{"type":"object"},"storageCodec":{"ownerId":"restudio","localId":"resource-locator-json"},"networkCodec":{"ownerId":"restudio","localId":"resource-locator-json"},"editor":{"ownerId":"restudio","localId":"resource-selector"},"validators":[{"ownerId":"example.reference","localId":"task-valid"}]}],
+  "conversions":[],
+  "categories":[],
+  "optionSources":[{"id":"tasks","valueType":{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}},"querySchema":{"schemaVersion":1,"resource":{"type":{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}},"required":true},"context":{},"dependencies":{"project":{"type":{"kind":"named","type":{"ownerId":"restudio","localId":"string"},"arguments":[]},"required":true,"defaultValue":null}}},"capability":{"ownerId":"example.reference","localId":"tasks"},"pageLimit":100}],
+  "validators":[{"id":"task-valid","phase":"semantic","stage":"task","appliesTo":[{"ownerId":"example.reference","localId":"task"}],"capability":{"ownerId":"example.reference","localId":"task-valid"},"diagnosticCodes":["TYPE.VALUE_INVALID"]}],
+  "editors":[],
+  "previews":[],
+  "capabilities":[{"id":"task-handler","version":1,"optional":false,"fallback":"read-only-node"},{"id":"tasks","version":1,"optional":false,"fallback":"read-only-field"},{"id":"task-valid","version":1,"optional":false,"fallback":"read-only-node"}],
+  "runtimeRequirements":[{"capability":{"ownerId":"example.reference","localId":"task-handler"},"operation":{"ownerId":"example.reference","localId":"run"},"inputs":[{"kind":"resource","resourceType":{"ownerId":"example.reference","localId":"task"}}],"outputs":[{"kind":"named","type":{"ownerId":"restudio","localId":"boolean"},"arguments":[]}],"semantics":{"effect":"state-mutating","thread":"main","authorization":{"ownerId":"example.reference","localId":"task.edit"},"cancellation":"cooperative","timeoutMillis":10000,"drainDeadlineMillis":5000,"hardDeadlineMillis":10000,"unloadPolicy":"drain","retry":"never","idempotency":"mutation-id","audit":"full-redacted","confirmation":"none","sensitiveData":"redacted","determinism":"nondeterministic","success":["completed"],"failure":["failed","timed-out"],"cancelled":["cancelled"],"failureContract":{"payloadType":{"kind":"named","type":{"ownerId":"restudio","localId":"diagnostic"},"arguments":[]},"diagnosticCodes":["RUNTIME.HANDLER_FAILURE","RUNTIME.EXECUTION_TIMEOUT","RUNTIME.EXECUTION_CANCELLED"],"branches":["failed","timed-out","cancelled"],"commitBoundary":"atomic"},"resourceReads":[{"ownerId":"example.reference","localId":"task"}],"resourceWrites":[{"ownerId":"example.reference","localId":"task"}]}}],
+  "migrations":[],
+  "provenance":{"sourceKind":"extension","sourceUri":"extension:example.reference","sourceHash":"7777777777777777777777777777777777777777777777777777777777777777","sourceVersion":"1.0.0","buildId":"reference-1"}
+}
+

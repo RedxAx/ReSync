@@ -1,0 +1,532 @@
+[
+  {
+    "id": "custom.event.emit",
+    "displayName": "Custom Event Emit",
+    "description": "Emit a named custom event with a map of payload values.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID and payload, then handle Flow."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_trigger"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "data_payload",
+        "displayName": "Data Payload",
+        "name": "data_payload",
+        "pinType": "DATA",
+        "dataType": "map<any,any>",
+        "description": "Provides the data payload used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "input",
+          "source": "data_payload",
+          "target": "data_payload"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "custom.event.listen",
+    "displayName": "Custom Event Listen",
+    "description": "Listen for a named custom event for a bounded number of ticks.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID, then handle Flow and Listening."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_listen"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "timeout_ticks",
+        "displayName": "Timeout Ticks",
+        "name": "timeout_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the timeout ticks used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      },
+      {
+        "id": "listening",
+        "displayName": "Listening",
+        "name": "listening",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the listening value produced by this event.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "input",
+          "source": "timeout_ticks",
+          "target": "timeout_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "listening",
+          "target": "listening"
+        }
+      ]
+    }
+  },
+  {
+    "id": "event.custom_event_define",
+    "displayName": "Custom Event Define",
+    "description": "Declare a named custom event for use by other flows.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID, then handle Flow."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_define"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "event.custom_event_remove_listener",
+    "displayName": "Custom Event Remove Listener",
+    "description": "Remove listeners registered for a named custom event.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID, then handle Flow."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_remove_listener"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "custom.event.clear",
+    "displayName": "Clear Custom Event Listeners",
+    "description": "Clear all listeners registered for a named custom event.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID, then handle Flow."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_clear"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "custom.event.get.data",
+    "displayName": "Get Custom Event Data",
+    "description": "Read the last payload recorded for a named custom event.",
+    "domain": "custom_event",
+    "family": "custom",
+    "lifecycle": "active",
+    "handlerCapability": "flow.custom-event",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "EVENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "custom",
+      "event"
+    ],
+    "examples": [
+      "Connect Flow, provide the Event ID, then handle Flow."
+    ],
+    "handler": "CustomEventHandler",
+    "handlerConfig": {
+      "operation": "custom_event_get_data"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by this custom event operation.",
+        "direction": "input"
+      },
+      {
+        "id": "event_id",
+        "displayName": "Event ID",
+        "name": "event_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the event id used by this custom event operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after this custom event operation.",
+        "direction": "output"
+      },
+      {
+        "id": "data",
+        "displayName": "Data",
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "map<any,any>",
+        "description": "Provides the data value produced by this event.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "data",
+          "target": "data"
+        }
+      ]
+    }
+  }
+]

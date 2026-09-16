@@ -1,0 +1,310 @@
+[
+  {
+    "id": "json_parse",
+    "displayName": "Parse JSON",
+    "description": "Parse canonical JSON text into a validated JSON value. Text is limited to 65536 characters, nesting is limited to depth 64, and malformed JSON, duplicate keys, non-finite numbers, cycles, or unsupported values fail before output.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "parse", "value"],
+    "legacyIds": ["json.parse"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_parse"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "json_string", "target": "json_string"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "object", "target": "object"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts parsing when execution reaches this node."},
+      {"id": "json_string", "displayName": "JSON String", "name": "json_string", "pinType": "DATA", "dataType": "string", "defaultValue": "{}", "constraints": {"max": 65536}, "description": "Canonical JSON text to parse. Missing or null input uses {}. Text may contain at most 65536 characters; malformed JSON, duplicate keys, non-finite numbers, or nesting deeper than 64 fail."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the JSON value is parsed successfully."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "any", "description": "Returns the validated JSON value, which may be an object, array, string, number, Boolean, or null."}
+    ]
+  },
+  {
+    "id": "json_to_string",
+    "displayName": "JSON To String",
+    "description": "Serialize a CanonicalJson-supported value to canonical JSON text. Character, UUID, Set, Iterable, and array shapes are coerced to JSON; cycles, non-finite numbers, values outside the canonical JSON contract, or output beyond 65536 characters fail before return.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "stringify", "value"],
+    "legacyIds": ["json.to.string"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_to_string"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "object", "target": "object"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "string", "target": "string"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts JSON serialization when execution reaches this node."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "any", "description": "Value to serialize through CanonicalJson. Character, UUID, Set, Iterable, and array shapes are accepted; cycles, non-finite numbers, values outside the canonical JSON contract, and text over 65536 characters fail."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after canonical JSON text is produced."},
+      {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Returns canonical JSON text no longer than 65536 characters."}
+    ]
+  },
+  {
+    "id": "json_get",
+    "displayName": "Get JSON Value",
+    "description": "Read a value from a JSON object using a simple dotted, object-only path. Missing keys return null; blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "query", "value"],
+    "legacyIds": ["json.get"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_get"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "object", "target": "object"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "value", "target": "value"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON lookup when execution reaches this node."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "JSON object to inspect. A non-object root fails before output, and arrays or scalar values cannot be traversed as objects."},
+      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output; a missing key returns null."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the lookup completes, including when the value is missing."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the value at the dotted path, or null when a key is missing. Invalid paths fail before this output is published."}
+    ]
+  },
+  {
+    "id": "json_has",
+    "displayName": "JSON Has Key",
+    "description": "Check whether a JSON object contains a value at a simple dotted, object-only path. Missing keys return false; blank paths, non-object roots, traversal through non-objects, and unsupported path values fail before output.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "query", "key"],
+    "legacyIds": ["json.has"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_has"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "object", "target": "object"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "has", "target": "has"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON key check when execution reaches this node."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "JSON object to inspect. A non-object root fails before output, and arrays or scalar values cannot be traversed as objects."},
+      {"id": "path", "displayName": "Path", "name": "path", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Simple dotted object-only path such as player.score. Blank paths and traversal through a non-object fail before output; a missing key returns false."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the key check completes."},
+      {"id": "has", "displayName": "Has", "name": "has", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the object-only dotted path exists, including when its value is null."}
+    ]
+  },
+  {
+    "id": "json_keys",
+    "displayName": "Get JSON Keys",
+    "description": "Return the keys of a JSON object in canonical code-point-sorted order. The result is a fresh list; missing, null, array, and scalar inputs return an empty list.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "query", "keys"],
+    "legacyIds": ["json.keys"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_keys"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "object", "target": "object"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "keys", "target": "keys"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading JSON keys when execution reaches this node."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "JSON object whose keys should be copied. Non-object values produce an empty list."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the keys have been collected."},
+      {"id": "keys", "displayName": "Keys", "name": "keys", "pinType": "DATA", "dataType": "list<any>", "description": "Returns a fresh list containing the object's keys in canonical code-point-sorted order."}
+    ]
+  },
+  {
+    "id": "json_merge",
+    "displayName": "Merge JSON",
+    "description": "Merge two JSON objects by top-level keys into a fresh map with recursively detached canonical copies. Values from the second object replace duplicate keys; nested objects and lists are detached recursively, and non-object inputs are ignored.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "merge", "object"],
+    "legacyIds": ["json.merge"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_merge"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "object1", "target": "object1"},
+        {"direction": "input", "source": "object2", "target": "object2"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "merged", "target": "merged"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the JSON merge when execution reaches this node."},
+      {"id": "object1", "displayName": "Object 1", "name": "object1", "pinType": "DATA", "dataType": "map<any,any>", "description": "First JSON object to copy recursively into the fresh detached result. Non-object input is ignored."},
+      {"id": "object2", "displayName": "Object 2", "name": "object2", "pinType": "DATA", "dataType": "map<any,any>", "description": "Second JSON object to copy recursively after Object 1. Its values replace duplicate keys; non-object input is ignored."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the shallow merge completes."},
+      {"id": "merged", "displayName": "Merged", "name": "merged", "pinType": "DATA", "dataType": "map<any,any>", "description": "Returns a fresh recursively detached map. Duplicate keys use Object 2 values, and nested objects and lists are copied through the canonical JSON form."}
+    ]
+  },
+  {
+    "id": "json_create",
+    "displayName": "Create JSON Object",
+    "description": "Create a fresh empty JSON object map. The result is independent from every previous execution and is ready for validated JSON values.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "create", "object"],
+    "legacyIds": ["json.create"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_create"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "object", "target": "object"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts creating the JSON object when execution reaches this node."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after a fresh JSON object is created."},
+      {"id": "object", "displayName": "Object", "name": "object", "pinType": "DATA", "dataType": "map<any,any>", "description": "Returns a fresh empty JSON object map."}
+    ]
+  },
+  {
+    "id": "json_set_array",
+    "displayName": "Create JSON Array",
+    "description": "Create a fresh JSON array list from the supplied values. The list is recursively detached through the canonical JSON form; cycles, non-finite numbers, values outside the canonical JSON contract, or values that cannot be validated as JSON fail.",
+    "domain": "core",
+    "family": "json",
+    "lifecycle": "active",
+    "handlerCapability": "generic-json",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["json", "create", "array"],
+    "legacyIds": ["json.set.array"],
+    "handler": "JsonHandler",
+    "handlerConfig": {"operation": "json_set_array"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "values", "target": "values"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "array", "target": "array"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts creating the JSON array when execution reaches this node."},
+      {"id": "values", "displayName": "Values", "name": "values", "pinType": "DATA", "dataType": "list<any>", "description": "Values to copy recursively into the fresh detached array. Cycles, non-finite numbers, values outside the canonical JSON contract, or invalid JSON values fail."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the JSON array is created successfully."},
+      {"id": "array", "displayName": "Array", "name": "array", "pinType": "DATA", "dataType": "list<any>", "description": "Returns a fresh recursively detached copy of the values as a JSON array."}
+    ]
+  }
+]

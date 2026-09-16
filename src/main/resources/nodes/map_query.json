@@ -1,0 +1,173 @@
+[
+  {
+    "id": "core.map.get",
+    "displayName": "Map Get",
+    "description": "Read a value by key from a string-keyed map.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "get"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Provides the string-keyed map to read."},
+      {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "Provides the key to read."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Returns the value stored at the key."}
+    ]
+  },
+  {
+    "id": "core.map.contains_key",
+    "displayName": "Contains Key",
+    "description": "Check whether a map contains a key.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "contains_key"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Provides the map to inspect."},
+      {"id": "key", "displayName": "Key", "name": "key", "dataType": "string", "description": "Provides the key to find."}
+    ],
+    "outputs": [
+      {"id": "contains", "displayName": "Contains", "name": "contains", "dataType": "boolean", "description": "Reports whether the map contains the key."}
+    ]
+  },
+  {
+    "id": "core.map.contains_value",
+    "displayName": "Contains Value",
+    "description": "Check whether a map contains a value.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "contains_value"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Provides the map to inspect."},
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Provides the value to find."}
+    ],
+    "outputs": [
+      {"id": "contains", "displayName": "Contains", "name": "contains", "dataType": "boolean", "description": "Reports whether the map contains the value."}
+    ]
+  },
+  {
+    "id": "core.map.keys",
+    "displayName": "Keys",
+    "description": "Return the ordered keys from a map.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "keys"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Provides the map whose keys are returned."}
+    ],
+    "outputs": [
+      {"id": "keys", "displayName": "Keys", "name": "keys", "dataType": "list<string>", "description": "Returns the map keys in order."}
+    ]
+  },
+  {
+    "id": "core.map.values",
+    "displayName": "Values",
+    "description": "Return the ordered values from a map.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "values"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<string,type:t>", "description": "Provides the map whose values are returned."}
+    ],
+    "outputs": [
+      {"id": "values", "displayName": "Values", "name": "values", "dataType": "list<type:t>", "description": "Returns the map values in order."}
+    ]
+  },
+  {
+    "id": "core.map.size",
+    "displayName": "Map Size",
+    "description": "Count the entries in a map.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "size"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<any,any>", "description": "Provides the map to count."}
+    ],
+    "outputs": [
+      {"id": "size", "displayName": "Size", "name": "size", "dataType": "number", "description": "Returns the number of entries in the map."}
+    ]
+  },
+  {
+    "id": "core.map.is_empty",
+    "displayName": "Map Is Empty",
+    "description": "Check whether a map has no entries.",
+    "domain": "data",
+    "family": "map-query",
+    "lifecycle": "active",
+    "handlerCapability": "generic-map",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["map", "query", "data"],
+    "handler": "GenericMapHandler",
+    "handlerConfig": {"operation": "is_empty"},
+    "inputs": [
+      {"id": "map", "displayName": "Map", "name": "map", "dataType": "map<any,any>", "description": "Provides the map to check."}
+    ],
+    "outputs": [
+      {"id": "is_empty", "displayName": "Is Empty", "name": "is_empty", "dataType": "boolean", "description": "Reports whether the map has no entries."}
+    ]
+  }
+]

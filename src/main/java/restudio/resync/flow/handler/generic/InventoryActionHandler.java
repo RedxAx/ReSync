@@ -24,6 +24,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +41,7 @@ import java.util.function.BiConsumer;
 public class InventoryActionHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private final ItemAttributeSchemaService itemComponents = new ItemAttributeSchemaService();
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public InventoryActionHandler() {
         operations.put("player_has_item", (ctx, node) -> {
@@ -66,15 +68,18 @@ public class InventoryActionHandler implements NodeHandler {
             int amount = ctx.getInputValue(node, "amount", Integer.class, 1);
             if (amount < 1) throw new IllegalArgumentException("Item amount must be positive");
             Material mat = requireMaterial(matName);
-            if (countMaterial(player.getInventory(), mat) < amount) throw new IllegalArgumentException("Player inventory does not contain the requested material amount");
-            ItemStack toRemove = new ItemStack(mat, amount);
-            player.getInventory().removeItem(toRemove);
+            playerDataAdmission.mutatePlayer("flow-inventory-remove-item:" + player.getUniqueId(), player, () -> {
+                if (countMaterial(player.getInventory(), mat) < amount) throw new IllegalArgumentException("Player inventory does not contain the requested material amount");
+                ItemStack toRemove = new ItemStack(mat, amount);
+                player.getInventory().removeItem(toRemove);
+            });
         });
 
         operations.put("player_clear_inv", (ctx, node) -> {
             Player player = ctx.getPlayer();
             if (player == null) throw new IllegalArgumentException("Player is required");
-            player.getInventory().clear();
+            playerDataAdmission.mutatePlayer("flow-inventory-clear:" + player.getUniqueId(), player,
+                () -> player.getInventory().clear());
         });
 
         operations.put("inventory_open_gui", (ctx, node) -> {
@@ -103,7 +108,8 @@ public class InventoryActionHandler implements NodeHandler {
             Player player = requirePlayer(ctx, node);
             Integer rows = ctx.getInputValue(node, "rows", Integer.class, 1);
             if (rows < 1 || rows > 6) throw new IllegalArgumentException("Inventory rows must be between 1 and 6");
-            resizeOpenInventory(player, rows);
+            playerDataAdmission.mutatePlayer("flow-inventory-resize:" + player.getUniqueId(), player,
+                () -> resizeOpenInventory(player, rows));
         });
 
         operations.put("inventory_get_contents", (ctx, node) -> {
@@ -197,7 +203,8 @@ public class InventoryActionHandler implements NodeHandler {
         });
 
         operations.put("inventory_update", (ctx, node) -> {
-            requirePlayer(ctx, node).updateInventory();
+            Player player = requirePlayer(ctx, node);
+            playerDataAdmission.mutatePlayer("flow-inventory-update:" + player.getUniqueId(), player, player::updateInventory);
         });
 
         operations.put("inventory_has_space", (ctx, node) -> {
@@ -692,8 +699,29 @@ public class InventoryActionHandler implements NodeHandler {
         if (op == null) {
             throw new IllegalArgumentException("Unknown inventory action operation: " + operation);
         }
-        op.accept(ctx, node);
+        Player player = mutationPlayer(ctx, node);
+        if (player == null) {
+            op.accept(ctx, node);
+        } else {
+            playerDataAdmission.mutatePlayer("flow-inventory-action:" + operation + ":" + player.getUniqueId(), player,
+                () -> op.accept(ctx, node));
+        }
         ctx.triggerOutput("flow");
+    }
+
+    private static Player mutationPlayer(FlowContext context, FlowNode node) {
+        Player explicit = context.getInputValue(node, "player", Player.class, null);
+        if (explicit != null) {
+            return explicit;
+        }
+        Object input = context.getInputValue(node, "inventory", Object.class, null);
+        if (input instanceof Player player) {
+            return player;
+        }
+        if (input instanceof Inventory inventory && inventory.getHolder() instanceof Player player) {
+            return player;
+        }
+        return context.getPlayer();
     }
 
     private static Player requirePlayer(FlowContext context, FlowNode node) {
@@ -760,7 +788,7 @@ public class InventoryActionHandler implements NodeHandler {
         return slot;
     }
 
-    private static void resizeOpenInventory(Player player, int rows) {
+    private void resizeOpenInventory(Player player, int rows) {
         Inventory current = player.getOpenInventory().getTopInventory();
         int size = rows * 9;
         if (current.getSize() == size) return;

@@ -333,7 +333,8 @@ class CustomContentCompatibilityTest {
 
     @Test
     void schemaServiceProductionFilterUsesVanillaOriginEvidence() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/ItemAttributeSchemaService.java"));
+        String source = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/ItemAttributeSchemaService.java"))
+            .replace("\r\n", "\n");
         String storageSource = Files.readString(Path.of("src/main/java/restudio/resync/customcontent/CustomContentStorage.java"));
         String flowModuleSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/FlowModule.java"));
         String resourceRouterSource = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/FlowResourcePacketRouter.java"));
@@ -355,7 +356,7 @@ class CustomContentCompatibilityTest {
         assertTrue(source.contains("jsonEquivalent"));
         assertTrue(flowModuleSource.contains("quickEditAttributeService.customComponentsFromStack(item)"));
         assertTrue(storageSource.contains("definition.setComponents(attributeSchemaService.customComponentsForMaterial(definition.getMaterial(), definition.getComponents()))"));
-        assertTrue(resourceRouterSource.contains("value.setComponents(attributeSchemaService.customComponentsForMaterial(value.getMaterial(), value.getComponents()))"));
+        assertFalse(resourceRouterSource.contains("value.setComponents(attributeSchemaService.customComponentsForMaterial(value.getMaterial(), value.getComponents()))"));
         assertTrue(source.contains("SPECIALIZED_ITEM_COMPONENTS"));
         assertFalse(source.contains("if (SPECIALIZED_ITEM_COMPONENTS.contains(id))"));
         assertTrue(source.contains("case \"minecraft:food\" -> \"Nutrition And Saturation\""));

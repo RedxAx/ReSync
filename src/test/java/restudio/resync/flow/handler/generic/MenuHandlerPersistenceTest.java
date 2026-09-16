@@ -1,5 +1,6 @@
 package restudio.resync.flow.handler.generic;
 
+import com.google.gson.Gson;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +15,14 @@ import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.storage.AssetTransactionCoordinator;
 
+import java.io.IOException;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,20 +31,29 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class MenuHandlerPersistenceTest {
     private FlowStorage storage;
     private MenuHandler handler;
+    private AssetTransactionCoordinator coordinator;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         MockBukkit.mock();
         JavaPlugin plugin = MockBukkit.createMockPlugin();
-        storage = new FlowStorage(plugin);
+        coordinator = AssetTransactionCoordinator.open(plugin.getDataFolder().toPath().resolve("assets"), new Gson());
+        storage = new FlowStorage(plugin, coordinator);
         FlowRuntimeAccess.configure(plugin, () -> storage, Map::of);
         handler = new MenuHandler();
     }
 
     @AfterEach
-    void tearDown() {
-        FlowRuntimeAccess.clear();
-        MockBukkit.unmock();
+    void tearDown() throws IOException {
+        try {
+            FlowRuntimeAccess.clear();
+        } finally {
+            try {
+                coordinator.close();
+            } finally {
+                MockBukkit.unmock();
+            }
+        }
     }
 
     @Test
@@ -71,6 +88,22 @@ class MenuHandlerPersistenceTest {
         assertEquals("Open Shop", element.getVisual().getName());
         assertEquals(2, element.getVisual().getLore().size());
         assertEquals("shop.open", element.getFlowId());
+    }
+
+    @Test
+    void menuOperationsAcceptTypedResourceLocators() {
+        ServerResourceLocator locator = new ServerResourceLocator(ServerId.deterministic("menu-handler-test"),
+            new ContractRef<>(new OwnerId("builtin"), new ResourceTypeId("gui")), "typed-menu");
+
+        execute("menu_create", Map.of(
+            "menu_id", locator,
+            "title", "Typed Menu",
+            "rows", 1
+        ));
+
+        GuiDefinition definition = storage.getGui("typed-menu");
+        assertNotNull(definition);
+        assertEquals("Typed Menu", definition.getTitle());
     }
 
     private void execute(String operation, Map<String, Object> inputs) {

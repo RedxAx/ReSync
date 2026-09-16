@@ -1,0 +1,1750 @@
+[
+  {
+    "id": "entity_mount",
+    "displayName": "Entity Mount",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_mount",
+    "handlerConfig": {"operation": "entity_mount"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_mount_entity",
+        "displayName": "Mount Entity",
+        "name": "mount_entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "mount_entity",
+          "target": "input_mount_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_dismount",
+    "displayName": "Entity Dismount",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_dismount",
+    "handlerConfig": {"operation": "entity_dismount"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_ai_disable",
+    "displayName": "Entity AI Disable",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_ai_disable",
+    "handlerConfig": {"operation": "entity_ai_disable"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_ai_enable",
+    "displayName": "Entity AI Enable",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_ai_enable",
+    "handlerConfig": {"operation": "entity_ai_enable"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_set_no_damage",
+    "displayName": "Entity Set No Damage",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_set_no_damage",
+    "handlerConfig": {"operation": "entity_set_no_damage"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_no_damage",
+        "displayName": "No Damage",
+        "name": "no_damage",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "no_damage",
+          "target": "input_no_damage"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_set_silent",
+    "displayName": "Entity Set Silent",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_set_silent",
+    "handlerConfig": {"operation": "entity_set_silent"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_silent",
+        "displayName": "Silent",
+        "name": "silent",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "silent",
+          "target": "input_silent"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_add_potion",
+    "displayName": "Entity Add Potion",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_add_potion",
+    "handlerConfig": {"operation": "entity_add_potion"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_effect_type",
+        "displayName": "Effect Type",
+        "name": "effect_type",
+        "pinType": "DATA",
+        "dataType": "potion_effect",
+        "description": "Value provided to the entity operation.",
+        "optionsSource": "server:minecraft:potion_effect"
+      },
+      {
+        "id": "input_duration",
+        "displayName": "Duration",
+        "name": "duration",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Value provided to the entity operation.",
+        "defaultValue": 200
+      },
+      {
+        "id": "input_amplifier",
+        "displayName": "Amplifier",
+        "name": "amplifier",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Value provided to the entity operation.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "effect_type",
+          "target": "input_effect_type"
+        },
+        {
+          "direction": "input",
+          "source": "duration",
+          "target": "input_duration"
+        },
+        {
+          "direction": "input",
+          "source": "amplifier",
+          "target": "input_amplifier"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_clear_potions",
+    "displayName": "Entity Clear Potions",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_clear_potions",
+    "handlerConfig": {"operation": "entity_clear_potions"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_leash",
+    "displayName": "Entity Leash",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_leash",
+    "handlerConfig": {"operation": "entity_leash"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_holder_entity",
+        "displayName": "Holder Entity",
+        "name": "holder_entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "holder_entity",
+          "target": "input_holder_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_unleash",
+    "displayName": "Entity Unleash",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_unleash",
+    "handlerConfig": {"operation": "entity_unleash"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_set_custom_name",
+    "displayName": "Entity Set Custom Name",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_set_custom_name",
+    "handlerConfig": {"operation": "entity_set_custom_name"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "input_name"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_get_passengers",
+    "displayName": "Entity Get Passengers",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_get_passengers",
+    "handlerConfig": {"operation": "entity_get_passengers"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_passengers_list",
+        "displayName": "Passengers List",
+        "name": "passengers_list",
+        "pinType": "DATA",
+        "dataType": "list<entity>",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "passengers_list",
+          "target": "output_passengers_list"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_get_vehicle",
+    "displayName": "Entity Get Vehicle",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_get_vehicle",
+    "handlerConfig": {"operation": "entity_get_vehicle"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_vehicle",
+        "displayName": "Vehicle",
+        "name": "vehicle",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "vehicle",
+          "target": "output_vehicle"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_set_fire_ticks",
+    "displayName": "Entity Set Fire Ticks",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_set_fire_ticks",
+    "handlerConfig": {"operation": "entity_set_fire_ticks"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_ticks",
+        "displayName": "Ticks",
+        "name": "ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "ticks",
+          "target": "input_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_set_frozen",
+    "displayName": "Entity Set Frozen",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_set_frozen",
+    "handlerConfig": {"operation": "entity_set_frozen"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_ticks",
+        "displayName": "Ticks",
+        "name": "ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "ticks",
+          "target": "input_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_add_tag",
+    "displayName": "Entity Add Tag",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_add_tag",
+    "handlerConfig": {"operation": "entity_add_tag"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_tag",
+        "displayName": "Tag",
+        "name": "tag",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "tag",
+          "target": "input_tag"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_remove_tag",
+    "displayName": "Entity Remove Tag",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_remove_tag",
+    "handlerConfig": {"operation": "entity_remove_tag"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_tag",
+        "displayName": "Tag",
+        "name": "tag",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "tag",
+          "target": "input_tag"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_clear_tags",
+    "displayName": "Entity Clear Tags",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "ACTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_clear_tags",
+    "handlerConfig": {"operation": "entity_clear_tags"},
+    "inputs": [
+      {
+        "id": "input_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the entity operation when execution reaches this node."
+      },
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after the entity operation completes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "input_flow"
+        },
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_has_tag",
+    "displayName": "Entity Has Tag",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_has_tag",
+    "handlerConfig": {"operation": "entity_has_tag"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_tag",
+        "displayName": "Tag",
+        "name": "tag",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_has_tag",
+        "displayName": "Has Tag",
+        "name": "has_tag",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "tag",
+          "target": "input_tag"
+        },
+        {
+          "direction": "output",
+          "source": "has_tag",
+          "target": "output_has_tag"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_has_any_tag",
+    "displayName": "Entity Has Any Tag",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_has_any_tag",
+    "handlerConfig": {"operation": "entity_has_any_tag"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_tags",
+        "displayName": "Tags",
+        "name": "tags",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_has_any",
+        "displayName": "Has Any",
+        "name": "has_any",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "tags",
+          "target": "input_tags"
+        },
+        {
+          "direction": "output",
+          "source": "has_any",
+          "target": "output_has_any"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_has_all_tags",
+    "displayName": "Entity Has All Tags",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_has_all_tags",
+    "handlerConfig": {"operation": "entity_has_all_tags"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      },
+      {
+        "id": "input_tags",
+        "displayName": "Tags",
+        "name": "tags",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Value provided to the entity operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_has_all",
+        "displayName": "Has All",
+        "name": "has_all",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "input",
+          "source": "tags",
+          "target": "input_tags"
+        },
+        {
+          "direction": "output",
+          "source": "has_all",
+          "target": "output_has_all"
+        }
+      ]
+    }
+  },
+  {
+    "id": "entity_get_tags",
+    "displayName": "Entity Get Tags",
+    "description": "Provides the restored entity operation and preserves its execution contract.",
+    "domain": "entity",
+    "family": "entity",
+    "lifecycle": "active",
+    "handlerCapability": "entity.restored",
+    "selectorIntent": "restored-entity-operation",
+    "inspectorIntent": "entity-restored",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "entity",
+      "restored"
+    ],
+    "examples": [
+      "Provides the restored entity operation and preserves its execution contract."
+    ],
+    "handler": "entity_get_tags",
+    "handlerConfig": {"operation": "entity_get_tags"},
+    "inputs": [
+      {
+        "id": "input_entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Entity to use for this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_tags",
+        "displayName": "Tags",
+        "name": "tags",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Value returned by the entity operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "input_entity"
+        },
+        {
+          "direction": "output",
+          "source": "tags",
+          "target": "output_tags"
+        }
+      ]
+    }
+  }
+]

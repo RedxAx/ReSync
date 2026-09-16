@@ -1,7 +1,9 @@
 package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import restudio.resync.Log;
 import restudio.flow.data.CustomContentDefinition;
@@ -17,30 +19,30 @@ import restudio.resync.flow.FlowFunctionInUseException;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.flow.GlobalTriggers;
-import restudio.resync.flow.migration.FlowGraphMigrator;
+import restudio.resync.flow.handler.event.FlowEventRegistry;
+import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
 import restudio.resync.flow.validation.FlowGraphValidationException;
 import restudio.resync.jobs.JobRecord;
+import restudio.resync.protocol.ReSyncProtocolContract;
 import restudio.resync.resources.ReSyncResourceCatalog;
-import restudio.resync.storage.StorageSafety;
+import restudio.resync.server.AuthorityEpoch;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class FlowBlueprintPacketHandler {
@@ -51,25 +53,60 @@ public class FlowBlueprintPacketHandler {
     private final NodeDefinitionRegistry definitionRegistry;
     private final FlowPacketSender sender;
     private final FlowResourceRegistry resourceRegistry;
+    private final AuthorityEpoch authorityEpoch;
+    private final Predicate<Session> legacyCompatibility;
     private final Gson gson = new Gson();
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, FlowPacketSender sender) {
-        this(storage, triggerRegistry, globalTriggers, NodeDefinitionRegistry.getInstance(), sender, null);
+        this(storage, triggerRegistry, globalTriggers, NodeDefinitionRegistry.getInstance(), sender, null,
+            requireExplicitAuthorityEpoch(sender), FlowMutationPayloadReader::legacyCompatible);
     }
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender) {
-        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, null);
+        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, null,
+            requireExplicitAuthorityEpoch(sender), FlowMutationPayloadReader::legacyCompatible);
     }
 
     public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers, NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender, FlowResourceRegistry resourceRegistry) {
+        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, resourceRegistry,
+            requireExplicitAuthorityEpoch(sender), FlowMutationPayloadReader::legacyCompatible);
+    }
+
+    public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                                      NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender,
+                                      FlowResourceRegistry resourceRegistry, AuthorityEpoch authorityEpoch,
+                                      boolean legacyCompatible) {
+        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, resourceRegistry, authorityEpoch,
+            legacyCompatible ? FlowMutationPayloadReader::legacyCompatible : ignored -> false);
+    }
+
+    public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                                      NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender,
+                                      FlowResourceRegistry resourceRegistry, AuthorityEpoch authorityEpoch) {
+        this(storage, triggerRegistry, globalTriggers, definitionRegistry, sender, resourceRegistry, authorityEpoch, false);
+    }
+
+    public FlowBlueprintPacketHandler(FlowStorage storage, TriggerRegistry triggerRegistry, GlobalTriggers globalTriggers,
+                                      NodeDefinitionRegistry definitionRegistry, FlowPacketSender sender,
+                                      FlowResourceRegistry resourceRegistry, AuthorityEpoch authorityEpoch,
+                                      Predicate<Session> legacyCompatibility) {
         this.storage = storage;
         this.triggerRegistry = triggerRegistry;
         this.globalTriggers = globalTriggers;
-        this.definitionRegistry = definitionRegistry;
+        this.definitionRegistry = definitionRegistry == null ? new NodeDefinitionRegistry(false) : definitionRegistry;
         this.sender = sender;
         this.resourceRegistry = resourceRegistry;
-        migrateLegacyCommandBindings();
-        refreshAllGraphBindings();
+        if (authorityEpoch != null && authorityEpoch.current() < 1L) {
+            throw new IllegalArgumentException("Authority epoch must be positive");
+        }
+        if (sender != null && authorityEpoch == null) {
+            throw new IllegalStateException("Authority epoch is required when packet handling is enabled");
+        }
+        this.authorityEpoch = authorityEpoch;
+        Predicate<Session> configuredLegacyCompatibility = Objects.requireNonNull(legacyCompatibility,
+            "Legacy compatibility policy is required");
+        this.legacyCompatibility = session -> configuredLegacyCompatibility.test(session)
+            && FlowMutationPayloadReader.legacyCompatible(session);
     }
 
     public void handleRequest(Session session, ByteBuffer buffer) {
@@ -93,6 +130,10 @@ public class FlowBlueprintPacketHandler {
     }
 
     public void handleSave(Session session, ByteBuffer buffer) {
+        if (resourceRegistry != null && resourceRegistry.genericMutationAuthorityRequired()) {
+            sender.sendError(session, "RESOURCE_GENERIC_AUTHORITY_REQUIRED", resourceRegistry.genericMutationAuthorityReason());
+            return;
+        }
         if (!buffer.hasRemaining()) {
             sender.sendError(session, "INVALID_SAVE", "No data provided");
             return;
@@ -102,6 +143,9 @@ public class FlowBlueprintPacketHandler {
             return;
         }
         FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+        if (!validateMutationEpoch(session, payload)) {
+            return;
+        }
         String json = payload.payload();
         JobRecord<String> job = sender.beginJob(session, "saveFlow", "", payload.requestId());
         if (job == null) {
@@ -109,7 +153,7 @@ public class FlowBlueprintPacketHandler {
         }
         FlowGraph previousGraph = null;
         Map<String, CustomContentDefinition> previousContent = Map.of();
-        List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
+        List<TriggerBinding> previousEventBindings = List.of();
         String rollbackFlowId = null;
         boolean graphPersisted = false;
         try {
@@ -129,9 +173,9 @@ public class FlowBlueprintPacketHandler {
                 graph.setResourceType(storedType);
                 graph.setFunction(ReSyncResourceCatalog.FUNCTION.equals(storedType));
             }
-            new FlowGraphMigrator(storage, definitionRegistry).migrateGraph(graph);
             storage.requireValidGraph(graph);
             rollbackFlowId = flowId;
+            previousEventBindings = eventBindings(flowId);
             previousGraph = storage.getGraph(flowId);
             CustomContentStorage customContentStorage = CustomContentAccess.getStorage();
             CustomContentDefinition content = CustomContentGraphAdapter.toDefinition(graph);
@@ -185,13 +229,19 @@ public class FlowBlueprintPacketHandler {
             sender.failJob(job, "Reload this resource before saving your changes", e);
             Log.warn("Flow save conflict: " + e.getMessage());
         } catch (Exception e) {
-            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers, graphPersisted);
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousEventBindings, graphPersisted);
             sender.failJob(job, "Failed to save flow: " + e.getMessage(), e);
             Log.error("Flow save error: " + e.getMessage());
+        } finally {
+            sender.completeJobExecution(job);
         }
     }
 
     public void handleDelete(Session session, ByteBuffer buffer) {
+        if (resourceRegistry != null && resourceRegistry.genericMutationAuthorityRequired()) {
+            sender.sendError(session, "RESOURCE_GENERIC_AUTHORITY_REQUIRED", resourceRegistry.genericMutationAuthorityReason());
+            return;
+        }
         if (!buffer.hasRemaining()) {
             sender.sendError(session, "INVALID_DELETE", "Flow ID not provided");
             return;
@@ -199,12 +249,15 @@ public class FlowBlueprintPacketHandler {
         JobRecord<String> job = null;
         FlowGraph previousGraph = null;
         Map<String, CustomContentDefinition> previousContent = Map.of();
-        List<TriggerBinding> previousTriggers = triggerRegistry != null ? triggerRegistry.getBindings() : List.of();
+        List<TriggerBinding> previousEventBindings = List.of();
         String rollbackFlowId = null;
         boolean graphDeleted = false;
 
         try {
             FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
+            if (!validateMutationEpoch(session, payload)) {
+                return;
+            }
             String flowId = payload.payload();
             long expectedRevision = 0L;
             if (flowId.startsWith("{")) {
@@ -213,6 +266,7 @@ public class FlowBlueprintPacketHandler {
                 expectedRevision = deleteRequest != null && deleteRequest.has("expectedRevision") ? deleteRequest.get("expectedRevision").getAsLong() : 0L;
             }
             rollbackFlowId = flowId;
+            previousEventBindings = eventBindings(flowId);
             job = sender.beginJob(session, "deleteFlow", flowId, payload.requestId());
             if (job == null) {
                 return;
@@ -236,8 +290,8 @@ public class FlowBlueprintPacketHandler {
                     }
                 }
             }
-            if (triggerRegistry != null) {
-                triggerRegistry.removeFlowBindings(flowId);
+            if (triggerRegistry != null && !ReSyncResourceCatalog.COMMAND.equals(resourceType)) {
+                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
             }
             if (globalTriggers != null) {
                 globalTriggers.refreshBindings();
@@ -254,10 +308,12 @@ public class FlowBlueprintPacketHandler {
             sender.failJob(job, "Reload this resource before deleting it", e);
             Log.warn("Flow delete conflict: " + e.getMessage());
         } catch (Exception e) {
-            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousTriggers, graphDeleted);
+            restoreFlowSave(rollbackFlowId, previousGraph, previousContent, previousEventBindings, graphDeleted);
             sender.failJob(job, e.getMessage(), e);
             sender.sendError(session, "DELETE_FAILED", "Failed to delete flow: " + e.getMessage());
             Log.error("Flow delete error: " + e.getMessage());
+        } finally {
+            sender.completeJobExecution(job);
         }
     }
 
@@ -266,30 +322,159 @@ public class FlowBlueprintPacketHandler {
     }
 
     public void handleTriggerUpdate(Session session, ByteBuffer buffer) {
-        if (!buffer.hasRemaining() || triggerRegistry == null) {
+        if (!buffer.hasRemaining()) {
+            sender.sendError(session, "INVALID_TRIGGER_UPDATE", "No trigger update data provided");
             return;
         }
         FlowMutationPayload payload = FlowMutationPayloadReader.read(buffer);
-        JobRecord<String> job = sender.beginJob(session, "updateTriggers", "", payload.requestId());
+        String requestId = payload.requestId();
+        if (requestId == null || requestId.isBlank()) {
+            sender.sendError(session, "INVALID_TRIGGER_UPDATE", "A trigger update request ID is required");
+            return;
+        }
+        List<TriggerBinding> bindings;
+        String bindingHash;
+        try {
+            bindings = parseTriggerBindings(payload);
+            bindingHash = triggerRegistry != null ? triggerRegistry.bindingHash(bindings) : "";
+        } catch (RuntimeException exception) {
+            sender.sendError(session, "INVALID_TRIGGER_UPDATE", exception.getMessage(), requestId);
+            return;
+        }
+        String intentHash = triggerIntentHash(bindingHash, payload);
+        JobRecord<String> job = sender.beginJob(session, "updateTriggers", "", requestId, intentHash);
         if (job == null) {
             return;
         }
-        String json = payload.payload();
+        boolean durableCommitted = false;
+        TriggerRegistry.BindingMutationResult mutation = null;
         try {
-            List<TriggerBinding> bindings = gson.fromJson(json, new TypeToken<List<TriggerBinding>>() {
-            }.getType());
-            triggerRegistry.setBindingsPreservingTypes(bindings, Set.of(TriggerType.EVENT, TriggerType.COMMAND));
-            if (globalTriggers != null) {
-                globalTriggers.refreshBindings();
+            if (triggerRegistry == null) {
+                sender.failJob(job, "Trigger registry is unavailable", null);
+                return;
             }
-            sender.succeedJob(job, "triggers", "Saved");
+            FlowMutationPayloadReader.EpochDecision decision = FlowMutationPayloadReader.validateAuthorityEpoch(
+                payload, authorityEpoch, legacyCompatibility.test(session));
+            if (!decision.accepted()) {
+                sender.sendError(session, decision.code(), decision.message());
+                sender.failJob(job, decision.message(), null);
+                return;
+            }
+            if (payload.hasExpectedBindingEpoch() || payload.expectedBindingHash() != null) {
+                if (!payload.hasAuthorityEpoch() || !payload.hasExpectedBindingEpoch()
+                    || payload.expectedBindingHash() == null
+                    || payload.expectedBindingHash().isBlank()) {
+                    String message = "Expected trigger binding state is incomplete";
+                    sender.sendError(session, "TRIGGER_BINDING_STATE_REQUIRED", message);
+                    sender.failJob(job, message, null);
+                    return;
+                }
+                mutation = triggerRegistry.setBindingsPreservingTypesIfCurrent(
+                    bindings, Set.of(TriggerType.EVENT, TriggerType.SYSTEM), payload.expectedBindingEpoch(),
+                    payload.expectedBindingHash());
+                if (!mutation.accepted()) {
+                    String state = triggerMutationState(false, true, false, false, null,
+                        triggerRegistry.bindingState());
+                    sender.sendError(session, "TRIGGER_BINDING_STATE_STALE", state);
+                    sender.failJob(job, state, null);
+                    return;
+                }
+            } else {
+                triggerRegistry.setBindingsPreservingTypes(bindings, Set.of(TriggerType.EVENT, TriggerType.SYSTEM));
+                mutation = new TriggerRegistry.BindingMutationResult(true, triggerRegistry.bindingEpoch(),
+                    triggerRegistry.bindingHash());
+            }
+            durableCommitted = true;
+            boolean runtimeReady = true;
+            String finalizationError = null;
+            try {
+                if (globalTriggers != null) {
+                    globalTriggers.refreshBindings();
+                }
+            } catch (RuntimeException | Error exception) {
+                runtimeReady = false;
+                finalizationError = exception.getMessage();
+                Log.warn("Trigger runtime refresh deferred: " + finalizationError);
+            }
+            String state = triggerMutationState(true, false, true, runtimeReady, finalizationError,
+                triggerRegistry.bindingState());
+            sender.succeedJob(job, state, runtimeReady ? "Saved" : "Saved; Runtime Refresh Pending");
         } catch (Exception e) {
-            sender.failJob(job, e.getMessage(), e);
-            sender.sendError(session, "TRIGGER_UPDATE_FAILED", "Failed to update triggers: " + e.getMessage());
+            if (durableCommitted) {
+                String state = triggerMutationState(true, false, true, false, e.getMessage(),
+                    triggerRegistry.bindingState());
+                sender.succeedJob(job, state, "Saved; Runtime Refresh Pending");
+            } else {
+                sender.failJob(job, e.getMessage(), e);
+                sender.sendError(session, "TRIGGER_UPDATE_FAILED", "Failed to update triggers: " + e.getMessage());
+            }
+        } finally {
+            sender.completeJobExecution(job);
         }
     }
 
-    private void refreshAllGraphBindings() {
+    private String triggerIntentHash(String bindingHash, FlowMutationPayload payload) {
+        String expectedHash = payload.expectedBindingHash() == null ? "" : payload.expectedBindingHash();
+        return (bindingHash == null ? "" : bindingHash) + "\u0000" + payload.authorityEpoch()
+            + "\u0000" + payload.expectedBindingEpoch() + "\u0000" + expectedHash;
+    }
+
+    private String triggerMutationState(boolean accepted, boolean stale, boolean durable, boolean runtimeReady,
+                                        String finalizationError, TriggerRegistry.BindingState bindingState) {
+        JsonObject result = new JsonObject();
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_ACCEPTED_FIELD, accepted);
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_DURABLE_FIELD, durable);
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_RUNTIME_READY_FIELD, runtimeReady);
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_STALE_FIELD, stale);
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_EPOCH_FIELD,
+            bindingState != null ? bindingState.epoch() : 0L);
+        result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_HASH_FIELD,
+            bindingState != null ? bindingState.hash() : "");
+        result.add(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_BINDINGS_FIELD,
+            gson.toJsonTree(bindingState != null ? bindingState.bindings() : List.of()));
+        if (finalizationError != null && !finalizationError.isBlank()) {
+            result.addProperty(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_RESULT_FINALIZATION_ERROR_FIELD,
+                finalizationError);
+        }
+        return gson.toJson(result);
+    }
+
+    private List<TriggerBinding> parseTriggerBindings(FlowMutationPayload payload) {
+        JsonElement parsed = JsonParser.parseString(payload.payload());
+        if (parsed.isJsonArray()) {
+            return gson.fromJson(parsed, new TypeToken<List<TriggerBinding>>() {
+            }.getType());
+        }
+        if (!parsed.isJsonObject()) {
+            throw new IllegalArgumentException("Trigger update payload must be an object");
+        }
+        JsonObject envelope = parsed.getAsJsonObject();
+        Set<String> fields = Set.of(
+            ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_FORMAT_VERSION_FIELD,
+            ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_REQUEST_ID_FIELD,
+            ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_BINDINGS_FIELD);
+        if (envelope.size() != fields.size() || envelope.keySet().stream().anyMatch(field -> !fields.contains(field))) {
+            throw new IllegalArgumentException("Trigger update payload contains unexpected fields");
+        }
+        JsonElement version = envelope.get(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_FORMAT_VERSION_FIELD);
+        if (version == null || !version.isJsonPrimitive() || !version.getAsJsonPrimitive().isNumber()
+            || version.getAsInt() != ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_FORMAT_VERSION) {
+            throw new IllegalArgumentException("Unsupported trigger update payload version");
+        }
+        JsonElement requestId = envelope.get(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_REQUEST_ID_FIELD);
+        if (requestId == null || !requestId.isJsonPrimitive() || !requestId.getAsJsonPrimitive().isString()
+            || !payload.requestId().equals(requestId.getAsString())) {
+            throw new IllegalArgumentException("Trigger update request ID does not match its transport request");
+        }
+        JsonElement bindings = envelope.get(ReSyncProtocolContract.FLOW_TRIGGER_UPDATE_BINDINGS_FIELD);
+        if (bindings == null || !bindings.isJsonArray()) {
+            throw new IllegalArgumentException("Trigger update bindings must be an array");
+        }
+        return gson.fromJson(bindings, new TypeToken<List<TriggerBinding>>() {
+        }.getType());
+    }
+
+    public void refreshAllGraphBindings() {
         if (triggerRegistry == null) {
             return;
         }
@@ -298,12 +483,8 @@ public class FlowBlueprintPacketHandler {
                 FlowGraph graph = storage.getGraph(type, graphId);
                 if (graph != null && graph.getId() != null && !graph.getId().isBlank() && graph.getNodes() != null) {
                     updateEventBindings(graph);
-                    updateCommandBindings(graph);
                 }
             }
-        }
-        if (globalTriggers != null) {
-            globalTriggers.refreshBindings();
         }
     }
 
@@ -312,7 +493,9 @@ public class FlowBlueprintPacketHandler {
             return;
         }
         if (deleted) {
-            triggerRegistry.removeFlowBindings(flowId);
+            if (ReSyncResourceCatalog.FLOW.equals(type)) {
+                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, List.of());
+            }
             if (globalTriggers != null) {
                 globalTriggers.refreshBindings();
             }
@@ -322,116 +505,6 @@ public class FlowBlueprintPacketHandler {
         if (graph != null) {
             updateGraphBindings(graph);
         }
-    }
-
-    private void migrateLegacyCommandBindings() {
-        if (triggerRegistry == null) {
-            return;
-        }
-        Path reportFile = storage.getAssetsPath().resolve(".migrations").resolve("command-bindings-v1.json");
-        if (Files.exists(reportFile)) {
-            return;
-        }
-        int inspected = 0;
-        int migrated = 0;
-        int skipped = 0;
-        List<String> migratedIds = new ArrayList<>();
-        List<String> skippedIds = new ArrayList<>();
-        Map<String, String> rejected = new HashMap<>();
-        for (String commandId : storage.listGraphIds(ReSyncResourceCatalog.COMMAND)) {
-            FlowGraph graph = storage.getGraph(ReSyncResourceCatalog.COMMAND, commandId);
-            if (graph == null || graph.getNodes() == null) {
-                continue;
-            }
-            FlowGraph candidate = FlowSerializer.deserialize(FlowSerializer.serialize(graph));
-            List<TriggerBinding> legacy = triggerRegistry.getBindings(TriggerType.COMMAND).stream()
-                .filter(binding -> commandId.equals(binding.getFlowId()) && binding.getContext() != null && !binding.getContext().isBlank())
-                .sorted((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.getId() != null ? left.getId() : "", right.getId() != null ? right.getId() : ""))
-                .toList();
-            if (legacy.isEmpty()) {
-                continue;
-            }
-            inspected++;
-            List<Map.Entry<String, FlowNode>> commandNodes = candidate.getNodes().entrySet().stream()
-                .filter(entry -> entry.getValue() != null && isCommandNode(entry.getValue().getType()))
-                .sorted(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER))
-                .toList();
-            boolean changed = false;
-            for (Map.Entry<String, FlowNode> commandNode : commandNodes) {
-                TriggerBinding binding = legacy.stream()
-                    .filter(legacyBinding -> legacyBinding.getId() != null && legacyBinding.getId().equals(commandId + ":command:" + commandNode.getKey()))
-                    .findFirst()
-                    .orElse(legacy.size() == 1 ? legacy.getFirst() : null);
-                if (binding != null) {
-                    changed |= applyLegacyCommandContext(commandNode.getValue(), binding.getContext());
-                } else if (!legacy.isEmpty()) {
-                    Log.warn("Command binding migration skipped ambiguous paths for " + commandId + ':' + commandNode.getKey());
-                }
-            }
-            if (changed) {
-                try {
-                    storage.saveGraph(candidate);
-                    migrated++;
-                    migratedIds.add(commandId);
-                } catch (RuntimeException exception) {
-                    skipped++;
-                    rejected.put(commandId, exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName());
-                    Log.warn("Command binding migration rejected " + commandId + ": " + rejected.get(commandId));
-                }
-            } else {
-                skipped++;
-                skippedIds.add(commandId);
-            }
-        }
-        JsonObject report = new JsonObject();
-        report.addProperty("version", 1);
-        report.addProperty("inspected", inspected);
-        report.addProperty("migrated", migrated);
-        report.addProperty("skipped", skipped);
-        report.add("migratedIds", gson.toJsonTree(migratedIds));
-        report.add("skippedIds", gson.toJsonTree(skippedIds));
-        report.add("rejected", gson.toJsonTree(rejected));
-        try {
-            StorageSafety.writeUtf8Atomic(reportFile, gson.toJson(report));
-        } catch (IOException exception) {
-            Log.warn("Failed to save command binding migration report: " + exception.getMessage());
-        }
-    }
-
-    private boolean applyLegacyCommandContext(FlowNode node, String context) {
-        Map<String, Object> values = node.getInputValues();
-        if (values == null) {
-            values = new HashMap<>();
-            node.setInputValues(values);
-        }
-        if (!text(values, "command").isBlank() || !text(values, "label").isBlank() || !text(values, "name").isBlank()) {
-            return false;
-        }
-        String command = context.trim();
-        List<String> subcommands = List.of();
-        boolean structured = false;
-        if (command.startsWith("{")) {
-            JsonObject payload;
-            try {
-                payload = gson.fromJson(command, JsonObject.class);
-            } catch (RuntimeException exception) {
-                Log.warn("Command binding migration skipped malformed context: " + exception.getMessage());
-                return false;
-            }
-            if (payload == null) {
-                return false;
-            }
-            command = payload.has("command") && !payload.get("command").isJsonNull() ? payload.get("command").getAsString() : "";
-            subcommands = payload.has("subcommands") ? stringList(gson.fromJson(payload.get("subcommands"), List.class)) : List.of();
-            structured = payload.has("structured") && payload.get("structured").getAsBoolean();
-        }
-        if (command.isBlank()) {
-            return false;
-        }
-        values.put("command", command);
-        values.put("subcommands", subcommands);
-        values.put("structured", structured);
-        return true;
     }
 
     private void notifyDeleted(String type, String resourceId) {
@@ -460,13 +533,15 @@ public class FlowBlueprintPacketHandler {
             return;
         }
         updateEventBindings(graph);
-        updateCommandBindings(graph);
         if (globalTriggers != null) {
             globalTriggers.refreshBindings();
         }
     }
 
     private void updateEventBindings(FlowGraph graph) {
+        if (!ReSyncResourceCatalog.FLOW.equals(graph.getResourceType())) {
+            return;
+        }
         Set<String> contexts = new HashSet<>();
         for (var entry : graph.getNodes().entrySet()) {
             FlowNode node = entry.getValue();
@@ -486,98 +561,26 @@ public class FlowBlueprintPacketHandler {
         triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, bindings);
     }
 
-    private void updateCommandBindings(FlowGraph graph) {
-        String flowId = graph.getId();
-        List<TriggerBinding> existing = triggerRegistry.getBindings(TriggerType.COMMAND).stream()
+    private List<TriggerBinding> eventBindings(String flowId) {
+        if (triggerRegistry == null || flowId == null || flowId.isBlank()) {
+            return List.of();
+        }
+        return triggerRegistry.getBindings(TriggerType.EVENT).stream()
             .filter(binding -> flowId.equals(binding.getFlowId()))
             .toList();
-        List<TriggerBinding> bindings = new ArrayList<>();
-        int index = 0;
-        for (var entry : graph.getNodes().entrySet()) {
-            FlowNode node = entry.getValue();
-            if (node == null || !isCommandNode(node.getType())) {
-                continue;
-            }
-            String bindingId = flowId + ":command:" + entry.getKey();
-            String fallbackCommand = index == 0 && "command".equals(storage.getGraphResourceType(flowId)) ? flowId : "";
-            String context = commandContext(node, existing, bindingId, index, fallbackCommand);
-            if (context == null || context.isBlank()) {
-                continue;
-            }
-            bindings.add(new TriggerBinding(bindingId, flowId, TriggerType.COMMAND, context));
-            index++;
-        }
-        triggerRegistry.replaceFlowBindings(flowId, TriggerType.COMMAND, bindings);
     }
 
-    private boolean isCommandNode(String nodeType) {
-        if (nodeType == null) {
-            return false;
+    private boolean validateMutationEpoch(Session session, FlowMutationPayload payload) {
+        FlowMutationPayloadReader.EpochDecision decision = FlowMutationPayloadReader.validateAuthorityEpoch(
+            payload, authorityEpoch, legacyCompatibility.test(session));
+        if (decision.accepted()) {
+            return true;
         }
-        String normalized = nodeType.trim().toLowerCase(Locale.ROOT);
-        return "event.resync.command".equals(normalized) || "event:resync_command".equals(normalized);
+        sender.sendError(session, decision.code(), decision.message());
+        return false;
     }
 
-    private String commandContext(FlowNode node, List<TriggerBinding> existing, String bindingId, int index, String fallbackCommand) {
-        Map<String, Object> values = new HashMap<>(node.getHandlerConfigValues());
-        if (node.getInputValues() != null) {
-            values.putAll(node.getInputValues());
-        }
-        String command = text(values, "command");
-        if (command.isBlank()) {
-            command = text(values, "label");
-        }
-        if (command.isBlank()) {
-            command = text(values, "name");
-        }
-        List<String> subcommands = stringList(values.get("subcommands"));
-        if (subcommands.isEmpty()) {
-            subcommands = stringList(values.get("allowedSubcommands"));
-        }
-        boolean structured = bool(values.get("structured"));
-        if (!command.isBlank()) {
-            return gson.toJson(Map.of("command", command, "subcommands", subcommands, "structured", structured));
-        }
-        for (TriggerBinding binding : existing) {
-            if (bindingId.equals(binding.getId()) && binding.getContext() != null && !binding.getContext().isBlank()) {
-                return binding.getContext();
-            }
-        }
-        if (index < existing.size() && existing.get(index).getContext() != null && !existing.get(index).getContext().isBlank()) {
-            return existing.get(index).getContext();
-        }
-        return fallbackCommand;
-    }
-
-    private String text(Map<String, Object> values, String key) {
-        Object value = values.get(key);
-        return value != null ? value.toString().trim() : "";
-    }
-
-    private boolean bool(Object value) {
-        if (value instanceof Boolean bool) {
-            return bool;
-        }
-        return value != null && Boolean.parseBoolean(value.toString());
-    }
-
-    private List<String> stringList(Object value) {
-        if (value instanceof List<?> list) {
-            List<String> result = new ArrayList<>();
-            for (Object entry : list) {
-                if (entry != null && !entry.toString().isBlank()) {
-                    result.add(entry.toString().trim());
-                }
-            }
-            return result;
-        }
-        if (value instanceof String text && !text.isBlank()) {
-            return List.of(text);
-        }
-        return List.of();
-    }
-
-    private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousTriggers, boolean graphPersisted) {
+    private void restoreFlowSave(String flowId, FlowGraph previousGraph, Map<String, CustomContentDefinition> previousContent, List<TriggerBinding> previousEventBindings, boolean graphPersisted) {
         try {
             if (graphPersisted) {
                 if (previousGraph != null && previousGraph.getId() != null) {
@@ -597,8 +600,8 @@ public class FlowBlueprintPacketHandler {
                     customContentStorage.save(definition);
                 }
             }
-            if (triggerRegistry != null && previousTriggers != null) {
-                triggerRegistry.setBindings(previousTriggers);
+            if (triggerRegistry != null && previousEventBindings != null && flowId != null && !flowId.isBlank()) {
+                triggerRegistry.replaceFlowBindings(flowId, TriggerType.EVENT, previousEventBindings);
             }
             if (globalTriggers != null) {
                 globalTriggers.refreshBindings();
@@ -611,6 +614,10 @@ public class FlowBlueprintPacketHandler {
     private String mapEventContext(String nodeType) {
         if (nodeType == null) {
             return null;
+        }
+        NodeDefinition definition = definitionRegistry.get(nodeType);
+        if (definition != null) {
+            return FlowEventRegistry.bindingContext(definition);
         }
         String normalized = nodeType.trim().toLowerCase(Locale.ROOT);
         if (normalized.startsWith("event:")) {
@@ -625,5 +632,12 @@ public class FlowBlueprintPacketHandler {
             return null;
         }
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private static AuthorityEpoch requireExplicitAuthorityEpoch(FlowPacketSender sender) {
+        if (sender == null) {
+            return null;
+        }
+        throw new IllegalStateException("Authority epoch is required; use the bound-epoch constructor");
     }
 }

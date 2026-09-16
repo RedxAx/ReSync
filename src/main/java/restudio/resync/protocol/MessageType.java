@@ -11,7 +11,8 @@ public enum MessageType {
     HEARTBEAT(0x05),
     ACK(0x06),
     ERROR(0x07),
-    CHANNEL_REGISTRY(0x08);
+    CHANNEL_REGISTRY(0x08),
+    PROTOCOL_ENVELOPE(ReSyncProtocolContract.MESSAGE_PROTOCOL_ENVELOPE);
 
     private final byte value;
 

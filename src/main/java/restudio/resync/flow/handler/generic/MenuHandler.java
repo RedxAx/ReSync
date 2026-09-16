@@ -5,6 +5,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.GuiElement;
 import restudio.flow.data.Visual;
@@ -14,6 +15,7 @@ import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.flow.identity.ServerResourceLocator;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,7 +32,7 @@ public class MenuHandler implements NodeHandler {
 
     public MenuHandler() {
         operations.put("menu_create", (context, node) -> {
-            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            String menuId = resourceId(context.getInputValue(node, "menu_id"), "Menu ID");
             String title = context.getInputValue(node, "title", String.class, "Menu");
             int rows = context.getInputValue(node, "rows", Integer.class, 1);
             if (title == null || title.isBlank()) throw new IllegalArgumentException("Menu title is required");
@@ -59,7 +61,7 @@ public class MenuHandler implements NodeHandler {
         operations.put("menu_open", (context, node) -> {
             GuiManager manager = requireManager();
             Player player = requirePlayer(context, node);
-            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            String menuId = resourceId(context.getInputValue(node, "menu_id"), "Menu ID");
             if (requireStorage().getGui(menuId) == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
             manager.openGui(player, menuId);
         });
@@ -67,7 +69,7 @@ public class MenuHandler implements NodeHandler {
         operations.put("menu_update", (context, node) -> {
             GuiManager manager = requireManager();
             Player player = requirePlayer(context, node);
-            String menuId = requireText(context.getInputValue(node, "menu_id", String.class, ""), "Menu ID");
+            String menuId = resourceId(context.getInputValue(node, "menu_id"), "Menu ID");
             if (requireStorage().getGui(menuId) == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
             manager.refreshPlayerGui(player, menuId);
         });
@@ -138,7 +140,7 @@ public class MenuHandler implements NodeHandler {
         }));
 
         operations.put("menu_get_item", (context, node) -> {
-            GuiDefinition definition = requireGui(context.getInputValue(node, "menu_id", String.class, ""));
+            GuiDefinition definition = requireGui(resourceId(context.getInputValue(node, "menu_id"), "Menu ID"));
             int slot = context.getInputValue(node, "slot", Integer.class, 0);
             requireSlot(definition, slot);
             GuiElement element = elementAt(definition, slot, false);
@@ -147,7 +149,7 @@ public class MenuHandler implements NodeHandler {
         });
 
         operations.put("menu_get_all_items", (context, node) -> {
-            GuiDefinition definition = requireGui(context.getInputValue(node, "menu_id", String.class, ""));
+            GuiDefinition definition = requireGui(resourceId(context.getInputValue(node, "menu_id"), "Menu ID"));
             List<ItemStack> items = new ArrayList<>();
             definition.getElements().stream()
                 .filter(element -> element != null && element.getSlots() != null && !element.getSlots().isEmpty())
@@ -160,7 +162,7 @@ public class MenuHandler implements NodeHandler {
         });
 
         operations.put("menu_duplicate", (context, node) -> {
-            String sourceId = requireText(context.getInputValue(node, "source_menu_id", String.class, ""), "Source menu ID");
+            String sourceId = resourceId(context.getInputValue(node, "source_menu_id"), "Source menu ID");
             String newId = requireText(context.getInputValue(node, "new_menu_id", String.class, ""), "New menu ID");
             FlowStorage storage = requireStorage();
             GuiDefinition source = storage.getGui(sourceId);
@@ -205,9 +207,9 @@ public class MenuHandler implements NodeHandler {
     }
 
     private void mutate(FlowContext context, FlowNode node, Consumer<GuiDefinition> mutation) {
-        String menuId = context.getInputValue(node, "menu_id", String.class, "");
+        String menuId = resourceId(context.getInputValue(node, "menu_id"), "Menu ID");
         FlowStorage storage = requireStorage();
-        GuiDefinition definition = storage.getGui(requireText(menuId, "Menu ID"));
+        GuiDefinition definition = storage.getGui(menuId);
         if (definition == null) throw new IllegalArgumentException("Unknown menu: " + menuId);
         ensureElements(definition);
         mutation.accept(definition);
@@ -348,5 +350,15 @@ public class MenuHandler implements NodeHandler {
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
         return value;
+    }
+
+    static String resourceId(Object value, String field) {
+        if (value instanceof ServerResourceLocator locator) {
+            return requireText(locator.id(), field);
+        }
+        if (value instanceof FlowResourceReference reference) {
+            return requireText(reference.id(), field);
+        }
+        return requireText(value != null ? String.valueOf(value) : null, field);
     }
 }

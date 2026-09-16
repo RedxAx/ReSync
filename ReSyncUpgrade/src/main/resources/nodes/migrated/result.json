@@ -1,0 +1,115 @@
+[
+  {
+    "id": "result.success",
+    "displayName": "Successful Result",
+    "description": "Create a successful result containing a typed value.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "success", "value"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "success"},
+    "inputs": [
+      {"name": "value", "dataType": "type:t"}
+    ],
+    "outputs": [
+      {"name": "result", "dataType": "result<type:t>"}
+    ]
+  },
+  {
+    "id": "result.failure",
+    "displayName": "Failed Result",
+    "description": "Create a failed result with a clear error code, message, and optional details.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "failure", "error"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "failure"},
+    "inputs": [
+      {"name": "error_code", "dataType": "string", "defaultValue": "FAILED"},
+      {"name": "message", "dataType": "string", "defaultValue": "Operation Failed"},
+      {"name": "details", "dataType": "map<string,any>", "optional": true}
+    ],
+    "outputs": [
+      {"name": "result", "dataType": "result<any>"}
+    ]
+  },
+  {
+    "id": "result.is_success",
+    "displayName": "Result Succeeded",
+    "description": "Check whether a result completed successfully.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "success", "check"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "is_success"},
+    "inputs": [
+      {"name": "result", "dataType": "result<type:t>"}
+    ],
+    "outputs": [
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "result.value",
+    "displayName": "Result Value",
+    "description": "Read the typed value from a successful result.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "value", "unwrap"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "value"},
+    "inputs": [
+      {"name": "result", "dataType": "result<type:t>"}
+    ],
+    "outputs": [
+      {"name": "value", "dataType": "type:t"},
+      {"name": "available", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "result.error",
+    "displayName": "Result Error",
+    "description": "Read the error information from a failed result.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "error", "message", "details"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "error"},
+    "inputs": [
+      {"name": "result", "dataType": "result<any>"}
+    ],
+    "outputs": [
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {"name": "details", "dataType": "map<string,any>"}
+    ]
+  },
+  {
+    "id": "result.match",
+    "displayName": "Match Result",
+    "description": "Continue through Success or Failure and expose the typed value or error information.",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["result", "match", "branch", "success", "failure"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "match"},
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "result", "dataType": "result<type:t>"}
+    ],
+    "outputs": [
+      {"name": "success", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "failure", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "value", "dataType": "type:t"},
+      {"name": "error_code", "dataType": "string"},
+      {"name": "message", "dataType": "string"},
+      {"name": "details", "dataType": "map<string,any>"}
+    ]
+  }
+]

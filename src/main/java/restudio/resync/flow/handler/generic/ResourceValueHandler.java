@@ -10,6 +10,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowRuntimeAccess;
 import restudio.resync.flow.FlowStorage;
+import restudio.resync.flow.FunctionCallSupport;
 import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
@@ -93,39 +94,31 @@ public final class ResourceValueHandler implements NodeHandler {
             throw new FlowHandlerException("FUNCTION_VALUE_REQUIRED", "Function value is required",
                 "Connect the Value output from Get Function");
         }
-        Map<String, Object> arguments = functionArguments(function, ctx.getInputValue(node, "arguments", Object.class, null));
-        CompletableFuture<Map<String, Object>> execution = requireExecutor(ctx).executeFunction(function, ctx.getPlayer(), ctx.getEvent(), arguments,
-            new LinkedHashMap<>(ctx.getRuntime().getEventVariables()));
+        Map<String, Object> arguments = FunctionCallSupport.normalizeArguments(function,
+            ctx.getInputValue(node, "arguments", Object.class, null));
+        FlowExecutor executor = requireExecutor(ctx);
+        Map<String, Object> variables = new LinkedHashMap<>(ctx.getRuntime().getEventVariables());
+        FlowExecutor.FunctionInvocationContext invocation = functionInvocationContext(ctx, node, function, executor, variables);
+        CompletableFuture<Map<String, Object>> execution = invocation == null
+            ? executor.executeFunction(function, ctx.getPlayer(), ctx.getEvent(), arguments, variables)
+            : executor.executeFunction(function, ctx.getPlayer(), ctx.getEvent(), arguments, variables, invocation);
         ctx.awaitBeforeContinuation(execution.thenAccept(results -> {
             ctx.setOutput(node, "results", results);
             ctx.setOutput(node, "result", FlowOperationResult.success(results));
         }));
     }
 
-    private Map<String, Object> functionArguments(FlowGraph function, Object value) {
-        if (value instanceof Map<?, ?> values) {
-            Map<String, Object> arguments = new LinkedHashMap<>();
-            values.forEach((name, argument) -> {
-                if (name != null) {
-                    arguments.put(name.toString(), argument);
-                }
-            });
-            return arguments;
+    private FlowExecutor.FunctionInvocationContext functionInvocationContext(FlowContext ctx, FlowNode node,
+                                                                              FlowGraph function, FlowExecutor executor,
+                                                                              Map<String, Object> variables) {
+        String nodeId = ctx.resolveNodeId(node);
+        String identity = "resource-value|" + (ctx.getInvocationKey() == null ? "" : ctx.getInvocationKey())
+            + "|" + (nodeId == null ? node.getType() : nodeId) + "|" + function.getId();
+        if (ctx.getRuntimePrincipal() != null && ctx.getInvocationId() != null) {
+            return new FlowExecutor.FunctionInvocationContext(ctx.getRuntimePrincipal(), ctx.getInvocationId(),
+                ctx.getCompiledRuntimeContext(), ctx.getRequestedDeadlineMillis()).child(identity);
         }
-        if (value == null) {
-            return Map.of();
-        }
-        List<FlowGraph.FunctionParameter> inputs = function.getFunctionInputs() != null
-            ? function.getFunctionInputs().stream()
-                .filter(input -> input != null && input.getName() != null && !input.getName().isBlank())
-                .toList()
-            : List.of();
-        if (inputs.size() != 1) {
-            throw new FlowHandlerException("FUNCTION_ARGUMENTS_NEED_NAMES",
-                "This function has multiple inputs, so each value needs an argument name",
-                "Use Add Function Argument nodes and connect their Arguments output");
-        }
-        return Map.of(inputs.getFirst().getName(), value);
+        return executor.defaultFunctionInvocationContext(ctx.getPlayer(), ctx.getEvent(), variables);
     }
 
     private void motdDetails(FlowContext ctx, FlowNode node) {

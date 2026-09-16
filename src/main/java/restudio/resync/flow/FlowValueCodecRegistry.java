@@ -20,6 +20,8 @@ import restudio.flow.data.GuiDefinition;
 import restudio.flow.data.GuiElement;
 import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.api.ExtensionRegistryActivation;
 import restudio.resync.flow.util.TextFormatter;
 
 import java.time.Instant;
@@ -34,13 +36,19 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class FlowValueCodecRegistry {
     private final Gson gson = new Gson();
     private final Map<String, FlowValueCodec<?>> codecs = new ConcurrentHashMap<>();
     private final Map<String, String> aliases = new ConcurrentHashMap<>();
+    private volatile ExtensionRegistryActivation activation;
 
     public FlowValueCodecRegistry() {
+        this(null);
+    }
+
+    public FlowValueCodecRegistry(LegacyRuntimeActivationGate legacyRuntimeGate) {
         register(codec("string", String.class, value -> value, String::valueOf));
         register(codec("number", Number.class, Number::doubleValue, this::number));
         register(codec("integer", Integer.class, value -> value, value -> number(value).intValue()));
@@ -66,9 +74,9 @@ public final class FlowValueCodecRegistry {
         register(codec("scoreboard_definition", ScoreboardDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), ScoreboardDefinition.class)));
         register(codec("tab_definition", TabDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), TabDefinition.class)));
         register(codec("custom_content_definition", CustomContentDefinition.class, value -> gson.toJson(value), value -> gson.fromJson(String.valueOf(value), CustomContentDefinition.class)));
-        register(codec("flow_definition", FlowGraph.class, value -> FlowSerializer.serialize(value), value -> FlowSerializer.deserialize(String.valueOf(value))));
-        registerAlias("function_definition", "flow_definition");
-        registerAlias("command_definition", "flow_definition");
+        if (legacyRuntimeGate != null && legacyRuntimeGate.allowsLegacyRuntime()) {
+            registerLegacyFlowDefinitionCodecs();
+        }
         registerAliases("json_object", "chat_profile", "motd_profile", "message_rule", "text_template");
         registerAlias("dialog_definition", "json_object");
         registerAlias("trade_profile", "json_object");
@@ -95,24 +103,72 @@ public final class FlowValueCodecRegistry {
         registerAlias("worldgen_job", "job_reference");
     }
 
+    public void bindActivation(ExtensionRegistryActivation activation) {
+        this.activation = activation;
+    }
+
+    private void registerLegacyFlowDefinitionCodecs() {
+        register(codec("flow_definition", FlowGraph.class, value -> FlowSerializer.serialize(value), value -> FlowSerializer.deserialize(String.valueOf(value))));
+        registerAlias("function_definition", "flow_definition");
+        registerAlias("command_definition", "flow_definition");
+    }
+
     public void register(FlowValueCodec<?> codec) {
         if (codec == null || codec.id() == null || codec.id().isBlank()) {
             throw new IllegalArgumentException("Codec ID is required");
         }
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(FlowValueCodecRegistry.class, target -> {
+                target.registerLocal(codec);
+                return null;
+            });
+            return;
+        }
+        registerLocal(codec);
+    }
+
+    private void registerLocal(FlowValueCodec<?> codec) {
         codecs.put(codec.id().toLowerCase(Locale.ROOT), codec);
     }
 
     public void unregister(String typeId) {
         if (typeId != null) {
-            codecs.remove(typeId.toLowerCase(Locale.ROOT));
-            aliases.remove(typeId.toLowerCase(Locale.ROOT));
+            ExtensionRegistryActivation current = activation;
+            if (current != null) {
+                current.update(FlowValueCodecRegistry.class, target -> {
+                    target.unregisterLocal(typeId);
+                    return null;
+                });
+                return;
+            }
+            unregisterLocal(typeId);
         }
     }
 
+    private void unregisterLocal(String typeId) {
+        codecs.remove(typeId.toLowerCase(Locale.ROOT));
+        aliases.remove(typeId.toLowerCase(Locale.ROOT));
+    }
+
     public void registerAlias(String typeId, String codecTypeId) {
-        if (typeId == null || typeId.isBlank() || codecTypeId == null || codecTypeId.isBlank() || codec(codecTypeId) == null) {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (typeId == null || typeId.isBlank() || codecTypeId == null || codecTypeId.isBlank()
+            || activeRegistry.codec(codecTypeId) == null) {
             throw new IllegalArgumentException("Codec alias and registered target are required");
         }
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(FlowValueCodecRegistry.class, target -> {
+                target.registerAliasLocal(typeId, codecTypeId);
+                return null;
+            });
+            return;
+        }
+        registerAliasLocal(typeId, codecTypeId);
+    }
+
+    private void registerAliasLocal(String typeId, String codecTypeId) {
         aliases.put(typeId.toLowerCase(Locale.ROOT), codecTypeId.toLowerCase(Locale.ROOT));
     }
 
@@ -123,6 +179,10 @@ public final class FlowValueCodecRegistry {
     }
 
     public boolean hasCodec(FlowTypeRef type) {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.hasCodec(type);
+        }
         if (type == null) {
             return false;
         }
@@ -134,6 +194,10 @@ public final class FlowValueCodecRegistry {
     }
 
     public Object encode(FlowTypeRef type, Object value) {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.encode(type, value);
+        }
         if (value == null) {
             return null;
         }
@@ -148,6 +212,10 @@ public final class FlowValueCodecRegistry {
     }
 
     public Object decode(FlowTypeRef type, Object value) {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.decode(type, value);
+        }
         if (value == null) {
             return null;
         }
@@ -162,7 +230,54 @@ public final class FlowValueCodecRegistry {
     }
 
     public Map<String, FlowValueCodec<?>> codecs() {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.codecs();
+        }
         return Map.copyOf(codecs);
+    }
+
+    public Map<String, String> aliases() {
+        FlowValueCodecRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.aliases();
+        }
+        return Map.copyOf(aliases);
+    }
+
+    public synchronized FlowValueCodecRegistry copy() {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            return current.snapshot().valueCodecs();
+        }
+        FlowValueCodecRegistry copy = new FlowValueCodecRegistry();
+        copy.codecs.clear();
+        copy.codecs.putAll(codecs);
+        copy.aliases.clear();
+        copy.aliases.putAll(aliases);
+        return copy;
+    }
+
+    public synchronized void replaceFrom(FlowValueCodecRegistry staged) {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(FlowValueCodecRegistry.class, target -> {
+                target.replaceFromLocal(staged);
+                return null;
+            });
+            return;
+        }
+        replaceFromLocal(staged);
+    }
+
+    private synchronized void replaceFromLocal(FlowValueCodecRegistry staged) {
+        if (staged == null) {
+            throw new IllegalArgumentException("A staged Flow value codec registry is required");
+        }
+        codecs.clear();
+        codecs.putAll(staged.codecs);
+        aliases.clear();
+        aliases.putAll(staged.aliases);
     }
 
     private Object encodeIterable(FlowTypeRef type, Iterable<?> values, boolean distinct) {
@@ -415,9 +530,15 @@ public final class FlowValueCodecRegistry {
     }
 
     private Color color(Object value) {
-        String hex = String.valueOf(value).strip().replace("#", "");
-        if (hex.length() != 6) {
+        String hex = String.valueOf(value).strip();
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
+        }
+        if (!hex.matches("[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}")) {
             throw new IllegalArgumentException("Invalid RGB color: " + value);
+        }
+        if (hex.length() == 3) {
+            hex = hex.chars().mapToObj(character -> String.valueOf((char) character).repeat(2)).collect(Collectors.joining());
         }
         return Color.fromRGB(Integer.parseInt(hex, 16));
     }
@@ -481,5 +602,10 @@ public final class FlowValueCodecRegistry {
                 return decoder.apply(value);
             }
         };
+    }
+
+    private FlowValueCodecRegistry activeRegistry() {
+        ExtensionRegistryActivation current = activation;
+        return current != null ? current.snapshot().valueCodecs() : this;
     }
 }

@@ -3,15 +3,23 @@ package restudio.resync.runtime;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.resources.ReSyncResourceCatalog;
+
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JsonRuntimeResourceValidatorTest {
     private final JsonRuntimeResourceValidator validator = new JsonRuntimeResourceValidator(null);
+
+    @TempDir
+    Path temporaryDirectory;
 
     @Test
     void validTradeProfilePassesAuthoritativeValidation() {
@@ -156,6 +164,20 @@ class JsonRuntimeResourceValidatorTest {
         assertFalse(definition.has("spawnMode"));
         assertFalse(definition.has("location"));
         assertFalse(definition.getAsJsonObject("hooks").has("interactFlow"));
+    }
+
+    @Test
+    void replacementRuntimeRejectsLegacyNpcSaveShapeWithoutMutatingIt() {
+        JsonObject definition = npc();
+        definition.addProperty("spawnMode", "startup");
+        definition.getAsJsonObject("hooks").addProperty("interactFlow", "legacy-interact");
+        JsonRuntimeResourceValidator replacementValidator = new JsonRuntimeResourceValidator(null, null,
+            LegacyRuntimeActivationGate.runtime(temporaryDirectory));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> replacementValidator.beforeSave(ReSyncResourceCatalog.NPC_DEFINITION, definition));
+        assertTrue(definition.has("spawnMode"));
+        assertTrue(definition.getAsJsonObject("hooks").has("interactFlow"));
     }
 
     private JsonObject profile(String cost, String result) {

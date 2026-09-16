@@ -1,0 +1,259 @@
+[
+  {
+    "id": "color_from_rgb",
+    "displayName": "RGB Color",
+    "description": "Create an RGB color from red, green, and blue channels. Each channel is clamped to the inclusive range from 0 through 255.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "rgb", "create"],
+    "legacyIds": ["color.from.rgb"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_from_rgb"},
+    "inputs": [
+      {"id": "red", "displayName": "Red", "name": "red", "pinType": "DATA", "dataType": "integer", "defaultValue": 0, "constraints": {"min": 0, "max": 255}, "description": "Red channel value. Values outside 0 through 255 are clamped to the supported channel range."},
+      {"id": "green", "displayName": "Green", "name": "green", "pinType": "DATA", "dataType": "integer", "defaultValue": 0, "constraints": {"min": 0, "max": 255}, "description": "Green channel value. Values outside 0 through 255 are clamped to the supported channel range."},
+      {"id": "blue", "displayName": "Blue", "name": "blue", "pinType": "DATA", "dataType": "integer", "defaultValue": 0, "constraints": {"min": 0, "max": 255}, "description": "Blue channel value. Values outside 0 through 255 are clamped to the supported channel range."}
+    ],
+    "outputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the RGB color built from the three clamped channels."}
+    ]
+  },
+  {
+    "id": "color_from_hex",
+    "displayName": "Color From Hex",
+    "description": "Parse a 3-digit or 6-digit hexadecimal RGB color. A leading # is accepted; invalid hexadecimal text or any other length fails before output.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "hex", "parse"],
+    "legacyIds": ["color.from.hex"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_from_hex"},
+    "inputs": [
+      {"id": "hex_string", "displayName": "Hex String", "name": "hex_string", "pinType": "DATA", "dataType": "string", "widget": "COLOR", "defaultValue": "#FFFFFF", "description": "Three-digit or six-digit hexadecimal RGB text, optionally prefixed with #. Missing or null input uses #FFFFFF; invalid text or any other length fails before output."}
+    ],
+    "outputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the parsed RGB color."}
+    ]
+  },
+  {
+    "id": "color_to_hex",
+    "displayName": "Color To Hex",
+    "description": "Format an RGB color as a six-digit hexadecimal value. Missing or null color input uses white.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "hex", "format"],
+    "legacyIds": ["color.to.hex"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_to_hex"},
+    "inputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to format. Missing or null input uses white."}
+    ],
+    "outputs": [
+      {"id": "hex_string", "displayName": "Hex String", "name": "hex_string", "pinType": "DATA", "dataType": "string", "description": "Returns the color as a six-digit hexadecimal string."}
+    ]
+  },
+  {
+    "id": "color_to_rgb",
+    "displayName": "Color Channels",
+    "description": "Read the red, green, and blue channels of an RGB color. Missing or null color input uses white.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "rgb", "channels"],
+    "legacyIds": ["color.to.rgb"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_to_rgb"},
+    "inputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color whose channels should be read. Missing or null input uses white."}
+    ],
+    "outputs": [
+      {"id": "red", "displayName": "Red", "name": "red", "pinType": "DATA", "dataType": "integer", "description": "Returns the red channel from 0 through 255."},
+      {"id": "green", "displayName": "Green", "name": "green", "pinType": "DATA", "dataType": "integer", "description": "Returns the green channel from 0 through 255."},
+      {"id": "blue", "displayName": "Blue", "name": "blue", "pinType": "DATA", "dataType": "integer", "description": "Returns the blue channel from 0 through 255."}
+    ]
+  },
+  {
+    "id": "color_invert",
+    "displayName": "Invert Color",
+    "description": "Invert every RGB channel by replacing it with 255 minus its value. Missing or null color input uses white.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "invert"],
+    "legacyIds": ["color.invert"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_invert"},
+    "inputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to invert. Missing or null input uses white."}
+    ],
+    "outputs": [
+      {"id": "inverted_color", "displayName": "Inverted Color", "name": "inverted_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the color with every channel inverted."}
+    ]
+  },
+  {
+    "id": "color_brighten",
+    "displayName": "Brighten Color",
+    "description": "Brighten an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output; channel results are truncated and capped at 255.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "brighten"],
+    "legacyIds": ["color.brighten"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_brighten"},
+    "inputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to brighten. Missing or null input uses white."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized brightening amount from 0 through 1. Missing or null input uses 0.2; values are clamped, non-finite values fail before output, and channel results are truncated."}
+    ],
+    "outputs": [
+      {"id": "brightened_color", "displayName": "Brightened Color", "name": "brightened_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the brightened color with channels capped at 255."}
+    ]
+  },
+  {
+    "id": "color_darken",
+    "displayName": "Darken Color",
+    "description": "Darken an RGB color by a finite normalized amount. Missing or null color uses white, missing or null amount uses 0.2, and the amount is clamped to 0 through 1. Non-finite amounts fail before output; channel results are truncated and floored at 0.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "darken"],
+    "legacyIds": ["color.darken"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_darken"},
+    "inputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "RGB color to darken. Missing or null input uses white."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0.2, "constraints": {"min": 0, "max": 1}, "description": "Finite normalized darkening amount from 0 through 1. Missing or null input uses 0.2; values are clamped, non-finite values fail before output, and channel results are truncated."}
+    ],
+    "outputs": [
+      {"id": "darkened_color", "displayName": "Darkened Color", "name": "darkened_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the darkened color with channels floored at 0."}
+    ]
+  },
+  {
+    "id": "color_blend",
+    "displayName": "Blend Colors",
+    "description": "Blend two RGB colors by interpolating each channel with a finite ratio. Missing or null color1 uses white, color2 uses black, and missing or null ratio uses 0.5; ratio is clamped to 0 through 1, channels are truncated, and non-finite ratios fail before output.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "blend", "mix"],
+    "legacyIds": ["utility.color_blend"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_blend"},
+    "inputs": [
+      {"id": "color1", "displayName": "Color 1", "name": "color1", "pinType": "DATA", "dataType": "rgb_color", "description": "First RGB color to interpolate from. Missing or null input uses white."},
+      {"id": "color2", "displayName": "Color 2", "name": "color2", "pinType": "DATA", "dataType": "rgb_color", "description": "Second RGB color to interpolate toward. Missing or null input uses black."},
+      {"id": "ratio", "displayName": "Ratio", "name": "ratio", "pinType": "DATA", "dataType": "number", "defaultValue": 0.5, "constraints": {"min": 0, "max": 1}, "description": "Finite interpolation ratio from 0 through 1. Missing or null input uses 0.5; values are clamped, non-finite values fail before output, and channel results are truncated."}
+    ],
+    "outputs": [
+      {"id": "mixed_color", "displayName": "Mixed Color", "name": "mixed_color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns the color produced by channel-by-channel interpolation."}
+    ]
+  },
+  {
+    "id": "color_random",
+    "displayName": "Random RGB Color",
+    "description": "Create a fresh nondeterministic random RGB color. Each execution chooses every channel independently from 0 through 255.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "random", "rgb"],
+    "legacyIds": ["utility.color_random"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_random"},
+    "inputs": [],
+    "outputs": [
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "dataType": "rgb_color", "description": "Returns a newly generated random RGB color."}
+    ]
+  },
+  {
+    "id": "color_distance",
+    "displayName": "Color Distance",
+    "description": "Measure the Euclidean distance between two RGB colors. Missing or null color1 uses white and color2 uses black.",
+    "domain": "core",
+    "family": "color",
+    "lifecycle": "active",
+    "handlerCapability": "generic-color",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["color", "distance", "compare"],
+    "legacyIds": ["utility.color_distance"],
+    "handler": "ColorHandler",
+    "handlerConfig": {"operation": "color_distance"},
+    "inputs": [
+      {"id": "color1", "displayName": "Color 1", "name": "color1", "pinType": "DATA", "dataType": "rgb_color", "description": "First RGB color in the Euclidean distance calculation. Missing or null input uses white."},
+      {"id": "color2", "displayName": "Color 2", "name": "color2", "pinType": "DATA", "dataType": "rgb_color", "description": "Second RGB color in the Euclidean distance calculation. Missing or null input uses black."}
+    ],
+    "outputs": [
+      {"id": "distance", "displayName": "Distance", "name": "distance", "pinType": "DATA", "dataType": "number", "description": "Returns the Euclidean distance between the two RGB colors."}
+    ]
+  }
+]

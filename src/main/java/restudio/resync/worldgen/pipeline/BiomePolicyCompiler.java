@@ -7,6 +7,7 @@ import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
 import restudio.resync.worldgen.data.WorldGenProjectSettings;
 import restudio.resync.worldgen.data.WorldGenSpawnRule;
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,20 +24,24 @@ public final class BiomePolicyCompiler {
     }
 
     public static Result compile(WorldGenProject project) {
+        return compile(project, false);
+    }
+
+    public static Result compile(WorldGenProject project, boolean legacyCompatibility) {
         WorldGenProjectSettings settings = project.getSettings();
         Map<String, Boolean> featureOverrides = new HashMap<>(settings == null ? Map.of() : settings.getBiomeVanillaFeatureOverrides());
         Map<String, Boolean> structureOverrides = new HashMap<>();
         Map<String, Boolean> spawnOverrides = new HashMap<>();
         List<WorldGenSpawnRule> spawnRules = new ArrayList<>();
         collectProfilePolicies(project, featureOverrides, structureOverrides, spawnOverrides, spawnRules);
-        collectNodePolicies(project.getBiomeGraph(), featureOverrides, structureOverrides, spawnOverrides);
-        collectSpawnRules(project.getSpawnGraph(), spawnRules);
+        collectNodePolicies(project.getBiomeGraph(), featureOverrides, structureOverrides, spawnOverrides, legacyCompatibility);
+        collectSpawnRules(project.getSpawnGraph(), spawnRules, legacyCompatibility);
         boolean defaultFeatures = collectOverridePolicies(project.getFeatureGraph(), "scatter", "poisson_scatter", featureOverrides,
-            settings == null || settings.isVanillaFeaturesEnabled());
+            settings == null || settings.isVanillaFeaturesEnabled(), legacyCompatibility);
         boolean defaultStructures = collectOverridePolicies(project.getStructureGraph(), "structure_placement", null, structureOverrides,
-            settings == null || settings.isVanillaStructuresEnabled());
+            settings == null || settings.isVanillaStructuresEnabled(), legacyCompatibility);
         boolean defaultSpawns = collectOverridePolicies(project.getSpawnGraph(), "spawn_rule", null, spawnOverrides,
-            settings == null || settings.isVanillaSpawnsEnabled());
+            settings == null || settings.isVanillaSpawnsEnabled(), legacyCompatibility);
         return new Result(new CompiledBiomePolicy(
             defaultFeatures,
             defaultStructures,
@@ -68,7 +73,7 @@ public final class BiomePolicyCompiler {
     }
 
     private static void collectNodePolicies(WorldGenGraph graph, Map<String, Boolean> featureOverrides, Map<String, Boolean> structureOverrides,
-                                            Map<String, Boolean> spawnOverrides) {
+                                            Map<String, Boolean> spawnOverrides, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
@@ -81,7 +86,8 @@ public final class BiomePolicyCompiler {
             addPolicyId(ids, node.getInputValues().get("true_biome"));
             addPolicyId(ids, node.getInputValues().get("false_biome"));
             addPolicyId(ids, node.getInputValues().get("profile"));
-            if ("climate_map".equals(node.getType()) || "biome_climate_router".equals(node.getType())) {
+            String type = localType(node, legacyCompatibility);
+            if ("climate_map".equals(type) || "biome_climate_router".equals(type)) {
                 ids.addAll(List.of("minecraft:snowy_plains", "minecraft:desert", "minecraft:forest", "minecraft:savanna", "minecraft:plains"));
             }
             for (String biomeId : ids) {
@@ -101,14 +107,14 @@ public final class BiomePolicyCompiler {
         }
     }
 
-    private static void collectSpawnRules(WorldGenGraph graph, List<WorldGenSpawnRule> spawnRules) {
+    private static void collectSpawnRules(WorldGenGraph graph, List<WorldGenSpawnRule> spawnRules, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
-        Set<String> active = activeNodes(graph, "output_spawns");
+        Set<String> active = activeNodes(graph, "output_spawns", legacyCompatibility);
         for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
             WorldGenNode node = entry.getValue();
-            if (node == null || !active.contains(entry.getKey()) || !"spawn_rule".equals(node.getType())) {
+            if (node == null || !active.contains(entry.getKey()) || !"spawn_rule".equals(localType(node, legacyCompatibility))) {
                 continue;
             }
             WorldGenSpawnRule rule = new WorldGenSpawnRule();
@@ -130,16 +136,18 @@ public final class BiomePolicyCompiler {
         }
     }
 
-    private static boolean collectOverridePolicies(WorldGenGraph graph, String firstType, String secondType, Map<String, Boolean> overrides, boolean defaultValue) {
+    private static boolean collectOverridePolicies(WorldGenGraph graph, String firstType, String secondType, Map<String, Boolean> overrides, boolean defaultValue,
+                                                   boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return defaultValue;
         }
         boolean result = defaultValue;
         String outputType = "structure_placement".equals(firstType) ? "output_structures" : "spawn_rule".equals(firstType) ? "output_spawns" : "output_features";
-        Set<String> active = activeNodes(graph, outputType);
+        Set<String> active = activeNodes(graph, outputType, legacyCompatibility);
         for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
             WorldGenNode node = entry.getValue();
-            if (node == null || !active.contains(entry.getKey()) || !firstType.equals(node.getType()) && (secondType == null || !secondType.equals(node.getType()))
+            String type = node == null ? "" : localType(node, legacyCompatibility);
+            if (node == null || !active.contains(entry.getKey()) || !firstType.equals(type) && (secondType == null || !secondType.equals(type))
                 || !booleanValue(node.getInputValues().get("override_vanilla"), false)) {
                 continue;
             }
@@ -153,11 +161,11 @@ public final class BiomePolicyCompiler {
         return result;
     }
 
-    private static Set<String> activeNodes(WorldGenGraph graph, String outputType) {
+    private static Set<String> activeNodes(WorldGenGraph graph, String outputType, boolean legacyCompatibility) {
         Set<String> active = new LinkedHashSet<>();
         List<String> pending = new ArrayList<>();
         graph.getNodes().forEach((id, node) -> {
-            if (node != null && outputType.equals(node.getType())) {
+            if (node != null && outputType.equals(localType(node, legacyCompatibility))) {
                 active.add(id);
                 pending.add(id);
             }
@@ -174,6 +182,14 @@ public final class BiomePolicyCompiler {
             }
         }
         return active;
+    }
+
+    private static String localType(WorldGenNode node, boolean legacyCompatibility) {
+        try {
+            return WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility);
+        } catch (RuntimeException exception) {
+            throw new CompilationException(exception.getMessage());
+        }
     }
 
     private static void addPolicyId(List<String> ids, Object value) {

@@ -1,12 +1,14 @@
 package restudio.resync.flow.handler.generic;
 
 import org.junit.jupiter.api.Test;
+import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.FlowHandlerException;
+import restudio.resync.flow.identity.FunctionParameterId;
 
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,30 @@ class FunctionHandlerTest {
         handler.execute(resultContext, result);
 
         assertEquals("Done", resultContext.getOutput(result, "value"));
+    }
+
+    @Test
+    void functionBoundariesUseDirectionQualifiedParameterPins() {
+        FunctionParameterId inputId = FunctionParameterId.deterministic("function-handler-input");
+        FunctionParameterId outputId = FunctionParameterId.deterministic("function-handler-output");
+        FlowGraph function = new FlowGraph();
+        function.setFunction(true);
+        function.setFunctionInputs(List.of(new FlowGraph.FunctionParameter(inputId, "player", FlowDataType.STRING)));
+        function.setFunctionOutputs(List.of(new FlowGraph.FunctionParameter(outputId, "result", FlowDataType.BOOLEAN)));
+        FlowRuntime runtime = new FlowRuntime(new FlowGraph(), new TypeAdapterRegistry(), Map.of());
+        runtime.callFunctionById(function, "caller", Map.of(inputId, "Alex"));
+        FunctionHandler handler = new FunctionHandler();
+        FlowNode start = node("function_start", Map.of());
+        FlowContext startContext = new FlowContext(runtime, null, null);
+
+        handler.execute(startContext, start);
+
+        assertEquals("Alex", startContext.getOutput(start, "function-output-" + inputId.canonicalText()));
+
+        FlowNode end = node("function_end", Map.of("function-input-" + outputId.canonicalText(), true));
+        handler.execute(new FlowContext(runtime, null, null), end);
+
+        assertEquals(Map.of(outputId, true), runtime.getReturnedFunctionOutputsById());
     }
 
     private FlowContext context() {

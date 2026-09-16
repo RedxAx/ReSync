@@ -34,7 +34,7 @@ public class GenericMapHandler implements NodeHandler {
             String key = ctx.getInputValue(node, "key", String.class, "");
             Object value = ctx.getInputValue(node, "value", null);
             map.put(key, value);
-            ctx.setOutput(node, "map", map);
+            ctx.setOutput(node, "output_map", map);
         });
         operations.put("contains_key", (ctx, node) -> {
             Map<String, Object> map = ctx.getInputValue(node, "map", Map.class, Map.of());
@@ -66,25 +66,25 @@ public class GenericMapHandler implements NodeHandler {
             Map<String, Object> map = mutableMap(ctx, node, "map");
             String key = ctx.getInputValue(node, "key", String.class, "");
             map.remove(key);
-            ctx.setOutput(node, "map", map);
+            ctx.setOutput(node, "output_map", map);
         });
         operations.put("clear", (ctx, node) -> {
             Map<String, Object> map = mutableMap(ctx, node, "map");
             map.clear();
-            ctx.setOutput(node, "map", map);
+            ctx.setOutput(node, "output_map", map);
         });
         operations.put("merge", (ctx, node) -> {
-            Map<String, Object> mapA = ctx.getInputValue(node, "mapA", Map.class, Map.of());
-            Map<String, Object> mapB = ctx.getInputValue(node, "mapB", Map.class, Map.of());
+            Map<String, Object> mapA = ctx.getInputValue(node, "map_a", Map.class, Map.of());
+            Map<String, Object> mapB = ctx.getInputValue(node, "map_b", Map.class, Map.of());
             Map<String, Object> result = new LinkedHashMap<>(mapA);
             result.putAll(mapB);
-            ctx.setOutput(node, "map", result);
+            ctx.setOutput(node, "output_map", result);
         });
         operations.put("put_all", (ctx, node) -> {
             Map<String, Object> map = mutableMap(ctx, node, "map");
             Map<String, Object> other = ctx.getInputValue(node, "other", Map.class, Map.of());
             map.putAll(other);
-            ctx.setOutput(node, "map", map);
+            ctx.setOutput(node, "output_map", map);
         });
     }
 

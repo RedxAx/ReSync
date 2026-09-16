@@ -1,6 +1,6 @@
 package restudio.resync.resources;
 
-import restudio.resync.contracts.ReSyncProtocolContract;
+import restudio.resync.protocol.ReSyncProtocolContract;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,6 +32,8 @@ public final class ReSyncResourceCatalog {
     public static final String SCHEDULE_DEFINITION = "schedule_definition";
     public static final String WORLDGEN = "worldgen";
     public static final String WORLD = "world";
+    public static final String STRUCTURE_OWNER = "restudio.resync";
+    public static final String STRUCTURE = "structure";
     private static final Map<String, ReSyncManagedResource> BY_TYPE = new LinkedHashMap<>();
     private static final Map<Byte, ReSyncManagedResource> BY_FLOW_PACKET = new LinkedHashMap<>();
 

@@ -1,0 +1,768 @@
+[
+  {
+    "id": "location.add",
+    "displayName": "Add Location Offset",
+    "description": "Add finite X, Y, and Z offsets to a location.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Add",
+      "Offset Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "offset_x",
+          "target": "offset_x"
+        },
+        {
+          "direction": "input",
+          "source": "offset_y",
+          "target": "offset_y"
+        },
+        {
+          "direction": "input",
+          "source": "offset_z",
+          "target": "offset_z"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_add"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      },
+      {
+        "id": "offset_x",
+        "displayName": "X Offset",
+        "name": "offset_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides x offset.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_y",
+        "displayName": "Y Offset",
+        "name": "offset_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides y offset.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_z",
+        "displayName": "Z Offset",
+        "name": "offset_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides z offset.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.multiply",
+    "displayName": "Scale Location",
+    "description": "Multiply a location's coordinates by a finite factor.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Multiply",
+      "Multiply Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "factor",
+          "target": "factor"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_multiply"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      },
+      {
+        "id": "factor",
+        "displayName": "Factor",
+        "name": "factor",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides factor.",
+        "defaultValue": 1
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.direction",
+    "displayName": "Move In Direction",
+    "description": "Set a location's yaw and pitch, then move it along its direction.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Direction",
+      "Direction Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "yaw",
+          "target": "yaw"
+        },
+        {
+          "direction": "input",
+          "source": "pitch",
+          "target": "pitch"
+        },
+        {
+          "direction": "input",
+          "source": "distance",
+          "target": "distance"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_direction"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      },
+      {
+        "id": "yaw",
+        "displayName": "Yaw",
+        "name": "yaw",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Yaw value provided by the direction.",
+        "defaultValue": 0
+      },
+      {
+        "id": "pitch",
+        "displayName": "Pitch",
+        "name": "pitch",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Pitch value provided by the direction.",
+        "defaultValue": 0
+      },
+      {
+        "id": "distance",
+        "displayName": "Distance",
+        "name": "distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides distance.",
+        "defaultValue": 1
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.relative.to.entity",
+    "displayName": "Get Entity Location",
+    "description": "Create a location relative to an entity's eyes or feet.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Relative To Entity",
+      "Entity Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "entity",
+          "target": "entity"
+        },
+        {
+          "direction": "input",
+          "source": "offset_type",
+          "target": "offset_type"
+        },
+        {
+          "direction": "input",
+          "source": "offset_x",
+          "target": "offset_x"
+        },
+        {
+          "direction": "input",
+          "source": "offset_y",
+          "target": "offset_y"
+        },
+        {
+          "direction": "input",
+          "source": "offset_z",
+          "target": "offset_z"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_relative_to_entity"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "entity",
+        "displayName": "Entity",
+        "name": "entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Provides entity."
+      },
+      {
+        "id": "offset_type",
+        "displayName": "Offset Type",
+        "name": "offset_type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides offset type.",
+        "defaultValue": "eye",
+        "widget": "DROPDOWN",
+        "options": [
+          "eye",
+          "feet"
+        ]
+      },
+      {
+        "id": "offset_x",
+        "displayName": "X Offset",
+        "name": "offset_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides x offset.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_y",
+        "displayName": "Y Offset",
+        "name": "offset_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides y offset.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_z",
+        "displayName": "Z Offset",
+        "name": "offset_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides z offset.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.look.at",
+    "displayName": "Look At Location",
+    "description": "Aim a location at another location in the same world.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Look At",
+      "Aim Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "target_location",
+          "target": "target_location"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_look_at"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      },
+      {
+        "id": "target_location",
+        "displayName": "Target Location",
+        "name": "target_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides target location."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.get.offset",
+    "displayName": "Get Location Offset",
+    "description": "Move a location along a cardinal or vertical direction.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Get Offset",
+      "Offset Location"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "direction",
+          "target": "direction"
+        },
+        {
+          "direction": "input",
+          "source": "distance",
+          "target": "distance"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_get_offset"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      },
+      {
+        "id": "direction",
+        "displayName": "Direction",
+        "name": "direction",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides direction.",
+        "defaultValue": "north",
+        "widget": "DROPDOWN",
+        "options": [
+          "north",
+          "south",
+          "east",
+          "west",
+          "up",
+          "down"
+        ]
+      },
+      {
+        "id": "distance",
+        "displayName": "Distance",
+        "name": "distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides distance.",
+        "defaultValue": 1
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.center",
+    "displayName": "Center Location",
+    "description": "Move a location to the center of its block.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Center",
+      "Center Block"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "output_location"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_center"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns location."
+      }
+    ]
+  },
+  {
+    "id": "location.distance",
+    "displayName": "Get Location Distance",
+    "description": "Measure the distance between two locations in the same world.",
+    "domain": "location",
+    "family": "location",
+    "lifecycle": "active",
+    "handlerCapability": "location",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "location",
+      "transform"
+    ],
+    "legacyIds": [],
+    "aliases": [
+      "Location Distance",
+      "Distance Between Locations"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "location1",
+          "target": "location1"
+        },
+        {
+          "direction": "input",
+          "source": "location2",
+          "target": "location2"
+        },
+        {
+          "direction": "output",
+          "source": "distance",
+          "target": "distance"
+        }
+      ]
+    },
+    "handler": "LocationHandler",
+    "handlerConfig": {
+      "operation": "location_distance"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "location_transform",
+    "confirmationPolicy": "none",
+    "inputs": [
+      {
+        "id": "location1",
+        "displayName": "Location 1",
+        "name": "location1",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location 1."
+      },
+      {
+        "id": "location2",
+        "displayName": "Location 2",
+        "name": "location2",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides location 2."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "distance",
+        "displayName": "Distance",
+        "name": "distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns distance."
+      }
+    ]
+  }
+]

@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Entity;
 import org.bukkit.scheduler.BukkitTask;
+import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowNode;
@@ -15,6 +16,17 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FlowValueCodecRegistry;
+import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimePrincipal;
+import restudio.resync.flow.runtime.RuntimePrincipalAuthority;
 import restudio.resync.flow.automation.AutomationDefinitionRegistry;
 import restudio.resync.flow.automation.AutomationInstanceKey;
 import restudio.resync.flow.automation.AutomationOwner;
@@ -50,6 +62,11 @@ public class ScheduleHandler implements NodeHandler {
     private final AutomationDefinitionRegistry definitions;
     private final AutomationTaskService automationTasks;
     private final FlowValueCodecRegistry valueCodecs;
+    private final RuntimePrincipalAuthority principalAuthority;
+    private final ServerId serverId;
+    private static final OwnerId CORE_GRAPH_OWNER = OwnerId.of("restudio.resync");
+    private static final Set<String> GRAPH_TYPES = Set.of("flow", "function", "command");
+    private volatile RuntimePrincipal persistentSchedulePrincipal;
 
     public ScheduleHandler(FlowStorage flowStorage) {
         this(flowStorage, Clock.systemUTC(), null, null, null);
@@ -61,11 +78,19 @@ public class ScheduleHandler implements NodeHandler {
 
     public ScheduleHandler(FlowStorage flowStorage, Clock clock, AutomationDefinitionRegistry definitions,
                            AutomationTaskService automationTasks, FlowValueCodecRegistry valueCodecs) {
+        this(flowStorage, clock, definitions, automationTasks, valueCodecs, null, null);
+    }
+
+    public ScheduleHandler(FlowStorage flowStorage, Clock clock, AutomationDefinitionRegistry definitions,
+                           AutomationTaskService automationTasks, FlowValueCodecRegistry valueCodecs,
+                           RuntimePrincipalAuthority principalAuthority, ServerId serverId) {
         this.flowStorage = flowStorage;
         this.clock = clock != null ? clock : Clock.systemUTC();
         this.definitions = definitions;
         this.automationTasks = automationTasks;
         this.valueCodecs = valueCodecs;
+        this.principalAuthority = principalAuthority;
+        this.serverId = serverId;
 
         operations.put("delay", (ctx, node) -> {
             Number seconds = ctx.getInputValue(node, "seconds", Number.class, 1L);
@@ -221,12 +246,12 @@ public class ScheduleHandler implements NodeHandler {
 
     private void schedulePattern(FlowContext context, FlowNode node, SchedulePattern pattern) {
         FlowExecutor executor = requireExecutor(context);
-        String flowId = requireFlowId(context, node);
+        ServerResourceLocator flowTarget = requireFlowTarget(context, node);
         String taskId = newTaskId();
         long createdAt = clock.millis();
         UUID playerId = context.getPlayer() != null ? context.getPlayer().getUniqueId() : null;
         ScheduleExecutionGate running = new ScheduleExecutionGate();
-        scheduleNextOccurrence(executor, pattern, flowId, taskId, playerId, running, createdAt, clock.instant());
+        scheduleNextOccurrence(executor, pattern, flowTarget, taskId, playerId, running, createdAt, clock.instant());
         context.setOutput(node, "task_id", taskId);
         context.setOutput(node, "scheduled", true);
         Map<String, Object> task = taskValue(executor.getScheduledTaskSnapshot(taskId));
@@ -234,25 +259,25 @@ public class ScheduleHandler implements NodeHandler {
         setResult(context, node, FlowOperationResult.success(task));
     }
 
-    private void scheduleNextOccurrence(FlowExecutor executor, SchedulePattern pattern, String flowId, String taskId,
+    private void scheduleNextOccurrence(FlowExecutor executor, SchedulePattern pattern, ServerResourceLocator flowTarget, String taskId,
                                         UUID playerId, ScheduleExecutionGate running, long createdAt, Instant cursor) {
         Instant target = pattern.nextAfter(cursor)
             .orElseThrow(() -> new IllegalArgumentException("Scheduled time must be in the future"));
         long delayMillis = pattern.delayMillisFrom(clock.instant(), target);
         CompletableFuture<Void> timerCompletion = new CompletableFuture<>();
-        executor.scheduleWallClockTask(taskId, flowId, "schedule", delayMillis, createdAt, target.toEpochMilli(), pattern.isRecurring(), () -> {
+        executor.scheduleWallClockTask(taskId, flowTarget.canonicalText(), "schedule", delayMillis, createdAt, target.toEpochMilli(), pattern.isRecurring(), () -> {
             long firedAt = clock.millis();
             Map<String, Object> firingTask = taskValue(executor.getScheduledTaskSnapshot(taskId));
             if (pattern.isRecurring()) {
-                scheduleNextOccurrence(executor, pattern, flowId, taskId, playerId, running, createdAt, clock.instant());
+                scheduleNextOccurrence(executor, pattern, flowTarget, taskId, playerId, running, createdAt, clock.instant());
             }
-            return executeScheduledFlow(executor, flowId, taskId, playerId, running, firingTask, firedAt);
+            return executeScheduledFlow(executor, flowTarget, taskId, playerId, running, firingTask, firedAt);
         }, timerCompletion);
     }
 
     private void scheduleRepeating(FlowContext context, FlowNode node, long intervalTicks) {
         FlowExecutor executor = requireExecutor(context);
-        String flowId = requireFlowId(context, node);
+        ServerResourceLocator flowTarget = requireFlowTarget(context, node);
         String taskId = newTaskId();
         long createdAt = clock.millis();
         UUID playerId = context.getPlayer() != null ? context.getPlayer().getUniqueId() : null;
@@ -262,10 +287,10 @@ public class ScheduleHandler implements NodeHandler {
                 long firedAt = clock.millis();
                 Map<String, Object> firingTask = taskValue(executor.getScheduledTaskSnapshot(taskId));
                 executor.updateScheduledTaskNextFireAt(taskId, Math.addExact(firedAt, Math.multiplyExact(intervalTicks, 50L)));
-                executeScheduledFlow(executor, flowId, taskId, playerId, running, firingTask, firedAt);
+                executeScheduledFlow(executor, flowTarget, taskId, playerId, running, firingTask, firedAt);
             }, intervalTicks, intervalTicks);
         long nextFireAt = Math.addExact(createdAt, Math.multiplyExact(intervalTicks, 50L));
-        executor.registerPendingTask(taskId, flowId, "schedule", task, null, createdAt, nextFireAt, true);
+        executor.registerPendingTask(taskId, flowTarget.canonicalText(), "schedule", task, null, createdAt, nextFireAt, true);
         context.setOutput(node, "task_id", taskId);
         context.setOutput(node, "scheduled", true);
         Map<String, Object> snapshotValue = taskValue(executor.getScheduledTaskSnapshot(taskId));
@@ -273,32 +298,33 @@ public class ScheduleHandler implements NodeHandler {
         setResult(context, node, FlowOperationResult.success(snapshotValue));
     }
 
-    private CompletableFuture<Void> executeScheduledFlow(FlowExecutor executor, String flowId, String taskId, UUID playerId, ScheduleExecutionGate running,
+    private CompletableFuture<Void> executeScheduledFlow(FlowExecutor executor, ServerResourceLocator flowTarget, String taskId, UUID playerId, ScheduleExecutionGate running,
                                                          Map<String, Object> firingTask, long firedAt) {
         if (!running.tryBegin()) {
             Log.fine("[Flow:Schedule] Skipped overlapping execution for task: " + taskId);
             return CompletableFuture.completedFuture(null);
         }
-        FlowGraph graph = flowStorage != null ? flowStorage.getGraph(flowId) : null;
+        FlowGraph graph = targetGraph(flowTarget);
         if (graph == null) {
             running.complete();
-            executor.recordScheduledTaskFailure(taskId, new IllegalStateException("Flow not found: " + flowId));
+            executor.recordScheduledTaskFailure(taskId, new IllegalStateException("Flow not found: " + flowTarget.canonicalText()));
             executor.cancelPendingTask(taskId);
-            Log.warn("[Flow:Schedule] Flow not found: " + flowId);
+            Log.warn("[Flow:Schedule] Flow not found: " + flowTarget.canonicalText());
             return CompletableFuture.completedFuture(null);
         }
         Player player = playerId != null ? Bukkit.getPlayer(playerId) : null;
         Map<String, Object> variables = Map.of(
             "schedule.task", firingTask != null ? firingTask : Map.of(),
             "schedule.task_id", taskId,
-            "schedule.flow_id", flowId,
+            "schedule.flow_id", flowTarget.id(),
+            "schedule.flow_locator", flowTarget,
             "schedule.fired_at", firedAt
         );
         return executor.execute(graph, player, null, variables).whenComplete((result, failure) -> {
             running.complete();
             if (failure != null) {
                 executor.recordScheduledTaskFailure(taskId, failure);
-                Log.warn("[Flow:Schedule] Scheduled flow failed: " + flowId + " - " + failure.getMessage(), failure);
+                Log.warn("[Flow:Schedule] Scheduled flow failed: " + flowTarget.canonicalText() + " - " + failure.getMessage(), failure);
             }
         });
     }
@@ -308,24 +334,31 @@ public class ScheduleHandler implements NodeHandler {
         ScheduleDefinition definition = definitions.schedule(definitionId);
         Object ownerValue = automationOwnerValue(context, node, definition);
         AutomationOwner owner = AutomationOwner.resolve(definition.scope(), context, ownerValue);
-        FlowGraph target = flowStorage != null ? flowStorage.getGraph(definition.targetId()) : null;
+        ServerResourceLocator targetLocator = targetLocator(definition);
+        FlowGraph target = targetGraph(targetLocator);
         if (target == null) {
-            throw new IllegalArgumentException("Schedule target not found: " + definition.targetId());
-        }
-        if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION && !target.isFunction()) {
-            throw new IllegalArgumentException("Schedule target is not a Function: " + definition.targetId());
+            throw new IllegalArgumentException("Schedule target not found: " + targetLocator.canonicalText());
         }
         Map<String, Object> arguments = definition.targetType() == ScheduleDefinition.TargetType.FUNCTION
             ? captureFunctionArguments(context, node, target, definition.persistent()) : captureArgumentsMap(context, node, definition.persistent());
         int signatureVersion = target.getFunctionVersion();
         UUID scheduledPlayerId = context.getPlayer() != null ? context.getPlayer().getUniqueId() : playerId(owner, definition);
         FlowExecutor executor = requireExecutor(context);
-        Supplier<CompletableFuture<Object>> invocation = scheduleInvocation(definition, owner, arguments, signatureVersion, scheduledPlayerId, executor);
+        FlowExecutor.FunctionInvocationContext functionContext = schedulingFunctionContext(context, executor);
+        if (definition.persistent() && functionContext == null) {
+            throw new IllegalStateException("Persistent schedules require a trusted creator principal");
+        }
+        Supplier<CompletableFuture<Object>> invocation = scheduleInvocation(definition, owner, arguments, signatureVersion,
+            scheduledPlayerId, executor, targetLocator, functionContext,
+            functionContext != null ? functionContext.principal().canonical() : null,
+            functionContext != null ? functionContext.sessionReference() : null);
         Timing timing = timing(definition);
         AutomationTaskService.StartResult result = automationTasks.startSchedule(new AutomationTaskService.ScheduleRequest(
-            definition, owner, timing.firstDelay(), timing.interval(), timing.nextDelay(), invocation, arguments, signatureVersion));
+            definition, owner, timing.firstDelay(), timing.interval(), timing.nextDelay(), invocation, arguments, signatureVersion,
+            functionContext != null ? functionContext.principal().canonical() : null,
+            functionContext != null ? functionContext.sessionReference() : null, targetLocator));
         Map<String, Object> task = result.task().value();
-        context.setOutput(node, "schedule", definitions.reference(definition));
+        context.setOutput(node, "output_schedule", definitions.reference(definition));
         context.setOutput(node, "task", task);
         context.setOutput(node, "scheduled", result.started() || result.keptExisting());
         setResult(context, node, FlowOperationResult.success(task));
@@ -335,9 +368,10 @@ public class ScheduleHandler implements NodeHandler {
         automationTasks.restorePersistentSchedules(state -> {
             ScheduleDefinition definition = definitions.schedule(state.definitionId());
             AutomationOwner owner = new AutomationOwner(state.ownerId(), state.ownerId());
-            FlowGraph target = flowStorage.getGraph(definition.targetId());
+            ServerResourceLocator targetLocator = restoredTargetLocator(state, definition);
+            FlowGraph target = targetGraph(targetLocator);
             if (target == null) {
-                throw new IllegalArgumentException("Schedule target not found: " + definition.targetId());
+                throw new IllegalArgumentException("Schedule target not found: " + targetLocator.canonicalText());
             }
             Timing timing;
             try {
@@ -350,20 +384,34 @@ public class ScheduleHandler implements NodeHandler {
             }
             UUID playerId = playerId(owner, definition);
             Supplier<CompletableFuture<Object>> invocation = scheduleInvocation(
-                definition, owner, state.arguments(), state.signatureVersion(), playerId, executor);
+                definition, owner, state.arguments(), state.signatureVersion(), playerId, executor, targetLocator, null,
+                state.creatorPrincipal(), state.creatorSessionReference());
             return new AutomationTaskService.ScheduleRequest(definition, owner, timing.firstDelay(), timing.interval(),
-                timing.nextDelay(), invocation, state.arguments(), state.signatureVersion());
+                timing.nextDelay(), invocation, state.arguments(), state.signatureVersion(), state.creatorPrincipal(),
+                state.creatorSessionReference(), targetLocator);
         });
     }
 
-    private Supplier<CompletableFuture<Object>> scheduleInvocation(ScheduleDefinition definition, AutomationOwner owner,
-                                                                   Map<String, Object> arguments, int signatureVersion,
-                                                                   UUID scheduledPlayerId, FlowExecutor executor) {
+    Supplier<CompletableFuture<Object>> scheduleInvocation(ScheduleDefinition definition, AutomationOwner owner,
+                                                           Map<String, Object> arguments, int signatureVersion,
+                                                           UUID scheduledPlayerId, FlowExecutor executor,
+                                                           FlowExecutor.FunctionInvocationContext scheduledFunctionContext,
+                                                           String creatorPrincipal, String creatorSessionReference) {
+        return scheduleInvocation(definition, owner, arguments, signatureVersion, scheduledPlayerId, executor,
+            targetLocator(definition), scheduledFunctionContext, creatorPrincipal, creatorSessionReference);
+    }
+
+    Supplier<CompletableFuture<Object>> scheduleInvocation(ScheduleDefinition definition, AutomationOwner owner,
+                                                           Map<String, Object> arguments, int signatureVersion,
+                                                           UUID scheduledPlayerId, FlowExecutor executor,
+                                                           ServerResourceLocator targetLocator,
+                                                           FlowExecutor.FunctionInvocationContext scheduledFunctionContext,
+                                                           String creatorPrincipal, String creatorSessionReference) {
         AutomationInstanceKey key = new AutomationInstanceKey(definition.id(), definition.scope(), owner.id());
         return () -> onServerThread(() -> {
-            FlowGraph currentTarget = flowStorage.getGraph(definition.targetId());
+            FlowGraph currentTarget = targetGraph(targetLocator);
             if (currentTarget == null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Schedule target not found: " + definition.targetId()));
+                return CompletableFuture.failedFuture(new IllegalStateException("Schedule target not found: " + targetLocator.canonicalText()));
             }
             if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION && currentTarget.getFunctionVersion() != signatureVersion) {
                 return CompletableFuture.failedFuture(new IllegalStateException(
@@ -384,13 +432,22 @@ public class ScheduleHandler implements NodeHandler {
             }
             AutomationTaskService.TaskSnapshot task = automationTasks.check(key);
             Map<String, Object> scheduleContext = new LinkedHashMap<>();
-            scheduleContext.put("schedule.task", task.value());
+            scheduleContext.put("schedule.task", stableScheduleTask(task));
             scheduleContext.put("schedule.definition", definitions.reference(definition));
-            scheduleContext.put("schedule.fired_at", clock.millis());
+            scheduleContext.put("schedule.fired_at", task.nextRun());
             scheduleContext.put("schedule.arguments", arguments);
             if (definition.targetType() == ScheduleDefinition.TargetType.FUNCTION) {
-                return executor.executeFunction(currentTarget, player, null, runtimeArguments(currentTarget, arguments), scheduleContext)
+                FlowExecutor.FunctionInvocationContext invocation = functionInvocationForSchedule(executor, player,
+                    scheduleContext, scheduledFunctionContext, key, task.runCount(), definition.persistent(),
+                    creatorPrincipal, creatorSessionReference);
+                CompletableFuture<Map<String, Object>> function = invocation == null
+                    ? executor.executeFunction(currentTarget, player, null, runtimeArguments(currentTarget, arguments), scheduleContext)
+                    : executor.executeFunction(currentTarget, player, null, runtimeArguments(currentTarget, arguments), scheduleContext, invocation);
+                return function
                     .thenApply(result -> (Object) result);
+            }
+            if (definition.targetType() == ScheduleDefinition.TargetType.COMMAND) {
+                return executor.execute(currentTarget, player, null, scheduleContext).thenApply(ignored -> (Object) Map.of());
             }
             String eventEntry = currentTarget.getNodes().entrySet().stream().filter(entry -> entry.getValue() != null)
                 .filter(entry -> "event.schedule".equals(entry.getValue().getType()))
@@ -415,6 +472,159 @@ public class ScheduleHandler implements NodeHandler {
             eventContext.put("event.runCount", task.runCount());
             return executor.execute(currentTarget, eventEntry, player, event, eventContext).thenApply(ignored -> (Object) Map.of());
         });
+    }
+
+    private ServerResourceLocator targetLocator(ScheduleDefinition definition) {
+        if (definition == null) {
+            throw new IllegalArgumentException("Schedule definition is required");
+        }
+        if (serverId == null) {
+            throw new IllegalStateException("Schedule target resolution requires an authoritative server ID");
+        }
+        return validateTargetLocator(definition.targetLocator(serverId));
+    }
+
+    private ServerResourceLocator restoredTargetLocator(AutomationTaskService.PersistentTask state,
+                                                        ScheduleDefinition definition) {
+        ServerResourceLocator expected = targetLocator(definition);
+        String persisted = state.targetLocator();
+        if (persisted != null && !persisted.isBlank()) {
+            ServerResourceLocator locator;
+            try {
+                locator = ServerResourceLocator.parseCanonicalText(persisted);
+            } catch (RuntimeException failure) {
+                throw new IllegalArgumentException("Persisted schedule target locator is invalid", failure);
+            }
+            locator = validateTargetLocator(locator);
+            if (!expected.equals(locator)) {
+                throw new IllegalArgumentException("Persisted schedule target does not match its definition");
+            }
+            validateLegacyTargetFields(state, locator);
+            return locator;
+        }
+        if (state.targetType() == null || state.targetType().isBlank()
+            || state.targetId() == null || state.targetId().isBlank()) {
+            throw new IllegalArgumentException("Persisted schedule has no complete typed target; restore rejected");
+        }
+        ScheduleDefinition.TargetType legacyType;
+        try {
+            legacyType = ScheduleDefinition.TargetType.valueOf(state.targetType().trim().replace('-', '_').toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("Persisted schedule target type is invalid; restore rejected", failure);
+        }
+        ServerResourceLocator migrated = validateTargetLocator(new ServerResourceLocator(serverId,
+            ContractRef.of(CORE_GRAPH_OWNER, ResourceTypeId.of(legacyType == ScheduleDefinition.TargetType.FUNCTION
+                ? "function" : legacyType == ScheduleDefinition.TargetType.COMMAND ? "command" : "flow")), state.targetId()));
+        if (!expected.equals(migrated)) {
+            throw new IllegalArgumentException("Persisted legacy schedule target does not match its definition");
+        }
+        return migrated;
+    }
+
+    private void validateLegacyTargetFields(AutomationTaskService.PersistentTask state, ServerResourceLocator locator) {
+        if (state.targetType() != null && !state.targetType().isBlank()
+            && !state.targetType().equals(locator.resourceType().value())) {
+            throw new IllegalArgumentException("Persisted schedule target type conflicts with its locator");
+        }
+        if (state.targetId() != null && !state.targetId().isBlank() && !state.targetId().equals(locator.id())) {
+            throw new IllegalArgumentException("Persisted schedule target ID conflicts with its locator");
+        }
+    }
+
+    private ServerResourceLocator validateTargetLocator(ServerResourceLocator locator) {
+        if (locator == null || serverId == null || !serverId.equals(locator.serverId())
+            || !CORE_GRAPH_OWNER.equals(locator.owner()) || !GRAPH_TYPES.contains(locator.resourceType().value())
+            || locator.id().isBlank()) {
+            throw new IllegalArgumentException("Schedule target locator is not an authoritative Core graph locator");
+        }
+        return locator;
+    }
+
+    private FlowGraph targetGraph(ServerResourceLocator locator) {
+        if (flowStorage == null) {
+            return null;
+        }
+        ServerResourceLocator validated = validateTargetLocator(locator);
+        FlowGraph graph = flowStorage.getGraph(validated.resourceType().value(), validated.id());
+        if (graph == null || !validated.id().equals(graph.getId())
+            || !validated.resourceType().value().equals(graph.getResourceType())
+            || ("function".equals(validated.resourceType().value()) != graph.isFunction())) {
+            return null;
+        }
+        return graph;
+    }
+
+    Map<String, Object> stableScheduleTask(AutomationTaskService.TaskSnapshot task) {
+        return Map.of(
+            "definitionId", task.definitionId(),
+            "scope", task.scope().name().toLowerCase(Locale.ROOT),
+            "ownerId", task.ownerId(),
+            "runCount", task.runCount(),
+            "scheduledAt", task.nextRun());
+    }
+
+    private FlowExecutor.FunctionInvocationContext schedulingFunctionContext(FlowContext context, FlowExecutor executor) {
+        Map<String, Object> variables = new LinkedHashMap<>(context.getRuntime().getEventVariables());
+        if (context.getRuntimePrincipal() != null && context.getInvocationId() != null) {
+            return executor.functionInvocationContext(context.getPlayer(), context.getEvent(), variables,
+                context.getRuntimePrincipal(), context.getInvocationId(), context.getRequestedDeadlineMillis());
+        }
+        return executor.defaultFunctionInvocationContext(context.getPlayer(), context.getEvent(), variables);
+    }
+
+    FlowExecutor.FunctionInvocationContext functionInvocationForSchedule(
+        FlowExecutor executor, Player player, Map<String, Object> scheduleContext,
+        FlowExecutor.FunctionInvocationContext scheduledContext, AutomationInstanceKey key, long runCount
+    ) {
+        return functionInvocationForSchedule(executor, player, scheduleContext, scheduledContext, key, runCount, false,
+            scheduledContext != null ? scheduledContext.creatorPrincipal() : null,
+            scheduledContext != null ? scheduledContext.creatorSessionReference() : null);
+    }
+
+    FlowExecutor.FunctionInvocationContext functionInvocationForSchedule(
+        FlowExecutor executor, Player player, Map<String, Object> scheduleContext,
+        FlowExecutor.FunctionInvocationContext scheduledContext, AutomationInstanceKey key, long runCount,
+        boolean persistent, String creatorPrincipal, String creatorSessionReference
+    ) {
+        FlowExecutor.FunctionInvocationContext base = scheduledContext != null
+            ? scheduledContext : executor.defaultFunctionInvocationContext(player, null, scheduleContext);
+        RuntimePrincipal executionPrincipal = persistent ? persistentSchedulePrincipal() : base != null ? base.principal() : null;
+        if (executionPrincipal == null) {
+            if (persistent) {
+                throw new IllegalStateException("Persistent schedule principal is unavailable");
+            }
+            return null;
+        }
+        if (persistent && (creatorPrincipal == null || creatorPrincipal.isBlank())) {
+            throw new IllegalStateException("Persistent schedule creator attribution is unavailable");
+        }
+        if (base != null && base.sessionReference() != null) {
+            scheduleContext.put("runtime.sessionId", base.sessionReference());
+        } else if (creatorSessionReference != null) {
+            scheduleContext.put("runtime.sessionId", creatorSessionReference);
+        }
+        CorrelationId invocationId = CorrelationId.deterministic("schedule-function|"
+            + key.definitionId() + "|" + key.scope().name() + "|" + key.ownerId() + "|" + runCount);
+        return executor.functionInvocationContext(player, null, scheduleContext, executionPrincipal, invocationId,
+            RuntimeExecutionContext.NO_DEADLINE, creatorPrincipal, creatorSessionReference);
+    }
+
+    private RuntimePrincipal persistentSchedulePrincipal() {
+        if (principalAuthority == null || serverId == null) {
+            return null;
+        }
+        RuntimePrincipal current = persistentSchedulePrincipal;
+        if (current != null && principalAuthority.trusts(current, principalAuthority.authority())) {
+            return current;
+        }
+        synchronized (this) {
+            if (persistentSchedulePrincipal == null
+                || !principalAuthority.trusts(persistentSchedulePrincipal, principalAuthority.authority())) {
+                persistentSchedulePrincipal = principalAuthority.issuePersistentSystem(
+                    "resync:schedule:" + serverId.canonicalText());
+            }
+            return persistentSchedulePrincipal;
+        }
     }
 
     private CompletableFuture<Object> onServerThread(Supplier<CompletableFuture<Object>> action) {
@@ -448,12 +658,72 @@ public class ScheduleHandler implements NodeHandler {
 
     private Map<String, Object> runtimeArguments(FlowGraph target, Map<String, Object> captured) {
         Map<String, Object> values = new LinkedHashMap<>();
-        for (FlowGraph.FunctionParameter parameter : target.getFunctionInputs()) {
-            Object value = captured.get(parameter.getName());
-            values.put(parameter.getName(), valueCodecs != null && valueCodecs.hasCodec(parameter.getTypeRef())
+        if (target == null || target.getFunctionInputs() == null) {
+            return values;
+        }
+        List<FlowGraph.FunctionParameter> declared = new ArrayList<>(target.getFunctionInputs());
+        List<FunctionParameterId> authoredIds = declared.stream()
+            .map(parameter -> parameter != null ? parameter.getParameterId() : null)
+            .toList();
+        List<FunctionParameterId> capturedIds = captured == null ? List.of() : captured.keySet().stream()
+            .map(FunctionCallSupport::parameterId)
+            .filter(id -> id != null)
+            .toList();
+        retainCapturedParameterIds(target, capturedIds);
+        if (authoredIds.stream().noneMatch(id -> id != null) && capturedIds.isEmpty()) {
+            target.adaptLegacyFunctionParameterIds();
+        }
+        List<FlowGraph.FunctionParameter> resolved = target.getFunctionInputs();
+        for (int index = 0; index < resolved.size(); index++) {
+            FlowGraph.FunctionParameter parameter = resolved.get(index);
+            if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
+                continue;
+            }
+            FunctionParameterId authoredId = index < authoredIds.size() ? authoredIds.get(index) : null;
+            FunctionParameterId capturedId = index < capturedIds.size() ? capturedIds.get(index) : null;
+            Object value = explicitArgument(captured, authoredId);
+            if (value == null) {
+                value = explicitArgument(captured, capturedId);
+            }
+            if (value == null) {
+                value = FunctionCallSupport.valueForArgument(captured, parameter);
+            }
+            String key = authoredId != null ? authoredId.canonicalText()
+                : capturedId != null ? capturedId.canonicalText() : parameter.getName();
+            values.put(key, valueCodecs != null && valueCodecs.hasCodec(parameter.getTypeRef())
                 ? valueCodecs.decode(parameter.getTypeRef(), value) : value);
         }
         return values;
+    }
+
+    private void retainCapturedParameterIds(FlowGraph target, List<FunctionParameterId> capturedIds) {
+        if (capturedIds.isEmpty()) {
+            return;
+        }
+        List<FlowGraph.FunctionParameter> parameters = target.getFunctionInputs();
+        List<FlowGraph.FunctionParameter> retained = new ArrayList<>(parameters.size());
+        boolean changed = false;
+        for (int index = 0; index < parameters.size(); index++) {
+            FlowGraph.FunctionParameter parameter = parameters.get(index);
+            FunctionParameterId capturedId = index < capturedIds.size() ? capturedIds.get(index) : null;
+            if (parameter != null && parameter.getParameterId() == null && capturedId != null
+                && parameters.stream().filter(value -> value != null).noneMatch(value -> capturedId.equals(value.getParameterId()))) {
+                parameter = new FlowGraph.FunctionParameter(capturedId, parameter.getName(), parameter.getType(),
+                    parameter.getWidget(), parameter.getOptionsSource(), parameter.getDefaultValue(), parameter.getTypeRef());
+                changed = true;
+            }
+            retained.add(parameter);
+        }
+        if (changed) {
+            target.setFunctionInputs(retained);
+        }
+    }
+
+    private Object explicitArgument(Map<String, Object> captured, FunctionParameterId id) {
+        if (captured == null || id == null) {
+            return null;
+        }
+        return captured.get(id.canonicalText());
     }
 
     private UUID playerId(AutomationOwner owner, ScheduleDefinition definition) {
@@ -483,7 +753,7 @@ public class ScheduleHandler implements NodeHandler {
             default -> throw new IllegalArgumentException("Unknown Scheduled Task action: " + action);
         };
         Map<String, Object> value = result.value();
-        context.setOutput(node, "task", value);
+        context.setOutput(node, "output_task", value);
         context.setOutput(node, "state", value.get("state"));
         context.setOutput(node, "remaining", value.get("remaining"));
         context.setOutput(node, "next_run", value.get("nextRun"));
@@ -531,18 +801,27 @@ public class ScheduleHandler implements NodeHandler {
     private Map<String, Object> captureFunctionArguments(FlowContext context, FlowNode node, FlowGraph target, boolean persistent) {
         Map<String, Object> arguments = new LinkedHashMap<>();
         Map<String, Object> fallback = captureArgumentsMap(context, node, persistent);
+        if (target.getFunctionInputs() == null) {
+            return Map.of();
+        }
         for (FlowGraph.FunctionParameter parameter : target.getFunctionInputs()) {
             if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
                 continue;
             }
-            Object value = context.getInputValue(node, parameter.getName(), Object.class, fallback.get(parameter.getName()));
+            Object value = context.getInputValue(node, FunctionCallSupport.parameterPinKey(parameter, true), Object.class, null);
+            if (value == null && parameter.isLegacyNameOnly()) {
+                value = context.getInputValue(node, parameter.getName(), Object.class, null);
+            }
+            if (value == null) {
+                value = FunctionCallSupport.valueForArgument(fallback, parameter);
+            }
             if (value == null && parameter.getDefaultValue() != null && !parameter.getDefaultValue().isBlank()) {
                 value = parameter.getDefaultValue();
             }
             if (value == null) {
                 throw new IllegalArgumentException("Function argument is required: " + parameter.getName());
             }
-            arguments.put(parameter.getName(), captureValue(context, parameter.getTypeRef(), value, persistent));
+            arguments.put(FunctionCallSupport.parameterKey(parameter), captureValue(context, parameter.getTypeRef(), value, persistent));
         }
         return Collections.unmodifiableMap(arguments);
     }
@@ -647,15 +926,31 @@ public class ScheduleHandler implements NodeHandler {
         return executor;
     }
 
-    private String requireFlowId(FlowContext context, FlowNode node) {
-        String flowId = context.getInputValue(node, "flow_id", String.class, "");
-        if (flowId == null || flowId.isBlank()) {
-            throw new IllegalArgumentException("Flow ID is required");
+    private ServerResourceLocator requireFlowTarget(FlowContext context, FlowNode node) {
+        if (serverId == null) {
+            throw new IllegalStateException("Flow schedule target resolution requires an authoritative server ID");
         }
-        if (flowStorage == null || flowStorage.getGraph(flowId) == null) {
-            throw new IllegalArgumentException("Flow not found: " + flowId);
+        Object raw = context.getInputValue(node, "flow_id", Object.class, null);
+        ServerResourceLocator locator;
+        if (raw instanceof ServerResourceLocator typed) {
+            locator = typed;
+        } else if (raw instanceof FlowResourceReference legacy) {
+            if (!legacy.available() || !CORE_GRAPH_OWNER.value().equals(legacy.owner()) || !"flow".equals(legacy.kind())) {
+                throw new IllegalArgumentException("Flow schedule target must be an available Core flow locator");
+            }
+            locator = new ServerResourceLocator(serverId,
+                ContractRef.of(CORE_GRAPH_OWNER, ResourceTypeId.of("flow")), legacy.id());
+        } else if (raw instanceof String flowId && !flowId.isBlank()) {
+            locator = new ServerResourceLocator(serverId,
+                ContractRef.of(CORE_GRAPH_OWNER, ResourceTypeId.of("flow")), flowId);
+        } else {
+            throw new IllegalArgumentException("Flow schedule target locator is required");
         }
-        return flowId;
+        locator = validateTargetLocator(locator);
+        if (targetGraph(locator) == null) {
+            throw new IllegalArgumentException("Flow not found: " + locator.canonicalText());
+        }
+        return locator;
     }
 
     private ZoneId resolveZone(String value) {

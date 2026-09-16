@@ -1,5 +1,5 @@
 {
-  "sourceRoot": "src/main/resources/nodes/migrated",
+  "sourceRoot": "ReSyncUpgrade/src/main/resources/nodes/migrated",
   "files": {
     "player.json": [55, 415, 358],
     "player_action.json": [53, 317, 3],

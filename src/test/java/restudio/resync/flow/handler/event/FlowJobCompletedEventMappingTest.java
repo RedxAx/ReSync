@@ -7,9 +7,6 @@ import restudio.resync.flow.jobs.FlowJobCompletedEvent;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
 
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -21,11 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class FlowJobCompletedEventMappingTest {
     @Test
     void shippedJobCompletionDefinitionExtractsEveryOutput() throws Exception {
-        Path path = Path.of("src", "main", "resources", "nodes", "migrated", "jobs.json");
-        List<NodeDefinition> definitions;
-        try (InputStream input = Files.newInputStream(path)) {
-            definitions = new NodeDefinitionLoader().parse(input, path.toString());
-        }
+        List<NodeDefinition> definitions = new NodeDefinitionLoader().loadReplacementFromClasspath("nodes");
         NodeDefinition definition = definitions.stream().filter(candidate -> "event.job.completed".equals(candidate.getId())).findFirst().orElseThrow();
         FlowJobReference<String> reference = new FlowJobReference<>("job-17", "compile", "flow:test");
         reference.start();

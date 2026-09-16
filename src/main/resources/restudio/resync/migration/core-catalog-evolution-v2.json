@@ -1,0 +1,1184 @@
+{
+  "id": "core-catalog-evolution-v2",
+  "sourceChecksum": "4f335d707ce8cd6c60c06e3296d92a46b8ee66feb22df533389b9f1c8ffa556b",
+  "targetChecksum": "d9c25c92807d45e79d80fcb941fdf181111d7af53c7f9f93126a62b310377a13",
+  "targetBinding": "57|d9c25c92807d45e79d80fcb941fdf181111d7af53c7f9f93126a62b310377a13|eb30c3b9bad4a5f57d1e62af0f66b25bf3d31d1d6b4c2158d6e5f2d2e417d0b4",
+  "sourceBindings": [
+    {
+      "generation": 56,
+      "catalogChecksum": "4f335d707ce8cd6c60c06e3296d92a46b8ee66feb22df533389b9f1c8ffa556b",
+      "bindingManifestHash": "8f0915fc00c8e51c98234f096c81166045e8c1e3bd4ef49f269d2cfda9d423c8"
+    }
+  ],
+  "changes": [
+    {
+      "kind": "insert",
+      "paths": [
+        [
+          "capabilities"
+        ]
+      ],
+      "index": 273,
+      "values": [
+        {
+          "fallback": "generic",
+          "id": "options-server-resync-structure",
+          "kind": "capability",
+          "optional": false,
+          "ownerId": "restudio.resync",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "kind": "insert",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "capabilities"
+        ]
+      ],
+      "index": 193,
+      "values": [
+        {
+          "fallback": "generic",
+          "id": "options-server-resync-structure",
+          "kind": "capability",
+          "optional": false,
+          "version": 1
+        }
+      ]
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "description"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "description"
+        ],
+        [
+          "definitions",
+          "1155",
+          "description"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "description"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "Delete a named structure from the server library.",
+      "after": "Delete the selected Structure from this server's library."
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "dataType"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "dataType"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "string",
+      "after": "resource_reference<restudio.resync:structure>"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "description"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "description"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "description"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "description"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "Provides the structure id used by Structure Delete.",
+      "after": "Selects the ReSync Structure on this server to delete."
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "displayName"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "displayName"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "displayName"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "displayName"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "Structure Id",
+      "after": "Structure"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "optionsSource"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "optionsSource"
+        ]
+      ],
+      "beforePresent": false,
+      "afterPresent": true,
+      "after": "server:resync:structure"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "widget"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "presentation",
+          "widget"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "inputs",
+          "1",
+          "widget"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "presentation",
+          "widget"
+        ]
+      ],
+      "beforePresent": false,
+      "afterPresent": true,
+      "after": "SEARCHABLE_LIST"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "migrationMapping",
+          "targetSchemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "schemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "schemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "migrations",
+          "832",
+          "pinMappings",
+          "0",
+          "targetSchemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "migrations",
+          "832",
+          "pinMappings",
+          "1",
+          "targetSchemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "migrations",
+          "832",
+          "pinMappings",
+          "2",
+          "targetSchemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "migrations",
+          "832",
+          "pinMappings",
+          "3",
+          "targetSchemaVersion"
+        ],
+        [
+          "contributions",
+          "0",
+          "migrations",
+          "832",
+          "toVersion"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "migrationMapping",
+          "targetSchemaVersion"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "schemaVersion"
+        ],
+        [
+          "definitions",
+          "1155",
+          "schemaVersion"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": 2,
+      "after": 3
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "selectorIntent"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "selectorIntent"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "none",
+      "after": "typed-reference"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1088",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1089",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1090",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1091",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1092",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1102",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1103",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1104",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1105",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1106",
+          "sourceHash"
+        ],
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "entries",
+          "1107",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1144",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1155",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1164",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1166",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1175",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "definitions",
+          "1238",
+          "metadata",
+          "authoredSource",
+          "sourceProvenance",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1102",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1103",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1104",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1105",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1106",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "entries",
+          "1107",
+          "sourceHash"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "5f6e978067cea21a0c2ffc51713a80f3c3231a6d6c7bf221cc586d3e4b746275",
+      "after": "aaeaaea19f146a051befffb222e62b3db8725cbe0f619aa92228cff04d83e9f4"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "type",
+          "arguments"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "type",
+          "arguments"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": false,
+      "before": []
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "type",
+          "kind"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "type",
+          "kind"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "named",
+      "after": "resource"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "type",
+          "type"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "type",
+          "type"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": false,
+      "before": {
+        "localId": "string",
+        "ownerId": "builtin"
+      }
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "type",
+          "resourceType"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "type",
+          "resourceType"
+        ]
+      ],
+      "beforePresent": false,
+      "afterPresent": true,
+      "after": {
+        "localId": "structure",
+        "ownerId": "restudio.resync"
+      }
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "optionSource"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "optionSource"
+        ]
+      ],
+      "beforePresent": false,
+      "afterPresent": true,
+      "after": {
+        "localId": "server-resync-structure",
+        "ownerId": "restudio.resync"
+      }
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "definitions",
+          "1087",
+          "pins",
+          "1",
+          "resourceRole"
+        ],
+        [
+          "definitions",
+          "1155",
+          "pins",
+          "1",
+          "resourceRole"
+        ]
+      ],
+      "beforePresent": false,
+      "afterPresent": true,
+      "after": "reference"
+    },
+    {
+      "kind": "insert",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "optionSources"
+        ]
+      ],
+      "index": 53,
+      "values": [
+        {
+          "capability": {
+            "localId": "options-server-resync-structure",
+            "ownerId": "restudio.resync"
+          },
+          "contextSchema": {},
+          "description": "Provides server-authored options for server-resync-structure values.",
+          "id": "server-resync-structure",
+          "invalidationKey": "server-resync-structure",
+          "pageLimit": 100,
+          "title": "server-resync-structure",
+          "valueType": {
+            "kind": "resource",
+            "resourceType": {
+              "localId": "structure",
+              "ownerId": "restudio.resync"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "sourceHash"
+        ],
+        [
+          "provenance",
+          "0",
+          "sourceHash"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "b0267fc12aa9ac9ae045449688f2d19cdbef7ad4adbc3cadae11c7a900a65e8c",
+      "after": "67a5294a47935e33c34a45743e448ecad9d176f766baa6f7e5aa140aea210eef"
+    },
+    {
+      "kind": "replace",
+      "paths": [
+        [
+          "contributions",
+          "0",
+          "provenance",
+          "sourceUri"
+        ],
+        [
+          "provenance",
+          "0",
+          "sourceUri"
+        ]
+      ],
+      "beforePresent": true,
+      "afterPresent": true,
+      "before": "catalog://aggregate/restudio.resync/b0267fc12aa9ac9ae045449688f2d19cdbef7ad4adbc3cadae11c7a900a65e8c",
+      "after": "catalog://aggregate/restudio.resync/67a5294a47935e33c34a45743e448ecad9d176f766baa6f7e5aa140aea210eef"
+    },
+    {
+      "kind": "insert",
+      "paths": [
+        [
+          "minimumClientCapabilities"
+        ]
+      ],
+      "index": 273,
+      "values": [
+        {
+          "localId": "options-server-resync-structure",
+          "ownerId": "restudio.resync"
+        }
+      ]
+    },
+    {
+      "kind": "insert",
+      "paths": [
+        [
+          "optionSources"
+        ]
+      ],
+      "index": 53,
+      "values": [
+        {
+          "capability": {
+            "localId": "options-server-resync-structure",
+            "ownerId": "restudio.resync"
+          },
+          "contextSchema": {},
+          "description": "Provides server-authored options for server-resync-structure values.",
+          "id": "server-resync-structure",
+          "invalidationKey": "server-resync-structure",
+          "ownerId": "restudio.resync",
+          "pageLimit": 100,
+          "title": "server-resync-structure",
+          "valueType": {
+            "kind": "resource",
+            "resourceType": {
+              "localId": "structure",
+              "ownerId": "restudio.resync"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "relocate",
+      "paths": [
+        [
+          "runtimeRequirements"
+        ]
+      ],
+      "index": 1265,
+      "targetIndex": 1295,
+      "before": {
+        "capability": {
+          "localId": "world-action",
+          "ownerId": "restudio.resync"
+        },
+        "inputs": [
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "execution",
+              "ownerId": "builtin"
+            }
+          },
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "string",
+              "ownerId": "builtin"
+            }
+          }
+        ],
+        "kind": "runtimeRequirement",
+        "operation": {
+          "localId": "structure_delete",
+          "ownerId": "restudio.resync"
+        },
+        "outputs": [
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "execution",
+              "ownerId": "builtin"
+            }
+          },
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "boolean",
+              "ownerId": "builtin"
+            }
+          }
+        ],
+        "ownerId": "restudio.resync",
+        "pins": [
+          {
+            "direction": "input",
+            "id": "flow",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "execution",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          {
+            "direction": "input",
+            "id": "structure_id",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "string",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          {
+            "direction": "output",
+            "id": "output_flow",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "execution",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          {
+            "direction": "output",
+            "id": "deleted",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "boolean",
+                "ownerId": "builtin"
+              }
+            }
+          }
+        ],
+        "semantics": {
+          "audit": "none",
+          "authorization": {
+            "localId": "world-action",
+            "ownerId": "restudio.resync"
+          },
+          "cancellation": "none",
+          "cancelled": [],
+          "confirmation": "server",
+          "determinism": "deterministic",
+          "drainDeadlineMillis": 0,
+          "effect": "destructive",
+          "failure": [
+            "failure"
+          ],
+          "failureContract": {
+            "branches": [
+              "failure"
+            ],
+            "commitBoundary": "no-mutation",
+            "diagnosticCodes": [
+              "RUNTIME.HANDLER_FAILURE"
+            ],
+            "payloadType": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "any",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          "hardDeadlineMillis": 0,
+          "idempotency": "none",
+          "resourceReads": [],
+          "resourceWrites": [],
+          "retry": "never",
+          "sensitiveData": "none",
+          "success": [],
+          "thread": "main",
+          "timeoutMillis": 0,
+          "unloadPolicy": "drain"
+        }
+      },
+      "after": {
+        "capability": {
+          "localId": "world-action",
+          "ownerId": "restudio.resync"
+        },
+        "inputs": [
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "execution",
+              "ownerId": "builtin"
+            }
+          },
+          {
+            "kind": "resource",
+            "resourceType": {
+              "localId": "structure",
+              "ownerId": "restudio.resync"
+            }
+          }
+        ],
+        "kind": "runtimeRequirement",
+        "operation": {
+          "localId": "structure_delete",
+          "ownerId": "restudio.resync"
+        },
+        "outputs": [
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "execution",
+              "ownerId": "builtin"
+            }
+          },
+          {
+            "arguments": [],
+            "kind": "named",
+            "type": {
+              "localId": "boolean",
+              "ownerId": "builtin"
+            }
+          }
+        ],
+        "ownerId": "restudio.resync",
+        "pins": [
+          {
+            "direction": "input",
+            "id": "flow",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "execution",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          {
+            "direction": "input",
+            "id": "structure_id",
+            "type": {
+              "kind": "resource",
+              "resourceType": {
+                "localId": "structure",
+                "ownerId": "restudio.resync"
+              }
+            }
+          },
+          {
+            "direction": "output",
+            "id": "output_flow",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "execution",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          {
+            "direction": "output",
+            "id": "deleted",
+            "type": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "boolean",
+                "ownerId": "builtin"
+              }
+            }
+          }
+        ],
+        "semantics": {
+          "audit": "none",
+          "authorization": {
+            "localId": "world-action",
+            "ownerId": "restudio.resync"
+          },
+          "cancellation": "none",
+          "cancelled": [],
+          "confirmation": "server",
+          "determinism": "deterministic",
+          "drainDeadlineMillis": 0,
+          "effect": "destructive",
+          "failure": [
+            "failure"
+          ],
+          "failureContract": {
+            "branches": [
+              "failure"
+            ],
+            "commitBoundary": "no-mutation",
+            "diagnosticCodes": [
+              "RUNTIME.HANDLER_FAILURE"
+            ],
+            "payloadType": {
+              "arguments": [],
+              "kind": "named",
+              "type": {
+                "localId": "any",
+                "ownerId": "builtin"
+              }
+            }
+          },
+          "hardDeadlineMillis": 0,
+          "idempotency": "none",
+          "resourceReads": [],
+          "resourceWrites": [],
+          "retry": "never",
+          "sensitiveData": "none",
+          "success": [],
+          "thread": "main",
+          "timeoutMillis": 0,
+          "unloadPolicy": "drain"
+        }
+      }
+    }
+  ]
+}

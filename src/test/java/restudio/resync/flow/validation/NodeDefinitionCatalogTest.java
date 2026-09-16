@@ -15,11 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NodeDefinitionCatalogTest {
+    private static final Path MIGRATED_CATALOG_ROOT = Path.of("ReSyncUpgrade", "src", "main", "resources", "nodes", "migrated");
+    private static final Path REPLACEMENT_AUTOMATION_SOURCE = Path.of("src", "main", "resources", "nodes", "automation.json");
+
     @Test
     void migratedNodeCatalogKeepsExpectedNodeCount() throws Exception {
-        Path root = Path.of("src", "main", "resources", "nodes", "migrated");
         int count = 0;
-        try (var files = Files.list(root)) {
+        try (var files = Files.list(MIGRATED_CATALOG_ROOT)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".json") && !path.getFileName().toString().startsWith("_")).toList()) {
                 JsonElement element = JsonParser.parseString(Files.readString(file));
                 count += element.isJsonArray() ? element.getAsJsonArray().size() : 1;
@@ -46,11 +48,18 @@ class NodeDefinitionCatalogTest {
     }
 
     @Test
-    void timerUsesDefinitionDefaultsForOptionalRuntimeInputs() throws Exception {
-        JsonObject timer = findNode(Path.of("src", "main", "resources", "nodes", "automation.json"), "automation.timer");
-        assertEquals(2, timer.get("schemaVersion").getAsInt());
+    void replacementTimerDefinitionPreservesOptionalInputs() throws Exception {
+        JsonObject timer = findNode(REPLACEMENT_AUTOMATION_SOURCE, "automation.timer");
+        assertEquals(3, timer.get("schemaVersion").getAsInt());
         assertTrue(pin(timer, "inputs", "owner").get("optional").getAsBoolean());
         assertTrue(pin(timer, "inputs", "duration").get("optional").getAsBoolean());
+    }
+
+    @Test
+    void replacementScheduleNodesDeclareEverySupportedClockDomain() throws Exception {
+        for (String id : List.of("automation.schedule", "automation.scheduled_task")) {
+            assertEquals("wall_time,monotonic_elapsed,server_ticks", findNode(REPLACEMENT_AUTOMATION_SOURCE, id).get("clockDomain").getAsString(), id);
+        }
     }
 
     @Test
@@ -77,7 +86,7 @@ class NodeDefinitionCatalogTest {
     }
 
     @Test
-    void runtimeDataNodesExposeTypedQueriesAndItemResolution() throws Exception {
+    void dataNodesExposeTypedQueriesAndItemResolution() throws Exception {
         assertEquals("Find Data", findNode("runtime_data.json", "data.runtime_query").get("displayName").getAsString());
         assertEquals("list<runtime_data_entry>", pinType(findNode("runtime_data.json", "data.runtime_query"), "outputs", "results"));
         assertEquals("list<runtime_data_category>", pinType(findNode("runtime_data.json", "data.runtime_categories"), "outputs", "categories"));
@@ -158,8 +167,7 @@ class NodeDefinitionCatalogTest {
 
     @Test
     void propertySelectorsAreSearchableAcrossEveryPropertyFamily() throws Exception {
-        Path root = Path.of("src", "main", "resources", "nodes", "migrated");
-        try (var files = Files.list(root)) {
+        try (var files = Files.list(MIGRATED_CATALOG_ROOT)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".json") && !path.getFileName().toString().startsWith("_")).toList()) {
                 JsonElement element = JsonParser.parseString(Files.readString(file));
                 Iterable<JsonElement> nodes = element.isJsonArray() ? element.getAsJsonArray() : List.of(element);
@@ -366,7 +374,7 @@ class NodeDefinitionCatalogTest {
     }
 
     private JsonObject findNode(String fileName, String id) throws Exception {
-        return findNode(Path.of("src", "main", "resources", "nodes", "migrated", fileName), id);
+        return findNode(MIGRATED_CATALOG_ROOT.resolve(fileName), id);
     }
 
     private JsonObject findNode(Path file, String id) throws Exception {

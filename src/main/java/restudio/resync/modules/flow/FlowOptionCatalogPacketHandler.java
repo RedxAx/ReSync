@@ -2,12 +2,14 @@ package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
 import restudio.resync.api.OptionCatalogItem;
+import restudio.resync.api.OptionCatalogCapture;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customcontent.ItemAttributeSchemaService;
 import restudio.resync.core.Session;
+import restudio.resync.server.OptionCatalogCaptureExecutor;
 
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +31,7 @@ public class FlowOptionCatalogPacketHandler {
     private final Gson gson = new Gson();
     private final Map<String, CatalogSnapshot> customContentCatalogSnapshots = new HashMap<>();
     private final AtomicLong catalogSequence = new AtomicLong();
+    private volatile OptionCatalogCaptureExecutor captureExecutor;
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, CustomContentService customContentService) {
         this(sender, customContentService, null);
@@ -38,11 +42,22 @@ public class FlowOptionCatalogPacketHandler {
     }
 
     public FlowOptionCatalogPacketHandler(FlowPacketSender sender, OptionCatalogRegistry optionCatalogRegistry, BuiltinOptionCatalogService builtinCatalogs) {
+        this(sender, optionCatalogRegistry, builtinCatalogs, OptionCatalogCaptureExecutor.callerOnly());
+    }
+
+    public FlowOptionCatalogPacketHandler(FlowPacketSender sender, OptionCatalogRegistry optionCatalogRegistry,
+                                          BuiltinOptionCatalogService builtinCatalogs,
+                                          OptionCatalogCaptureExecutor captureExecutor) {
         this.sender = sender;
         this.optionCatalogRegistry = optionCatalogRegistry;
+        this.captureExecutor = captureExecutor != null ? captureExecutor : OptionCatalogCaptureExecutor.callerOnly();
         if (optionCatalogRegistry != null && builtinCatalogs != null) {
             builtinCatalogs.registerProviders(optionCatalogRegistry);
         }
+    }
+
+    public void setCaptureExecutor(OptionCatalogCaptureExecutor captureExecutor) {
+        this.captureExecutor = captureExecutor != null ? captureExecutor : OptionCatalogCaptureExecutor.callerOnly();
     }
 
     public void handle(Session session, ByteBuffer buffer) {
@@ -81,10 +96,14 @@ public class FlowOptionCatalogPacketHandler {
         }
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
-            List<OptionCatalogItem> items = optionCatalogRegistry.items(sourceId, query);
-            List<String> values = items.stream().map(OptionCatalogItem::value).toList();
-            sender.sendOptionCatalog(session, sourceId, request.contextKey(), values, items, provider.revision(query), sequence,
-                provider.status(query), provider.diagnostic(query));
+            try {
+                OptionCatalogCapture capture = captureExecutor.capture(provider, query);
+                sender.sendOptionCatalog(session, sourceId, request.contextKey(), capture.values(), capture.items(), capture.revision(), sequence,
+                    capture.status(), capture.diagnostic());
+            } catch (RuntimeException exception) {
+                sender.sendOptionCatalog(session, sourceId, request.contextKey(), List.of(), List.of(), "unavailable:" + sourceId, sequence,
+                    "unavailable", "Catalog provider does not expose a coherent snapshot");
+            }
             return;
         }
         sender.sendOptionCatalog(session, sourceId, request.contextKey(), List.of(), List.of(), "missing:" + sourceId, sequence, "missing", "Catalog provider is not registered");
@@ -118,7 +137,8 @@ public class FlowOptionCatalogPacketHandler {
         }
     }
 
-    public void broadcastChangedCustomContentCatalogs() {
+    public Set<String> broadcastChangedCustomContentCatalogs() {
+        Set<String> changed = new LinkedHashSet<>();
         for (CatalogSnapshot snapshot : customContentCatalogSnapshots()) {
             CatalogSnapshot previous = customContentCatalogSnapshots.get(snapshot.sourceId());
             if (snapshot.equals(previous)) {
@@ -126,7 +146,9 @@ public class FlowOptionCatalogPacketHandler {
             }
             customContentCatalogSnapshots.put(snapshot.sourceId(), snapshot);
             snapshot.broadcast(sender, catalogSequence.incrementAndGet());
+            changed.add(snapshot.sourceId());
         }
+        return Set.copyOf(changed);
     }
 
     public void broadcastCatalog(String sourceId) {
@@ -134,7 +156,20 @@ public class FlowOptionCatalogPacketHandler {
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
             OptionCatalogQuery query = new OptionCatalogQuery(sourceId, Map.of());
-            sender.broadcastOptionCatalog(sourceId, optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), sequence, provider.status(query), provider.diagnostic(query));
+            try {
+                captureExecutor.captureAsync(provider, query).whenComplete((capture, failure) -> {
+                    if (failure == null && capture != null) {
+                        sender.broadcastOptionCatalog(sourceId, capture.values(), capture.items(), capture.revision(), sequence,
+                            capture.status(), capture.diagnostic());
+                    } else {
+                        sender.broadcastOptionCatalog(sourceId, List.of(), List.of(), "unavailable:" + sourceId, sequence, "unavailable",
+                            "Catalog provider does not expose a coherent snapshot");
+                    }
+                });
+            } catch (RuntimeException exception) {
+                sender.broadcastOptionCatalog(sourceId, List.of(), List.of(), "unavailable:" + sourceId, sequence, "unavailable",
+                    "Catalog provider does not expose a coherent snapshot");
+            }
         } else {
             sender.broadcastOptionCatalog(sourceId, List.of(), List.of(), "missing:" + sourceId, sequence, "missing", "Catalog provider is not registered");
         }
@@ -157,7 +192,13 @@ public class FlowOptionCatalogPacketHandler {
         OptionCatalogProvider provider = optionCatalogRegistry != null ? optionCatalogRegistry.provider(sourceId) : null;
         if (provider != null) {
             OptionCatalogQuery query = new OptionCatalogQuery(sourceId, Map.of());
-            return new CatalogSnapshot(sourceId, optionCatalogRegistry.values(sourceId, query), optionCatalogRegistry.items(sourceId, query), provider.revision(query), provider.status(query), provider.diagnostic(query));
+            try {
+                OptionCatalogCapture capture = captureExecutor.capture(provider, query);
+                return new CatalogSnapshot(sourceId, capture.values(), capture.items(), capture.revision(), capture.status(), capture.diagnostic());
+            } catch (RuntimeException exception) {
+                return new CatalogSnapshot(sourceId, List.of(), List.of(), "unavailable:" + sourceId, "unavailable",
+                    "Catalog provider does not expose a coherent snapshot");
+            }
         }
         return new CatalogSnapshot(sourceId, List.of(), List.of(), "missing:" + sourceId, "missing", "Catalog provider is not registered");
     }

@@ -41,6 +41,8 @@ public class RateLimiter {
     }
 
     private static class TokenBucket {
+        private static final int YIELD_AFTER_CAS_FAILURES = 64;
+
         private final long capacity;
         private final long refillRate;
         private final long refillInterval;
@@ -56,16 +58,24 @@ public class RateLimiter {
         }
 
         public boolean tryConsume(int amount) {
-            refillIfNeeded();
-
-            long currentTokens = tokens.get();
-            if (currentTokens >= amount) {
+            int failures = 0;
+            while (true) {
+                refillIfNeeded();
+                long currentTokens = tokens.get();
+                if (currentTokens < amount) {
+                    return false;
+                }
                 if (tokens.compareAndSet(currentTokens, currentTokens - amount)) {
                     return true;
                 }
-                return tryConsume(amount);
+                failures++;
+                if (failures == YIELD_AFTER_CAS_FAILURES) {
+                    failures = 0;
+                    Thread.yield();
+                } else {
+                    Thread.onSpinWait();
+                }
             }
-            return false;
         }
 
         public long getAvailableTokens() {

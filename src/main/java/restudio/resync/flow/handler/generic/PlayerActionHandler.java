@@ -38,6 +38,7 @@ import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -57,6 +58,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
     private final ItemAttributeSchemaService itemComponents = new ItemAttributeSchemaService();
     private final Map<String, BossBar> bossBars = new ConcurrentHashMap<>();
     private final Map<UUID, MovementSpeeds> frozenPlayers = new ConcurrentHashMap<>();
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     private record MovementSpeeds(float walk, float fly) {
     }
@@ -100,7 +102,10 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                 location = new Location(target.getWorld(), x, y, z);
             }
             requireLocation(location, "Teleport location");
-            if (!target.teleport(location)) throw new IllegalStateException("Player teleport was rejected");
+            Location finalLocation = location;
+            runPlayerMutation(target, "flow-player-teleport", () -> {
+                if (!target.teleport(finalLocation)) throw new IllegalStateException("Player teleport was rejected");
+            });
         });
 
         operations.put("give_item", (ctx, node) -> {
@@ -110,21 +115,21 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (target == null) throw new IllegalArgumentException("Player is required");
             Material material = requireMaterial(materialName);
             if (amount < 1 || amount > material.getMaxStackSize()) throw new IllegalArgumentException("Item amount must be between 1 and " + material.getMaxStackSize());
-            runSync(() -> addItemFully(target, new ItemStack(material, amount)));
+            runPlayerMutation(target, "flow-player-give-item", () -> addItemFully(target, new ItemStack(material, amount)));
         });
 
         operations.put("player_set_walking_speed", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             Double speed = ctx.getInputValue(node, "speed", Double.class, 0.2);
             float value = requireSpeed(speed, "Walking speed");
-            runSync(() -> target.setWalkSpeed(value));
+            runPlayerMutation(target, "flow-player-walk-speed", () -> runSync(() -> target.setWalkSpeed(value)));
         });
 
         operations.put("player_set_flying_speed", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             Double speed = ctx.getInputValue(node, "speed", Double.class, 0.05);
             float value = requireSpeed(speed, "Flying speed");
-            runSync(() -> target.setFlySpeed(value));
+            runPlayerMutation(target, "flow-player-fly-speed", () -> runSync(() -> target.setFlySpeed(value)));
         });
 
         operations.put("player_execute_command", (ctx, node) -> {
@@ -135,7 +140,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (command.isBlank()) throw new IllegalArgumentException("Command is required");
             String normalizedCommand = command.startsWith("/") ? command.substring(1) : command;
             if (normalizedCommand.isBlank()) throw new IllegalArgumentException("Command is required");
-            boolean success = callSync(() -> {
+            boolean success = playerDataAdmission.mutatePlayer("flow-player-execute-command", target, () -> callSync(() -> {
                 boolean wasOp = target.isOp();
                 try {
                     if (asOp && !wasOp) {
@@ -147,7 +152,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         target.setOp(false);
                     }
                 }
-            });
+            }));
             ctx.setOutput(node, "success", success);
         });
 
@@ -253,128 +258,128 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                     switch (property.toLowerCase()) {
                         case "sprint" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> target.setSprinting(enabled));
+                            runPlayerMutation(target, "flow-player-sprint", () -> runSync(() -> target.setSprinting(enabled)));
                             success = true;
                         }
                         case "sneak" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> target.setSneaking(enabled));
+                            runPlayerMutation(target, "flow-player-sneak", () -> runSync(() -> target.setSneaking(enabled)));
                             success = true;
                         }
                         case "fly" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> {
+                            runPlayerMutation(target, "flow-player-fly", () -> runSync(() -> {
                                 target.setAllowFlight(enabled);
                                 target.setFlying(enabled);
-                            });
+                            }));
                             success = true;
                         }
                         case "vanish" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> target.setInvisible(enabled));
+                            runPlayerMutation(target, "flow-player-vanish", () -> runSync(() -> target.setInvisible(enabled)));
                             success = true;
                         }
                         case "glowing" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> target.setGlowing(enabled));
+                            runPlayerMutation(target, "flow-player-glowing", () -> runSync(() -> target.setGlowing(enabled)));
                             success = true;
                         }
                         case "invulnerable" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> target.setInvulnerable(enabled));
+                            runPlayerMutation(target, "flow-player-invulnerable", () -> runSync(() -> target.setInvulnerable(enabled)));
                             success = true;
                         }
                         case "gamemode" -> {
                             String modeName = ctx.getInputValue(node, "gamemode", String.class, "SURVIVAL");
                             GameMode gameMode = GameMode.valueOf(modeName.toUpperCase(Locale.ROOT));
-                            runSync(() -> target.setGameMode(gameMode));
+                            runPlayerMutation(target, "flow-player-game-mode", () -> runSync(() -> target.setGameMode(gameMode)));
                             success = true;
                         }
                         case "food_level" -> {
                             Integer level = ctx.getInputValue(node, "value", Integer.class, 20);
                             requireRange(level, 0, 20, "Food level");
-                            runSync(() -> target.setFoodLevel(level));
+                            runPlayerMutation(target, "flow-player-food-level", () -> runSync(() -> target.setFoodLevel(level)));
                             success = true;
                         }
                         case "saturation" -> {
                             Float saturation = ctx.getInputValue(node, "value", Float.class, 20.0f);
                             requireFiniteRange(saturation, 0.0, 20.0, "Saturation");
-                            runSync(() -> target.setSaturation(saturation));
+                            runPlayerMutation(target, "flow-player-saturation", () -> runSync(() -> target.setSaturation(saturation)));
                             success = true;
                         }
                         case "exhaustion" -> {
                             Float exhaustion = ctx.getInputValue(node, "value", Float.class, 0.0f);
                             requireFiniteRange(exhaustion, 0.0, 40.0, "Exhaustion");
-                            runSync(() -> target.setExhaustion(exhaustion));
+                            runPlayerMutation(target, "flow-player-exhaustion", () -> runSync(() -> target.setExhaustion(exhaustion)));
                             success = true;
                         }
                         case "health" -> {
                             Double health = ctx.getInputValue(node, "value", Double.class, 20.0);
-                            FlowMutations.setHealth(ctx, target, health);
+                            runPlayerMutation(target, "flow-player-health", () -> FlowMutations.setHealth(ctx, target, health));
                             success = true;
                         }
                         case "max_health" -> {
                             Double maxHealth = ctx.getInputValue(node, "value", Double.class, 20.0);
                             requireFiniteRange(maxHealth, 1.0, 2048.0, "Maximum health");
-                            runSync(() -> {
+                            runPlayerMutation(target, "flow-player-max-health", () -> runSync(() -> {
                                 target.setMaxHealth(maxHealth);
                                 if (target.getHealth() > maxHealth) target.setHealth(maxHealth);
-                            });
+                            }));
                             success = true;
                         }
                         case "absorption" -> {
                             Double absorption = ctx.getInputValue(node, "value", Double.class, 0.0);
-                            FlowMutations.setAbsorption(ctx, target, absorption);
+                            runPlayerMutation(target, "flow-player-absorption", () -> FlowMutations.setAbsorption(ctx, target, absorption));
                             success = true;
                         }
                         case "walk_speed" -> {
                             Float speed = ctx.getInputValue(node, "value", Float.class, 0.2f);
                             float validated = requireSpeed(speed, "Walk speed");
-                            runSync(() -> target.setWalkSpeed(validated));
+                            runPlayerMutation(target, "flow-player-walk-speed", () -> runSync(() -> target.setWalkSpeed(validated)));
                             success = true;
                         }
                         case "fly_speed" -> {
                             Float speed = ctx.getInputValue(node, "value", Float.class, 0.1f);
                             float validated = requireSpeed(speed, "Fly speed");
-                            runSync(() -> target.setFlySpeed(validated));
+                            runPlayerMutation(target, "flow-player-fly-speed", () -> runSync(() -> target.setFlySpeed(validated)));
                             success = true;
                         }
                         case "fire_ticks" -> {
                             Integer ticks = ctx.getInputValue(node, "value", Integer.class, 0);
                             requireRange(ticks, 0, 72_000, "Fire ticks");
-                            runSync(() -> target.setFireTicks(ticks));
+                            runPlayerMutation(target, "flow-player-fire-ticks", () -> runSync(() -> target.setFireTicks(ticks)));
                             success = true;
                         }
                         case "air_ticks" -> {
                             Integer ticks = ctx.getInputValue(node, "value", Integer.class, 300);
                             requireRange(ticks, -20, target.getMaximumAir(), "Air ticks");
-                            runSync(() -> target.setRemainingAir(ticks));
+                            runPlayerMutation(target, "flow-player-air-ticks", () -> runSync(() -> target.setRemainingAir(ticks)));
                             success = true;
                         }
                         case "no_damage_ticks" -> {
                             Integer ticks = ctx.getInputValue(node, "value", Integer.class, 0);
-                            FlowMutations.noDamageTicks(ctx, target, ticks);
+                            runPlayerMutation(target, "flow-player-no-damage-ticks", () -> FlowMutations.noDamageTicks(ctx, target, ticks));
                             success = true;
                         }
                         case "freeze_state" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> setFrozen(target, enabled));
+                            runPlayerMutation(target, "flow-player-freeze-state", () -> runSync(() -> setFrozen(target, enabled)));
                             success = true;
                         }
                         case "flight_state" -> {
                             Boolean enabled = ctx.getInputValue(node, "enabled", Boolean.class, true);
-                            runSync(() -> {
+                            runPlayerMutation(target, "flow-player-flight-state", () -> runSync(() -> {
                                 target.setAllowFlight(enabled);
                                 if (!enabled) {
                                     target.setFlying(false);
                                 }
-                            });
+                            }));
                             success = true;
                         }
                         case "compass_target" -> {
                             Location location = ctx.getInputValue(node, "compass_location", Location.class, null);
                             if (location == null || location.getWorld() == null) throw new IllegalArgumentException("Compass world location is required");
-                            runSync(() -> target.setCompassTarget(location));
+                            runPlayerMutation(target, "flow-player-compass-target", () -> runSync(() -> target.setCompassTarget(location)));
                             success = true;
                         }
                         case "xp" -> {
@@ -382,16 +387,16 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                             Float points = ctx.getInputValue(node, "points", Float.class, 0.0f);
                             requireRange(level, 0, 21_863, "Experience level");
                             requireFiniteRange(points, 0.0, 1.0, "Experience progress");
-                            runSync(() -> {
+                            runPlayerMutation(target, "flow-player-experience", () -> runSync(() -> {
                                 target.setLevel(level);
                                 target.setExp(points);
-                            });
+                            }));
                             success = true;
                         }
                         case "total_exp" -> {
                             Integer exp = ctx.getInputValue(node, "value", Integer.class, 0);
                             if (exp < 0) throw new IllegalArgumentException("Total experience must be non-negative");
-                            runSync(() -> target.setTotalExperience(exp));
+                            runPlayerMutation(target, "flow-player-total-experience", () -> runSync(() -> target.setTotalExperience(exp)));
                             success = true;
                         }
                         default -> throw new IllegalArgumentException("Unknown writable player state property: " + property);
@@ -451,9 +456,9 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         }
                         requireLocation(location, "Teleport location");
                         Location finalLocation = location;
-                        runSync(() -> {
+                        runPlayerMutation(target, "flow-player-movement-teleport", () -> runSync(() -> {
                             if (!target.teleport(finalLocation)) throw new IllegalStateException("Player teleport was rejected");
-                        });
+                        }));
                         success = true;
                     }
                     case "launch" -> {
@@ -471,12 +476,12 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                             FlowMutations.finiteVelocity(inputDirection);
                             if (inputDirection.lengthSquared() == 0) throw new IllegalArgumentException("Push direction cannot be zero");
                         }
-                        runSync(() -> {
+                        runPlayerMutation(target, "flow-player-push", () -> runSync(() -> {
                             Vector direction = inputDirection != null ? inputDirection.clone() : target.getLocation().getDirection();
                             if (direction.lengthSquared() == 0) throw new IllegalArgumentException("Push direction cannot be zero");
                             direction.normalize();
                             FlowMutations.applyVelocity(ctx, target, direction.multiply(strength));
-                        });
+                        }));
                         success = true;
                     }
                     case "spin" -> {
@@ -485,7 +490,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         requireFiniteRange(yaw, -360000, 360000, "Spin yaw");
                         requireFiniteRange(pitch, -180, 180, "Spin pitch");
                         Boolean resetVelocity = ctx.getInputValue(node, "reset_velocity", Boolean.class, false);
-                        runSync(() -> {
+                        runPlayerMutation(target, "flow-player-spin", () -> runSync(() -> {
                             Vector velocity = resetVelocity ? null : target.getVelocity().clone();
                             Location loc = target.getLocation();
                             double finalPitch = loc.getPitch() + pitch;
@@ -496,7 +501,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                             if (velocity != null) {
                                 FlowMutations.applyVelocity(ctx, target, velocity);
                             }
-                        });
+                        }));
                         success = true;
                     }
                     case "set_rotation" -> {
@@ -506,7 +511,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         requireFiniteRange(yaw, -360000, 360000, "Rotation yaw");
                         requireFiniteRange(pitch, -90, 90, "Rotation pitch");
                         Boolean resetVelocity = ctx.getInputValue(node, "reset_velocity", Boolean.class, false);
-                        runSync(() -> {
+                        runPlayerMutation(target, "flow-player-set-rotation", () -> runSync(() -> {
                             Vector velocity = resetVelocity ? null : target.getVelocity().clone();
                             Location loc = target.getLocation();
                             loc.setYaw(yaw);
@@ -515,7 +520,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                             if (velocity != null) {
                                 FlowMutations.applyVelocity(ctx, target, velocity);
                             }
-                        });
+                        }));
                         success = true;
                     }
                     default -> throw new IllegalArgumentException("Unknown player movement mode: " + mode);
@@ -539,11 +544,11 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         if (duration < 1) throw new IllegalArgumentException("Potion duration must be positive");
                         if (amp < 0 || amp > 255) throw new IllegalArgumentException("Potion amplifier must be between 0 and 255");
                         PotionEffect effect = new PotionEffect(type, duration, amp);
-                        runSync(() -> target.addPotionEffect(effect));
+                        runPlayerMutation(target, "flow-player-potion-add", () -> runSync(() -> target.addPotionEffect(effect)));
                         success = true;
                     }
                     case "clear" -> {
-                        runSync(() -> target.getActivePotionEffects().forEach(effect -> target.removePotionEffect(effect.getType())));
+                        runPlayerMutation(target, "flow-player-potion-clear", () -> runSync(() -> target.getActivePotionEffects().forEach(effect -> target.removePotionEffect(effect.getType()))));
                         success = true;
                     }
                     case "has" -> {
@@ -579,11 +584,11 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (advancement == null) throw new IllegalArgumentException("Unknown advancement: " + key);
             switch (mode.toLowerCase(Locale.ROOT)) {
                             case "grant" -> {
-                                runSync(() -> target.getAdvancementProgress(advancement).awardCriteria(criterion));
+                                runPlayerMutation(target, "flow-player-advancement-grant", () -> target.getAdvancementProgress(advancement).awardCriteria(criterion));
                                 success = true;
                             }
                             case "revoke" -> {
-                                runSync(() -> target.getAdvancementProgress(advancement).revokeCriteria(criterion));
+                                runPlayerMutation(target, "flow-player-advancement-revoke", () -> target.getAdvancementProgress(advancement).revokeCriteria(criterion));
                                 success = true;
                             }
                             case "has" -> {
@@ -610,7 +615,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                         case "set" -> {
                             Integer ticks = ctx.getInputValue(node, "ticks", Integer.class, 0);
                             if (ticks < 0) throw new IllegalArgumentException("Cooldown ticks cannot be negative");
-                            runSync(() -> target.setCooldown(material, ticks));
+                            runPlayerMutation(target, "flow-player-cooldown-set", () -> runSync(() -> target.setCooldown(material, ticks)));
                             success = true;
                         }
                         case "has" -> {
@@ -622,7 +627,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
                             success = true;
                         }
                         case "clear" -> {
-                            runSync(() -> target.setCooldown(material, 0));
+                            runPlayerMutation(target, "flow-player-cooldown-clear", () -> runSync(() -> target.setCooldown(material, 0)));
                             success = true;
                         }
                         default -> throw new IllegalArgumentException("Unknown player cooldown mode: " + mode);
@@ -725,7 +730,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
         operations.put("player_give_item", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = requireItem(ctx, node, "item");
-            runSync(() -> addItemFully(target, item.clone()));
+            runPlayerMutation(target, "flow-player-give-item", () -> addItemFully(target, item.clone()));
         });
 
         operations.put("player_give_item_stack", (ctx, node) -> {
@@ -752,7 +757,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (amount < 1 || amount > stackLimit) throw new IllegalArgumentException("Stack amount must be between 1 and " + stackLimit);
             stack.setAmount(amount);
             ItemStack given = stack;
-            runSync(() -> addItemFully(target, given.clone()));
+            runPlayerMutation(target, "flow-player-give-item-stack", () -> addItemFully(target, given.clone()));
             ctx.setOutput(node, "item", given);
             ctx.setOutput(node, "amount", amount);
             ctx.setOutput(node, "max_stack_size", stackLimit);
@@ -765,7 +770,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (amount < 1) throw new IllegalArgumentException("Item amount must be positive");
             ItemStack toRemove = item.clone();
             toRemove.setAmount(amount);
-            runSync(() -> {
+            runPlayerMutation(target, "flow-player-take-item", () -> {
                 if (!target.getInventory().containsAtLeast(toRemove, amount)) throw new IllegalArgumentException("Player does not have the requested item amount");
                 target.getInventory().removeItem(toRemove);
             });
@@ -775,13 +780,13 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             Player target = requirePlayer(ctx, node, "target");
             int slot = requireInventorySlot(ctx.getInputValue(node, "slot", Integer.class, 0));
             ItemStack item = requireItem(ctx, node, "item");
-            runSync(() -> target.getInventory().setItem(slot, item));
+            runPlayerMutation(target, "flow-player-set-item", () -> target.getInventory().setItem(slot, item));
         });
 
         operations.put("player_clear_slot", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             int slot = requireInventorySlot(ctx.getInputValue(node, "slot", Integer.class, 0));
-            runSync(() -> target.getInventory().setItem(slot, null));
+            runPlayerMutation(target, "flow-player-clear-slot", () -> target.getInventory().setItem(slot, null));
         });
 
         operations.put("player_swap_items", (ctx, node) -> {
@@ -789,7 +794,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             int slot1 = requireInventorySlot(ctx.getInputValue(node, "slot1", Integer.class, 0));
             int slot2 = requireInventorySlot(ctx.getInputValue(node, "slot2", Integer.class, 1));
             if (slot1 == slot2) throw new IllegalArgumentException("Inventory swap slots must be different");
-            runSync(() -> {
+            runPlayerMutation(target, "flow-player-swap-items", () -> {
                 ItemStack item1 = target.getInventory().getItem(slot1);
                 ItemStack item2 = target.getInventory().getItem(slot2);
                 target.getInventory().setItem(slot1, item2);
@@ -800,37 +805,37 @@ public class PlayerActionHandler implements NodeHandler, Listener {
         operations.put("player_set_helmet", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItem(EquipmentSlot.HEAD, item));
+            runPlayerMutation(target, "flow-player-set-helmet", () -> target.getInventory().setItem(EquipmentSlot.HEAD, item));
         });
 
         operations.put("player_set_chestplate", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItem(EquipmentSlot.CHEST, item));
+            runPlayerMutation(target, "flow-player-set-chestplate", () -> target.getInventory().setItem(EquipmentSlot.CHEST, item));
         });
 
         operations.put("player_set_leggings", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItem(EquipmentSlot.LEGS, item));
+            runPlayerMutation(target, "flow-player-set-leggings", () -> target.getInventory().setItem(EquipmentSlot.LEGS, item));
         });
 
         operations.put("player_set_boots", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItem(EquipmentSlot.FEET, item));
+            runPlayerMutation(target, "flow-player-set-boots", () -> target.getInventory().setItem(EquipmentSlot.FEET, item));
         });
 
         operations.put("player_set_mainhand", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItemInMainHand(item));
+            runPlayerMutation(target, "flow-player-set-mainhand", () -> target.getInventory().setItemInMainHand(item));
         });
 
         operations.put("player_set_offhand", (ctx, node) -> {
             Player target = requirePlayer(ctx, node, "target");
             ItemStack item = ctx.getInputValue(node, "item", ItemStack.class, null);
-            runSync(() -> target.getInventory().setItemInOffHand(item));
+            runPlayerMutation(target, "flow-player-set-offhand", () -> target.getInventory().setItemInOffHand(item));
         });
 
         operations.put("player_set_inventory_title", (ctx, node) -> {
@@ -848,7 +853,7 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             Integer green = ctx.getInputValue(node, "green", Integer.class, 255);
             Integer blue = ctx.getInputValue(node, "blue", Integer.class, 255);
             requireRgb(red, green, blue);
-            runSync(() -> {
+            runPlayerMutation(target, "flow-player-set-armor-color", () -> {
                 ItemStack item = target.getInventory().getItem(slot);
                 if (item == null || !(item.getItemMeta() instanceof LeatherArmorMeta meta)) throw new IllegalArgumentException("Selected equipment slot does not contain leather armor");
                 meta.setColor(Color.fromRGB(red, green, blue));
@@ -1110,12 +1115,14 @@ public class PlayerActionHandler implements NodeHandler, Listener {
     private void setFrozen(Player player, boolean frozen) {
         UUID playerId = player.getUniqueId();
         if (frozen) {
-            frozenPlayers.putIfAbsent(playerId, new MovementSpeeds(player.getWalkSpeed(), player.getFlySpeed()));
-            player.setWalkSpeed(0.0f);
-            player.setFlySpeed(0.0f);
+            runPlayerMutation(player, "flow-player-freeze", () -> {
+                frozenPlayers.putIfAbsent(playerId, new MovementSpeeds(player.getWalkSpeed(), player.getFlySpeed()));
+                player.setWalkSpeed(0.0f);
+                player.setFlySpeed(0.0f);
+            });
             return;
         }
-        restoreFrozen(player, true);
+        runPlayerMutation(player, "flow-player-unfreeze", () -> restoreFrozen(player, true));
     }
 
     private void restoreFrozen(Player player, boolean required) {
@@ -1124,8 +1131,10 @@ public class PlayerActionHandler implements NodeHandler, Listener {
             if (required) throw new IllegalStateException("Player is not frozen by ReSync");
             return;
         }
-        player.setWalkSpeed(speeds.walk());
-        player.setFlySpeed(speeds.fly());
+        playerDataAdmission.mutatePlayer("flow-player-restore-speed:" + player.getUniqueId(), player, () -> {
+            player.setWalkSpeed(speeds.walk());
+            player.setFlySpeed(speeds.fly());
+        });
     }
 
     private void requireRgb(int red, int green, int blue) {
@@ -1157,6 +1166,10 @@ public class PlayerActionHandler implements NodeHandler, Listener {
 
     private void runSync(Runnable action) {
         action.run();
+    }
+
+    private void runPlayerMutation(Player player, String operation, Runnable action) {
+        playerDataAdmission.mutatePlayer(operation, player, action);
     }
 
     private <T> T callSync(Supplier<T> supplier) {

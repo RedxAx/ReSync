@@ -4,6 +4,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.flow.FlowExecutor;
+import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.runtime.CompiledRuntimeContext;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
+import restudio.resync.flow.runtime.RuntimePrincipal;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -25,14 +29,33 @@ public final class FlowFunctionTestHarness {
         CompletableFuture<Map<String, Object>> execute(FlowGraph graph, Player player, Event event, Map<String, Object> inputs, Map<String, Object> eventVariables);
     }
 
+    @FunctionalInterface
+    public interface AuthenticatedFunctionRunner {
+        CompletableFuture<Map<String, Object>> execute(FlowGraph graph, Player player, Event event,
+                                                        Map<String, Object> inputs, Map<String, Object> eventVariables,
+                                                        RuntimePrincipal principal, CorrelationId invocationId,
+                                                        CompiledRuntimeContext runtimeContext, long requestedDeadlineMillis);
+    }
+
     public record Fixture(String name, Map<String, Object> inputs, Map<String, Object> expectedOutputs, Map<String, Object> serverContext,
-                          Player player, Event event, Duration timeout) {
+                          Player player, Event event, Duration timeout, RuntimePrincipal principal,
+                          CorrelationId invocationId, CompiledRuntimeContext runtimeContext,
+                          long requestedDeadlineMillis) {
+        public Fixture(String name, Map<String, Object> inputs, Map<String, Object> expectedOutputs, Map<String, Object> serverContext,
+                       Player player, Event event, Duration timeout) {
+            this(name, inputs, expectedOutputs, serverContext, player, event, timeout, null, null, null,
+                RuntimeExecutionContext.NO_DEADLINE);
+        }
+
         public Fixture {
             name = name != null && !name.isBlank() ? name : "Fixture";
             inputs = immutableMap(inputs);
             expectedOutputs = immutableMap(expectedOutputs);
             serverContext = immutableMap(serverContext);
             timeout = timeout != null && !timeout.isNegative() && !timeout.isZero() ? timeout : Duration.ofSeconds(5);
+            if (requestedDeadlineMillis < 0) {
+                throw new IllegalArgumentException("Requested Deadline Cannot Be Negative");
+            }
         }
     }
 
@@ -58,14 +81,22 @@ public final class FlowFunctionTestHarness {
     }
 
     private final FunctionRunner runner;
+    private final AuthenticatedFunctionRunner authenticatedRunner;
     private final Clock clock;
 
     public FlowFunctionTestHarness(FlowExecutor executor, Clock clock) {
-        this(executor::executeFunction, clock);
+        FlowExecutor configuredExecutor = Objects.requireNonNull(executor, "executor");
+        this.runner = (graph, player, event, inputs, eventVariables) ->
+            configuredExecutor.executeFunction(graph, player, event, inputs, eventVariables);
+        this.authenticatedRunner = (graph, player, event, inputs, eventVariables, principal, invocationId,
+                                    runtimeContext, requestedDeadlineMillis) -> configuredExecutor.executeFunction(
+            graph, player, event, inputs, eventVariables, principal, invocationId, runtimeContext, requestedDeadlineMillis);
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     public FlowFunctionTestHarness(FunctionRunner runner, Clock clock) {
         this.runner = Objects.requireNonNull(runner, "runner");
+        this.authenticatedRunner = null;
         this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
@@ -78,7 +109,14 @@ public final class FlowFunctionTestHarness {
         eventVariables.put("test.clock.zone", clock.getZone().getId());
         CompletableFuture<Map<String, Object>> execution;
         try {
-            execution = runner.execute(function, normalizedFixture.player(), normalizedFixture.event(), normalizedFixture.inputs(), immutableMap(eventVariables));
+            execution = authenticatedRunner != null
+                ? normalizedFixture.principal() == null || normalizedFixture.invocationId() == null
+                    ? CompletableFuture.failedFuture(new IllegalArgumentException(
+                        "Authenticated Function Tests Require A Trusted Principal And Invocation ID"))
+                    : authenticatedRunner.execute(function, normalizedFixture.player(), normalizedFixture.event(),
+                        normalizedFixture.inputs(), immutableMap(eventVariables), normalizedFixture.principal(),
+                        normalizedFixture.invocationId(), normalizedFixture.runtimeContext(), normalizedFixture.requestedDeadlineMillis())
+                : runner.execute(function, normalizedFixture.player(), normalizedFixture.event(), normalizedFixture.inputs(), immutableMap(eventVariables));
         } catch (Throwable error) {
             return CompletableFuture.completedFuture(failureResult(normalizedFixture, error, started));
         }

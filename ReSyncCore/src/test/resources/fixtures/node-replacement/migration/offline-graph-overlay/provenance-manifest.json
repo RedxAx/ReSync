@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "fixture": "offline-graph-overlay",
+  "sources": [
+    {
+      "id": "sanitized-real",
+      "root": "fixtures/node-replacement/full-folder/populated",
+      "treeHash": "f55fc1e06d724e82eb59a864fd520629ab7a81a2ca3a42919182dc574dcbee96",
+      "files": [
+        {
+          "path": "assets/Blueprints/Flows/fixture-flow.json",
+          "sha256": "5a92ec5dd986a1e6649ff3c41ac9a2bd18554852979ec8dd09b35753a6d69c60",
+          "action": "copy-to-replacement"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-supplement",
+      "root": "none",
+      "treeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "files": [],
+      "action": "none"
+    },
+    {
+      "id": "derived-overlay",
+      "root": "fixtures/node-replacement/migration/offline-graph-overlay/legacy",
+      "treeHash": "74613819e7053e71fbc6131adf0642b4859a4406a7d284902b1fd1fe70e9314d",
+      "files": [
+        {
+          "path": "flows/fixture-flow.json",
+          "sha256": "1649b62002a4611f7583739410c208958b70a543eade7c83887922233fa6f348",
+          "action": "quarantine-legacy-duplicate"
+        }
+      ]
+    }
+  ],
+  "expectedActions": [
+    "retain-sanitized-real-source",
+    "copy-canonical-flow-to-replacement",
+    "quarantine-derived-legacy-overlay",
+    "preserve-original-source-archive"
+  ]
+}

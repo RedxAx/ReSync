@@ -1,5 +1,8 @@
 package restudio.resync.customcontent;
 
+import com.google.gson.Gson;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.CustomContentDefinition;
@@ -7,6 +10,10 @@ import restudio.flow.data.CustomContentGraphAdapter;
 import restudio.flow.data.FlowConnection;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.CanonicalProjectMetadataFixture;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -19,10 +26,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CustomContentIdentityRepairTest {
     @TempDir
     Path tempDir;
+    private AssetPersistenceGate gate;
+    private AssetTransactionCoordinator coordinator;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        gate = new AssetPersistenceGate(tempDir);
+        coordinator = AssetTransactionCoordinator.open(tempDir.resolve("assets"), new Gson());
+        CanonicalProjectMetadataFixture.seed(coordinator);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        coordinator.close();
+    }
 
     @Test
-    void malformedFlowIdAssetKeepsItsActionsButRecoversTheOriginalItemIdentity() {
-        CustomContentStorage storage = new CustomContentStorage(tempDir.toFile());
+    void malformedFlowIdAssetKeepsItsActionsButRecoversTheOriginalItemIdentity() throws Exception {
+        CustomContentStorage storage = storage();
         FlowGraph originalGraph = CustomContentGraphAdapter.createContentGraph("blockingSword", "item", "Shielding Sword");
         CustomContentGraphAdapter.setContentProperty(originalGraph, "material", "DIAMOND_SWORD");
         CustomContentGraphAdapter.setContentProperty(originalGraph, "custom_model_data", 42);
@@ -37,7 +58,10 @@ class CustomContentIdentityRepairTest {
         CustomContentDefinition malformed = CustomContentGraphAdapter.toDefinition(malformedGraph);
         storage.save(malformed);
 
-        storage = new CustomContentStorage(tempDir.toFile());
+        gate.quiesce();
+        storage.close();
+        gate.resume();
+        storage = storage();
         CustomContentDefinition repaired = storage.get("blockingSword");
 
         assertNotNull(repaired);
@@ -48,11 +72,13 @@ class CustomContentIdentityRepairTest {
         assertEquals(originalGraph.getId(), repaired.getGraph().getId());
         assertTrue(repaired.getGraph().getNodes().containsKey("latest-action"));
         assertNull(storage.get(originalGraph.getId()));
+        gate.quiesce();
+        storage.close();
     }
 
     @Test
-    void malformedItemAliasForBlockKeepsDetachedActionsWithoutReplacingTheBlockGraph() {
-        CustomContentStorage storage = new CustomContentStorage(tempDir.toFile());
+    void malformedItemAliasForBlockKeepsDetachedActionsWithoutReplacingTheBlockGraph() throws Exception {
+        CustomContentStorage storage = storage();
         FlowGraph originalGraph = CustomContentGraphAdapter.createContentGraph("reblock", "block", "Berger");
         originalGraph.getNodes().put("original-action", new FlowNode("title.action.bar", 300, 120, Map.of("text", "Original")));
         CustomContentDefinition original = CustomContentGraphAdapter.toDefinition(originalGraph);
@@ -66,7 +92,10 @@ class CustomContentIdentityRepairTest {
         malformedGraph.getConnections().add(new FlowConnection(malformedStartId, "while_holding", "latest-action", "flow"));
         storage.save(CustomContentGraphAdapter.toDefinition(malformedGraph));
 
-        storage = new CustomContentStorage(tempDir.toFile());
+        gate.quiesce();
+        storage.close();
+        gate.resume();
+        storage = storage();
         CustomContentDefinition repaired = storage.get("reblock");
 
         assertNotNull(repaired);
@@ -75,5 +104,12 @@ class CustomContentIdentityRepairTest {
         assertTrue(repaired.getGraph().getNodes().containsKey("original-action"));
         assertTrue(repaired.getGraph().getNodes().containsKey("latest-action"));
         assertNull(storage.get(originalGraph.getId()));
+        gate.quiesce();
+        storage.close();
+    }
+
+    private CustomContentStorage storage() {
+        return new CustomContentStorage(null, tempDir, new ItemAttributeSchemaService(),
+            LegacyRuntimeActivationGate.compatibility(tempDir), gate, coordinator);
     }
 }

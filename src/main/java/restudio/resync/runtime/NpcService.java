@@ -33,10 +33,14 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.dialog.DialogService;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.migration.MigrationPaths;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.runtime.event.ReSyncNpcInteractEvent;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -60,6 +64,7 @@ public class NpcService implements Listener {
     private final PlayerNpcRuntime playerNpcRuntime;
     private final PlayerNpcInstanceStorage playerNpcInstances;
     private final NamespacedKey npcIdKey;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private BukkitTask followTask;
     private BukkitTask restoreTask;
 
@@ -68,14 +73,35 @@ public class NpcService implements Listener {
     }
 
     public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService, PlayerNpcRuntime playerNpcRuntime) {
-        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, playerNpcRuntime, new NamespacedKey(plugin, "resync_npc_id"));
+        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, playerNpcRuntime, new NamespacedKey(plugin, "resync_npc_id"), null, null);
     }
 
     NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService, NamespacedKey npcIdKey) {
-        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null, npcIdKey);
+        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, (PlayerNpcRuntime) null, npcIdKey, null, null);
     }
 
     NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService, PlayerNpcRuntime playerNpcRuntime, NamespacedKey npcIdKey) {
+        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, playerNpcRuntime, npcIdKey, null, null);
+    }
+
+    public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher,
+                      TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService,
+                      PlayerNpcRuntime playerNpcRuntime, LegacyRuntimeActivationGate legacyRuntimeGate) {
+        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, playerNpcRuntime,
+            new NamespacedKey(plugin, "resync_npc_id"), legacyRuntimeGate, null);
+    }
+
+    public NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher,
+                      TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService,
+                      PlayerNpcRuntime playerNpcRuntime, LegacyRuntimeActivationGate legacyRuntimeGate, Path activeDataRoot) {
+        this(plugin, storage, customContentService, dispatcher, tradeProfileService, lootTableService, dialogService, playerNpcRuntime,
+            new NamespacedKey(plugin, "resync_npc_id"), legacyRuntimeGate, activeDataRoot);
+    }
+
+    NpcService(JavaPlugin plugin, ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher,
+               TradeProfileService tradeProfileService, LootTableService lootTableService, DialogService dialogService,
+               PlayerNpcRuntime playerNpcRuntime, NamespacedKey npcIdKey, LegacyRuntimeActivationGate legacyRuntimeGate,
+               Path activeDataRoot) {
         this.plugin = plugin;
         this.storage = storage;
         this.customContentService = customContentService;
@@ -84,8 +110,9 @@ public class NpcService implements Listener {
         this.lootTableService = lootTableService;
         this.dialogService = dialogService;
         this.playerNpcRuntime = playerNpcRuntime;
+        this.legacyRuntimeGate = legacyRuntimeGate;
         this.playerNpcInstances = plugin != null
-            ? new PlayerNpcInstanceStorage(plugin.getDataFolder().toPath().resolve("runtime").resolve("player-npcs.json"))
+            ? new PlayerNpcInstanceStorage(persistenceFile(plugin, activeDataRoot))
             : null;
         this.npcIdKey = npcIdKey;
         if (plugin != null) {
@@ -98,6 +125,9 @@ public class NpcService implements Listener {
     }
 
     public Entity spawn(String id, Location location) {
+        if (!persistenceWritable()) {
+            return null;
+        }
         JsonObject definition = get(id);
         if (definition == null || location == null || location.getWorld() == null || !bool(definition, "enabled", true)) {
             return null;
@@ -130,7 +160,10 @@ public class NpcService implements Listener {
             return null;
         }
         if (packetActive) {
-            playerNpcRuntime.despawn(id);
+            if (!playerNpcRuntime.despawn(id)) {
+                reportLifecycleWarning("replace Player NPC entity", id, "The Player NPC packet instance could not be removed");
+                return null;
+            }
         }
         EntityType type = spawnEntityType(definition);
         if (type == null) {
@@ -148,6 +181,7 @@ public class NpcService implements Listener {
         } catch (RuntimeException exception) {
             entity.remove();
             activeNpcs.remove(id, entity.getUniqueId());
+            activeDefinitions.remove(id);
             throw exception;
         }
         dispatch(id, "spawnAction", null, entity, location, null);
@@ -155,6 +189,9 @@ public class NpcService implements Listener {
     }
 
     public boolean despawn(String id) {
+        if (!persistenceWritable()) {
+            return false;
+        }
         UUID uuid = activeNpcs.remove(id);
         Entity entity = uuid != null && plugin != null ? plugin.getServer().getEntity(uuid) : null;
         Location location = entity != null ? entity.getLocation() : playerNpcRuntime != null ? playerNpcRuntime.location(id) : null;
@@ -208,7 +245,7 @@ public class NpcService implements Listener {
     }
 
     public void restorePersistentNpcs() {
-        if (plugin == null || storage == null) {
+        if (plugin == null || storage == null || !persistenceWritable()) {
             return;
         }
         if (restoreTask != null) {
@@ -216,6 +253,9 @@ public class NpcService implements Listener {
         }
         restoreTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             restoreTask = null;
+            if (!persistenceWritable()) {
+                return;
+            }
             try {
                 restorePersistedNpcEntities();
             } catch (RuntimeException exception) {
@@ -242,6 +282,151 @@ public class NpcService implements Listener {
         activeDefinitions.clear();
     }
 
+    Path persistenceRoot() {
+        return playerNpcInstances == null ? null : playerNpcInstances.file();
+    }
+
+    void flushPersistence() throws IOException {
+        if (playerNpcInstances != null) {
+            playerNpcInstances.flush();
+        }
+    }
+
+    private static Path persistenceFile(JavaPlugin plugin, Path activeDataRoot) {
+        Path root = activeDataRoot == null
+            ? plugin.getDataFolder().toPath()
+            : requireActiveDataRoot(activeDataRoot);
+        return MigrationPaths.resolveInside(root, "runtime/player-npcs.json");
+    }
+
+    private static Path requireActiveDataRoot(Path activeDataRoot) {
+        try {
+            return MigrationPaths.requireDirectory(activeDataRoot, "activeDataRoot");
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Active data root is unavailable: " + activeDataRoot, exception);
+        }
+    }
+
+    void quiescePersistence() throws IOException {
+        if (playerNpcInstances != null) {
+            playerNpcInstances.quiesce();
+        }
+    }
+
+    void resumePersistence() throws IOException {
+        if (playerNpcInstances != null) {
+            playerNpcInstances.resume();
+        }
+    }
+
+    synchronized void rebindPersistence(Path activeFile) throws IOException {
+        if (playerNpcInstances == null) {
+            return;
+        }
+        Path previousFile = playerNpcInstances.file();
+        List<ActivePlayerNpc> active = activePlayerNpcs();
+        playerNpcInstances.rebind(activeFile);
+        try {
+            reconcileActivePlayerNpcs(active, playerNpcInstances.snapshot());
+        } catch (IOException | RuntimeException failure) {
+            rollbackPlayerNpcRebind(previousFile, active, failure);
+            throw failure instanceof IOException ioException
+                ? ioException
+                : new IOException("Player NPC runtime could not follow persistence rebind", failure);
+        }
+    }
+
+    void healthCheckPersistence() throws IOException {
+        if (playerNpcInstances != null) {
+            playerNpcInstances.healthCheck();
+        }
+    }
+
+    boolean persistenceWritable() {
+        return playerNpcInstances == null || playerNpcInstances.isWritable();
+    }
+
+    private List<ActivePlayerNpc> activePlayerNpcs() throws IOException {
+        if (playerNpcRuntime == null) {
+            return List.of();
+        }
+        List<ActivePlayerNpc> active = new ArrayList<>();
+        for (String id : playerNpcRuntime.activeIds()) {
+            if (id == null || id.isBlank() || !playerNpcRuntime.isActive(id)) {
+                continue;
+            }
+            Location location = playerNpcRuntime.location(id);
+            JsonObject definition = activeDefinitions.get(id);
+            if (definition == null) {
+                definition = get(id);
+            }
+            if (location == null || location.getWorld() == null || definition == null) {
+                throw new IOException("Active Player NPC runtime state is incomplete: " + id);
+            }
+            active.add(new ActivePlayerNpc(id, location.clone(), definition.deepCopy()));
+        }
+        return List.copyOf(active);
+    }
+
+    private void reconcileActivePlayerNpcs(List<ActivePlayerNpc> active,
+                                           Map<String, PlayerNpcInstanceStorage.Position> rebound) throws IOException {
+        if (playerNpcRuntime == null) {
+            return;
+        }
+        for (ActivePlayerNpc previous : active) {
+            PlayerNpcInstanceStorage.Position next = rebound.get(previous.id());
+            if (next == null) {
+                if (playerNpcRuntime.despawn(previous.id()) || !playerNpcRuntime.isActive(previous.id())) {
+                    continue;
+                }
+                throw new IOException("Player NPC runtime rejected persistence rebind removal: " + previous.id());
+            }
+            if (next.equals(PlayerNpcInstanceStorage.Position.from(previous.location()))) {
+                continue;
+            }
+            if (!playerNpcRuntime.teleport(previous.id(), next.world(), next.x(), next.y(), next.z(), next.yaw(), next.pitch())) {
+                throw new IOException("Player NPC runtime rejected persistence rebind position: " + previous.id());
+            }
+        }
+        for (ActivePlayerNpc previous : active) {
+            if (!rebound.containsKey(previous.id())) {
+                activeDefinitions.remove(previous.id());
+            }
+        }
+    }
+
+    private void rollbackPlayerNpcRebind(Path previousFile, List<ActivePlayerNpc> active, Throwable failure) {
+        try {
+            restoreActivePlayerNpcs(active);
+        } catch (IOException | RuntimeException restoreFailure) {
+            failure.addSuppressed(restoreFailure);
+        }
+        try {
+            playerNpcInstances.rebind(previousFile);
+        } catch (IOException | RuntimeException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
+        }
+    }
+
+    private void restoreActivePlayerNpcs(List<ActivePlayerNpc> active) throws IOException {
+        if (playerNpcRuntime == null) {
+            return;
+        }
+        for (ActivePlayerNpc previous : active) {
+            if (playerNpcRuntime.isActive(previous.id())) {
+                if (!playerNpcRuntime.teleport(previous.id(), previous.location().getWorld().getName(), previous.location().getX(),
+                    previous.location().getY(), previous.location().getZ(), previous.location().getYaw(), previous.location().getPitch())) {
+                    throw new IOException("Player NPC runtime could not restore position: " + previous.id());
+                }
+            } else if (!playerNpcRuntime.spawn(previous.id(), previous.definition(), previous.location())) {
+                throw new IOException("Player NPC runtime could not restore instance: " + previous.id());
+            }
+        }
+    }
+
+    private record ActivePlayerNpc(String id, Location location, JsonObject definition) {
+    }
+
     public boolean setProfile(String id, String profileId) {
         Entity entity = activeEntity(id);
         return tradeProfileService != null && entity instanceof Villager villager && tradeProfileService.apply(villager, profileId);
@@ -250,6 +435,9 @@ public class NpcService implements Listener {
     public void reload(String id, JsonObject definition, boolean deleted) {
         try {
             if (id == null || id.isBlank()) {
+                return;
+            }
+            if (!persistenceWritable()) {
                 return;
             }
             if (storage != null) {
@@ -376,7 +564,7 @@ public class NpcService implements Listener {
     }
 
     public boolean teleport(String id, Location location) {
-        if (id == null || id.isBlank() || location == null || location.getWorld() == null) {
+        if (!persistenceWritable() || id == null || id.isBlank() || location == null || location.getWorld() == null) {
             return false;
         }
         Entity entity = activeEntity(id);
@@ -443,7 +631,7 @@ public class NpcService implements Listener {
     }
 
     private void restorePersistedNpcEntities() {
-        if (plugin == null) {
+        if (plugin == null || !persistenceWritable()) {
             return;
         }
         for (World world : plugin.getServer().getWorlds()) {
@@ -454,7 +642,8 @@ public class NpcService implements Listener {
     }
 
     private void restorePersistedPlayerNpcs() {
-        if (plugin == null || playerNpcInstances == null || playerNpcRuntime == null || !playerNpcRuntime.available()) {
+        if (plugin == null || playerNpcInstances == null || playerNpcRuntime == null || !playerNpcRuntime.available()
+            || !persistenceWritable()) {
             return;
         }
         for (Map.Entry<String, PlayerNpcInstanceStorage.Position> entry : playerNpcInstances.snapshot().entrySet()) {
@@ -477,6 +666,9 @@ public class NpcService implements Listener {
     }
 
     private void reconcilePersistedEntity(Entity entity) {
+        if (!persistenceWritable()) {
+            return;
+        }
         String id = npcId(entity);
         if (id.isBlank()) {
             return;
@@ -494,10 +686,14 @@ public class NpcService implements Listener {
                 entity.remove();
                 return;
             }
-            if (playerNpcRuntime != null && playerNpcRuntime.isActive(id)) {
-                playerNpcRuntime.despawn(id);
+            if (playerNpcRuntime != null && playerNpcRuntime.isActive(id) && !playerNpcRuntime.despawn(id)) {
+                reportLifecycleWarning("restore NPC entity", id, "The Player NPC packet instance could not be removed");
+                return;
             }
-            removePlayerNpcPosition(id);
+            if (!removePlayerNpcPosition(id)) {
+                reportLifecycleWarning("restore NPC entity", id, "The saved Player NPC instance could not be removed");
+                return;
+            }
             activeNpcs.put(id, entity.getUniqueId());
             applyDefinition(entity, definition);
             activeDefinitions.put(id, definition.deepCopy());
@@ -764,7 +960,20 @@ public class NpcService implements Listener {
             variables.putAll(extraVariables);
         }
         variables.put("hook", hook);
-        if (hooks.has(hook) && dispatchHookElement(hooks.get(hook), player, event, variables)) {
+        if (hooks.has(hook)) {
+            JsonElement action = hooks.get(hook);
+            if (!legacyAllowed() && containsLegacyHookValue(action)) {
+                recordBlockedLegacyHook(id, hook);
+                return;
+            }
+            if (dispatchHookElement(action, player, event, variables)) {
+                return;
+            }
+        }
+        if (!legacyAllowed()) {
+            if (hooks.has(hook) || hooks.has(hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook)) {
+                recordBlockedLegacyHook(id, hook);
+            }
             return;
         }
         String legacyHook = hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook;
@@ -799,6 +1008,34 @@ public class NpcService implements Listener {
         return false;
     }
 
+    private boolean containsLegacyHookValue(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
+        if (element.isJsonPrimitive()) {
+            return !"none".equalsIgnoreCase(element.getAsString());
+        }
+        if (element.isJsonArray()) {
+            for (JsonElement entry : element.getAsJsonArray()) {
+                if (containsLegacyHookValue(entry)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean legacyAllowed() {
+        return legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyRuntime();
+    }
+
+    private void recordBlockedLegacyHook(String id, String hook) {
+        if (legacyRuntimeGate != null) {
+            legacyRuntimeGate.recordBlocked("NPC " + id + " " + hook + " legacy hook fallback");
+        }
+    }
+
+
     void dispatchInteraction(String id, boolean leftClick, Player player, Entity entity, Location location, Event event, Map<String, Object> variables) {
         String primary = leftClick ? "leftClickAction" : "rightClickAction";
         if (hasHook(id, "interactAction")) {
@@ -825,7 +1062,16 @@ public class NpcService implements Listener {
             }
         }
         if (hooks.has(hook) && hooks.get(hook).isJsonPrimitive() && !hooks.get(hook).getAsString().isBlank() && !"none".equalsIgnoreCase(hooks.get(hook).getAsString())) {
-            return true;
+            if (!legacyAllowed()) {
+                recordBlockedLegacyHook(id, hook);
+            }
+            return legacyAllowed();
+        }
+        if (!legacyAllowed()) {
+            if (hooks.has(hook)) {
+                recordBlockedLegacyHook(id, hook);
+            }
+            return false;
         }
         String legacyHook = hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook;
         return !text(hooks, legacyHook).isBlank();

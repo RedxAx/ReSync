@@ -64,6 +64,9 @@ public class FlowControlHandler implements NodeHandler {
             ctx.triggerOutput("branch_3");
         });
 
+        operations.put("loop_count", FlowControlHandler::admitCompiledLoop);
+        operations.put("loop_for_each", FlowControlHandler::admitCompiledLoop);
+
         operations.put("break_loop", (ctx, node) -> {
             if (!ctx.getRuntime().requestLoopBreak()) {
                 throw new IllegalStateException("Break can only run inside a loop");
@@ -81,6 +84,9 @@ public class FlowControlHandler implements NodeHandler {
 
     public void registerTo(HandlerRegistry registry) {
         registry.register("FlowControlHandler", this);
+    }
+
+    private static void admitCompiledLoop(FlowContext ctx, FlowNode node) {
     }
 
     private static boolean caseMatches(Object caseValue, Object value) {

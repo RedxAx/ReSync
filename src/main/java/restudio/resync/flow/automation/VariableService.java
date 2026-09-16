@@ -10,6 +10,7 @@ import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.PersistentVariableStore;
 import restudio.resync.flow.automation.event.VariableChangedEvent;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,18 +28,23 @@ public final class VariableService {
     private final Map<AutomationInstanceKey, Object> values = new ConcurrentHashMap<>();
 
     public VariableService(AutomationDefinitionRegistry definitions, FlowValueCodecRegistry codecs) {
-        this(definitions, codecs, PersistentVariableStore.getInstance(), ReSync.getInstance());
+        this(definitions, codecs, compatibilityStore(ReSync.getInstance()), ReSync.getInstance());
     }
 
     public VariableService(AutomationDefinitionRegistry definitions, FlowValueCodecRegistry codecs, Plugin plugin) {
-        this(definitions, codecs, PersistentVariableStore.getInstance(), plugin);
+        this(definitions, codecs, compatibilityStore(plugin), plugin);
     }
 
-    VariableService(AutomationDefinitionRegistry definitions, FlowValueCodecRegistry codecs, PersistentVariableStore persistent, Plugin plugin) {
-        this.definitions = definitions;
-        this.codecs = codecs;
-        this.persistent = persistent;
+    public VariableService(AutomationDefinitionRegistry definitions, FlowValueCodecRegistry codecs,
+                           PersistentVariableStore persistent, Plugin plugin) {
+        this.definitions = Objects.requireNonNull(definitions, "definitions");
+        this.codecs = Objects.requireNonNull(codecs, "codecs");
+        this.persistent = Objects.requireNonNull(persistent, "persistent");
         this.plugin = plugin;
+    }
+
+    public PersistentVariableStore persistentStore() {
+        return persistent;
     }
 
     public VariableDefinition definition(String id) {
@@ -94,10 +100,10 @@ public final class VariableService {
             if (definition.scope() == AutomationScope.FLOW) {
                 context.getLocalVariables().remove(FLOW_PREFIX + definition.id());
             } else {
-                values.remove(key);
                 if (definition.persistent()) {
                     persistent.remove(key.storageKey("variable"));
                 }
+                values.remove(key);
             }
             if (existed) {
                 publish(definition, owner, previous, null);
@@ -137,6 +143,10 @@ public final class VariableService {
         return definitions.reference(definition);
     }
 
+    private static PersistentVariableStore compatibilityStore(Plugin plugin) {
+        return new PersistentVariableStore(plugin != null ? plugin.getDataFolder().toPath() : Path.of("."));
+    }
+
     private Object normalize(FlowContext context, VariableDefinition definition, Object value) {
         if (value == null) {
             return null;
@@ -166,16 +176,20 @@ public final class VariableService {
             }
             return;
         }
-        if (value == null) {
-            values.remove(key);
-        } else {
-            values.put(key, value);
-        }
         if (definition.persistent()) {
             if (!codecs.hasCodec(definition.valueType())) {
                 throw new IllegalArgumentException("Persistent Variable type is unsupported: " + definition.valueType());
             }
-            persistent.set(key.storageKey("variable"), codecs.encode(definition.valueType(), value));
+            if (value == null) {
+                persistent.remove(key.storageKey("variable"));
+            } else {
+                persistent.set(key.storageKey("variable"), codecs.encode(definition.valueType(), value));
+            }
+        }
+        if (value == null) {
+            values.remove(key);
+        } else {
+            values.put(key, value);
         }
     }
 

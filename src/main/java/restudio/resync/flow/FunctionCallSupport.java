@@ -7,12 +7,16 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowSerializer;
 import restudio.resync.Log;
 import restudio.resync.flow.handler.FlowHandlerException;
+import restudio.resync.flow.identity.FunctionParameterId;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -26,6 +30,13 @@ public final class FunctionCallSupport {
     }
 
     public static boolean evaluate(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event, Map<String, Object> vars) {
+        FlowExecutor.FunctionInvocationContext invocation = executor == null ? null
+            : executor.defaultFunctionInvocationContext(player, event, vars);
+        return evaluate(storage, executor, call, player, event, vars, invocation);
+    }
+
+    public static boolean evaluate(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event,
+                                   Map<String, Object> vars, FlowExecutor.FunctionInvocationContext invocation) {
         if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
             return true;
         }
@@ -35,7 +46,11 @@ public final class FunctionCallSupport {
         }
         FlowGraph function = requireFunction(storage, call);
         try {
-            Map<String, Object> outputs = executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars).get(5, TimeUnit.SECONDS);
+            Map<String, Object> outputs = invocation == null
+                ? executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars)
+                    .get(5, TimeUnit.SECONDS)
+                : executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars, invocation)
+                    .get(5, TimeUnit.SECONDS);
             Object result = first(outputs, "condition", "result", "return", "success");
             return result instanceof Boolean value ? value : Boolean.parseBoolean(String.valueOf(result));
         } catch (InterruptedException exception) {
@@ -60,6 +75,14 @@ public final class FunctionCallSupport {
 
     public static CompletableFuture<Map<String, Object>> execute(FlowStorage storage, FlowExecutor executor, JsonObject call, Player player, Event event,
                                                                   Map<String, Object> vars) {
+        FlowExecutor.FunctionInvocationContext invocation = executor == null ? null
+            : executor.defaultFunctionInvocationContext(player, event, vars);
+        return execute(storage, executor, call, player, event, vars, invocation);
+    }
+
+    public static CompletableFuture<Map<String, Object>> execute(FlowStorage storage, FlowExecutor executor, JsonObject call,
+                                                                  Player player, Event event, Map<String, Object> vars,
+                                                                  FlowExecutor.FunctionInvocationContext invocation) {
         if (call == null || call.isEmpty() || !hasCallableFunction(call)) {
             return CompletableFuture.completedFuture(Map.of());
         }
@@ -68,7 +91,10 @@ public final class FunctionCallSupport {
                 "Restore the Flow runtime before executing this function");
         }
         FlowGraph function = requireFunction(storage, call);
-        return executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars).whenComplete((result, error) -> {
+        CompletableFuture<Map<String, Object>> execution = invocation == null
+            ? executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars)
+            : executor.executeFunction(function, player, event, inputs(function, call, player, vars), vars, invocation);
+        return execution.whenComplete((result, error) -> {
             if (error != null) Log.warn("Function execution failed for " + function.getId() + ": " + error.getMessage());
         });
     }
@@ -98,7 +124,14 @@ public final class FunctionCallSupport {
     private static FlowGraph function(FlowStorage storage, JsonObject call) {
         String type = text(call, "type");
         if (("inlineFunction".equals(type) || "function".equals(type)) && call.has("graph") && call.get("graph").isJsonObject()) {
-            FlowGraph graph = GSON.fromJson(call.getAsJsonObject("graph"), FlowGraph.class);
+            FlowGraph graph;
+            try {
+                graph = FlowSerializer.deserialize(call.getAsJsonObject("graph").toString());
+            } catch (RuntimeException failure) {
+                throw new FlowHandlerException("FUNCTION_INLINE_SERIALIZATION_FAILED", "Inline function could not be restored",
+                    "Persist the function graph with the active Flow serializer before calling it",
+                    Map.of("cause", failure.getClass().getSimpleName()));
+            }
             if (graph != null) {
                 graph.setFunction(true);
             }
@@ -125,33 +158,174 @@ public final class FunctionCallSupport {
     }
 
     private static Map<String, Object> inputs(FlowGraph function, JsonObject call, Player player, Map<String, Object> vars) {
-        Map<String, Object> inputs = new HashMap<>();
+        Map<String, Object> inputs = new LinkedHashMap<>();
         if (function != null && function.getFunctionInputs() != null) {
             for (FlowGraph.FunctionParameter parameter : function.getFunctionInputs()) {
                 if (parameter != null && parameter.getName() != null && !parameter.getName().isBlank() && parameter.getDefaultValue() != null && !parameter.getDefaultValue().isBlank()) {
-                    inputs.put(parameter.getName(), coerce(value(parameter.getDefaultValue(), player, vars), parameter.getType()));
+                    inputs.put(parameterKey(parameter), coerce(value(parameter.getDefaultValue(), player, vars), parameter.getType()));
                 }
             }
             for (FlowGraph.FunctionParameter parameter : function.getFunctionInputs()) {
-                if (parameter == null || parameter.getName() == null || parameter.getName().isBlank() || inputs.containsKey(parameter.getName())) {
+                if (parameter == null || parameter.getName() == null || parameter.getName().isBlank() || inputs.containsKey(parameterKey(parameter))) {
                     continue;
                 }
                 Object contextValue = contextValue(parameter, player, vars);
                 if (contextValue != null) {
-                    inputs.put(parameter.getName(), coerce(contextValue, parameter.getType()));
+                    inputs.put(parameterKey(parameter), coerce(contextValue, parameter.getType()));
                 }
             }
         }
-        JsonObject configured = call.has("inputs") && call.get("inputs").isJsonObject() ? call.getAsJsonObject("inputs") : new JsonObject();
         if (function != null && function.getFunctionInputs() != null) {
             for (FlowGraph.FunctionParameter parameter : function.getFunctionInputs()) {
-                if (parameter == null || parameter.getName() == null || parameter.getName().isBlank() || !configured.has(parameter.getName())) {
+                if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
                     continue;
                 }
-                inputs.put(parameter.getName(), coerce(value(configured.get(parameter.getName()), player, vars), parameter.getType()));
+                JsonElement configured = configuredValue(call, parameter);
+                if (configured != null) {
+                    inputs.put(parameterKey(parameter), coerce(value(configured, player, vars), parameter.getType()));
+                }
             }
         }
         return inputs;
+    }
+
+    public static String parameterKey(FlowGraph.FunctionParameter parameter) {
+        Objects.requireNonNull(parameter, "Function parameter is required");
+        FunctionParameterId id = parameter.getParameterId();
+        if (id != null) {
+            return id.canonicalText();
+        }
+        return parameter.getName() != null ? parameter.getName().trim() : "";
+    }
+
+    public static String parameterPinKey(FlowGraph.FunctionParameter parameter, boolean input) {
+        FunctionParameterId id = parameter != null ? parameter.getParameterId() : null;
+        if (id == null) {
+            return parameterKey(parameter);
+        }
+        return (input ? "function-input-" : "function-output-") + id.canonicalText();
+    }
+
+    public static FunctionParameterId parameterId(Object raw) {
+        if (raw instanceof FunctionParameterId id) {
+            return id;
+        }
+        if (raw instanceof Map<?, ?> value) {
+            Object nested = value.get("value");
+            if (nested == null) {
+                nested = value.get("canonicalText");
+            }
+            return parameterId(nested);
+        }
+        if (raw == null || raw.toString().isBlank()) {
+            return null;
+        }
+        try {
+            return FunctionParameterId.parseCanonicalText(raw.toString().trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    public static Map<String, Object> normalizeArguments(FlowGraph function, Object value) {
+        if (value == null) {
+            return Map.of();
+        }
+        if (!(value instanceof Map<?, ?> supplied)) {
+            List<FlowGraph.FunctionParameter> parameters = function != null && function.getFunctionInputs() != null
+                ? function.getFunctionInputs().stream().filter(Objects::nonNull).filter(parameter -> parameter.getName() != null
+                    && !parameter.getName().isBlank()).toList() : List.of();
+            if (parameters.size() != 1) {
+                throw new FlowHandlerException("FUNCTION_ARGUMENTS_NEED_NAMES",
+                    "This function has multiple inputs, so each value needs an argument name",
+                    "Use Add Function Argument nodes and connect their Arguments output");
+            }
+            return Map.of(parameterKey(parameters.getFirst()), value);
+        }
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        supplied.forEach((key, argument) -> {
+            if (key == null) {
+                return;
+            }
+            arguments.put(argumentKey(function, key), argument);
+        });
+        return arguments;
+    }
+
+    public static Object valueForArgument(Map<?, ?> values, FlowGraph.FunctionParameter parameter) {
+        if (values == null || parameter == null) {
+            return null;
+        }
+        String key = parameterKey(parameter);
+        if (values.containsKey(key)) {
+            return values.get(key);
+        }
+        if (parameter.isLegacyNameOnly()) {
+            String name = parameter.getName();
+            return name != null ? values.get(name) : null;
+        }
+        return null;
+    }
+
+    private static String argumentKey(FlowGraph function, Object rawKey) {
+        FunctionParameterId id = parameterId(rawKey);
+        String text = rawKey.toString().trim();
+        if (id != null) {
+            return id.canonicalText();
+        }
+        if (function != null && function.getFunctionInputs() != null) {
+            for (FlowGraph.FunctionParameter parameter : function.getFunctionInputs()) {
+                if (parameter == null || parameter.getName() == null) {
+                    continue;
+                }
+                if (text.equals(parameterPinKey(parameter, true))
+                    || (parameter.isLegacyNameOnly() && text.equals(parameter.getName()))) {
+                    return parameterKey(parameter);
+                }
+            }
+        }
+        return text;
+    }
+
+    private static JsonElement configuredValue(JsonObject call, FlowGraph.FunctionParameter parameter) {
+        for (String field : List.of("inputs", "arguments", "parameterValues")) {
+            if (!call.has(field) || !call.get(field).isJsonObject()) {
+                continue;
+            }
+            JsonObject values = call.getAsJsonObject(field);
+            List<String> keys = parameter.isLegacyNameOnly()
+                ? List.of(parameterKey(parameter), parameter.getName())
+                : List.of(parameterKey(parameter), parameterPinKey(parameter, true));
+            for (String key : keys) {
+                if (key != null && !key.isBlank() && values.has(key)) {
+                    return unwrapConfiguredValue(values.get(key));
+                }
+            }
+        }
+        for (String field : List.of("parameters", "inputs", "arguments")) {
+            if (!call.has(field) || !call.get(field).isJsonArray()) {
+                continue;
+            }
+            for (JsonElement item : call.getAsJsonArray(field)) {
+                if (!item.isJsonObject()) {
+                    continue;
+                }
+                JsonObject entry = item.getAsJsonObject();
+                FunctionParameterId id = parameterId(entry.has("parameterId") ? entry.get("parameterId") : null);
+                if ((id != null && parameter.getParameterId() != null && id.equals(parameter.getParameterId()))
+                    || (parameter.isLegacyNameOnly() && text(entry, "name").equals(parameter.getName()))) {
+                    return unwrapConfiguredValue(entry.has("value") ? entry.get("value") : entry.get("input"));
+                }
+            }
+        }
+        return null;
+    }
+
+    private static JsonElement unwrapConfiguredValue(JsonElement value) {
+        if (value != null && value.isJsonObject() && value.getAsJsonObject().has("value")) {
+            return value.getAsJsonObject().get("value");
+        }
+        return value;
     }
 
     private static Object contextValue(FlowGraph.FunctionParameter parameter, Player player, Map<String, Object> vars) {

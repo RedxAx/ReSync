@@ -13,6 +13,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Codec {
     public static final int DEFAULT_MAX_ENCODED_FRAME_BYTES = 1_048_576;
     public static final int DEFAULT_MAX_DECOMPRESSED_PAYLOAD_BYTES = 4_194_304;
+
+    public static final class FrameTooLargeException extends IllegalArgumentException {
+        public FrameTooLargeException(String message) {
+            super(message);
+        }
+    }
+
     private final CompressionPool compressionPool;
     private final Map<Byte, Class<? extends Message>> messageTypes;
     private final AtomicInteger sequenceCounter = new AtomicInteger();
@@ -38,6 +45,11 @@ public class Codec {
         messageTypes.put((byte) 0x06, AckMessage.class);
         messageTypes.put((byte) 0x07, ErrorMessage.class);
         messageTypes.put((byte) 0x08, ChannelRegistryMessage.class);
+        messageTypes.put(MessageType.PROTOCOL_ENVELOPE.getValue(), ProtocolEnvelopeMessage.class);
+    }
+
+    public int getMaxEncodedFrameBytes() {
+        return maxEncodedFrameBytes;
     }
 
     public byte[] encodeFrame(Message message, int channel, boolean compress) {
@@ -49,8 +61,11 @@ public class Codec {
         boolean actuallyCompressed = false;
 
         if (compress && payload.length > 1024) {
-            payload = compressionPool.compress(payload);
-            actuallyCompressed = true;
+            byte[] compressedPayload = compressionPool.compress(payload);
+            if (compressedPayload.length < payload.length) {
+                payload = compressedPayload;
+                actuallyCompressed = true;
+            }
         }
 
         FrameHeader header = new FrameHeader();
@@ -59,13 +74,13 @@ public class Codec {
         header.setHasAck(false);
         header.setMessageType(message.getType());
         header.setChannel(channel);
-        header.setSequence(sequenceCounter.getAndIncrement());
         header.setPayloadLength(payload.length);
 
-        byte[] headerBytes = header.toBytes();
-        if (headerBytes.length + payload.length > maxEncodedFrameBytes) {
-            throw new IllegalArgumentException("Encoded frame too large");
+        if (header.getTotalLength() > maxEncodedFrameBytes) {
+            throw new FrameTooLargeException("Encoded frame too large");
         }
+        header.setSequence(sequenceCounter.getAndIncrement());
+        byte[] headerBytes = header.toBytes();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream(headerBytes.length + payload.length);
         baos.writeBytes(headerBytes);
@@ -98,10 +113,7 @@ public class Codec {
         System.arraycopy(data, 12, payload, 0, header.getPayloadLength());
 
         if (header.isCompressed()) {
-            payload = compressionPool.decompress(payload);
-            if (payload.length > maxDecompressedPayloadBytes) {
-                throw new IllegalArgumentException("Decompressed payload too large");
-            }
+            payload = compressionPool.decompress(payload, maxDecompressedPayloadBytes);
         } else if (payload.length > maxDecompressedPayloadBytes) {
             throw new IllegalArgumentException("Payload too large");
         }

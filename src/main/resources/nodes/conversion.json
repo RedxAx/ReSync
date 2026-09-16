@@ -1,0 +1,706 @@
+[
+  {
+    "id": "to_string",
+    "displayName": "To String",
+    "description": "Convert the supplied value with the registered To String conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.string"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_string"
+    ],
+    "examples": [
+      "Connect a value to convert it with To String."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_string"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the Value value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "string",
+        "displayName": "String",
+        "name": "string",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the String value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "string",
+          "target": "string"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_number",
+    "displayName": "To Number",
+    "description": "Convert the supplied value with the registered To Number conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.number"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_number"
+    ],
+    "examples": [
+      "Connect a value to convert it with To Number."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_number"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "defaultValue": 0,
+        "description": "Provides the Value value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "number",
+        "displayName": "Number",
+        "name": "number",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Number value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "number",
+          "target": "number"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_boolean",
+    "displayName": "To Boolean",
+    "description": "Convert the supplied value with the registered To Boolean conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.boolean"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_boolean"
+    ],
+    "examples": [
+      "Connect a value to convert it with To Boolean."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_boolean"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "defaultValue": false,
+        "description": "Provides the Value value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "boolean",
+        "displayName": "Boolean",
+        "name": "boolean",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Boolean value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "boolean",
+          "target": "boolean"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_player",
+    "displayName": "To Player",
+    "description": "Convert the supplied value with the registered To Player conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.player"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_player"
+    ],
+    "examples": [
+      "Connect a value to convert it with To Player."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_player"
+    },
+    "inputs": [
+      {
+        "id": "uuid_or_name",
+        "displayName": "Uuid Or Name",
+        "name": "uuid_or_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Provides the Uuid Or Name value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Returns the Player value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "uuid_or_name",
+          "target": "uuid_or_name"
+        },
+        {
+          "direction": "output",
+          "source": "player",
+          "target": "player"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_location",
+    "displayName": "To Location",
+    "description": "Convert the supplied value with the registered To Location conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.location"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_location"
+    ],
+    "examples": [
+      "Connect a value to convert it with To Location."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_location"
+    },
+    "inputs": [
+      {
+        "id": "x",
+        "displayName": "X",
+        "name": "x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "description": "Provides the X value to convert.",
+        "direction": "input"
+      },
+      {
+        "id": "y",
+        "displayName": "Y",
+        "name": "y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "description": "Provides the Y value to convert.",
+        "direction": "input"
+      },
+      {
+        "id": "z",
+        "displayName": "Z",
+        "name": "z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "description": "Provides the Z value to convert.",
+        "direction": "input"
+      },
+      {
+        "id": "world",
+        "displayName": "World",
+        "name": "world",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Provides the World value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Location value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "x",
+          "target": "x"
+        },
+        {
+          "direction": "input",
+          "source": "y",
+          "target": "y"
+        },
+        {
+          "direction": "input",
+          "source": "z",
+          "target": "z"
+        },
+        {
+          "direction": "input",
+          "source": "world",
+          "target": "world"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "location"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_item",
+    "displayName": "To Item",
+    "description": "Convert the supplied value with the registered To Item conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.item"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_item"
+    ],
+    "examples": [
+      "Connect a value to convert it with To Item."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_item"
+    },
+    "inputs": [
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "STONE",
+        "description": "Provides the Material value to convert.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "description": "Provides the Amount value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "to_list",
+    "displayName": "To List",
+    "description": "Convert the supplied value with the registered To List conversion.",
+    "domain": "core",
+    "family": "conversion",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "to.list"
+    ],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "conversion",
+      "data",
+      "to_list"
+    ],
+    "examples": [
+      "Connect a value to convert it with To List."
+    ],
+    "handler": "ConversionHandler",
+    "handlerConfig": {
+      "operation": "to_list"
+    },
+    "inputs": [
+      {
+        "id": "value_or_separator",
+        "displayName": "Value Or Separator",
+        "name": "value_or_separator",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the Value Or Separator value to convert.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "list",
+        "displayName": "List",
+        "name": "list",
+        "pinType": "DATA",
+        "dataType": "list<any>",
+        "description": "Returns the List value produced by this conversion.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "value_or_separator",
+          "target": "value_or_separator"
+        },
+        {
+          "direction": "output",
+          "source": "list",
+          "target": "list"
+        }
+      ]
+    }
+  },
+  {
+    "id": "literal_string",
+    "displayName": "String",
+    "description": "Provide a string value local to this graph.",
+    "domain": "core",
+    "family": "literal",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["literal", "string", "constant", "value"],
+    "examples": ["Type a value and connect String to another data input."],
+    "handler": "ConversionHandler",
+    "handlerConfig": {"operation": "literal_string"},
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "The local string value.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "string",
+        "displayName": "String",
+        "name": "string",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the local string value.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "string", "target": "string"}
+      ]
+    }
+  },
+  {
+    "id": "literal_number",
+    "displayName": "Number",
+    "description": "Provide a number value local to this graph.",
+    "domain": "core",
+    "family": "literal",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["literal", "number", "constant", "value"],
+    "examples": ["Type a value and connect Number to another data input."],
+    "handler": "ConversionHandler",
+    "handlerConfig": {"operation": "literal_number"},
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "description": "The local number value.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "number",
+        "displayName": "Number",
+        "name": "number",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the local number value.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "number", "target": "number"}
+      ]
+    }
+  },
+  {
+    "id": "literal_boolean",
+    "displayName": "Boolean",
+    "description": "Provide a boolean value local to this graph.",
+    "domain": "core",
+    "family": "literal",
+    "lifecycle": "active",
+    "handlerCapability": "conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [],
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["literal", "boolean", "constant", "value"],
+    "examples": ["Choose a value and connect Boolean to another data input."],
+    "handler": "ConversionHandler",
+    "handlerConfig": {"operation": "literal_boolean"},
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "description": "The local boolean value.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "boolean",
+        "displayName": "Boolean",
+        "name": "boolean",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the local boolean value.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "boolean", "target": "boolean"}
+      ]
+    }
+  }
+]

@@ -1,0 +1,532 @@
+[
+  {
+    "id": "math_abs",
+    "displayName": "Absolute",
+    "description": "Returns the absolute value of a number.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "absolute"],
+    "legacyIds": ["math.abs"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "abs"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose distance from zero should be returned."}
+    ],
+    "outputs": [
+      {"id": "absolute", "displayName": "Absolute", "name": "absolute", "pinType": "DATA", "dataType": "number", "description": "Returns the non-negative distance of the input from zero."}
+    ]
+  },
+  {
+    "id": "math_floor",
+    "displayName": "Floor",
+    "description": "Rounds a number down to the nearest integer value.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "floor"],
+    "legacyIds": ["math.floor"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "floor"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number to round down."}
+    ],
+    "outputs": [
+      {"id": "floored", "displayName": "Floored", "name": "floored", "pinType": "DATA", "dataType": "number", "description": "Returns the greatest integer less than or equal to the input."}
+    ]
+  },
+  {
+    "id": "math_ceil",
+    "displayName": "Ceil",
+    "description": "Rounds a number up to the nearest integer value.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "ceil"],
+    "legacyIds": ["math.ceil"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "ceil"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number to round up."}
+    ],
+    "outputs": [
+      {"id": "ceiling", "displayName": "Ceiling", "name": "ceiling", "pinType": "DATA", "dataType": "number", "description": "Returns the smallest integer greater than or equal to the input."}
+    ]
+  },
+  {
+    "id": "math_sqrt",
+    "displayName": "Sqrt",
+    "description": "Returns the square root of a non-negative number; negative inputs fail because no finite real result exists.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "square-root"],
+    "legacyIds": ["math.sqrt"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "sqrt"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose square root should be returned."}
+    ],
+    "outputs": [
+      {"id": "sqrt", "displayName": "Square Root", "name": "sqrt", "pinType": "DATA", "dataType": "number", "description": "Returns the finite square root of the input; negative inputs fail."}
+    ]
+  },
+  {
+    "id": "math_cbrt",
+    "displayName": "Cube Root",
+    "description": "Returns the real cube root of a number, including negative values.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "cube-root"],
+    "legacyIds": ["math.cbrt"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "cbrt"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose cube root should be returned."}
+    ],
+    "outputs": [
+      {"id": "cbrt", "displayName": "Cube Root", "name": "cbrt", "pinType": "DATA", "dataType": "number", "description": "Returns the real cube root of the input."}
+    ]
+  },
+  {
+    "id": "math_signum",
+    "displayName": "Signum",
+    "description": "Returns the sign of a number as -1, 0, or 1.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "sign"],
+    "legacyIds": ["math.signum"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "signum"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number whose sign should be returned."}
+    ],
+    "outputs": [
+      {"id": "sign", "displayName": "Sign", "name": "sign", "pinType": "DATA", "dataType": "number", "description": "Returns -1 for negative values, 0 for zero, and 1 for positive values."}
+    ]
+  },
+  {
+    "id": "math_to_radians",
+    "displayName": "To Radians",
+    "description": "Converts an angle from degrees to radians.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "angle", "radians"],
+    "legacyIds": ["math.to_radians"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "to_radians"},
+    "inputs": [
+      {"id": "degrees", "displayName": "Degrees", "name": "degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Angle measured in degrees."}
+    ],
+    "outputs": [
+      {"id": "radians", "displayName": "Radians", "name": "radians", "pinType": "DATA", "dataType": "number", "description": "Returns the equivalent angle measured in radians."}
+    ]
+  },
+  {
+    "id": "math_to_degrees",
+    "displayName": "To Degrees",
+    "description": "Converts an angle from radians to degrees.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "angle", "degrees"],
+    "legacyIds": ["math.to_degrees"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "to_degrees"},
+    "inputs": [
+      {"id": "radians", "displayName": "Radians", "name": "radians", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Angle measured in radians."}
+    ],
+    "outputs": [
+      {"id": "degrees", "displayName": "Degrees", "name": "degrees", "pinType": "DATA", "dataType": "number", "description": "Returns the equivalent angle measured in degrees."}
+    ]
+  },
+  {
+    "id": "math_random_chance",
+    "displayName": "Random Chance",
+    "description": "Returns true when a random percentage draw is below the configured chance percentage.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "random", "chance", "boolean"],
+    "legacyIds": ["math.random_chance", "random.chance"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "random_chance"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "chance_percent", "target": "chance_percent"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "chance_percent", "displayName": "Chance Percent", "name": "chance_percent", "pinType": "DATA", "dataType": "number", "defaultValue": 50, "description": "Percentage threshold used by the random draw. A draw below this value succeeds."}
+    ],
+    "outputs": [
+      {"id": "success", "displayName": "Success", "name": "success", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the random draw succeeds."}
+    ]
+  },
+  {
+    "id": "math_random_choice",
+    "displayName": "Random Choice",
+    "description": "Selects one item at random from the list. An absent or empty list returns null.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "random", "choice", "list"],
+    "legacyIds": ["math.random_choice"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "random_choice"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "items_list", "target": "items_list"},
+        {"direction": "output", "source": "chosen_item", "target": "chosen_item"}
+      ]
+    },
+    "inputs": [
+      {"id": "items_list", "displayName": "Items List", "name": "items_list", "pinType": "DATA", "dataType": "list<any>", "description": "Items from which one value should be selected."}
+    ],
+    "outputs": [
+      {"id": "chosen_item", "displayName": "Chosen Item", "name": "chosen_item", "pinType": "DATA", "dataType": "any", "description": "Returns one randomly selected item, or null when the list is empty."}
+    ]
+  },
+  {
+    "id": "math_random_choice_weighted",
+    "displayName": "Random Choice Weighted",
+    "description": "Selects one item at random using the matching weight at each list position. A missing, empty, or mismatched list returns null.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "random", "choice", "weighted"],
+    "legacyIds": ["math.random_choice_weighted"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "random_choice_weighted"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "items_list", "target": "items_list"},
+        {"direction": "input", "source": "weights_list", "target": "weights_list"},
+        {"direction": "output", "source": "chosen_item", "target": "chosen_item"}
+      ]
+    },
+    "inputs": [
+      {"id": "items_list", "displayName": "Items List", "name": "items_list", "pinType": "DATA", "dataType": "list<any>", "description": "Items from which one value should be selected."},
+      {"id": "weights_list", "displayName": "Weights List", "name": "weights_list", "pinType": "DATA", "dataType": "list<number>", "description": "Weights corresponding to the items at the same positions."}
+    ],
+    "outputs": [
+      {"id": "chosen_item", "displayName": "Chosen Item", "name": "chosen_item", "pinType": "DATA", "dataType": "any", "description": "Returns the selected item, or null when the lists cannot be paired."}
+    ]
+  },
+  {
+    "id": "math_vector_create",
+    "displayName": "Vector Create",
+    "description": "Creates a vector from x, y, and z components.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "create"],
+    "legacyIds": ["math.vector_create"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_create"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "x", "target": "x"},
+        {"direction": "input", "source": "y", "target": "y"},
+        {"direction": "input", "source": "z", "target": "z"},
+        {"direction": "output", "source": "vector", "target": "vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "x", "displayName": "X", "name": "x", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Horizontal vector component."},
+      {"id": "y", "displayName": "Y", "name": "y", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Vertical vector component."},
+      {"id": "z", "displayName": "Z", "name": "z", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Depth vector component."}
+    ],
+    "outputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector formed from the three components."}
+    ]
+  },
+  {
+    "id": "math_vector_create_int",
+    "displayName": "Vector Create Integer",
+    "description": "Creates a vector from x, y, and z values converted to integer components.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "create", "integer"],
+    "legacyIds": ["math.vector_create_int"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_create_int"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "x", "target": "x"},
+        {"direction": "input", "source": "y", "target": "y"},
+        {"direction": "input", "source": "z", "target": "z"},
+        {"direction": "output", "source": "vector", "target": "vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "x", "displayName": "X", "name": "x", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Horizontal component, converted to an integer."},
+      {"id": "y", "displayName": "Y", "name": "y", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Vertical component, converted to an integer."},
+      {"id": "z", "displayName": "Z", "name": "z", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Depth component, converted to an integer."}
+    ],
+    "outputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector formed from the integer components."}
+    ]
+  },
+  {
+    "id": "math_vector_split",
+    "displayName": "Vector Split",
+    "description": "Splits a vector into its x, y, z, and block-coordinate components.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "split"],
+    "legacyIds": ["math.vector_split"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_split"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "x", "target": "x"},
+        {"direction": "output", "source": "y", "target": "y"},
+        {"direction": "output", "source": "z", "target": "z"},
+        {"direction": "output", "source": "block_x", "target": "block_x"},
+        {"direction": "output", "source": "block_y", "target": "block_y"},
+        {"direction": "output", "source": "block_z", "target": "block_z"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to split into individual components."}
+    ],
+    "outputs": [
+      {"id": "x", "displayName": "X", "name": "x", "pinType": "DATA", "dataType": "number", "description": "Horizontal component."},
+      {"id": "y", "displayName": "Y", "name": "y", "pinType": "DATA", "dataType": "number", "description": "Vertical component."},
+      {"id": "z", "displayName": "Z", "name": "z", "pinType": "DATA", "dataType": "number", "description": "Depth component."},
+      {"id": "block_x", "displayName": "Block X", "name": "block_x", "pinType": "DATA", "dataType": "number", "description": "Block-aligned horizontal component."},
+      {"id": "block_y", "displayName": "Block Y", "name": "block_y", "pinType": "DATA", "dataType": "number", "description": "Block-aligned vertical component."},
+      {"id": "block_z", "displayName": "Block Z", "name": "block_z", "pinType": "DATA", "dataType": "number", "description": "Block-aligned depth component."}
+    ]
+  },
+  {
+    "id": "math_vector_set",
+    "displayName": "Vector Set",
+    "description": "Returns a copy of a vector with one selected component replaced by a new value.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "set"],
+    "legacyIds": ["math.vector_set"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_set"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "component", "target": "component"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "vector", "target": "output_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to copy and update."},
+      {"id": "component", "displayName": "Component", "name": "component", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["x", "y", "z"], "defaultValue": "x", "description": "Component to replace."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "New value for the selected component."}
+    ],
+    "outputs": [
+      {"id": "output_vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the updated vector."}
+    ]
+  },
+  {
+    "id": "math_vector_length",
+    "displayName": "Vector Length",
+    "description": "Returns the Euclidean length of a vector.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "length"],
+    "legacyIds": ["math.vector_length"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_length"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "length", "target": "length"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose length should be measured."}
+    ],
+    "outputs": [
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "description": "Returns the Euclidean length of the input vector."}
+    ]
+  },
+  {
+    "id": "math_vector_normalize",
+    "displayName": "Vector Normalize",
+    "description": "Returns a unit vector pointing in the same direction as the input vector.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "normalize"],
+    "legacyIds": ["math.vector_normalize"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_normalize"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "output", "source": "normalized_vector", "target": "normalized_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector to normalize."}
+    ],
+    "outputs": [
+      {"id": "normalized_vector", "displayName": "Normalized Vector", "name": "normalized_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the normalized unit vector."}
+    ]
+  }
+]

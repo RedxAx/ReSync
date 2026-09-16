@@ -1,8 +1,8 @@
 package restudio.resync.network;
 
+import restudio.resync.contract.canonical.CanonicalDigests;
+
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -23,14 +23,10 @@ public final class NetworkCredentials {
         if (normalized.isBlank()) {
             throw new IllegalArgumentException("Network Credential Is Required");
         }
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(normalized.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 Is Unavailable", exception);
-        }
+        return CanonicalDigests.sha256(normalized.getBytes(StandardCharsets.UTF_8));
     }
 
     public static boolean matches(byte[] expectedHash, byte[] actualHash) {
-        return expectedHash != null && actualHash != null && MessageDigest.isEqual(expectedHash, actualHash);
+        return expectedHash != null && actualHash != null && CanonicalDigests.equal(expectedHash, actualHash);
     }
 }

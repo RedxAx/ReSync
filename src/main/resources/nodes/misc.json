@@ -1,0 +1,483 @@
+[
+  {
+    "id": "misc_log",
+    "displayName": "Log Message",
+    "description": "Write a message to the ReSync server log and continue the flow.",
+    "domain": "core",
+    "family": "misc",
+    "lifecycle": "active",
+    "handlerCapability": "misc.log",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["misc", "log", "diagnostics"],
+    "aliases": ["Log", "Write Log Message"],
+    "legacyIds": ["log"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "log"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "text", "target": "text"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts logging when execution reaches this node."},
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Message to write to the ReSync server log."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the message has been written."}
+    ]
+  },
+  {
+    "id": "event_cancel",
+    "displayName": "Cancel Event",
+    "description": "Cancel the active event when its mutation window is still open.",
+    "domain": "event",
+    "family": "event",
+    "lifecycle": "active",
+    "handlerCapability": "event.mutation",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["event", "cancel", "mutation"],
+    "aliases": ["Cancel Active Event"],
+    "legacyIds": ["cancel.event"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "cancel_event"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "cancel", "target": "cancel"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the event cancellation attempt."},
+      {"id": "cancel", "displayName": "Cancel", "name": "cancel", "pinType": "DATA", "dataType": "boolean", "defaultValue": true, "description": "When true, requests cancellation of the active event; when false, the operation succeeds without changing it."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the cancellation request is evaluated."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the requested event state was applied."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports EVENT_WINDOW_CLOSED when the active event can no longer be changed."}
+    ]
+  },
+  {
+    "id": "time_current_ticks",
+    "displayName": "Current Server Ticks",
+    "description": "Read the full server tick count for a loaded world or the first loaded world when no world is selected.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.server-clock",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "server_ticks",
+    "tags": ["time", "ticks", "server"],
+    "aliases": ["Current Ticks", "Server Tick Time"],
+    "legacyIds": ["time.current.ticks"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_current_ticks"},
+    "inputs": [
+      {"id": "world", "displayName": "World", "name": "world", "dataType": "string", "optional": true, "description": "Name of the loaded world to read. Leave blank to use the first loaded world."}
+    ],
+    "outputs": [
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "dataType": "number", "description": "Returns the selected world's full server tick count, or zero when no world is loaded."}
+    ]
+  },
+  {
+    "id": "time_current_real_ms",
+    "displayName": "Current Time In Milliseconds",
+    "description": "Read the current wall-clock time as epoch milliseconds.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.wall-clock",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "clock", "milliseconds"],
+    "aliases": ["Current Real MS", "Now In Milliseconds"],
+    "legacyIds": ["time.current.real.ms"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_current_real_ms"},
+    "inputs": [],
+    "outputs": [
+      {"id": "time_ms", "displayName": "Time In Milliseconds", "name": "time_ms", "dataType": "number", "description": "Returns the current epoch time in milliseconds."}
+    ]
+  },
+  {
+    "id": "time_current_real_seconds",
+    "displayName": "Current Time In Seconds",
+    "description": "Read the current wall-clock time as epoch seconds.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.wall-clock",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "clock", "seconds"],
+    "aliases": ["Current Real Seconds", "Now In Seconds"],
+    "legacyIds": ["time.current.real.seconds"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_current_real_seconds"},
+    "inputs": [],
+    "outputs": [
+      {"id": "time_seconds", "displayName": "Time In Seconds", "name": "time_seconds", "dataType": "number", "description": "Returns the current epoch time in whole seconds."}
+    ]
+  },
+  {
+    "id": "time_between",
+    "displayName": "Time Between",
+    "description": "Break the duration between two epoch-millisecond values into days, hours, minutes, seconds, and milliseconds.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.duration",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "duration", "between"],
+    "aliases": ["Split Duration", "Time Duration Parts"],
+    "legacyIds": ["time.between"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_between"},
+    "inputs": [
+      {"id": "start_ms", "displayName": "Start Time", "name": "start_ms", "dataType": "number", "defaultValue": 0, "description": "Starting epoch time in milliseconds."},
+      {"id": "end_ms", "displayName": "End Time", "name": "end_ms", "dataType": "number", "defaultValue": 0, "description": "Ending epoch time in milliseconds."}
+    ],
+    "outputs": [
+      {"id": "days", "displayName": "Days", "name": "days", "dataType": "number", "description": "Whole duration days."},
+      {"id": "hours", "displayName": "Hours", "name": "hours", "dataType": "number", "description": "Remaining hours after whole days."},
+      {"id": "minutes", "displayName": "Minutes", "name": "minutes", "dataType": "number", "description": "Remaining minutes after whole hours."},
+      {"id": "seconds", "displayName": "Seconds", "name": "seconds", "dataType": "number", "description": "Remaining seconds after whole minutes."},
+      {"id": "milliseconds", "displayName": "Milliseconds", "name": "milliseconds", "dataType": "number", "description": "Remaining milliseconds after whole seconds."}
+    ]
+  },
+  {
+    "id": "time_is_before",
+    "displayName": "Is Time Before",
+    "description": "Check whether the first epoch-millisecond value is earlier than the second.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "compare", "before"],
+    "aliases": ["Time Is Before", "Earlier Than"],
+    "legacyIds": ["time.is.before"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_is_before"},
+    "inputs": [
+      {"id": "timestamp1_ms", "displayName": "Time 1", "name": "timestamp1_ms", "dataType": "number", "defaultValue": 0, "description": "First epoch time in milliseconds."},
+      {"id": "timestamp2_ms", "displayName": "Time 2", "name": "timestamp2_ms", "dataType": "number", "defaultValue": 0, "description": "Second epoch time in milliseconds."}
+    ],
+    "outputs": [
+      {"id": "is_before", "displayName": "Is Before", "name": "is_before", "dataType": "boolean", "description": "True when Time 1 is earlier than Time 2."}
+    ]
+  },
+  {
+    "id": "time_is_after",
+    "displayName": "Is Time After",
+    "description": "Check whether the first epoch-millisecond value is later than the second.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "compare", "after"],
+    "aliases": ["Time Is After", "Later Than"],
+    "legacyIds": ["time.is.after"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_is_after"},
+    "inputs": [
+      {"id": "timestamp1_ms", "displayName": "Time 1", "name": "timestamp1_ms", "dataType": "number", "defaultValue": 0, "description": "First epoch time in milliseconds."},
+      {"id": "timestamp2_ms", "displayName": "Time 2", "name": "timestamp2_ms", "dataType": "number", "defaultValue": 0, "description": "Second epoch time in milliseconds."}
+    ],
+    "outputs": [
+      {"id": "is_after", "displayName": "Is After", "name": "is_after", "dataType": "boolean", "description": "True when Time 1 is later than Time 2."}
+    ]
+  },
+  {
+    "id": "time_ticks_to_ms",
+    "displayName": "Ticks To Milliseconds",
+    "description": "Convert nominal server ticks to milliseconds using the fixed 20 ticks-per-second rate.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "monotonic_elapsed",
+    "tags": ["time", "ticks", "convert"],
+    "aliases": ["Ticks To MS", "Ticks To Milliseconds"],
+    "legacyIds": ["time.convert.ticks.to.ms"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_convert_ticks_to_ms"},
+    "inputs": [
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "dataType": "number", "defaultValue": 0, "description": "Number of server ticks to convert."}
+    ],
+    "outputs": [
+      {"id": "milliseconds", "displayName": "Milliseconds", "name": "milliseconds", "dataType": "number", "description": "Equivalent duration in milliseconds."}
+    ]
+  },
+  {
+    "id": "time_ms_to_ticks",
+    "displayName": "Milliseconds To Ticks",
+    "description": "Convert milliseconds to nominal server ticks using the fixed 50-millisecond tick length.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time.conversion",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "monotonic_elapsed",
+    "tags": ["time", "ticks", "convert"],
+    "aliases": ["MS To Ticks", "Milliseconds To Ticks"],
+    "legacyIds": ["time.convert.ms.to.ticks"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "time_convert_ms_to_ticks"},
+    "inputs": [
+      {"id": "milliseconds", "displayName": "Milliseconds", "name": "milliseconds", "dataType": "number", "defaultValue": 0, "description": "Duration in milliseconds to convert."}
+    ],
+    "outputs": [
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "dataType": "number", "description": "Equivalent nominal server ticks, rounded down by integer division."}
+    ]
+  },
+  {
+    "id": "flow_run_async",
+    "displayName": "Run Async",
+    "description": "Schedule the next flow branch on the runtime's asynchronous executor.",
+    "domain": "flow",
+    "family": "execution",
+    "lifecycle": "active",
+    "handlerCapability": "flow.threading",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["flow", "async", "threading"],
+    "aliases": ["Run Asynchronous", "Async Flow"],
+    "legacyIds": ["run.async"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "run_async"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "async_flow", "target": "async_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts asynchronous scheduling."}
+    ],
+    "outputs": [
+      {"id": "async_flow", "displayName": "Async Flow", "name": "async_flow", "pinType": "FLOW", "dataType": "execution", "description": "Runs after the continuation has been scheduled on the asynchronous executor."}
+    ]
+  },
+  {
+    "id": "flow_run_sync",
+    "displayName": "Run Sync",
+    "description": "Schedule the next flow branch on the server's primary thread.",
+    "domain": "flow",
+    "family": "execution",
+    "lifecycle": "active",
+    "handlerCapability": "flow.threading",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["flow", "sync", "threading"],
+    "aliases": ["Run Synchronous", "Main Thread Flow"],
+    "legacyIds": ["run.sync"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "run_sync"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "sync_flow", "target": "sync_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts primary-thread scheduling."}
+    ],
+    "outputs": [
+      {"id": "sync_flow", "displayName": "Sync Flow", "name": "sync_flow", "pinType": "FLOW", "dataType": "execution", "description": "Runs on the server's primary thread after scheduling succeeds."}
+    ]
+  },
+  {
+    "id": "console_log",
+    "displayName": "Console Log",
+    "description": "Write a message at a selected severity to the ReSync server log.",
+    "domain": "core",
+    "family": "diagnostics",
+    "lifecycle": "active",
+    "handlerCapability": "misc.log",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["console", "log", "diagnostics"],
+    "aliases": ["Write Console Message", "Server Log"],
+    "legacyIds": ["console.log"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "console_log"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "level", "target": "level"},
+        {"direction": "input", "source": "message", "target": "message"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the console log operation."},
+      {"id": "level", "displayName": "Level", "name": "level", "dataType": "string", "widget": "DROPDOWN", "options": ["info", "warning", "severe"], "defaultValue": "info", "description": "Severity used for the server log entry."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "widget": "MULTILINE", "defaultValue": "", "description": "Text to write to the selected log level."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the log entry has been written."}
+    ]
+  },
+  {
+    "id": "event_caller",
+    "displayName": "Event Caller",
+    "description": "Read the player that initiated the active event when the event supplies one.",
+    "domain": "event",
+    "family": "event",
+    "lifecycle": "active",
+    "handlerCapability": "event.context",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["event", "context", "player"],
+    "aliases": ["Event Player", "Event Sender"],
+    "legacyIds": ["misc.event_caller"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "event_caller"},
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the caller has been read."},
+      {"id": "caller", "displayName": "Caller", "name": "caller", "dataType": "player", "optional": true, "description": "Returns the event's player context, or no player when the event has no caller."}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event_type",
+    "displayName": "Event Type",
+    "description": "Read the simple runtime class name of the active event.",
+    "domain": "event",
+    "family": "event",
+    "lifecycle": "active",
+    "handlerCapability": "event.context",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["event", "context", "type"],
+    "aliases": ["Active Event Type"],
+    "legacyIds": ["misc.event_type"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "event_type"},
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the event type has been read."},
+      {"id": "type", "displayName": "Type", "name": "type", "dataType": "string", "description": "Returns the active event's simple class name, or empty text when no event is active."}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event_is_cancelled",
+    "displayName": "Event Is Cancelled",
+    "description": "Check whether the active event implements cancellation and is currently cancelled.",
+    "domain": "event",
+    "family": "event",
+    "lifecycle": "active",
+    "handlerCapability": "event.context",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": ["event", "context", "cancel"],
+    "aliases": ["Is Event Cancelled", "Cancelled Event"],
+    "legacyIds": ["misc.event_is_cancelled"],
+    "handler": "MiscHandler",
+    "handlerConfig": {"operation": "event_is_cancelled"},
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the cancellation state has been read."},
+      {"id": "is_cancelled", "displayName": "Is Cancelled", "name": "is_cancelled", "dataType": "boolean", "description": "True when the active event is cancellable and currently cancelled."}
+    ],
+    "inputs": []
+  }
+]

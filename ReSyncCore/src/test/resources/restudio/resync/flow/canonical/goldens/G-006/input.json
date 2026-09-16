@@ -1,0 +1,10 @@
+{
+  "legacyCatalogHash":"c83f2e2828ee599c18563beaab2a131a160acceeb5b7ae8220064124188ff0e8",
+  "requiredDefinitionRows":1428,
+  "requiredPhysicalPinRows":7273,
+  "logicalCompatibilityPins":7278,
+  "mapping":"family-map-v1.proposed.json",
+  "mappingStatus":"proposal-only",
+  "strictBaseline":{"definitions":684,"physicalPins":3605,"sourcePolicyKeys":502},
+  "replacementDescriptionRequirement":{"nodeMissing":0,"pinMissing":0,"structuralMissing":0,"fallbacks":0}
+}

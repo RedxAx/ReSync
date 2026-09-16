@@ -1,0 +1,561 @@
+[
+  {
+    "id": "team_create",
+    "displayName": "Create Team",
+    "description": "Create a scoreboard team with a stable ID and display name.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.create"],
+    "tags": ["team", "scoreboard", "create"],
+    "examples": ["Connect Flow, provide a Team ID and display name, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_create"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts team creation."},
+      {"id": "team_id", "displayName": "Team ID", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "default", "constraints": {"max": 128}, "description": "Sets the stable ID of the new team."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Team", "description": "Sets the team's display name."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team is registered."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_set_prefix",
+    "displayName": "Set Team Prefix",
+    "description": "Set the text shown before team member names.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.set.prefix"],
+    "tags": ["team", "scoreboard", "prefix"],
+    "examples": ["Connect Flow, select a Team, provide its Prefix, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_set_prefix"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the team prefix."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "prefix", "displayName": "Prefix", "name": "prefix", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "", "description": "Sets the text displayed before team member names."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team prefix is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "prefix", "target": "prefix"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_set_suffix",
+    "displayName": "Set Team Suffix",
+    "description": "Set the text shown after team member names.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.set.suffix"],
+    "tags": ["team", "scoreboard", "suffix"],
+    "examples": ["Connect Flow, select a Team, provide its Suffix, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_set_suffix"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the team suffix."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "suffix", "displayName": "Suffix", "name": "suffix", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "", "description": "Sets the text displayed after team member names."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team suffix is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "suffix", "target": "suffix"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_set_color",
+    "displayName": "Set Team Color",
+    "description": "Set the chat color used for a team's display.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.set.color"],
+    "tags": ["team", "scoreboard", "color"],
+    "examples": ["Connect Flow, select a Team and Color, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_set_color"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the team color."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "color", "displayName": "Color", "name": "color", "pinType": "DATA", "direction": "input", "dataType": "string", "widget": "DROPDOWN", "options": ["BLACK", "DARK_BLUE", "DARK_GREEN", "DARK_AQUA", "DARK_RED", "DARK_PURPLE", "GOLD", "GRAY", "DARK_GRAY", "BLUE", "GREEN", "AQUA", "RED", "LIGHT_PURPLE", "YELLOW", "WHITE"], "defaultValue": "WHITE", "description": "Selects the ChatColor applied to the team."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team color is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "color", "target": "color"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_add_player",
+    "displayName": "Add Player To Team",
+    "description": "Add a player to a scoreboard team and assign the main scoreboard.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.add.player"],
+    "tags": ["team", "scoreboard", "player", "add"],
+    "examples": ["Connect Flow, select a Team and Player, then continue through Flow after membership is saved."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_add_player"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts adding the player to the team."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID that receives the player."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to add; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the player is added."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_remove_player",
+    "displayName": "Remove Player From Team",
+    "description": "Remove a player from a scoreboard team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.remove.player"],
+    "tags": ["team", "scoreboard", "player", "remove"],
+    "examples": ["Connect Flow, select a Team and Player, then continue through Flow after membership is removed."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_remove_player"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts removing the player from the team."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to remove; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the player is removed."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_remove",
+    "displayName": "Remove Team",
+    "description": "Unregister a scoreboard team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.remove"],
+    "tags": ["team", "scoreboard", "remove"],
+    "examples": ["Connect Flow, select the Team to unregister, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_remove"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts removing the team."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to unregister."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team is removed."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_set_friendly_fire",
+    "displayName": "Set Friendly Fire",
+    "description": "Allow or prevent team members from damaging one another.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.set.allow.friendly.fire"],
+    "tags": ["team", "scoreboard", "friendly-fire"],
+    "examples": ["Connect Flow, select a Team, choose whether friendly fire is allowed, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_set_friendly_fire"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing friendly fire."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "allow", "displayName": "Allow Friendly Fire", "name": "allow", "pinType": "DATA", "direction": "input", "dataType": "boolean", "defaultValue": true, "description": "Controls whether team members can damage one another."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the friendly fire setting is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "allow", "target": "allow"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_get_players",
+    "displayName": "Get Team Players",
+    "description": "Return the player entry names currently assigned to a team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["team.get.players"],
+    "tags": ["team", "scoreboard", "player", "query"],
+    "examples": ["Select a Team and connect Players to a list of strings."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_get_players"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "team_id",
+          "target": "team_id"
+        },
+        {
+          "direction": "output",
+          "source": "players",
+          "target": "players"
+        }
+      ]
+    },
+    "inputs": [
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to inspect."}
+    ],
+    "outputs": [
+      {"id": "players", "displayName": "Players", "name": "players", "pinType": "DATA", "direction": "output", "dataType": "list<string>", "description": "Returns the player entry names assigned to the team."}
+    ]
+  },
+  {
+    "id": "team_get_team",
+    "displayName": "Get Player Team",
+    "description": "Return the team ID containing a player, or an empty value when the player has no team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["team.get.team"],
+    "tags": ["team", "scoreboard", "player", "query"],
+    "examples": ["Provide a Player and connect Team ID to a string-compatible input."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_get_team"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "team_id",
+          "target": "team_id"
+        }
+      ]
+    },
+    "inputs": [
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player whose team should be found; the current Flow player is used when omitted."}
+    ],
+    "outputs": [
+      {"id": "team_id", "displayName": "Team ID", "name": "team_id", "pinType": "DATA", "direction": "output", "dataType": "string", "optional": true, "description": "Returns the matching team ID, or an empty value when the player is not assigned."}
+    ]
+  },
+  {
+    "id": "team_get_teams",
+    "displayName": "Get All Teams",
+    "description": "Return the IDs of every team on the main scoreboard.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["team.get.teams"],
+    "tags": ["team", "scoreboard", "query"],
+    "examples": ["Connect Teams to a list of strings to inspect the main scoreboard."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_get_teams"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "teams",
+          "target": "teams"
+        }
+      ]
+    },
+    "inputs": [],
+    "outputs": [
+      {"id": "teams", "displayName": "Teams", "name": "teams", "pinType": "DATA", "direction": "output", "dataType": "list<string>", "description": "Returns the IDs of all teams on the main scoreboard."}
+    ]
+  },
+  {
+    "id": "team_has_player",
+    "displayName": "Team Has Player",
+    "description": "Check whether a player is assigned to a team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": ["team.has.player"],
+    "tags": ["team", "scoreboard", "player", "query"],
+    "examples": ["Select a Team and Player, then connect Has to a Boolean-compatible input."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_has_player"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "team_id",
+          "target": "team_id"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        }
+      ]
+    },
+    "inputs": [
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to inspect."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "direction": "input", "dataType": "player", "optional": true, "description": "Selects the player to check; uses the current Flow player when omitted."}
+    ],
+    "outputs": [
+      {"id": "has", "displayName": "Has Player", "name": "has", "pinType": "DATA", "direction": "output", "dataType": "boolean", "description": "Reports whether the player is assigned to the selected team."}
+    ]
+  },
+  {
+    "id": "team_see_friendly_invisibles",
+    "displayName": "See Friendly Invisibles",
+    "description": "Allow or prevent team members from seeing invisible friendly members.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.see.friendly.invisibles"],
+    "tags": ["team", "scoreboard", "invisibility"],
+    "examples": ["Connect Flow, select a Team, choose whether friendly invisibles are visible, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_see_friendly_invisibles"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing friendly invisibility visibility."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "see", "displayName": "See Friendly Invisibles", "name": "see", "pinType": "DATA", "direction": "input", "dataType": "boolean", "defaultValue": true, "description": "Controls whether members can see invisible teammates."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the visibility setting is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "see", "target": "see"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  },
+  {
+    "id": "team_set_display_name",
+    "displayName": "Set Team Display Name",
+    "description": "Change the display name shown for a scoreboard team.",
+    "domain": "scoreboard",
+    "family": "team",
+    "lifecycle": "active",
+    "handlerCapability": "flow.team",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": ["team.set.display.name"],
+    "tags": ["team", "scoreboard", "name"],
+    "examples": ["Connect Flow, select a Team, enter its display name, then continue through Flow."],
+    "handler": "TeamHandler",
+    "handlerConfig": {"operation": "team_set_display_name"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts changing the team display name."},
+      {"id": "team_id", "displayName": "Team", "name": "team_id", "pinType": "DATA", "direction": "input", "dataType": "string", "description": "Enter the team ID to update."},
+      {"id": "display_name", "displayName": "Display Name", "name": "display_name", "pinType": "DATA", "direction": "input", "dataType": "string", "defaultValue": "Team", "description": "Sets the new team display name."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the team display name is saved."}
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "team_id", "target": "team_id"},
+        {"direction": "input", "source": "display_name", "target": "display_name"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    }
+  }
+]

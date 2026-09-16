@@ -4,7 +4,11 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 
-public record NetworkSnapshotChunk(String transferId, String snapshotId, String networkId, UUID playerId, long fenceEpoch, String family, String payloadHash, int schemaVersion, int dataVersion, String originNodeId, long createdAt, int totalBytes, int chunkIndex, int chunkCount, byte[] payload) {
+public record NetworkSnapshotChunk(String transferId, String snapshotId, String networkId, UUID playerId, long fenceEpoch, String family, String payloadHash, int schemaVersion, int dataVersion, String originNodeId, long createdAt, int totalBytes, int chunkIndex, int chunkCount, byte[] payload, boolean pinned) {
+    public NetworkSnapshotChunk(String transferId, String snapshotId, String networkId, UUID playerId, long fenceEpoch, String family, String payloadHash, int schemaVersion, int dataVersion, String originNodeId, long createdAt, int totalBytes, int chunkIndex, int chunkCount, byte[] payload) {
+        this(transferId, snapshotId, networkId, playerId, fenceEpoch, family, payloadHash, schemaVersion, dataVersion, originNodeId, createdAt, totalBytes, chunkIndex, chunkCount, payload, false);
+    }
+
     public NetworkSnapshotChunk {
         transferId = NetworkValues.required(transferId, "Transfer ID");
         snapshotId = NetworkValues.required(snapshotId, "Snapshot ID");
@@ -40,11 +44,11 @@ public record NetworkSnapshotChunk(String transferId, String snapshotId, String 
 
     @Override
     public boolean equals(Object object) {
-        return object instanceof NetworkSnapshotChunk other && fenceEpoch == other.fenceEpoch && schemaVersion == other.schemaVersion && dataVersion == other.dataVersion && createdAt == other.createdAt && totalBytes == other.totalBytes && chunkIndex == other.chunkIndex && chunkCount == other.chunkCount && transferId.equals(other.transferId) && snapshotId.equals(other.snapshotId) && networkId.equals(other.networkId) && playerId.equals(other.playerId) && family.equals(other.family) && payloadHash.equals(other.payloadHash) && originNodeId.equals(other.originNodeId) && Arrays.equals(payload, other.payload);
+        return object instanceof NetworkSnapshotChunk other && fenceEpoch == other.fenceEpoch && schemaVersion == other.schemaVersion && dataVersion == other.dataVersion && createdAt == other.createdAt && totalBytes == other.totalBytes && chunkIndex == other.chunkIndex && chunkCount == other.chunkCount && pinned == other.pinned && transferId.equals(other.transferId) && snapshotId.equals(other.snapshotId) && networkId.equals(other.networkId) && playerId.equals(other.playerId) && family.equals(other.family) && payloadHash.equals(other.payloadHash) && originNodeId.equals(other.originNodeId) && Arrays.equals(payload, other.payload);
     }
 
     @Override
     public int hashCode() {
-        return 31 * Objects.hash(transferId, snapshotId, networkId, playerId, fenceEpoch, family, payloadHash, schemaVersion, dataVersion, originNodeId, createdAt, totalBytes, chunkIndex, chunkCount) + Arrays.hashCode(payload);
+        return 31 * Objects.hash(transferId, snapshotId, networkId, playerId, fenceEpoch, family, payloadHash, schemaVersion, dataVersion, originNodeId, createdAt, totalBytes, chunkIndex, chunkCount, pinned) + Arrays.hashCode(payload);
     }
 }

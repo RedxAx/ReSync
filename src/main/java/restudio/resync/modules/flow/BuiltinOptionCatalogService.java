@@ -19,6 +19,7 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.DisplaySlot;
 import restudio.resync.api.OptionCatalogItem;
+import restudio.resync.api.OptionCatalogCapture;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
@@ -156,6 +157,19 @@ public final class BuiltinOptionCatalogService {
             }
 
             @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.SERVER_MAIN;
+            }
+
+            @Override
+            public OptionCatalogCapture capture(OptionCatalogQuery query) {
+                String material = query != null ? query.text("material") : "";
+                List<OptionCatalogItem> capturedItems = List.copyOf(itemAttributeSchemaService.catalog(material));
+                return new OptionCatalogCapture(sourceId() + ":" + material + ":" + capturedItems.size() + ":"
+                    + capturedItems.hashCode(), capturedItems, "available", "");
+            }
+
+            @Override
             public String revision() {
                 return itemAttributeSchemaService.revision("");
             }
@@ -211,7 +225,46 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public Set<String> contextKeys() {
-                return definition.key().equals("custom_content_asset") ? Set.of("provider", "content_type") : Set.of();
+                return definition.key().equals("custom_content_asset")
+                    ? Set.of("$nodeType", "provider", "content_type") : Set.of();
+            }
+
+            @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.SERVER_MAIN;
+            }
+
+            @Override
+            public OptionCatalogCapture capture(OptionCatalogQuery query) {
+                if (definition.key().equals("custom_content_asset")) {
+                    CustomContentService service = customContentService.get();
+                    String provider = customContentProvider(query);
+                    String contentType = customContentType(query);
+                    if (service == null) {
+                        return new OptionCatalogCapture(sourceId() + ":unavailable", List.of(), "unavailable",
+                            "Custom content service is unavailable");
+                    }
+                    if (provider.isBlank()) {
+                        return new OptionCatalogCapture(sourceId() + ":invalid:provider", List.of(), "invalid",
+                            "Custom content provider context is required");
+                    }
+                    if (contentType.isBlank()) {
+                        return new OptionCatalogCapture(sourceId() + ":invalid:content_type", List.of(), "invalid",
+                            "Custom content type context is required");
+                    }
+                    if (!service.isProviderAvailable(provider)) {
+                        return new OptionCatalogCapture(sourceId() + ":unavailable:" + provider, List.of(), "unavailable",
+                            "Custom content provider is unavailable: " + provider);
+                    }
+                    List<OptionCatalogItem> capturedItems = customContentAssetItems(definition, service, provider, contentType);
+                    return new OptionCatalogCapture(sourceId() + ":" + provider + ":" + contentType + ":"
+                        + capturedItems.size() + ":" + capturedItems.hashCode(), capturedItems, "available", "");
+                }
+                List<OptionCatalogItem> capturedItems = List.copyOf(items(query));
+                List<String> capturedValues = capturedItems.stream().map(OptionCatalogItem::value).toList();
+                String capturedRevision = sourceId() + ":" + Bukkit.getVersion() + ":" + capturedValues.size() + ":"
+                    + capturedValues.hashCode();
+                return new OptionCatalogCapture(capturedRevision, capturedItems, "available", "");
             }
 
             @Override
@@ -231,7 +284,8 @@ public final class BuiltinOptionCatalogService {
 
             @Override
             public String revision() {
-                List<String> values = values();
+                List<String> values = definition.key().equals("custom_content_recipe_item")
+                    ? customContentRecipeItemValuesForProjection() : values();
                 return sourceId() + ":" + Bukkit.getVersion() + ":" + values.size() + ":" + values.hashCode();
             }
 
@@ -293,7 +347,7 @@ public final class BuiltinOptionCatalogService {
             public List<OptionCatalogItem> items() {
                 if (definition.key().equals("custom_content_recipe_item")) {
                     CustomContentService service = customContentService.get();
-                    return service != null ? service.recipeItemCatalog() : List.of();
+                    return service != null ? service.recipeItemCatalogForProjection() : List.of();
                 }
                 return richItems(definition, values());
             }
@@ -327,9 +381,14 @@ public final class BuiltinOptionCatalogService {
     private List<OptionCatalogItem> customContentAssetItems(CatalogDefinition definition, OptionCatalogQuery query) {
         String provider = customContentProvider(query);
         String contentType = customContentType(query);
-        String group = displayLabel(provider);
         CustomContentService service = customContentService.get();
-        List<OptionCatalogItem> providerItems = service != null ? service.getProviderOptionCatalog(provider, contentType) : List.of();
+        return service != null ? customContentAssetItems(definition, service, provider, contentType) : List.of();
+    }
+
+    private List<OptionCatalogItem> customContentAssetItems(CatalogDefinition definition, CustomContentService service,
+                                                             String provider, String contentType) {
+        String group = displayLabel(provider);
+        List<OptionCatalogItem> providerItems = service.getProviderOptionCatalog(provider, contentType);
         return providerItems.stream().map(item -> {
             Map<String, Object> metadata = new LinkedHashMap<>(item.metadata());
             metadata.put("source", definition.sourceId());
@@ -490,13 +549,18 @@ public final class BuiltinOptionCatalogService {
             case "world" -> Bukkit.getWorlds().stream().map(World::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
             case "custom_content_provider" -> service != null ? service.getAvailableProviderIds() : List.of("vanilla");
             case "custom_content_asset" -> List.of();
-            case "custom_content_recipe_item" -> service != null ? service.recipeItemCatalog().stream().map(OptionCatalogItem::value).toList() : List.of();
+            case "custom_content_recipe_item" -> service != null ? service.recipeItemCatalogForProjection().stream().map(OptionCatalogItem::value).toList() : List.of();
             case "custom_content_nexo_item" -> service != null ? service.getProviderOptionIds("nexo", "item") : List.of();
             case "custom_content_nexo_block" -> service != null ? service.getProviderOptionIds("nexo", "block") : List.of();
             case "custom_content_nexo_furniture" -> service != null ? service.getProviderOptionIds("nexo", "furniture") : List.of();
             case "custom_content_nexo_armor" -> service != null ? service.getProviderOptionIds("nexo", "armor") : List.of();
             default -> List.of();
         };
+    }
+
+    private List<String> customContentRecipeItemValuesForProjection() {
+        CustomContentService service = customContentService.get();
+        return service != null ? service.recipeItemCatalogForProjection().stream().map(OptionCatalogItem::value).toList() : List.of();
     }
 
     private FlowTypeRef catalogRuntimeType(String key) {
@@ -508,6 +572,7 @@ public final class BuiltinOptionCatalogService {
             case "enchantment" -> "enchantment";
             case "entity_type" -> "entity_type";
             case "gamemode" -> "gamemode";
+            case "network_scope" -> "network_scope";
             case "potion_effect" -> "potion_effect";
             case "sound" -> "sound";
             case "text_decoration" -> "text_decoration";

@@ -1,0 +1,4034 @@
+[
+  {
+    "id": "block_set",
+    "displayName": "Block Set",
+    "description": "Run the block set operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set"
+    ],
+    "examples": [
+      "Connect Flow to run block set when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the material value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_replace",
+    "displayName": "Block Replace",
+    "description": "Run the block replace operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_replace"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_replace"
+    ],
+    "examples": [
+      "Connect Flow to run block replace when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_replace"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "old_type",
+          "target": "old_type"
+        },
+        {
+          "direction": "input",
+          "source": "new_type",
+          "target": "new_type"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "old_type",
+        "displayName": "Old Type",
+        "name": "old_type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the old type value used by this operation.",
+        "defaultValue": ""
+      },
+      {
+        "id": "new_type",
+        "displayName": "New Type",
+        "name": "new_type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the new type value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_fill",
+    "displayName": "Block Fill",
+    "description": "Run the block fill operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_fill"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_fill"
+    ],
+    "examples": [
+      "Connect Flow to run block fill when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_fill"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the min location value used by this operation."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the max location value used by this operation."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the material value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_replace_area",
+    "displayName": "Block Replace Area",
+    "description": "Run the block replace area operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_replace_area"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_replace_area"
+    ],
+    "examples": [
+      "Connect Flow to run block replace area when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_replace_area"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "old_type",
+          "target": "old_type"
+        },
+        {
+          "direction": "input",
+          "source": "new_type",
+          "target": "new_type"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the min location value used by this operation."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the max location value used by this operation."
+      },
+      {
+        "id": "old_type",
+        "displayName": "Old Type",
+        "name": "old_type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the old type value used by this operation.",
+        "defaultValue": ""
+      },
+      {
+        "id": "new_type",
+        "displayName": "New Type",
+        "name": "new_type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the new type value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_break_naturally",
+    "displayName": "Block Break Naturally",
+    "description": "Run the block break naturally operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_break_naturally"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_break_naturally"
+    ],
+    "examples": [
+      "Connect Flow to run block break naturally when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_naturally"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_drop_item",
+    "displayName": "Block Drop Item",
+    "description": "Run the block drop item operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_drop_item"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_drop_item"
+    ],
+    "examples": [
+      "Connect Flow to run block drop item when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_drop_item"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the item value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_update",
+    "displayName": "Block Update",
+    "description": "Run the block update operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_update"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_update"
+    ],
+    "examples": [
+      "Connect Flow to run block update when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_update"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_biome",
+    "displayName": "Block Set Biome",
+    "description": "Run the block set biome operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_biome"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_biome"
+    ],
+    "examples": [
+      "Connect Flow to run block set biome when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_biome"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "biome",
+          "target": "biome"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "biome",
+        "displayName": "Biome",
+        "name": "biome",
+        "pinType": "DATA",
+        "dataType": "biome",
+        "direction": "input",
+        "description": "Provides the biome value used by this operation.",
+        "defaultValue": "PLAINS"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_type",
+    "displayName": "Block Set Type",
+    "description": "Run the block set type operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_type"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_type"
+    ],
+    "examples": [
+      "Connect Flow to run block set type when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_type"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the material value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_data",
+    "displayName": "Block Set Data",
+    "description": "Run the block set data operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_data"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_data"
+    ],
+    "examples": [
+      "Connect Flow to run block set data when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_data"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "data",
+          "target": "data"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "data",
+        "displayName": "Data",
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "map<any,any>",
+        "direction": "input",
+        "description": "Provides the data value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_age",
+    "displayName": "Block Set Age",
+    "description": "Run the block set age operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_age"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_age"
+    ],
+    "examples": [
+      "Connect Flow to run block set age when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_age"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "age",
+          "target": "age"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "age",
+        "displayName": "Age",
+        "name": "age",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the age value used by this operation.",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_level",
+    "displayName": "Block Set Level",
+    "description": "Run the block set level operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_level"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_level"
+    ],
+    "examples": [
+      "Connect Flow to run block set level when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_level"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "level",
+        "displayName": "Level",
+        "name": "level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the level value used by this operation.",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_rotation",
+    "displayName": "Block Set Rotation",
+    "description": "Run the block set rotation operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_rotation"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_rotation"
+    ],
+    "examples": [
+      "Connect Flow to run block set rotation when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_rotation"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "rotation",
+          "target": "rotation"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "rotation",
+        "displayName": "Rotation",
+        "name": "rotation",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the rotation value used by this operation.",
+        "defaultValue": "NORTH"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_face",
+    "displayName": "Block Set Face",
+    "description": "Run the block set face operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_face"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_face"
+    ],
+    "examples": [
+      "Connect Flow to run block set face when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_face"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "face",
+          "target": "face"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "face",
+        "displayName": "Face",
+        "name": "face",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the face value used by this operation.",
+        "defaultValue": "NORTH"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_powered",
+    "displayName": "Block Set Powered",
+    "description": "Run the block set powered operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_powered"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_powered"
+    ],
+    "examples": [
+      "Connect Flow to run block set powered when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_powered"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "powered",
+          "target": "powered"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "powered",
+        "displayName": "Powered",
+        "name": "powered",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "input",
+        "description": "Provides the powered value used by this operation.",
+        "defaultValue": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_set_lit",
+    "displayName": "Block Set Lit",
+    "description": "Run the block set lit operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_lit"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_lit"
+    ],
+    "examples": [
+      "Connect Flow to run block set lit when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_lit"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "lit",
+          "target": "lit"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "lit",
+        "displayName": "Lit",
+        "name": "lit",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "input",
+        "description": "Provides the lit value used by this operation.",
+        "defaultValue": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_interact",
+    "displayName": "Block Interact",
+    "description": "Run the block interact operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "deprecated",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_interact"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_interact"
+    ],
+    "examples": [
+      "Connect Flow to run block interact when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_interact"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "hidden": true,
+    "hiddenReason": "migration-only-unsupported-runtime-state",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_break_particles",
+    "displayName": "Block Break Particles",
+    "description": "Run the block break particles operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_break_particles"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_break_particles"
+    ],
+    "examples": [
+      "Connect Flow to run block break particles when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_particles"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "type",
+          "target": "type"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "input",
+        "description": "Provides the type value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_play_sound",
+    "displayName": "Block Play Sound",
+    "description": "Run the block play sound operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_play_sound"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_play_sound"
+    ],
+    "examples": [
+      "Connect Flow to run block play sound when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_play_sound"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "type",
+          "target": "type"
+        },
+        {
+          "direction": "input",
+          "source": "volume",
+          "target": "volume"
+        },
+        {
+          "direction": "input",
+          "source": "pitch",
+          "target": "pitch"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "sound",
+        "direction": "input",
+        "description": "Provides the type value used by this operation.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound",
+        "defaultValue": "BLOCK_STONE_PLACE"
+      },
+      {
+        "id": "volume",
+        "displayName": "Volume",
+        "name": "volume",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the volume value used by this operation.",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0,
+          "max": 16
+        }
+      },
+      {
+        "id": "pitch",
+        "displayName": "Pitch",
+        "name": "pitch",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the pitch value used by this operation.",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0,
+          "max": 2
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_physics",
+    "displayName": "Block Physics",
+    "description": "Run the block physics operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_physics"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_physics"
+    ],
+    "examples": [
+      "Connect Flow to run block physics when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_physics"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_explode",
+    "displayName": "Block Explode",
+    "description": "Run the block explode operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_explode"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_explode"
+    ],
+    "examples": [
+      "Connect Flow to run block explode when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_explode"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "power",
+          "target": "power"
+        },
+        {
+          "direction": "input",
+          "source": "fire",
+          "target": "fire"
+        },
+        {
+          "direction": "input",
+          "source": "break_blocks",
+          "target": "break_blocks"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "power",
+        "displayName": "Power",
+        "name": "power",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the power value used by this operation.",
+        "defaultValue": 4,
+        "constraints": {
+          "min": 0,
+          "max": 100
+        }
+      },
+      {
+        "id": "fire",
+        "displayName": "Fire",
+        "name": "fire",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "input",
+        "description": "Provides the fire value used by this operation.",
+        "defaultValue": false
+      },
+      {
+        "id": "break_blocks",
+        "displayName": "Break Blocks",
+        "name": "break_blocks",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "input",
+        "description": "Provides the break blocks value used by this operation.",
+        "defaultValue": true
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_raytrace",
+    "displayName": "Block Raytrace",
+    "description": "Run the block raytrace operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_raytrace"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_raytrace"
+    ],
+    "examples": [
+      "Connect Flow to run block raytrace when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_raytrace"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "start_location",
+          "target": "start_location"
+        },
+        {
+          "direction": "input",
+          "source": "direction_vector",
+          "target": "direction_vector"
+        },
+        {
+          "direction": "input",
+          "source": "max_distance",
+          "target": "max_distance"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "hit_block",
+          "target": "hit_block"
+        },
+        {
+          "direction": "output",
+          "source": "hit_location",
+          "target": "hit_location"
+        },
+        {
+          "direction": "output",
+          "source": "distance",
+          "target": "distance"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "start_location",
+        "displayName": "Start Location",
+        "name": "start_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the start location value used by this operation."
+      },
+      {
+        "id": "direction_vector",
+        "displayName": "Direction Vector",
+        "name": "direction_vector",
+        "pinType": "DATA",
+        "dataType": "vector",
+        "direction": "input",
+        "description": "Provides the direction vector value used by this operation."
+      },
+      {
+        "id": "max_distance",
+        "displayName": "Max Distance",
+        "name": "max_distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the max distance value used by this operation.",
+        "defaultValue": 50,
+        "constraints": {
+          "min": 0,
+          "max": 1024
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "hit_block",
+        "displayName": "Hit Block",
+        "name": "hit_block",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "output",
+        "description": "Returns the hit block value produced by this operation."
+      },
+      {
+        "id": "hit_location",
+        "displayName": "Hit Location",
+        "name": "hit_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "output",
+        "description": "Returns the hit location value produced by this operation."
+      },
+      {
+        "id": "distance",
+        "displayName": "Distance",
+        "name": "distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the distance value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_offset",
+    "displayName": "Block Offset",
+    "description": "Run the block offset operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_offset"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_offset"
+    ],
+    "examples": [
+      "Connect Flow to run block offset when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_offset"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "offset_x",
+          "target": "offset_x"
+        },
+        {
+          "direction": "input",
+          "source": "offset_y",
+          "target": "offset_y"
+        },
+        {
+          "direction": "input",
+          "source": "offset_z",
+          "target": "offset_z"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "block",
+          "target": "block"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "offset_x",
+        "displayName": "Offset X",
+        "name": "offset_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the offset x value used by this operation.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_y",
+        "displayName": "Offset Y",
+        "name": "offset_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the offset y value used by this operation.",
+        "defaultValue": 0
+      },
+      {
+        "id": "offset_z",
+        "displayName": "Offset Z",
+        "name": "offset_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "input",
+        "description": "Provides the offset z value used by this operation.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "block",
+        "displayName": "Block",
+        "name": "block",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "output",
+        "description": "Returns the block value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_sign_text",
+    "displayName": "Block Sign Text",
+    "description": "Run the block sign text operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_sign_text"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_sign_text"
+    ],
+    "examples": [
+      "Connect Flow to run block sign text when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_sign_text"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "line1",
+          "target": "line1"
+        },
+        {
+          "direction": "input",
+          "source": "line2",
+          "target": "line2"
+        },
+        {
+          "direction": "input",
+          "source": "line3",
+          "target": "line3"
+        },
+        {
+          "direction": "input",
+          "source": "line4",
+          "target": "line4"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "line1",
+        "displayName": "Line1",
+        "name": "line1",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the line1 value used by this operation.",
+        "defaultValue": ""
+      },
+      {
+        "id": "line2",
+        "displayName": "Line2",
+        "name": "line2",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the line2 value used by this operation.",
+        "defaultValue": ""
+      },
+      {
+        "id": "line3",
+        "displayName": "Line3",
+        "name": "line3",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the line3 value used by this operation.",
+        "defaultValue": ""
+      },
+      {
+        "id": "line4",
+        "displayName": "Line4",
+        "name": "line4",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the line4 value used by this operation.",
+        "defaultValue": ""
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_container_get",
+    "displayName": "Block Container Get",
+    "description": "Run the block container get operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_container_get"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_container_get"
+    ],
+    "examples": [
+      "Connect Flow to run block container get when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "items_list",
+          "target": "items_list"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "items_list",
+        "displayName": "Items List",
+        "name": "items_list",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "direction": "output",
+        "description": "Returns the items list value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_container_set",
+    "displayName": "Block Container Set",
+    "description": "Run the block container set operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_container_set"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_container_set"
+    ],
+    "examples": [
+      "Connect Flow to run block container set when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_set"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "items_list",
+          "target": "items_list"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "items_list",
+        "displayName": "Items List",
+        "name": "items_list",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "direction": "input",
+        "description": "Provides the items list value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_container_add",
+    "displayName": "Block Container Add",
+    "description": "Run the block container add operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_container_add"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_container_add"
+    ],
+    "examples": [
+      "Connect Flow to run block container add when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_container_add"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "direction": "input",
+        "description": "Provides the item value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_spawn_falling",
+    "displayName": "Block Spawn Falling",
+    "description": "Run the block spawn falling operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_spawn_falling"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_spawn_falling"
+    ],
+    "examples": [
+      "Connect Flow to run block spawn falling when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_spawn_falling"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "material_type",
+          "target": "material_type"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "falling_block_entity",
+          "target": "falling_block_entity"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      },
+      {
+        "id": "material_type",
+        "displayName": "Material Type",
+        "name": "material_type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the material type value used by this operation.",
+        "defaultValue": "STONE"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "falling_block_entity",
+        "displayName": "Falling Block Entity",
+        "name": "falling_block_entity",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "direction": "output",
+        "description": "Returns the falling block entity value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_break_naturally_drops",
+    "displayName": "Block Break Naturally Drops",
+    "description": "Run the block break naturally drops operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_break_naturally_drops"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_break_naturally_drops"
+    ],
+    "examples": [
+      "Connect Flow to run block break naturally drops when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_naturally_drops"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "tool_item",
+          "target": "tool_item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "dropped_items_list",
+          "target": "dropped_items_list"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "tool_item",
+        "displayName": "Tool Item",
+        "name": "tool_item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "direction": "input",
+        "description": "Provides the tool item value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "dropped_items_list",
+        "displayName": "Dropped Items List",
+        "name": "dropped_items_list",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "direction": "output",
+        "description": "Returns the dropped items list value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_break_instantly",
+    "displayName": "Block Break Instantly",
+    "description": "Run the block break instantly operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_break_instantly"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_break_instantly"
+    ],
+    "examples": [
+      "Connect Flow to run block break instantly when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_break_instantly"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_get_drops",
+    "displayName": "Block Get Drops",
+    "description": "Run the block get drops operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_get_drops"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_get_drops"
+    ],
+    "examples": [
+      "Connect Flow to run block get drops when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_drops"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "tool_item",
+          "target": "tool_item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "dropped_items_list",
+          "target": "dropped_items_list"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "tool_item",
+        "displayName": "Tool Item",
+        "name": "tool_item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "direction": "input",
+        "description": "Provides the tool item value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "dropped_items_list",
+        "displayName": "Dropped Items List",
+        "name": "dropped_items_list",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "direction": "output",
+        "description": "Returns the dropped items list value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_get_state",
+    "displayName": "Block Get State",
+    "description": "Run the block get state operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_get_state"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_get_state"
+    ],
+    "examples": [
+      "Connect Flow to run block get state when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_state"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "state_data",
+          "target": "state_data"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "state_data",
+        "displayName": "State Data",
+        "name": "state_data",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the state data value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_set_state",
+    "displayName": "Block Set State",
+    "description": "Run the block set state operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_set_state"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_set_state"
+    ],
+    "examples": [
+      "Connect Flow to run block set state when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_set_state"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "input",
+          "source": "state_data",
+          "target": "state_data"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      },
+      {
+        "id": "state_data",
+        "displayName": "State Data",
+        "name": "state_data",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Provides the state data value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      }
+    ]
+  },
+  {
+    "id": "block_get",
+    "displayName": "Block Get",
+    "description": "Run the block get operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_get"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_get"
+    ],
+    "examples": [
+      "Connect Flow to run block get when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "type",
+          "target": "type"
+        },
+        {
+          "direction": "output",
+          "source": "data",
+          "target": "data"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the type value produced by this operation."
+      },
+      {
+        "id": "data",
+        "displayName": "Data",
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the data value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_get_type",
+    "displayName": "Block Get Type",
+    "description": "Run the block get type operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_get_type"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_get_type"
+    ],
+    "examples": [
+      "Connect Flow to run block get type when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_type"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "type",
+          "target": "type"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the type value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_get_data",
+    "displayName": "Block Get Data",
+    "description": "Run the block get data operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_get_data"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_get_data"
+    ],
+    "examples": [
+      "Connect Flow to run block get data when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_get_data"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "data",
+          "target": "data"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "data",
+        "displayName": "Data",
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the data value produced by this operation."
+      }
+    ]
+  },
+  {
+    "id": "block_is_solid",
+    "displayName": "Block Is Solid",
+    "description": "Run the block is solid operation against a block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.block_is_solid"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "action",
+      "block_is_solid"
+    ],
+    "examples": [
+      "Connect Flow to run block is solid when the block operation is needed."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "BlockActionHandler",
+    "handlerConfig": {
+      "operation": "block_is_solid"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "block_location",
+          "target": "block_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "is_solid",
+          "target": "is_solid"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "block_location",
+        "displayName": "Block Location",
+        "name": "block_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "input",
+        "description": "Provides the block location value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "is_solid",
+        "displayName": "Is Solid",
+        "name": "is_solid",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the is solid value produced by this operation."
+      }
+    ]
+  }
+]

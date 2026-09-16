@@ -1,0 +1,203 @@
+[
+  {
+    "id": "string_concat",
+    "displayName": "String Concat",
+    "description": "Concatenate two strings. Missing or null inputs use empty text, so the result is the available value or an empty string when both inputs are absent.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "concat"],
+    "legacyIds": ["string.concat"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "concat"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "string", "description": "First text to concatenate. Missing or null input is treated as empty text."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "string", "description": "Second text to concatenate. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the two inputs joined in order, or empty text when both inputs are absent."}
+    ]
+  },
+  {
+    "id": "string_upper",
+    "displayName": "Uppercase",
+    "description": "Convert text to uppercase. Missing or null input returns an empty string.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "uppercase"],
+    "legacyIds": ["string.upper"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "upper"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to convert to uppercase. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the uppercase text, or empty text when the input is absent."}
+    ]
+  },
+  {
+    "id": "string_lower",
+    "displayName": "Lowercase",
+    "description": "Convert text to lowercase. Missing or null input returns an empty string.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "case", "lowercase"],
+    "legacyIds": ["string.lower"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "lower"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to convert to lowercase. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the lowercase text, or empty text when the input is absent."}
+    ]
+  },
+  {
+    "id": "string_trim",
+    "displayName": "Trim",
+    "description": "Remove leading and trailing whitespace from text. Missing or null input returns an empty string.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "whitespace", "trim"],
+    "legacyIds": ["string.trim"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "trim"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text whose leading and trailing whitespace should be removed. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the trimmed text, or empty text when the input is absent."}
+    ]
+  },
+  {
+    "id": "string_length",
+    "displayName": "Length",
+    "description": "Return the number of characters in text. Missing or null input returns zero.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "length", "text"],
+    "legacyIds": ["string.length"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "length"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text whose character count should be returned. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the number of characters, or zero when the input is absent."}
+    ]
+  },
+  {
+    "id": "string_is_empty",
+    "displayName": "Is Empty",
+    "description": "Check whether text has no characters. Missing or null input is treated as empty and returns true.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "empty", "check"],
+    "legacyIds": ["string.is_empty"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_empty"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to check. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "is_empty", "displayName": "Is Empty", "name": "is_empty", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the text has no characters, including when the input is missing or null."}
+    ]
+  },
+  {
+    "id": "string_is_blank",
+    "displayName": "Is Blank",
+    "description": "Check whether text is empty or contains only whitespace. Missing or null input is treated as blank and returns true.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "blank", "whitespace", "check"],
+    "legacyIds": ["string.is_blank"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_blank"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to check. Missing or null input is treated as blank text."}
+    ],
+    "outputs": [
+      {"id": "is_blank", "displayName": "Is Blank", "name": "is_blank", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the text is empty or whitespace-only, including when the input is missing or null."}
+    ]
+  },
+  {
+    "id": "string_is_numeric",
+    "displayName": "Is Numeric",
+    "description": "Check whether text is a signed integer or decimal number. Missing, empty, blank, or malformed text returns false.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "numeric", "check"],
+    "legacyIds": ["string.is_numeric"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_numeric"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to check for a signed integer or decimal number. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "is_numeric", "displayName": "Is Numeric", "name": "is_numeric", "pinType": "DATA", "dataType": "boolean", "description": "Returns true for a signed integer or decimal number and false for missing, empty, blank, or malformed text."}
+    ]
+  }
+]

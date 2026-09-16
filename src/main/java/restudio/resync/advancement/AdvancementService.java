@@ -5,23 +5,39 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 public class AdvancementService {
+    private final PaperPlayerDataMutationAdmission playerDataAdmission;
+
+    public AdvancementService() {
+        this(PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public AdvancementService(PaperPlayerDataMutationAdmission playerDataAdmission) {
+        this.playerDataAdmission = Objects.requireNonNull(playerDataAdmission, "playerDataAdmission");
+    }
+
     public boolean grant(Player player, String treeId, String nodeId, String criterion) {
-        AdvancementProgress progress = progress(player, treeId, nodeId);
-        return progress != null && progress.awardCriteria(criterion(criterion));
+        return playerDataAdmission.mutatePlayer("advancement-grant:" + treeId + "/" + nodeId, player, () -> {
+            AdvancementProgress progress = progress(player, treeId, nodeId);
+            return progress != null && progress.awardCriteria(criterion(criterion));
+        });
     }
 
     public boolean revoke(Player player, String treeId, String nodeId, String criterion) {
-        AdvancementProgress progress = progress(player, treeId, nodeId);
-        return progress != null && progress.revokeCriteria(criterion(criterion));
+        return playerDataAdmission.mutatePlayer("advancement-revoke:" + treeId + "/" + nodeId, player, () -> {
+            AdvancementProgress progress = progress(player, treeId, nodeId);
+            return progress != null && progress.revokeCriteria(criterion(criterion));
+        });
     }
 
     public boolean has(Player player, String treeId, String nodeId, String criterion) {
@@ -54,23 +70,25 @@ public class AdvancementService {
             if (snapshot == null) {
                 continue;
             }
-            for (Map.Entry<NamespacedKey, Set<String>> entry : snapshot.entrySet()) {
-                Advancement advancement = Bukkit.getAdvancement(entry.getKey());
-                if (advancement == null) {
-                    continue;
-                }
-                AdvancementProgress progress = player.getAdvancementProgress(advancement);
-                for (String criterion : progress.getAwardedCriteria()) {
-                    if (!entry.getValue().contains(criterion)) {
-                        progress.revokeCriteria(criterion);
+            playerDataAdmission.mutatePlayer("advancement-restore:" + player.getUniqueId(), player, () -> {
+                for (Map.Entry<NamespacedKey, Set<String>> entry : snapshot.entrySet()) {
+                    Advancement advancement = Bukkit.getAdvancement(entry.getKey());
+                    if (advancement == null) {
+                        continue;
+                    }
+                    AdvancementProgress progress = player.getAdvancementProgress(advancement);
+                    for (String criterion : progress.getAwardedCriteria()) {
+                        if (!entry.getValue().contains(criterion)) {
+                            progress.revokeCriteria(criterion);
+                        }
+                    }
+                    for (String criterion : entry.getValue()) {
+                        if (!progress.getAwardedCriteria().contains(criterion)) {
+                            progress.awardCriteria(criterion);
+                        }
                     }
                 }
-                for (String criterion : entry.getValue()) {
-                    if (!progress.getAwardedCriteria().contains(criterion)) {
-                        progress.awardCriteria(criterion);
-                    }
-                }
-            }
+            });
         }
     }
 

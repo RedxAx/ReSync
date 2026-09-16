@@ -1,0 +1,6897 @@
+[
+  {
+    "id": "give_item",
+    "displayName": "Give Item",
+    "description": "Performs the Give Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "give",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "give_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Give Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the Material value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Amount value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Give Item completes.",
+        "direction": "output"
+      }
+    ],
+    "legacyIds": [
+      "give.item"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_message",
+    "displayName": "Player Message",
+    "description": "Performs the Player Message operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "message"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_message"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Message when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Text value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Message completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_kick",
+    "displayName": "Player Kick",
+    "description": "Performs the Player Kick operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "kick"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_kick"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Kick when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "reason",
+        "displayName": "Reason",
+        "name": "reason",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Reason value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Kick completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_teleport",
+    "displayName": "Player Teleport",
+    "description": "Performs the Player Teleport operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "teleport"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_teleport"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Teleport when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the Location value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "x",
+        "displayName": "X",
+        "name": "x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the X value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "y",
+        "displayName": "Y",
+        "name": "y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Y value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "z",
+        "displayName": "Z",
+        "name": "z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Z value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Teleport completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "x",
+          "target": "x"
+        },
+        {
+          "direction": "input",
+          "source": "y",
+          "target": "y"
+        },
+        {
+          "direction": "input",
+          "source": "z",
+          "target": "z"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_walking_speed",
+    "displayName": "Player Set Walking Speed",
+    "description": "Performs the Player Set Walking Speed operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "walking",
+      "speed"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_walking_speed"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Walking Speed when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "speed",
+        "displayName": "Speed",
+        "name": "speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Speed value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Walking Speed completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "speed",
+          "target": "speed"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_flying_speed",
+    "displayName": "Player Set Flying Speed",
+    "description": "Performs the Player Set Flying Speed operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "flying",
+      "speed"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_flying_speed"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Flying Speed when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "speed",
+        "displayName": "Speed",
+        "name": "speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Speed value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Flying Speed completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "speed",
+          "target": "speed"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_execute_command",
+    "displayName": "Player Execute Command",
+    "description": "Performs the Player Execute Command operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "execute",
+      "command"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_execute_command"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Execute Command when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "command",
+        "displayName": "Command",
+        "name": "command",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Command value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "as_op",
+        "displayName": "As Op",
+        "name": "as_op",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the As Op value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Execute Command completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Execute Command completed successfully.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "command",
+          "target": "command"
+        },
+        {
+          "direction": "input",
+          "source": "as_op",
+          "target": "as_op"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_chat",
+    "displayName": "Player Chat",
+    "description": "Performs the Player Chat operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "chat"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_chat"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Chat when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Message value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Chat completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "message",
+          "target": "message"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_say",
+    "displayName": "Player Say",
+    "description": "Performs the Player Say operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "say"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_say"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Say when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Message value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Say completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "message",
+          "target": "message"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_resourcepack",
+    "displayName": "Player Send Resourcepack",
+    "description": "Performs the Player Send Resourcepack operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "resourcepack"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_resourcepack"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Resourcepack when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "url",
+        "displayName": "URL",
+        "name": "url",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the URL value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Resourcepack completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "url",
+          "target": "url"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_show_bossbar",
+    "displayName": "Player Show Bossbar",
+    "description": "Performs the Player Show Bossbar operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "show",
+      "bossbar"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_show_bossbar"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Show Bossbar when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Title value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "progress",
+        "displayName": "Progress",
+        "name": "progress",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Progress value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "color",
+        "displayName": "Color",
+        "name": "color",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Color value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "style",
+        "displayName": "Style",
+        "name": "style",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Style value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Show Bossbar completes.",
+        "direction": "output"
+      },
+      {
+        "id": "bossbar_id",
+        "displayName": "Bossbar ID",
+        "name": "bossbar_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Bossbar ID value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "progress",
+          "target": "progress"
+        },
+        {
+          "direction": "input",
+          "source": "color",
+          "target": "color"
+        },
+        {
+          "direction": "input",
+          "source": "style",
+          "target": "style"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "bossbar_id",
+          "target": "bossbar_id"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_hide_bossbar",
+    "displayName": "Player Hide Bossbar",
+    "description": "Performs the Player Hide Bossbar operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "hide",
+      "bossbar"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_hide_bossbar"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Hide Bossbar when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "bossbar_id",
+        "displayName": "Bossbar ID",
+        "name": "bossbar_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Bossbar ID value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Hide Bossbar completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "bossbar_id",
+          "target": "bossbar_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_update_bossbar",
+    "displayName": "Player Update Bossbar",
+    "description": "Performs the Player Update Bossbar operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "update",
+      "bossbar"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_update_bossbar"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Update Bossbar when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "bossbar_id",
+        "displayName": "Bossbar ID",
+        "name": "bossbar_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Bossbar ID value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "new_title",
+        "displayName": "New Title",
+        "name": "new_title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the New Title value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "new_progress",
+        "displayName": "New Progress",
+        "name": "new_progress",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the New Progress value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Update Bossbar completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "bossbar_id",
+          "target": "bossbar_id"
+        },
+        {
+          "direction": "input",
+          "source": "new_title",
+          "target": "new_title"
+        },
+        {
+          "direction": "input",
+          "source": "new_progress",
+          "target": "new_progress"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_state",
+    "displayName": "Player State",
+    "description": "Performs the Player State operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "state"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_state"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player State when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Property value used by this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "sprint",
+          "sneak",
+          "fly",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "gamemode",
+          "food_level",
+          "saturation",
+          "exhaustion",
+          "health",
+          "max_health",
+          "absorption",
+          "walk_speed",
+          "fly_speed",
+          "fire_ticks",
+          "air_ticks",
+          "no_damage_ticks",
+          "freeze_state",
+          "flight_state",
+          "compass_target",
+          "xp",
+          "total_exp"
+        ],
+        "defaultValue": "health"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Action value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "enabled",
+        "displayName": "Enabled",
+        "name": "enabled",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the Enabled value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "sprint,sneak,fly,vanish,glowing,invulnerable,freeze_state,flight_state"
+        }
+      },
+      {
+        "id": "gamemode",
+        "displayName": "Gamemode",
+        "name": "gamemode",
+        "pinType": "DATA",
+        "dataType": "gamemode",
+        "description": "Provides the Gamemode value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "gamemode"
+        }
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "food_level,saturation,exhaustion,health,max_health,absorption,walk_speed,fly_speed,fire_ticks,air_ticks,no_damage_ticks,total_exp"
+        }
+      },
+      {
+        "id": "compass_location",
+        "displayName": "Compass Location",
+        "name": "compass_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the Compass Location value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "compass_target"
+        }
+      },
+      {
+        "id": "level",
+        "displayName": "Level",
+        "name": "level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Level value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "xp"
+        }
+      },
+      {
+        "id": "points",
+        "displayName": "Points",
+        "name": "points",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Points value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set",
+          "property": "xp"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player State completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player State completed successfully.",
+        "direction": "output"
+      },
+      {
+        "id": "sprint",
+        "displayName": "Sprint",
+        "name": "sprint",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Sprint value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sprint"
+        }
+      },
+      {
+        "id": "sneak",
+        "displayName": "Sneak",
+        "name": "sneak",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Sneak value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sneak"
+        }
+      },
+      {
+        "id": "fly",
+        "displayName": "Fly",
+        "name": "fly",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Fly value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly"
+        }
+      },
+      {
+        "id": "vanish",
+        "displayName": "Vanish",
+        "name": "vanish",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Vanish value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "vanish"
+        }
+      },
+      {
+        "id": "glowing",
+        "displayName": "Glowing",
+        "name": "glowing",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Glowing value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "id": "invulnerable",
+        "displayName": "Invulnerable",
+        "name": "invulnerable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Invulnerable value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "id": "output_gamemode",
+        "displayName": "Gamemode",
+        "name": "gamemode",
+        "pinType": "DATA",
+        "dataType": "gamemode",
+        "description": "Returns the Gamemode value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gamemode"
+        }
+      },
+      {
+        "id": "food_level",
+        "displayName": "Food Level",
+        "name": "food_level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Food Level value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "food_level"
+        }
+      },
+      {
+        "id": "saturation",
+        "displayName": "Saturation",
+        "name": "saturation",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Saturation value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "saturation"
+        }
+      },
+      {
+        "id": "exhaustion",
+        "displayName": "Exhaustion",
+        "name": "exhaustion",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Exhaustion value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exhaustion"
+        }
+      },
+      {
+        "id": "health",
+        "displayName": "Health",
+        "name": "health",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Health value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "id": "max_health",
+        "displayName": "Max Health",
+        "name": "max_health",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Max Health value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "id": "absorption",
+        "displayName": "Absorption",
+        "name": "absorption",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Absorption value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "absorption"
+        }
+      },
+      {
+        "id": "walk_speed",
+        "displayName": "Walk Speed",
+        "name": "walk_speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Walk Speed value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "walk_speed"
+        }
+      },
+      {
+        "id": "fly_speed",
+        "displayName": "Fly Speed",
+        "name": "fly_speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Fly Speed value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly_speed"
+        }
+      },
+      {
+        "id": "fire_ticks",
+        "displayName": "Fire Ticks",
+        "name": "fire_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Fire Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fire_ticks"
+        }
+      },
+      {
+        "id": "air_ticks",
+        "displayName": "Air Ticks",
+        "name": "air_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Air Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "air_ticks"
+        }
+      },
+      {
+        "id": "no_damage_ticks",
+        "displayName": "No Damage Ticks",
+        "name": "no_damage_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the No Damage Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "no_damage_ticks"
+        }
+      },
+      {
+        "id": "freeze_state",
+        "displayName": "Freeze State",
+        "name": "freeze_state",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Freeze State value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "freeze_state"
+        }
+      },
+      {
+        "id": "flight_state",
+        "displayName": "Flight State",
+        "name": "flight_state",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Flight State value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "flight_state"
+        }
+      },
+      {
+        "id": "compass_target",
+        "displayName": "Compass Target",
+        "name": "compass_target",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Compass Target value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "compass_target"
+        }
+      },
+      {
+        "id": "xp",
+        "displayName": "XP",
+        "name": "xp",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the XP value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp"
+        }
+      },
+      {
+        "id": "total_exp",
+        "displayName": "Total Exp",
+        "name": "total_exp",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Total Exp value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "total_exp"
+        }
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "input",
+          "source": "gamemode",
+          "target": "gamemode"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "input",
+          "source": "compass_location",
+          "target": "compass_location"
+        },
+        {
+          "direction": "input",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "direction": "input",
+          "source": "points",
+          "target": "points"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "sprint",
+          "target": "sprint"
+        },
+        {
+          "direction": "output",
+          "source": "sneak",
+          "target": "sneak"
+        },
+        {
+          "direction": "output",
+          "source": "fly",
+          "target": "fly"
+        },
+        {
+          "direction": "output",
+          "source": "vanish",
+          "target": "vanish"
+        },
+        {
+          "direction": "output",
+          "source": "glowing",
+          "target": "glowing"
+        },
+        {
+          "direction": "output",
+          "source": "invulnerable",
+          "target": "invulnerable"
+        },
+        {
+          "direction": "output",
+          "source": "gamemode",
+          "target": "output_gamemode"
+        },
+        {
+          "direction": "output",
+          "source": "food_level",
+          "target": "food_level"
+        },
+        {
+          "direction": "output",
+          "source": "saturation",
+          "target": "saturation"
+        },
+        {
+          "direction": "output",
+          "source": "exhaustion",
+          "target": "exhaustion"
+        },
+        {
+          "direction": "output",
+          "source": "health",
+          "target": "health"
+        },
+        {
+          "direction": "output",
+          "source": "max_health",
+          "target": "max_health"
+        },
+        {
+          "direction": "output",
+          "source": "absorption",
+          "target": "absorption"
+        },
+        {
+          "direction": "output",
+          "source": "walk_speed",
+          "target": "walk_speed"
+        },
+        {
+          "direction": "output",
+          "source": "fly_speed",
+          "target": "fly_speed"
+        },
+        {
+          "direction": "output",
+          "source": "fire_ticks",
+          "target": "fire_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "air_ticks",
+          "target": "air_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "no_damage_ticks",
+          "target": "no_damage_ticks"
+        },
+        {
+          "direction": "output",
+          "source": "freeze_state",
+          "target": "freeze_state"
+        },
+        {
+          "direction": "output",
+          "source": "flight_state",
+          "target": "flight_state"
+        },
+        {
+          "direction": "output",
+          "source": "compass_target",
+          "target": "compass_target"
+        },
+        {
+          "direction": "output",
+          "source": "xp",
+          "target": "xp"
+        },
+        {
+          "direction": "output",
+          "source": "total_exp",
+          "target": "total_exp"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_movement",
+    "displayName": "Player Movement",
+    "description": "Performs the Player Movement operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "movement"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_movement"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Movement when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "mode",
+        "displayName": "Mode",
+        "name": "mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Mode value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "teleport",
+          "launch",
+          "push",
+          "spin",
+          "set_rotation"
+        ],
+        "defaultValue": "teleport"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the Location value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "id": "x",
+        "displayName": "X",
+        "name": "x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the X value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "id": "y",
+        "displayName": "Y",
+        "name": "y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Y value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "id": "z",
+        "displayName": "Z",
+        "name": "z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Z value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport"
+        }
+      },
+      {
+        "id": "yaw",
+        "displayName": "Yaw",
+        "name": "yaw",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Yaw value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport,spin,set_rotation"
+        }
+      },
+      {
+        "id": "pitch",
+        "displayName": "Pitch",
+        "name": "pitch",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Pitch value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "teleport,spin,set_rotation"
+        }
+      },
+      {
+        "id": "reset_velocity",
+        "displayName": "Reset Velocity",
+        "name": "reset_velocity",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the Reset Velocity value used by this operation.",
+        "direction": "input",
+        "widget": "TOGGLE",
+        "defaultValue": false,
+        "visibleWhen": {
+          "mode": "spin,set_rotation"
+        }
+      },
+      {
+        "id": "vx",
+        "displayName": "Vx",
+        "name": "vx",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Vx value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "id": "vy",
+        "displayName": "Vy",
+        "name": "vy",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Vy value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "id": "vz",
+        "displayName": "Vz",
+        "name": "vz",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Vz value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "launch"
+        }
+      },
+      {
+        "id": "strength",
+        "displayName": "Strength",
+        "name": "strength",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Strength value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "visibleWhen": {
+          "mode": "push"
+        },
+        "constraints": {
+          "min": -100,
+          "max": 100
+        }
+      },
+      {
+        "id": "direction_vector",
+        "displayName": "Direction Vector",
+        "name": "direction_vector",
+        "pinType": "DATA",
+        "dataType": "vector",
+        "description": "Provides the Direction Vector value used by this operation.",
+        "direction": "input",
+        "visibleWhen": {
+          "mode": "push"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Movement completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Movement completed successfully.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "mode",
+          "target": "mode"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "x",
+          "target": "x"
+        },
+        {
+          "direction": "input",
+          "source": "y",
+          "target": "y"
+        },
+        {
+          "direction": "input",
+          "source": "z",
+          "target": "z"
+        },
+        {
+          "direction": "input",
+          "source": "yaw",
+          "target": "yaw"
+        },
+        {
+          "direction": "input",
+          "source": "pitch",
+          "target": "pitch"
+        },
+        {
+          "direction": "input",
+          "source": "reset_velocity",
+          "target": "reset_velocity"
+        },
+        {
+          "direction": "input",
+          "source": "vx",
+          "target": "vx"
+        },
+        {
+          "direction": "input",
+          "source": "vy",
+          "target": "vy"
+        },
+        {
+          "direction": "input",
+          "source": "vz",
+          "target": "vz"
+        },
+        {
+          "direction": "input",
+          "source": "strength",
+          "target": "strength"
+        },
+        {
+          "direction": "input",
+          "source": "direction_vector",
+          "target": "direction_vector"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_potion",
+    "displayName": "Player Potion",
+    "description": "Performs the Player Potion operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "potion"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_potion"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Potion when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "mode",
+        "displayName": "Mode",
+        "name": "mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Mode value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "add",
+          "clear",
+          "has"
+        ],
+        "defaultValue": "add"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "effect_type",
+        "displayName": "Effect Type",
+        "name": "effect_type",
+        "pinType": "DATA",
+        "dataType": "potion_effect",
+        "description": "Provides the Effect Type value used by this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:potion_effect"
+      },
+      {
+        "id": "duration_ticks",
+        "displayName": "Duration Ticks",
+        "name": "duration_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Duration Ticks value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "amplifier",
+        "displayName": "Amplifier",
+        "name": "amplifier",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Amplifier value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Potion completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Potion completed successfully.",
+        "direction": "output"
+      },
+      {
+        "id": "has_effect",
+        "displayName": "Has Effect",
+        "name": "has_effect",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Has Effect value produced by this operation.",
+        "direction": "output"
+      },
+      {
+        "id": "effect_amplifier",
+        "displayName": "Effect Amplifier",
+        "name": "effect_amplifier",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Effect Amplifier value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "mode",
+          "target": "mode"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "effect_type",
+          "target": "effect_type"
+        },
+        {
+          "direction": "input",
+          "source": "duration_ticks",
+          "target": "duration_ticks"
+        },
+        {
+          "direction": "input",
+          "source": "amplifier",
+          "target": "amplifier"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has_effect",
+          "target": "has_effect"
+        },
+        {
+          "direction": "output",
+          "source": "effect_amplifier",
+          "target": "effect_amplifier"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_advancement",
+    "displayName": "Player Advancement",
+    "description": "Performs the Player Advancement operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "advancement"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_advancement"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Advancement when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "mode",
+        "displayName": "Mode",
+        "name": "mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Mode value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "grant",
+          "revoke",
+          "has"
+        ],
+        "defaultValue": "has"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "advancement_key",
+        "displayName": "Advancement Key",
+        "name": "advancement_key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Advancement Key value used by this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:advancement"
+      },
+      {
+        "id": "criterion",
+        "displayName": "Criterion",
+        "name": "criterion",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Criterion value used by this operation.",
+        "direction": "input",
+        "defaultValue": "impossible"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Advancement completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Advancement completed successfully.",
+        "direction": "output"
+      },
+      {
+        "id": "has_advancement",
+        "displayName": "Has Advancement",
+        "name": "has_advancement",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Has Advancement value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "mode",
+          "target": "mode"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "advancement_key",
+          "target": "advancement_key"
+        },
+        {
+          "direction": "input",
+          "source": "criterion",
+          "target": "criterion"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has_advancement",
+          "target": "has_advancement"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_cooldown",
+    "displayName": "Player Cooldown",
+    "description": "Performs the Player Cooldown operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "cooldown"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_cooldown"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Cooldown when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "mode",
+        "displayName": "Mode",
+        "name": "mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Mode value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "has",
+          "get"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the Material value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "ticks",
+        "displayName": "Ticks",
+        "name": "ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Ticks value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Cooldown completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Cooldown completed successfully.",
+        "direction": "output"
+      },
+      {
+        "id": "has_cooldown",
+        "displayName": "Has Cooldown",
+        "name": "has_cooldown",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Has Cooldown value produced by this operation.",
+        "direction": "output"
+      },
+      {
+        "id": "remaining_ticks",
+        "displayName": "Remaining Ticks",
+        "name": "remaining_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Remaining Ticks value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "mode",
+          "target": "mode"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "ticks",
+          "target": "ticks"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has_cooldown",
+          "target": "has_cooldown"
+        },
+        {
+          "direction": "output",
+          "source": "remaining_ticks",
+          "target": "remaining_ticks"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_message",
+    "displayName": "Player Send Message",
+    "description": "Performs the Player Send Message operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "message"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_message"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Message when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Text value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Message completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_action_bar",
+    "displayName": "Player Send Action Bar",
+    "description": "Performs the Player Send Action Bar operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "bar"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_action_bar"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Action Bar when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Text value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Action Bar completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_title",
+    "displayName": "Player Send Title",
+    "description": "Performs the Player Send Title operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "title"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_title"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Title when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Title value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "subtitle",
+        "displayName": "Subtitle",
+        "name": "subtitle",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Subtitle value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Title completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "subtitle",
+          "target": "subtitle"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_sound",
+    "displayName": "Player Send Sound",
+    "description": "Performs the Player Send Sound operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "sound"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_sound"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Sound when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "sound",
+        "displayName": "Sound",
+        "name": "sound",
+        "pinType": "DATA",
+        "dataType": "sound",
+        "description": "Provides the Sound value used by this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound"
+      },
+      {
+        "id": "volume",
+        "displayName": "Volume",
+        "name": "volume",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Volume value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 16
+        }
+      },
+      {
+        "id": "pitch",
+        "displayName": "Pitch",
+        "name": "pitch",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Pitch value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 1.0,
+        "constraints": {
+          "min": 0,
+          "max": 2
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Sound completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "sound",
+          "target": "sound"
+        },
+        {
+          "direction": "input",
+          "source": "volume",
+          "target": "volume"
+        },
+        {
+          "direction": "input",
+          "source": "pitch",
+          "target": "pitch"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_book",
+    "displayName": "Player Send Book",
+    "description": "Performs the Player Send Book operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "book"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_book"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Book when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "book",
+        "displayName": "Book",
+        "name": "book",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Book value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Book completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "book",
+          "target": "book"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_sign",
+    "displayName": "Player Send Sign",
+    "description": "Performs the Player Send Sign operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "sign"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_sign"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Sign when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Sign completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_send_raw_json",
+    "displayName": "Player Send Raw Json",
+    "description": "Performs the Player Send Raw Json operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "send",
+      "raw",
+      "json"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_raw_json"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Send Raw Json when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "json",
+        "displayName": "JSON",
+        "name": "json",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the JSON value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Send Raw Json completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "json",
+          "target": "json"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_give_item",
+    "displayName": "Player Give Item",
+    "description": "Performs the Player Give Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "give",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_give_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Give Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Give Item completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_give_item_stack",
+    "displayName": "Give Item Stack",
+    "description": "Performs the Give Item Stack operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "give",
+      "item",
+      "stack"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_give_item_stack"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Give Item Stack when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "size_mode",
+        "displayName": "Size Mode",
+        "name": "size_mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Selects how the amount in the given stack is calculated.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "Item Amount",
+          "Max Stack",
+          "Custom",
+          "Random"
+        ],
+        "defaultValue": "Item Amount"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Amount value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "visibleWhen": {
+          "size_mode": "Custom"
+        }
+      },
+      {
+        "id": "min_size",
+        "displayName": "Min Size",
+        "name": "min_size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Min Size value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "visibleWhen": {
+          "size_mode": "Random"
+        }
+      },
+      {
+        "id": "max_size",
+        "displayName": "Max Size",
+        "name": "max_size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "The largest random amount. Values above the item's maximum stack size automatically use the item's maximum.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 99,
+        "visibleWhen": {
+          "size_mode": "Random"
+        }
+      },
+      {
+        "id": "force_stack_size",
+        "displayName": "Force Stack Size",
+        "name": "force_stack_size",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Overrides the item's maximum stack size with the Minecraft max stack size component.",
+        "direction": "input",
+        "defaultValue": false
+      },
+      {
+        "id": "forced_stack_size",
+        "displayName": "Forced Stack Size",
+        "name": "forced_stack_size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Forced Stack Size value used by this operation.",
+        "direction": "input",
+        "widget": "NUMBER",
+        "defaultValue": 64,
+        "visibleWhen": {
+          "force_stack_size": "true"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Give Item Stack completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      },
+      {
+        "id": "output_amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Amount value produced by this operation.",
+        "direction": "output"
+      },
+      {
+        "id": "max_stack_size",
+        "displayName": "Max Stack Size",
+        "name": "max_stack_size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Max Stack Size value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "size_mode",
+          "target": "size_mode"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "input",
+          "source": "min_size",
+          "target": "min_size"
+        },
+        {
+          "direction": "input",
+          "source": "max_size",
+          "target": "max_size"
+        },
+        {
+          "direction": "input",
+          "source": "force_stack_size",
+          "target": "force_stack_size"
+        },
+        {
+          "direction": "input",
+          "source": "forced_stack_size",
+          "target": "forced_stack_size"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        },
+        {
+          "direction": "output",
+          "source": "amount",
+          "target": "output_amount"
+        },
+        {
+          "direction": "output",
+          "source": "max_stack_size",
+          "target": "max_stack_size"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_take_item",
+    "displayName": "Player Take Item",
+    "description": "Performs the Player Take Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "take",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_take_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Take Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Amount value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Take Item completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item",
+    "displayName": "Player Set Item",
+    "description": "Performs the Player Set Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Slot value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_clear_slot",
+    "displayName": "Player Clear Slot",
+    "description": "Performs the Player Clear Slot operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "clear",
+      "slot"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_slot"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Clear Slot when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Slot value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Clear Slot completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_swap_items",
+    "displayName": "Player Swap Items",
+    "description": "Performs the Player Swap Items operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "swap",
+      "items"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_swap_items"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Swap Items when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "slot1",
+        "displayName": "Slot1",
+        "name": "slot1",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Slot1 value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "slot2",
+        "displayName": "Slot2",
+        "name": "slot2",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Slot2 value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Swap Items completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "slot1",
+          "target": "slot1"
+        },
+        {
+          "direction": "input",
+          "source": "slot2",
+          "target": "slot2"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_helmet",
+    "displayName": "Player Set Helmet",
+    "description": "Performs the Player Set Helmet operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "helmet"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_helmet"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Helmet when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Helmet completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_chestplate",
+    "displayName": "Player Set Chestplate",
+    "description": "Performs the Player Set Chestplate operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "chestplate"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_chestplate"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Chestplate when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Chestplate completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_leggings",
+    "displayName": "Player Set Leggings",
+    "description": "Performs the Player Set Leggings operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "leggings"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_leggings"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Leggings when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Leggings completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_boots",
+    "displayName": "Player Set Boots",
+    "description": "Performs the Player Set Boots operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "boots"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_boots"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Boots when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Boots completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_mainhand",
+    "displayName": "Player Set Mainhand",
+    "description": "Performs the Player Set Mainhand operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "mainhand"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_mainhand"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Mainhand when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Mainhand completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_offhand",
+    "displayName": "Player Set Offhand",
+    "description": "Performs the Player Set Offhand operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "offhand"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_offhand"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Offhand when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Offhand completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_inventory_title",
+    "displayName": "Player Set Inventory Title",
+    "description": "Performs the Player Set Inventory Title operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "inventory",
+      "title"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_inventory_title"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Inventory Title when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Title value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Inventory Title completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_armor_color",
+    "displayName": "Player Set Armor Color",
+    "description": "Performs the Player Set Armor Color operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "armor",
+      "color"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_armor_color"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Armor Color when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Slot value used by this operation.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "HEAD",
+          "CHEST",
+          "LEGS",
+          "FEET"
+        ],
+        "defaultValue": "CHEST"
+      },
+      {
+        "id": "red",
+        "displayName": "Red",
+        "name": "red",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Red value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "green",
+        "displayName": "Green",
+        "name": "green",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Green value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "blue",
+        "displayName": "Blue",
+        "name": "blue",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Blue value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Armor Color completes.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "red",
+          "target": "red"
+        },
+        {
+          "direction": "input",
+          "source": "green",
+          "target": "green"
+        },
+        {
+          "direction": "input",
+          "source": "blue",
+          "target": "blue"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_repair_item",
+    "displayName": "Player Repair Item",
+    "description": "Performs the Player Repair Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "repair",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_repair_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Repair Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Repair Item completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_enchant_item",
+    "displayName": "Player Enchant Item",
+    "description": "Performs the Player Enchant Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "enchant",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_enchant_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Enchant Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "enchantment",
+        "displayName": "Enchantment",
+        "name": "enchantment",
+        "pinType": "DATA",
+        "dataType": "enchantment",
+        "description": "Provides the Enchantment value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "level",
+        "displayName": "Level",
+        "name": "level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Level value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Enchant Item completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "enchantment",
+          "target": "enchantment"
+        },
+        {
+          "direction": "input",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_unenchant_item",
+    "displayName": "Player Unenchant Item",
+    "description": "Performs the Player Unenchant Item operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "unenchant",
+      "item"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_unenchant_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Unenchant Item when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "enchantment",
+        "displayName": "Enchantment",
+        "name": "enchantment",
+        "pinType": "DATA",
+        "dataType": "enchantment",
+        "description": "Provides the Enchantment value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Unenchant Item completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "enchantment",
+          "target": "enchantment"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_clear_enchants",
+    "displayName": "Player Clear Enchants",
+    "description": "Performs the Player Clear Enchants operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "clear",
+      "enchants"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_enchants"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Clear Enchants when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Clear Enchants completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item_name",
+    "displayName": "Player Set Item Name",
+    "description": "Performs the Player Set Item Name operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item",
+      "name"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_name"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item Name when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Name value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item Name completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item_lore",
+    "displayName": "Player Set Item Lore",
+    "description": "Performs the Player Set Item Lore operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item",
+      "lore"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_lore"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item Lore when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Lore value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item Lore completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item_flags",
+    "displayName": "Player Set Item Flags",
+    "description": "Performs the Player Set Item Flags operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item",
+      "flags"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_flags"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item Flags when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "flags",
+        "displayName": "Flags",
+        "name": "flags",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Flags value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item Flags completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "flags",
+          "target": "flags"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item_custom_model",
+    "displayName": "Player Set Item Custom Model",
+    "description": "Performs the Player Set Item Custom Model operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item",
+      "custom",
+      "model"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_custom_model"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item Custom Model when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "model_data",
+        "displayName": "Model Data",
+        "name": "model_data",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the Model Data value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item Custom Model completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "model_data",
+          "target": "model_data"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "player.player_set_item_unbreakable",
+    "displayName": "Player Set Item Unbreakable",
+    "description": "Performs the Player Set Item Unbreakable operation for a player.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "action",
+      "set",
+      "item",
+      "unbreakable"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_set_item_unbreakable"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Set Item Unbreakable when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Provides the Item value used by this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "unbreakable",
+        "displayName": "Unbreakable",
+        "name": "unbreakable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the Unbreakable value used by this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Set Item Unbreakable completes.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value produced by this operation.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "unbreakable",
+          "target": "unbreakable"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "get.player.info",
+    "displayName": "Get Player Info",
+    "description": "Reads the selected player's name, UUID, health, location, and operator status.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "query",
+      "info"
+    ],
+    "examples": [
+      "Connect Flow, select a player, then read the returned player information."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "get_player_info"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts reading player information when execution reaches this node."
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "direction": "input",
+        "description": "Selects the player whose information is returned."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues after player information is read."
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the player's name."
+      },
+      {
+        "id": "uuid",
+        "displayName": "UUID",
+        "name": "uuid",
+        "pinType": "DATA",
+        "dataType": "uuid",
+        "direction": "output",
+        "description": "Returns the player's UUID."
+      },
+      {
+        "id": "health",
+        "displayName": "Health",
+        "name": "health",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the player's current health."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "output",
+        "description": "Returns the player's current location."
+      },
+      {
+        "id": "is_op",
+        "displayName": "Is Operator",
+        "name": "is_op",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Reports whether the player is an operator."
+      }
+    ],
+    "legacyIds": [
+      "get_player_info"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "output",
+          "source": "uuid",
+          "target": "uuid"
+        },
+        {
+          "direction": "output",
+          "source": "health",
+          "target": "health"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "is_op",
+          "target": "is_op"
+        }
+      ]
+    },
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_get_exp_level",
+    "displayName": "Player Get Exp Level",
+    "description": "Reads the selected player's experience level.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "query",
+      "experience",
+      "level"
+    ],
+    "examples": [
+      "Connect Flow, select a player, then read the player's experience level."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_exp_level"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts reading the player's experience level."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "direction": "input",
+        "description": "Selects the player whose experience level is returned."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues after the experience level is read."
+      },
+      {
+        "id": "level",
+        "displayName": "Level",
+        "name": "level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the player's current experience level."
+      }
+    ],
+    "legacyIds": [
+      "player_get_exp_level"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "level",
+          "target": "level"
+        }
+      ]
+    },
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_get_exp_to_level",
+    "displayName": "Player Get Exp To Level",
+    "description": "Reads the experience points needed for the selected player to reach the next level.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "query",
+      "experience",
+      "level"
+    ],
+    "examples": [
+      "Connect Flow, select a player, then read the experience needed for the next level."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_exp_to_level"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts reading the experience needed for the next level."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "direction": "input",
+        "description": "Selects the player whose next-level experience is returned."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues after the required experience is read."
+      },
+      {
+        "id": "exp_needed",
+        "displayName": "Experience Needed",
+        "name": "exp_needed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the experience points needed for the next level."
+      }
+    ],
+    "legacyIds": [
+      "player_get_exp_to_level"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "exp_needed",
+          "target": "exp_needed"
+        }
+      ]
+    },
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_get_total_exp",
+    "displayName": "Player Get Total Exp",
+    "description": "Reads the selected player's total accumulated experience.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "query",
+      "experience",
+      "total"
+    ],
+    "examples": [
+      "Connect Flow, select a player, then read the player's total experience."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_get_total_exp"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts reading the player's total experience."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "direction": "input",
+        "description": "Selects the player whose total experience is returned."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues after total experience is read."
+      },
+      {
+        "id": "total_exp",
+        "displayName": "Total Experience",
+        "name": "total_exp",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the player's total accumulated experience."
+      }
+    ],
+    "legacyIds": [
+      "player_get_total_exp"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "total_exp",
+          "target": "total_exp"
+        }
+      ]
+    },
+    "hidden": true,
+    "canonicalId": "player.properties"
+  },
+  {
+    "id": "player.player_send_particle",
+    "displayName": "Player Send Particle",
+    "description": "Sends a particle effect at the selected player's location.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.action",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "player",
+      "actions",
+      "particle",
+      "send"
+    ],
+    "examples": [
+      "Connect Flow, select a player and particle, then send the effect at the player's location."
+    ],
+    "handler": "PlayerActionHandler",
+    "handlerConfig": {
+      "operation": "player_send_particle"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts the particle effect when execution reaches this node."
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "direction": "input",
+        "description": "Selects the player who receives the particle effect."
+      },
+      {
+        "id": "particle",
+        "displayName": "Particle",
+        "name": "particle",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:particle",
+        "defaultValue": "FLAME",
+        "description": "Selects the Minecraft particle type."
+      },
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0,
+          "max": 10000,
+          "step": 1
+        },
+        "description": "Sets the number of particles to send."
+      },
+      {
+        "id": "offset_x",
+        "displayName": "Offset X",
+        "name": "offset_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 0,
+        "constraints": {
+          "min": -1024,
+          "max": 1024
+        },
+        "description": "Sets the horizontal particle spread."
+      },
+      {
+        "id": "offset_y",
+        "displayName": "Offset Y",
+        "name": "offset_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 0,
+        "constraints": {
+          "min": -1024,
+          "max": 1024
+        },
+        "description": "Sets the vertical particle spread."
+      },
+      {
+        "id": "offset_z",
+        "displayName": "Offset Z",
+        "name": "offset_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 0,
+        "constraints": {
+          "min": -1024,
+          "max": 1024
+        },
+        "description": "Sets the depth particle spread."
+      },
+      {
+        "id": "speed",
+        "displayName": "Speed",
+        "name": "speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 100
+        },
+        "description": "Sets the particle motion speed."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues after the particle effect is sent."
+      }
+    ],
+    "legacyIds": [
+      "player_send_particle"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "particle",
+          "target": "particle"
+        },
+        {
+          "direction": "input",
+          "source": "count",
+          "target": "count"
+        },
+        {
+          "direction": "input",
+          "source": "offset_x",
+          "target": "offset_x"
+        },
+        {
+          "direction": "input",
+          "source": "offset_y",
+          "target": "offset_y"
+        },
+        {
+          "direction": "input",
+          "source": "offset_z",
+          "target": "offset_z"
+        },
+        {
+          "direction": "input",
+          "source": "speed",
+          "target": "speed"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "hidden": true,
+    "canonicalId": "particle.apply",
+    "deprecated": true
+  }
+]

@@ -6,6 +6,7 @@ import restudio.resync.core.Session;
 import restudio.resync.flow.jobs.FlowJobRegistry;
 import restudio.resync.jobs.JobManager;
 import restudio.resync.jobs.JobRecord;
+import restudio.resync.migration.ReSyncPersistenceCoordinator;
 import restudio.resync.player.PlayerTrackingService;
 import restudio.resync.protocol.Codec;
 import restudio.resync.protocol.messages.DataMessage;
@@ -15,7 +16,9 @@ import restudio.resync.world.WorldChannelMessage;
 import restudio.resync.world.WorldInventoryGroup;
 import restudio.resync.world.WorldManagementListener;
 import restudio.resync.world.WorldManagementManager;
+import restudio.resync.world.WorldManagementPersistenceParticipant;
 import restudio.resync.world.WorldManagementService;
+import restudio.resync.world.WorldExternalPersistenceCapability;
 import restudio.resync.world.WorldMapAction;
 import restudio.resync.world.WorldMapActionResult;
 import restudio.resync.world.WorldMapQuery;
@@ -23,16 +26,25 @@ import restudio.resync.world.WorldMapSnapshot;
 import restudio.resync.world.WorldMapService;
 import restudio.resync.world.WorldOperationResult;
 import restudio.resync.world.WorldOperationSafetyService;
+import restudio.resync.world.WorldAuditPersistenceParticipant;
 import restudio.resync.world.WorldProfileSettings;
 import restudio.resync.worldgen.WorldGenProjectStorage;
+import restudio.resync.worldgen.WorldGenGeneratedOutputController;
+import restudio.resync.worldgen.datapack.WorldGenInstalledDatapackCapability;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public class WorldManagementModule implements Module, WorldManagementListener {
@@ -59,11 +71,30 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         this.scheduler = context.getScheduler();
         PlayerTrackingService trackingService = context.getRequiredService(PlayerTrackingService.class);
         WorldGenProjectStorage worldGenProjectStorage = context.getRequiredService(WorldGenProjectStorage.class);
-        this.safetyService = new WorldOperationSafetyService(context.getPlugin());
+        ReSyncPersistenceCoordinator persistence = context.getRequiredService(ReSyncPersistenceCoordinator.class);
+        Path activeRoot;
+        try {
+            activeRoot = persistence.activeDataRoot().toAbsolutePath().normalize();
+        } catch (IOException exception) {
+            throw new IllegalStateException("World management active data root could not be read", exception);
+        }
+        this.safetyService = new WorldOperationSafetyService(activeRoot.resolve(WorldAuditPersistenceParticipant.FILE_NAME));
+        WorldExternalPersistenceCapability externalPersistenceCapability = WorldExternalPersistenceCapability.unavailable();
+        this.safetyService.bindExternalPersistence(externalPersistenceCapability);
+        WorldAuditPersistenceParticipant auditParticipant = new WorldAuditPersistenceParticipant(activeRoot, safetyService);
+        persistence.register(auditParticipant);
+        context.registerService(WorldAuditPersistenceParticipant.class, auditParticipant);
         this.jobManager = new JobManager(context.getRequiredService(FlowJobRegistry.class), job -> broadcast(WorldChannelMessage.job("jobStatus", job.snapshot())));
-        this.worldManagementService = new WorldManagementManager(context.getPlugin(), trackingService, worldGenProjectStorage);
+        WorldGenGeneratedOutputController generatedOutput = context.getRequiredService(WorldGenGeneratedOutputController.class);
+        WorldGenInstalledDatapackCapability datapackInstaller =
+            context.getRequiredService(WorldGenInstalledDatapackCapability.class);
+        this.worldManagementService = new WorldManagementManager(context.getPlugin(), activeRoot, trackingService, worldGenProjectStorage,
+            externalPersistenceCapability, generatedOutput, datapackInstaller);
         this.worldManagementService.addListener(this);
         context.registerService(WorldManagementService.class, worldManagementService);
+        context.registerService(WorldExternalPersistenceCapability.class, externalPersistenceCapability);
+        context.registerService(WorldManagementPersistenceParticipant.Controller.class,
+            (WorldManagementPersistenceParticipant.Controller) this.worldManagementService);
         context.registerService(WorldMapService.class, worldManagementService.getMapService());
     }
 
@@ -218,37 +249,69 @@ public class WorldManagementModule implements Module, WorldManagementListener {
         }
         var auditRecord = safetyService.begin(operationId, action, actorClientId, request.targetWorldName(), parameters);
         send(session, WorldChannelMessage.job("jobAccepted", job.snapshot()));
-        scheduler.execute(() -> {
-            WorldOperationResult result = null;
-            Throwable failure = null;
+        CompletableFuture<Void> termination = new CompletableFuture<>();
+        AtomicReference<Future<?>> scheduled = new AtomicReference<>();
+        AtomicBoolean taskStarted = new AtomicBoolean();
+        jobManager.bind(job, () -> {
             try {
-                job.markRunning();
-                jobManager.publish(job);
-                result = operation.get();
-                if (result != null) {
-                    enrichResult(result, operationId, actorClientId, job.snapshot(), auditRecord.getAuditId());
-                    safetyService.rememberStatus(result);
-                    if (result.isSuccess()) {
-                        job.markSucceeded(result, result.getMessage());
-                    } else {
-                        job.markFailed(result.getMessage(), null);
+                Future<?> task = scheduled.get();
+                if (task != null) {
+                    task.cancel(true);
+                    if (!taskStarted.get()) {
+                        termination.complete(null);
+                    }
+                } else {
+                    termination.complete(null);
+                }
+            } catch (Throwable failure) {
+                termination.completeExceptionally(failure);
+            }
+        }, termination);
+        try {
+            jobManager.launch(job, () -> scheduled.set(scheduler.submit(() -> {
+                taskStarted.set(true);
+                WorldOperationResult result = null;
+                Throwable failure = null;
+                try {
+                    if (!job.markRunning()) {
+                        return;
                     }
                     jobManager.publish(job);
+                    result = operation.get();
+                    if (result != null) {
+                        enrichResult(result, operationId, actorClientId, job.snapshot(), auditRecord.getAuditId());
+                        safetyService.rememberStatus(result);
+                        if (result.isSuccess()) {
+                            job.markSucceeded(result, result.getMessage());
+                        } else {
+                            job.markFailed(result.getMessage(), null);
+                        }
+                        jobManager.publish(job);
+                    }
+                    respondResult(session, action, result);
+                } catch (Exception exception) {
+                    failure = exception;
+                    Log.warn("WorldManagement operation failed: " + exception.getMessage());
+                    result = WorldOperationResult.failure(action, request.targetWorldName(), "RequestFailed");
+                    enrichResult(result, operationId, actorClientId, job.snapshot(), auditRecord.getAuditId());
+                    safetyService.rememberStatus(result);
+                    job.markFailed("RequestFailed", exception);
+                    jobManager.publish(job);
+                    send(session, WorldChannelMessage.response(action, false, "RequestFailed", result));
+                } finally {
+                    safetyService.finish(auditRecord, result, failure);
+                    termination.complete(null);
                 }
-                respondResult(session, action, result);
-            } catch (Exception exception) {
-                failure = exception;
-                Log.warn("WorldManagement operation failed: " + exception.getMessage());
-                result = WorldOperationResult.failure(action, request.targetWorldName(), "RequestFailed");
-                enrichResult(result, operationId, actorClientId, job.snapshot(), auditRecord.getAuditId());
-                safetyService.rememberStatus(result);
-                job.markFailed("RequestFailed", exception);
+            })));
+        } catch (RuntimeException schedulingFailure) {
+            try {
+                job.markFailed("RequestFailed", schedulingFailure);
                 jobManager.publish(job);
-                send(session, WorldChannelMessage.response(action, false, "RequestFailed", result));
+                safetyService.finish(auditRecord, null, schedulingFailure);
             } finally {
-                safetyService.finish(auditRecord, result, failure);
+                termination.complete(null);
             }
-        });
+        }
     }
 
     private void enrichResult(WorldOperationResult result, String operationId, String actorClientId, Map<String, Object> jobSnapshot, String auditId) {

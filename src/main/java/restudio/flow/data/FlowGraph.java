@@ -1,6 +1,7 @@
 package restudio.flow.data;
 
 import com.google.gson.JsonElement;
+import restudio.resync.flow.identity.FunctionParameterId;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,7 +11,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -47,38 +50,99 @@ public class FlowGraph {
     private transient boolean indicesDirty = true;
 
     public static class FunctionParameter {
+        private FunctionParameterId parameterId;
         private String name;
         private FlowDataType type;
         private FlowTypeRef typeRef;
         private String widget;
         private String optionsSource;
         private String defaultValue;
+        private transient boolean legacyNameOnly;
 
         public FunctionParameter() {
+            this.parameterId = null;
             this.name = "";
             this.type = FlowDataType.ANY;
             this.typeRef = null;
             this.widget = "";
             this.optionsSource = "";
             this.defaultValue = "";
+            this.legacyNameOnly = true;
         }
 
         public FunctionParameter(String name, FlowDataType type) {
+            this();
             this.name = name;
             this.type = type != null ? type : FlowDataType.ANY;
             this.typeRef = FlowTypeRef.simple(this.type.getId()).normalizedGenerics();
-            this.widget = "";
-            this.optionsSource = "";
-            this.defaultValue = "";
         }
 
         public FunctionParameter(String name, FlowDataType type, String widget, String optionsSource, String defaultValue) {
+            this(name, type);
+            this.widget = widget != null ? widget : "";
+            this.optionsSource = optionsSource != null ? optionsSource : "";
+            this.defaultValue = defaultValue != null ? defaultValue : "";
+        }
+
+        public FunctionParameter(FunctionParameterId parameterId, String name, FlowDataType type) {
+            this(parameterId, name, type, "", "", "");
+        }
+
+        public FunctionParameter(FunctionParameterId parameterId, String name, FlowDataType type,
+                                 String widget, String optionsSource, String defaultValue) {
+            this.parameterId = Objects.requireNonNull(parameterId, "Function parameter ID is required");
             this.name = name;
             this.type = type != null ? type : FlowDataType.ANY;
             this.typeRef = FlowTypeRef.simple(this.type.getId()).normalizedGenerics();
             this.widget = widget != null ? widget : "";
             this.optionsSource = optionsSource != null ? optionsSource : "";
             this.defaultValue = defaultValue != null ? defaultValue : "";
+            this.legacyNameOnly = false;
+        }
+
+        public FunctionParameter(FunctionParameterId parameterId, String name, FlowDataType type,
+                                 String widget, String optionsSource, String defaultValue, FlowTypeRef typeRef) {
+            this(parameterId, name, type, widget, optionsSource, defaultValue);
+            setTypeRef(typeRef);
+        }
+
+        public FunctionParameterId getParameterId() {
+            return parameterId;
+        }
+
+        public boolean hasParameterId() {
+            return parameterId != null;
+        }
+
+        public boolean isLegacyNameOnly() {
+            return legacyNameOnly || parameterId == null;
+        }
+
+        private void assignParameterId(FunctionParameterId parameterId) {
+            FunctionParameterId value = Objects.requireNonNull(parameterId, "Function parameter ID is required");
+            if (this.parameterId != null && !this.parameterId.equals(value)) {
+                throw new IllegalStateException("Function parameter identity cannot be changed");
+            }
+            this.parameterId = value;
+            this.legacyNameOnly = false;
+        }
+
+        public static FunctionParameter legacy(String name, FlowDataType type) {
+            return new FunctionParameter(name, type);
+        }
+
+        public static FunctionParameter authored(FunctionParameterId parameterId, String name, FlowDataType type) {
+            return new FunctionParameter(parameterId, name, type);
+        }
+
+        public static FunctionParameter authored(FunctionParameterId parameterId, String name, FlowDataType type,
+                                                 String widget, String optionsSource, String defaultValue) {
+            return new FunctionParameter(parameterId, name, type, widget, optionsSource, defaultValue);
+        }
+
+        private FunctionParameter copyWithParameterId(FunctionParameterId id) {
+            FunctionParameter copy = new FunctionParameter(id, name, type, widget, optionsSource, defaultValue, typeRef);
+            return copy;
         }
 
         public String getName() {
@@ -129,6 +193,72 @@ public class FlowGraph {
         public void setDefaultValue(String defaultValue) {
             this.defaultValue = defaultValue;
         }
+    }
+
+    public static final class LegacyFunctionParameterAdapter {
+        private static final String DETERMINISTIC_PREFIX = "legacy-flow-graph";
+
+        private LegacyFunctionParameterAdapter() {
+        }
+
+        public static FlowGraph adapt(FlowGraph graph) {
+            Objects.requireNonNull(graph, "Flow graph is required");
+            String graphId = graph.getId();
+            if (graphId == null || graphId.isBlank()) {
+                throw new IllegalArgumentException("A stable Flow graph ID is required for legacy parameter adaptation");
+            }
+            Set<FunctionParameterId> ids = new HashSet<>();
+            graph.setFunctionInputs(adapt(graphId, "input", graph.getFunctionInputs(), ids));
+            graph.setFunctionOutputs(adapt(graphId, "output", graph.getFunctionOutputs(), ids));
+            return graph;
+        }
+
+        public static List<FunctionParameter> adapt(String graphId, String direction, List<FunctionParameter> parameters) {
+            return adapt(graphId, direction, parameters, new HashSet<>());
+        }
+
+        private static List<FunctionParameter> adapt(String graphId, String direction, List<FunctionParameter> parameters,
+                                                     Set<FunctionParameterId> ids) {
+            if (parameters == null) {
+                return null;
+            }
+            if (graphId == null || graphId.isBlank()) {
+                throw new IllegalArgumentException("A stable Flow graph ID is required for legacy parameter adaptation");
+            }
+            String normalizedDirection = normalizeDirection(direction);
+            List<FunctionParameter> adapted = new ArrayList<>(parameters.size());
+            for (int index = 0; index < parameters.size(); index++) {
+                FunctionParameter parameter = parameters.get(index);
+                if (parameter == null) {
+                    adapted.add(null);
+                    continue;
+                }
+                FunctionParameterId id = parameter.getParameterId();
+                if (id == null) {
+                    id = FunctionParameterId.deterministic(DETERMINISTIC_PREFIX + '\u0000' + graphId
+                        + '\u0000' + normalizedDirection + '\u0000' + index);
+                    parameter = parameter.copyWithParameterId(id);
+                }
+                if (!ids.add(id)) {
+                    throw new IllegalArgumentException("Duplicate function parameter ID: " + id);
+                }
+                adapted.add(parameter);
+            }
+            return adapted;
+        }
+
+        private static String normalizeDirection(String direction) {
+            String value = direction == null ? "" : direction.trim().toLowerCase(Locale.ROOT);
+            if (!"input".equals(value) && !"output".equals(value)) {
+                throw new IllegalArgumentException("Function parameter direction must be input or output");
+            }
+            return value;
+        }
+    }
+
+    public FlowGraph adaptLegacyFunctionParameterIds() {
+        LegacyFunctionParameterAdapter.adapt(this);
+        return this;
     }
 
     public static class EditorPassthrough {
@@ -378,6 +508,10 @@ public class FlowGraph {
 
     public void setOpaqueProperties(Map<String, JsonElement> opaqueProperties) {
         this.opaqueProperties = opaqueProperties != null ? new HashMap<>(opaqueProperties) : new HashMap<>();
+    }
+
+    public FlowGraph copy() {
+        return FlowSerializer.deserialize(FlowSerializer.serialize(this));
     }
 
     private void rebuildIndices() {

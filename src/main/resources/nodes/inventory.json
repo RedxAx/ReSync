@@ -1,0 +1,4893 @@
+[
+  {
+    "id": "inventory.properties",
+    "displayName": "Inventory Properties",
+    "description": "Read supported properties from an inventory without changing it.",
+    "domain": "minecraft",
+    "family": "inventory",
+    "lifecycle": "active",
+    "handlerCapability": "family-inventory",
+    "selectorIntent": "inventory-property",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "inventory",
+      "property",
+      "query"
+    ],
+    "legacyIds": [
+      "inventory",
+      "inventory.size",
+      "inventory.type",
+      "inventory.items",
+      "inventory.first_empty",
+      "inventory.max_stack_size",
+      "inventory.holder",
+      "inventory.inventory_get_contents",
+      "inventory.inventory_has_item",
+      "inventory.inventory_count_item",
+      "inventory.inventory_get_slot",
+      "inventory.inventory_has_space",
+      "inventory.inventory_count_material",
+      "inventory.inventory_get_all",
+      "inventory.inventory_get_storage_contents",
+      "inventory.inventory_size",
+      "inventory.inventory_get_first_empty",
+      "inventory.inventory_get_max_stack_size",
+      "inventory.inventory_contains_at_least"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "size",
+          "target": "size"
+        },
+        {
+          "direction": "output",
+          "source": "type",
+          "target": "type"
+        },
+        {
+          "direction": "output",
+          "source": "items",
+          "target": "items"
+        },
+        {
+          "direction": "output",
+          "source": "first_empty",
+          "target": "first_empty"
+        },
+        {
+          "direction": "output",
+          "source": "max_stack_size",
+          "target": "max_stack_size"
+        },
+        {
+          "direction": "output",
+          "source": "holder",
+          "target": "holder"
+        },
+        {
+          "direction": "output",
+          "source": "contents",
+          "target": "contents"
+        },
+        {
+          "direction": "output",
+          "source": "storage_contents",
+          "target": "storage_contents"
+        },
+        {
+          "direction": "output",
+          "source": "armor",
+          "target": "armor"
+        }
+      ]
+    },
+    "handler": "inventory",
+    "handlerConfig": {
+      "operation": "get",
+      "action": "get"
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "description": "Inventory to inspect.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get",
+        "description": "Reads a property or checks whether it is available.",
+        "direction": "input"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "size",
+          "type",
+          "items",
+          "first_empty",
+          "max_stack_size",
+          "holder",
+          "contents",
+          "storage_contents",
+          "armor"
+        ],
+        "defaultValue": "size",
+        "description": "Property to read.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        },
+        "description": "Whether the selected property is available.",
+        "direction": "output"
+      },
+      {
+        "id": "size",
+        "displayName": "Size",
+        "name": "size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "size"
+        },
+        "description": "Number of inventory slots.",
+        "direction": "output"
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "type"
+        },
+        "description": "Inventory type name.",
+        "direction": "output"
+      },
+      {
+        "id": "items",
+        "displayName": "Items",
+        "name": "items",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "items"
+        },
+        "description": "All inventory item slots.",
+        "direction": "output"
+      },
+      {
+        "id": "first_empty",
+        "displayName": "First Empty",
+        "name": "first_empty",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "first_empty"
+        },
+        "description": "First empty slot, or -1 when none exists.",
+        "direction": "output"
+      },
+      {
+        "id": "max_stack_size",
+        "displayName": "Max Stack Size",
+        "name": "max_stack_size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_stack_size"
+        },
+        "description": "Inventory maximum stack size.",
+        "direction": "output"
+      },
+      {
+        "id": "holder",
+        "displayName": "Holder",
+        "name": "holder",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "visibleWhen": {
+          "action": "get",
+          "property": "holder"
+        },
+        "description": "Entity that owns the inventory when one exists.",
+        "direction": "output"
+      },
+      {
+        "id": "contents",
+        "displayName": "Contents",
+        "name": "contents",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "contents"
+        },
+        "description": "Inventory contents including every slot.",
+        "direction": "output"
+      },
+      {
+        "id": "storage_contents",
+        "displayName": "Storage Contents",
+        "name": "storage_contents",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "storage_contents"
+        },
+        "description": "Storage slots exposed by the inventory.",
+        "direction": "output"
+      },
+      {
+        "id": "armor",
+        "displayName": "Armor",
+        "name": "armor",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "armor"
+        },
+        "description": "Armor slots for a player inventory.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "inventory.actions",
+    "displayName": "Inventory Actions",
+    "description": "Run a supported inventory property action such as set, clear, or execute.",
+    "domain": "minecraft",
+    "family": "inventory",
+    "lifecycle": "active",
+    "handlerCapability": "family-inventory-actions",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "FAMILY",
+    "tags": [
+      "inventory",
+      "property",
+      "action"
+    ],
+    "legacyIds": [
+      "inventory.actions",
+      "inventory.clear",
+      "inventory.player_has_item"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        }
+      ]
+    },
+    "handler": "inventory",
+    "handlerConfig": {
+      "operation": "set",
+      "action": "set"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the inventory action.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "description": "Inventory to change.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set",
+        "description": "Action to perform on the selected property.",
+        "direction": "input"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "type",
+          "items",
+          "contents",
+          "storage_contents",
+          "armor"
+        ],
+        "defaultValue": "type",
+        "description": "Property to change or execute.",
+        "direction": "input"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "description": "Value supplied to the selected property setter.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the action completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        },
+        "description": "Whether the inventory action completed.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "inventory.player_remove_item",
+    "displayName": "Remove Player Items",
+    "description": "Remove a requested amount of one material from the current player inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "player",
+      "remove"
+    ],
+    "legacyIds": [
+      "player_remove_item"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "player_remove_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts removing items.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Material to remove.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        },
+        "description": "Positive number of items to remove.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removal.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.player_clear_inv",
+    "displayName": "Clear Player Inventory",
+    "description": "Remove every item from a player inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "player",
+      "clear"
+    ],
+    "legacyIds": [
+      "player_clear_inv"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "player_clear_inv"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose inventory is cleared.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_open_gui",
+    "displayName": "Open Inventory",
+    "description": "Open a new chest-style inventory for a player.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "gui",
+      "open"
+    ],
+    "legacyIds": [
+      "inventory_open_gui"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_open_gui"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts opening the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player who receives the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "Inventory",
+        "description": "Title shown above the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "rows",
+        "displayName": "Rows",
+        "name": "rows",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1,
+          "max": 6
+        },
+        "description": "Number of inventory rows from 1 through 6.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after opening.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "rows",
+          "target": "rows"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_close",
+    "displayName": "Close Inventory",
+    "description": "Close the currently open inventory for a player.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "gui",
+      "close"
+    ],
+    "legacyIds": [
+      "inventory_close"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_close"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts closing the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose inventory is closed.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after closing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_set_title",
+    "displayName": "Set Inventory Title",
+    "description": "Change the title of a player’s currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "gui",
+      "title"
+    ],
+    "legacyIds": [
+      "inventory_set_title"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_title"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the title.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player with the open inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "Inventory",
+        "description": "Non-empty inventory title.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing the title.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_set_rows",
+    "displayName": "Set Inventory Rows",
+    "description": "Resize a player’s currently open inventory from one through six rows.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "gui",
+      "resize"
+    ],
+    "legacyIds": [
+      "inventory_set_rows"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_rows"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts resizing the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player with the open inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "rows",
+        "displayName": "Rows",
+        "name": "rows",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1,
+          "max": 6
+        },
+        "description": "New row count from 1 through 6.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after resizing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "rows",
+          "target": "rows"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_set_contents",
+    "displayName": "Set Open Inventory Contents",
+    "description": "Replace the contents of a player’s currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "contents",
+      "set"
+    ],
+    "legacyIds": [
+      "inventory_set_contents"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_contents"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts replacing the contents.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "contents",
+        "displayName": "Contents",
+        "name": "contents",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "description": "Replacement item slots; they must fit in the inventory.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after replacing contents.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "contents",
+          "target": "contents"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_add_item",
+    "displayName": "Add Inventory Item",
+    "description": "Add an item to the currently open inventory, failing when it cannot fit completely.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "item",
+      "add"
+    ],
+    "legacyIds": [
+      "inventory_add_item"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_add_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts adding the item.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory receives the item.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to add.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_remove_item",
+    "displayName": "Remove Inventory Item",
+    "description": "Remove a matching item stack from the currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "item",
+      "remove"
+    ],
+    "legacyIds": [
+      "inventory_remove_item"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_remove_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts removing the item.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to remove.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removal.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_set_slot",
+    "displayName": "Set Inventory Slot",
+    "description": "Place an item in one slot of the currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "slot",
+      "set"
+    ],
+    "legacyIds": [
+      "inventory_set_slot"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_slot"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts setting the slot.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Zero-based slot index.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "optional": true,
+        "description": "Item to place; null clears the slot.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after setting.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_clear_slot",
+    "displayName": "Clear Inventory Slot",
+    "description": "Empty one slot in the currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "slot",
+      "clear"
+    ],
+    "legacyIds": [
+      "inventory_clear_slot"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear_slot"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing the slot.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Zero-based slot index.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_move_item",
+    "displayName": "Move Inventory Item",
+    "description": "Move an item from one open-inventory slot to another empty slot.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "slot",
+      "move"
+    ],
+    "legacyIds": [
+      "inventory_move_item"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_move_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts moving the item.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "from_slot",
+        "displayName": "From Slot",
+        "name": "from_slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Source slot index.",
+        "direction": "input"
+      },
+      {
+        "id": "to_slot",
+        "displayName": "To Slot",
+        "name": "to_slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Empty destination slot index.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after moving.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "from_slot",
+          "target": "from_slot"
+        },
+        {
+          "direction": "input",
+          "source": "to_slot",
+          "target": "to_slot"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_swap_items",
+    "displayName": "Swap Inventory Items",
+    "description": "Swap the items in two slots of the currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "slot",
+      "swap"
+    ],
+    "legacyIds": [
+      "inventory_swap_items"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_swap_items"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts swapping the items.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is changed.",
+        "direction": "input"
+      },
+      {
+        "id": "slot1",
+        "displayName": "Slot 1",
+        "name": "slot1",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "First slot index.",
+        "direction": "input"
+      },
+      {
+        "id": "slot2",
+        "displayName": "Slot 2",
+        "name": "slot2",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Second slot index.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after swapping.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "slot1",
+          "target": "slot1"
+        },
+        {
+          "direction": "input",
+          "source": "slot2",
+          "target": "slot2"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_clear",
+    "displayName": "Clear Open Inventory",
+    "description": "Remove every item from the currently open inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "clear"
+    ],
+    "legacyIds": [
+      "inventory_clear"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing the inventory.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose open inventory is cleared.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_update",
+    "displayName": "Update Inventory",
+    "description": "Send the player’s current inventory state to the client.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "update"
+    ],
+    "legacyIds": [
+      "inventory_update"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_update"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the inventory update.",
+        "direction": "input"
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player whose inventory is sent.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after updating.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_sort",
+    "displayName": "Sort Inventory",
+    "description": "Sort non-empty item stacks in an inventory by material and name.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "sort"
+    ],
+    "legacyIds": [
+      "inventory_sort"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_sort"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Flow that starts inventory sorting.",
+        "direction": "input"
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "optional": true,
+        "description": "Inventory to sort; the player inventory is used when omitted.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after sorting.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "inventory",
+          "target": "inventory"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_clear_all",
+    "displayName": "Clear Inventory Items",
+    "description": "Clear every slot in an inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "clear"
+    ],
+    "legacyIds": [
+      "inventory_clear_all"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_clear_all"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing.",
+        "direction": "input"
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "optional": true,
+        "description": "Inventory to clear; the player inventory is used when omitted.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "inventory",
+          "target": "inventory"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_remove_any",
+    "displayName": "Remove Material Amount",
+    "description": "Remove an amount of one material from an inventory.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "material",
+      "remove"
+    ],
+    "legacyIds": [
+      "inventory_remove_any"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_remove_any"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts removing the material.",
+        "direction": "input"
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "optional": true,
+        "description": "Inventory to change; the player inventory is used when omitted.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Material to remove.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        },
+        "description": "Positive amount to remove.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removal.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "inventory",
+          "target": "inventory"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_set_all_contents",
+    "displayName": "Set Inventory Contents",
+    "description": "Replace every slot in an inventory with the supplied item list.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "contents",
+      "set"
+    ],
+    "legacyIds": [
+      "inventory_set_all_contents"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_set_all_contents"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts replacing contents.",
+        "direction": "input"
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "optional": true,
+        "description": "Inventory to change; the player inventory is used when omitted.",
+        "direction": "input"
+      },
+      {
+        "id": "items_list",
+        "displayName": "Items",
+        "name": "items_list",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "description": "Replacement item slots.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after replacing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "inventory",
+          "target": "inventory"
+        },
+        {
+          "direction": "input",
+          "source": "items_list",
+          "target": "items_list"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.inventory_add_to_slot",
+    "displayName": "Add Item To Slot",
+    "description": "Place a clone of an item in a specific inventory slot.",
+    "domain": "minecraft",
+    "family": "inventory-action",
+    "lifecycle": "active",
+    "handlerCapability": "generic-inventory",
+    "selectorIntent": "inventory-action",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "INVENTORY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "inventory",
+      "slot",
+      "set"
+    ],
+    "legacyIds": [
+      "inventory_add_to_slot"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "inventory_add_to_slot"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts placing the item.",
+        "direction": "input"
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "optional": true,
+        "description": "Inventory to change; the player inventory is used when omitted.",
+        "direction": "input"
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Zero-based slot index.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to place.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after placing.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "inventory",
+          "target": "inventory"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_create",
+    "displayName": "Create Item",
+    "description": "Create an item stack from a material and amount.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-create",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "create"
+    ],
+    "legacyIds": [
+      "item_create"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_create"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts creating the item.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Material used for the item.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        },
+        "description": "Amount within the material stack limit.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after creating.",
+        "direction": "output"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Created item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_material",
+    "displayName": "Set Item Material",
+    "description": "Change an item’s material and clamp its amount to the new material limit.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "material",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_material"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_material"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the material.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Material to assign to the item stack.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_amount",
+    "displayName": "Set Item Amount",
+    "description": "Set an item stack amount within its material limit.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "amount",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_amount"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_amount"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the amount.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1
+        },
+        "description": "New positive item amount.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_damage",
+    "displayName": "Set Item Damage",
+    "description": "Set damage on an item that supports damage metadata.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "damage",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_damage"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_damage"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing damage.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Damageable item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "damage",
+        "displayName": "Damage",
+        "name": "damage",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Non-negative damage value within the item limit.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "damage",
+          "target": "damage"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_max_damage",
+    "displayName": "Set Item Max Damage",
+    "description": "Set the maximum damage on a damageable item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "damage",
+      "limit"
+    ],
+    "legacyIds": [
+      "item_set_max_damage"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_max_damage"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the maximum damage.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Damageable item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "max_damage",
+        "displayName": "Max Damage",
+        "name": "max_damage",
+        "pinType": "DATA",
+        "dataType": "number",
+        "optional": true,
+        "constraints": {
+          "min": 1
+        },
+        "description": "Positive maximum damage; omitted uses the material default.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "max_damage",
+          "target": "max_damage"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_unbreakable",
+    "displayName": "Set Item Unbreakable",
+    "description": "Set whether an item is unbreakable.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "unbreakable",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_unbreakable"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_unbreakable"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the item flag.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "unbreakable",
+        "displayName": "Unbreakable",
+        "name": "unbreakable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "defaultValue": true,
+        "description": "Whether the item cannot take damage.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "unbreakable",
+          "target": "unbreakable"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_custom_name",
+    "displayName": "Set Item Name",
+    "description": "Set an item’s custom display name.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "name",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_custom_name"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_custom_name"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the item name.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "New display name; empty clears it.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_lore",
+    "displayName": "Set Item Lore",
+    "description": "Replace an item’s lore using line-separated text.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "lore",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_lore"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_lore"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing lore.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Lore text separated into lines.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_add_lore",
+    "displayName": "Add Item Lore",
+    "description": "Append one lore line to an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "lore",
+      "add"
+    ],
+    "legacyIds": [
+      "item_add_lore"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_lore"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts adding lore.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore Line",
+        "name": "lore",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Lore line to append.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_clear_lore",
+    "displayName": "Clear Item Lore",
+    "description": "Remove all lore from an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "lore",
+      "clear"
+    ],
+    "legacyIds": [
+      "item_clear_lore"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_clear_lore"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing lore.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_flags",
+    "displayName": "Set All Item Flags",
+    "description": "Apply every available item flag to an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "flags",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_flags"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_flags"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts applying flags.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after applying flags.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_add_flag",
+    "displayName": "Add Item Flag",
+    "description": "Add one flag to an item stack.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "flags",
+      "add"
+    ],
+    "legacyIds": [
+      "item_add_flag"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_flag"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts adding the flag.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "flag",
+        "displayName": "Flag",
+        "name": "flag",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Item flag name to add or remove.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "flag",
+          "target": "flag"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_remove_flag",
+    "displayName": "Remove Item Flag",
+    "description": "Remove one item flag when present.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "flags",
+      "remove"
+    ],
+    "legacyIds": [
+      "item_remove_flag"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_remove_flag"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts removing the flag.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "flag",
+        "displayName": "Flag",
+        "name": "flag",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Item flag name to add or remove.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "flag",
+          "target": "flag"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_add_enchant",
+    "displayName": "Add Item Enchantment",
+    "description": "Add or replace an enchantment on an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "enchantment",
+      "add"
+    ],
+    "legacyIds": [
+      "item_add_enchant"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_add_enchant"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts adding the enchantment.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "enchantment",
+        "displayName": "Enchantment",
+        "name": "enchantment",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Enchantment key or name.",
+        "direction": "input"
+      },
+      {
+        "id": "level",
+        "displayName": "Level",
+        "name": "level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1,
+          "max": 255
+        },
+        "description": "Enchantment level from 1 through 255.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "enchantment",
+          "target": "enchantment"
+        },
+        {
+          "direction": "input",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_remove_enchant",
+    "displayName": "Remove Item Enchantment",
+    "description": "Remove an existing enchantment from an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "enchantment",
+      "remove"
+    ],
+    "legacyIds": [
+      "item_remove_enchant"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_remove_enchant"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts removing the enchantment.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "enchantment",
+        "displayName": "Enchantment",
+        "name": "enchantment",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Enchantment key or name.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after removing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "enchantment",
+          "target": "enchantment"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_clear_enchants",
+    "displayName": "Clear Item Enchantments",
+    "description": "Remove every enchantment from an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "enchantment",
+      "clear"
+    ],
+    "legacyIds": [
+      "item_clear_enchants"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_clear_enchants"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts clearing enchantments.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after clearing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_custom_model",
+    "displayName": "Set Custom Model Data",
+    "description": "Set an item’s custom model data value.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "model",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_custom_model"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_custom_model"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing model data.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Item stack to update with this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "model_data",
+        "displayName": "Model Data",
+        "name": "model_data",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Non-negative custom model value.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "model_data",
+          "target": "model_data"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_color",
+    "displayName": "Set Leather Item Color",
+    "description": "Set the RGB color of a leather armor item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "color",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_color"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_color"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the leather color.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Leather armor item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "red",
+        "displayName": "Red",
+        "name": "red",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 255,
+        "constraints": {
+          "min": 0,
+          "max": 255
+        },
+        "description": "Red channel from 0 through 255.",
+        "direction": "input"
+      },
+      {
+        "id": "green",
+        "displayName": "Green",
+        "name": "green",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 255,
+        "constraints": {
+          "min": 0,
+          "max": 255
+        },
+        "description": "Green channel from 0 through 255.",
+        "direction": "input"
+      },
+      {
+        "id": "blue",
+        "displayName": "Blue",
+        "name": "blue",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 255,
+        "constraints": {
+          "min": 0,
+          "max": 255
+        },
+        "description": "Blue channel from 0 through 255.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "red",
+          "target": "red"
+        },
+        {
+          "direction": "input",
+          "source": "green",
+          "target": "green"
+        },
+        {
+          "direction": "input",
+          "source": "blue",
+          "target": "blue"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_skull_owner",
+    "displayName": "Set Skull Owner",
+    "description": "Set the owning player of a player-head item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "skull",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_skull_owner"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_skull_owner"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing the skull owner.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Player-head item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "owner",
+        "displayName": "Owner",
+        "name": "owner",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Player name or identifier.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "owner",
+          "target": "owner"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_book_pages",
+    "displayName": "Set Book Details",
+    "description": "Set the title, author, and pages of a written book item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "book",
+      "set"
+    ],
+    "legacyIds": [
+      "item_set_book_pages"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_book_pages"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts changing book details.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Book item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Title text for the written book.",
+        "direction": "input"
+      },
+      {
+        "id": "author",
+        "displayName": "Author",
+        "name": "author",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Author name for the written book.",
+        "direction": "input"
+      },
+      {
+        "id": "pages",
+        "displayName": "Pages",
+        "name": "pages",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Pages separated by a line containing ---; at most 100 pages are accepted.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after changing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "author",
+          "target": "author"
+        },
+        {
+          "direction": "input",
+          "source": "pages",
+          "target": "pages"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_potion_effect",
+    "displayName": "Add Potion Effect",
+    "description": "Add a custom potion effect to a potion item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "potion",
+      "effect"
+    ],
+    "legacyIds": [
+      "item_set_potion_effect"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_potion_effect"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts adding the effect.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Potion item to change.",
+        "direction": "input"
+      },
+      {
+        "id": "effect",
+        "displayName": "Effect",
+        "name": "effect",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Potion effect name.",
+        "direction": "input"
+      },
+      {
+        "id": "duration",
+        "displayName": "Duration",
+        "name": "duration",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 200,
+        "constraints": {
+          "min": 1,
+          "max": 72000
+        },
+        "description": "Effect duration in ticks.",
+        "direction": "input"
+      },
+      {
+        "id": "amplifier",
+        "displayName": "Amplifier",
+        "name": "amplifier",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 255
+        },
+        "description": "Effect amplifier from 0 through 255.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after adding.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Changed item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "effect",
+          "target": "effect"
+        },
+        {
+          "direction": "input",
+          "source": "duration",
+          "target": "duration"
+        },
+        {
+          "direction": "input",
+          "source": "amplifier",
+          "target": "amplifier"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inventory.item_set_nbt",
+    "displayName": "Apply Item Data",
+    "description": "Deserialize a serialized item stack string into an item.",
+    "domain": "minecraft",
+    "family": "item",
+    "lifecycle": "active",
+    "handlerCapability": "generic-itemstack",
+    "selectorIntent": "item-mutation",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "ITEM",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "item",
+      "data",
+      "apply"
+    ],
+    "legacyIds": [
+      "item_set_nbt"
+    ],
+    "handler": "InventoryActionHandler",
+    "handlerConfig": {
+      "operation": "item_set_nbt"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts deserializing the item.",
+        "direction": "input"
+      },
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Existing item used to establish the operation context.",
+        "direction": "input"
+      },
+      {
+        "id": "nbt",
+        "displayName": "Serialized Data",
+        "name": "nbt",
+        "pinType": "DATA",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Base64 serialized item data.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after deserializing.",
+        "direction": "output"
+      },
+      {
+        "id": "output_item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Deserialized item stack.",
+        "direction": "output"
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "nbt",
+          "target": "nbt"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "output_item"
+        }
+      ]
+    }
+  }
+]

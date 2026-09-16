@@ -1,0 +1,203 @@
+[
+  {
+    "id": "core.logic.compare_equals",
+    "displayName": "Equals",
+    "description": "Returns true when two values are equal.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "equals"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "equals"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "any", "description": "Provides the first value to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "any", "description": "Provides the second value to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the two values are equal."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_not_equals",
+    "displayName": "Not Equals",
+    "description": "Returns true when two values are different.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "not-equals"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "not_equals"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "any", "description": "Provides the first value to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "any", "description": "Provides the second value to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the two values are different."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_greater",
+    "displayName": "Greater",
+    "description": "Returns true when the first number is greater than the second.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "greater"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "greater"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "description": "Provides the first number to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "description": "Provides the second number to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the first number is greater."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_less",
+    "displayName": "Less",
+    "description": "Returns true when the first number is less than the second.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "less"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "less"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "description": "Provides the first number to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "description": "Provides the second number to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the first number is less."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_greater_or_equal",
+    "displayName": "Greater Or Equal",
+    "description": "Returns true when the first number is greater than or equal to the second.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "greater-or-equal"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "greater_or_equal"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "description": "Provides the first number to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "description": "Provides the second number to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the first number is at least the second."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_less_or_equal",
+    "displayName": "Less Or Equal",
+    "description": "Returns true when the first number is less than or equal to the second.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "less-or-equal"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "less_or_equal"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "description": "Provides the first number to compare."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "description": "Provides the second number to compare."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the first number is at most the second."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_between",
+    "displayName": "Between",
+    "description": "Returns true when a number is within the inclusive minimum and maximum bounds.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "between"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "between"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "description": "Provides the number to check."},
+      {"id": "min", "displayName": "Minimum", "name": "min", "pinType": "DATA", "dataType": "number", "description": "Provides the inclusive lower bound."},
+      {"id": "max", "displayName": "Maximum", "name": "max", "pinType": "DATA", "dataType": "number", "description": "Provides the inclusive upper bound."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the value is within the bounds."}
+    ]
+  },
+  {
+    "id": "core.logic.compare_type",
+    "displayName": "Compare Type",
+    "description": "Returns true when a value matches the selected type.",
+    "domain": "logic",
+    "family": "comparison",
+    "lifecycle": "active",
+    "handlerCapability": "logic.compare",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["logic", "comparison", "type"],
+    "handler": "LogicHandler",
+    "handlerConfig": {"operation": "type"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Provides the value whose type should be checked."},
+      {"id": "type", "displayName": "Type", "name": "type", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["string", "number", "boolean", "list", "map", "json", "null"], "defaultValue": "string", "description": "Selects the type name to compare against."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the value matches the selected type."}
+    ]
+  }
+]

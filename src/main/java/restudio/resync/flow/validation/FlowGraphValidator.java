@@ -6,13 +6,18 @@ import restudio.flow.data.FlowTypeRef;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowResourceReference;
-import restudio.resync.api.OptionCatalogProvider;
+import restudio.resync.api.OptionCatalogCapture;
 import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.resync.flow.CustomFunctionNodeDefinitions;
+import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.generic.SchedulePattern;
 import restudio.resync.flow.migration.IdCompatibilityLayer;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.modules.flow.FlowResourceAdapter;
@@ -28,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 public final class FlowGraphValidator {
     private static final String CALL_PARAMETERS_KEY = "__call_parameters";
@@ -58,7 +64,9 @@ public final class FlowGraphValidator {
     private final FlowResourceRegistry resources;
     private final FlowGraphValidationRegistry extensionValidators;
     private final Clock clock;
-    private final IdCompatibilityLayer compatibility = new IdCompatibilityLayer();
+    private final BiConsumer<FlowGraph, FlowGraphValidationResult> diagnosticSink;
+    private final IdCompatibilityLayer compatibility;
+    private final boolean legacyAliasesEnabled;
 
     public FlowGraphValidator(NodeDefinitionRegistry definitions, HandlerRegistry handlers, TypeAdapterRegistry adapters, OptionCatalogRegistry catalogs) {
         this(definitions, handlers, adapters, catalogs, null);
@@ -76,6 +84,19 @@ public final class FlowGraphValidator {
 
     public FlowGraphValidator(NodeDefinitionRegistry definitions, HandlerRegistry handlers, TypeAdapterRegistry adapters, OptionCatalogRegistry catalogs,
                               FlowResourceRegistry resources, FlowGraphValidationRegistry extensionValidators, Clock clock) {
+        this(definitions, handlers, adapters, catalogs, resources, extensionValidators, clock, null);
+    }
+
+    public FlowGraphValidator(NodeDefinitionRegistry definitions, HandlerRegistry handlers, TypeAdapterRegistry adapters, OptionCatalogRegistry catalogs,
+                              FlowResourceRegistry resources, FlowGraphValidationRegistry extensionValidators, Clock clock,
+                              BiConsumer<FlowGraph, FlowGraphValidationResult> diagnosticSink) {
+        this(definitions, handlers, adapters, catalogs, resources, extensionValidators, clock, diagnosticSink, null);
+    }
+
+    public FlowGraphValidator(NodeDefinitionRegistry definitions, HandlerRegistry handlers, TypeAdapterRegistry adapters, OptionCatalogRegistry catalogs,
+                              FlowResourceRegistry resources, FlowGraphValidationRegistry extensionValidators, Clock clock,
+                              BiConsumer<FlowGraph, FlowGraphValidationResult> diagnosticSink,
+                              LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.definitions = definitions;
         this.handlers = handlers;
         this.adapters = adapters;
@@ -83,13 +104,16 @@ public final class FlowGraphValidator {
         this.resources = resources;
         this.extensionValidators = extensionValidators;
         this.clock = clock != null ? clock : Clock.systemUTC();
+        this.diagnosticSink = diagnosticSink;
+        this.legacyAliasesEnabled = legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyAliases();
+        this.compatibility = legacyAliasesEnabled ? new IdCompatibilityLayer() : null;
     }
 
     public FlowGraphValidationResult validate(FlowGraph graph) {
         List<FlowGraphDiagnostic> diagnostics = new ArrayList<>();
         if (graph == null) {
             diagnostics.add(error("GRAPH_REQUIRED", "", "", "", "Flow graph is required", "Select or create a Flow before saving or executing"));
-            return new FlowGraphValidationResult(diagnostics);
+            return publish(null, new FlowGraphValidationResult(diagnostics));
         }
         String graphId = graph.getId() != null ? graph.getId() : "";
         if (graphId.isBlank()) {
@@ -106,25 +130,33 @@ public final class FlowGraphValidator {
         if (extensionValidators != null) {
             diagnostics.addAll(extensionValidators.validate(graph));
         }
-        return new FlowGraphValidationResult(diagnostics);
+        return publish(graph, new FlowGraphValidationResult(diagnostics));
+    }
+
+    private FlowGraphValidationResult publish(FlowGraph graph, FlowGraphValidationResult result) {
+        if (!result.valid() && diagnosticSink != null) {
+            diagnosticSink.accept(graph, result);
+        }
+        return result;
     }
 
     private void validateFunctionSignature(FlowGraph graph, List<FlowGraphDiagnostic> diagnostics) {
         if (!graph.isFunction()) {
             return;
         }
-        validateFunctionParameters(graph, "input", graph.getFunctionInputs(), diagnostics);
-        validateFunctionParameters(graph, "output", graph.getFunctionOutputs(), diagnostics);
+        Set<FunctionParameterId> ids = new HashSet<>();
+        validateFunctionParameters(graph, "input", graph.getFunctionInputs(), ids, diagnostics);
+        validateFunctionParameters(graph, "output", graph.getFunctionOutputs(), ids, diagnostics);
     }
 
     private void validateFunctionParameters(FlowGraph graph, String direction, List<FlowGraph.FunctionParameter> parameters,
-                                            List<FlowGraphDiagnostic> diagnostics) {
+                                            Set<FunctionParameterId> ids, List<FlowGraphDiagnostic> diagnostics) {
         if (parameters == null) {
             diagnostics.add(error("FUNCTION_SIGNATURE_REQUIRED", graph.getId(), "", direction,
                 "Function " + direction + " parameters are missing", "Restore the function signature parameter list"));
             return;
         }
-        Set<String> names = new HashSet<>();
+        Set<String> legacyNames = new HashSet<>();
         for (int index = 0; index < parameters.size(); index++) {
             FlowGraph.FunctionParameter parameter = parameters.get(index);
             String location = direction + '[' + index + ']';
@@ -134,14 +166,19 @@ public final class FlowGraphValidator {
                 continue;
             }
             String name = parameter.getName();
-            if (!names.add(name)) {
+            FunctionParameterId parameterId = parameter.getParameterId();
+            if (parameterId != null && !ids.add(parameterId)) {
+                diagnostics.add(error("FUNCTION_PARAMETER_ID_DUPLICATE", graph.getId(), "", parameterId.canonicalText(),
+                    "Function declares the same " + direction + " parameter ID more than once: " + parameterId,
+                    "Keep each function parameter ID unique across inputs and outputs"));
+            } else if (parameterId == null && !legacyNames.add(name)) {
                 diagnostics.add(error("FUNCTION_PARAMETER_DUPLICATE", graph.getId(), "", name,
                     "Function has more than one " + direction + " parameter named " + name, "Rename or remove the duplicate parameter"));
             }
             String widget = parameter.getWidget();
             if (widget != null && !widget.isBlank()) {
                 try {
-                    NodeDefinition.WidgetType.valueOf(widget.trim().toUpperCase(Locale.ROOT));
+                    NodeDefinition.WidgetType.fromSerializedName(widget);
                 } catch (IllegalArgumentException exception) {
                     diagnostics.add(error("FUNCTION_PARAMETER_WIDGET_INVALID", graph.getId(), "", name,
                         "Unknown function parameter widget: " + widget, "Select a supported schema widget"));
@@ -170,7 +207,7 @@ public final class FlowGraphValidator {
                 diagnostics.add(error("NODE_TYPE_REQUIRED", graphId, nodeId, "", "Node type is required", "Select a registered node type"));
                 continue;
             }
-            String canonicalType = compatibility.mapToNew(type);
+            String canonicalType = legacyAliasesEnabled ? compatibility.mapToNew(type) : type;
             NodeDefinition definition = definitions != null ? definitions.get(canonicalType) : null;
             if (definition == null) {
                 diagnostics.add(error("NODE_DEFINITION_MISSING", graphId, nodeId, "", "Node definition is unavailable: " + type, "Install the required extension or migrate the node"));
@@ -197,26 +234,30 @@ public final class FlowGraphValidator {
     }
 
     private NodeDefinition functionBoundaryDefinition(FlowGraph graph, String type, NodeDefinition definition) {
-        if (!graph.isFunction() || !isFunctionStartType(type) && !isFunctionEndType(type)) {
+        if (!graph.isFunction() || !isFunctionBoundary(type, definition)) {
             return definition;
         }
         List<NodeDefinition.PinDefinition> inputs = new ArrayList<>();
         List<NodeDefinition.PinDefinition> outputs = new ArrayList<>();
-        inputs.add(new NodeDefinition.PinDefinition("flow", NodeDefinition.PinType.FLOW, NodeDefinition.PinDirection.INPUT, FlowDataType.EXECUTION));
-        outputs.add(new NodeDefinition.PinDefinition("flow", NodeDefinition.PinType.FLOW, NodeDefinition.PinDirection.OUTPUT, FlowDataType.EXECUTION));
-        List<FlowGraph.FunctionParameter> parameters = isFunctionStartType(type) ? graph.getFunctionInputs() : graph.getFunctionOutputs();
+        inputs.add(new NodeDefinition.PinDefinition(PinId.of("flow"), "flow", NodeDefinition.PinType.FLOW,
+            NodeDefinition.PinDirection.INPUT, FlowDataType.EXECUTION));
+        outputs.add(new NodeDefinition.PinDefinition(PinId.of("flow"), "flow", NodeDefinition.PinType.FLOW,
+            NodeDefinition.PinDirection.OUTPUT, FlowDataType.EXECUTION));
+        List<FlowGraph.FunctionParameter> parameters = isFunctionStart(type, definition) ? graph.getFunctionInputs() : graph.getFunctionOutputs();
         if (parameters != null) {
             for (FlowGraph.FunctionParameter parameter : parameters) {
                 if (parameter == null || parameter.getName() == null || parameter.getName().isBlank()) {
                     continue;
                 }
-                NodeDefinition.PinDirection direction = isFunctionStartType(type)
+                NodeDefinition.PinDirection direction = isFunctionStart(type, definition)
                     ? NodeDefinition.PinDirection.OUTPUT
                     : NodeDefinition.PinDirection.INPUT;
                 NodeDefinition.PinDefinition pin = new NodeDefinition.PinBuilder(
-                    parameter.getName(), NodeDefinition.PinType.DATA, direction,
+                    CustomFunctionNodeDefinitions.parameterPinId(parameter, direction), parameter.getName(),
+                    NodeDefinition.PinType.DATA, direction,
                     parameter.getType() != null ? parameter.getType() : FlowDataType.ANY
-                ).typeRef(parameter.getTypeRef()).build();
+                ).runtimeName(CustomFunctionNodeDefinitions.parameterRuntimeName(parameter, direction))
+                    .typeRef(parameter.getTypeRef()).build();
                 if (direction == NodeDefinition.PinDirection.OUTPUT) {
                     outputs.add(pin);
                 } else {
@@ -233,8 +274,8 @@ public final class FlowGraphValidator {
             return definition;
         }
         List<FlowGraph.FunctionParameter> declared = functionCallParameters(graph.getId(), nodeId, node, diagnostics);
-        boolean dynamic = graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> "function".equals(connection.getTargetPin()));
-        Object selected = node.getInputValues() != null ? node.getInputValues().get("function") : null;
+        boolean dynamic = isInputConnected(graph, nodeId, definition, node, "function");
+        Object selected = inputValue(node, definition, "function");
         String functionId = selected != null ? selected.toString().trim() : "";
         NodeDefinition signature = !dynamic && !functionId.isBlank() && definitions != null
             ? definitions.get("custom_function:" + functionId)
@@ -248,11 +289,12 @@ public final class FlowGraphValidator {
         if (!declared.isEmpty()) {
             for (FlowGraph.FunctionParameter parameter : declared) {
                 inputs.add(new NodeDefinition.PinBuilder(
-                    parameter.getName(),
+                    CustomFunctionNodeDefinitions.parameterPinId(parameter, NodeDefinition.PinDirection.INPUT), parameter.getName(),
                     NodeDefinition.PinType.DATA,
                     NodeDefinition.PinDirection.INPUT,
                     parameter.getType()
-                ).typeRef(parameter.getTypeRef()).build());
+                ).runtimeName(CustomFunctionNodeDefinitions.parameterRuntimeName(parameter, NodeDefinition.PinDirection.INPUT))
+                    .typeRef(parameter.getTypeRef()).build());
             }
             if (signature != null) {
                 validateFunctionCallContract(graph.getId(), nodeId, declared, signature, diagnostics);
@@ -272,7 +314,8 @@ public final class FlowGraphValidator {
             return List.of();
         }
         List<FlowGraph.FunctionParameter> parameters = new ArrayList<>();
-        Set<String> names = new HashSet<>();
+        Set<String> legacyNames = new HashSet<>();
+        Set<FunctionParameterId> ids = new HashSet<>();
         int index = 0;
         for (Object value : values) {
             String location = CALL_PARAMETERS_KEY + '[' + index++ + ']';
@@ -282,12 +325,23 @@ public final class FlowGraphValidator {
                 continue;
             }
             String name = entry.get("name").toString().trim();
-            if (!isTemplateName(name)) {
+            Object rawParameterId = entry.get("parameterId");
+            FunctionParameterId parameterId = parseFunctionParameterId(rawParameterId, graphId, nodeId, location, diagnostics);
+            if (rawParameterId != null && parameterId == null) {
+                continue;
+            }
+            if (parameterId == null && !isTemplateName(name)) {
                 diagnostics.add(error("FUNCTION_CALL_ARGUMENT_NAME_INVALID", graphId, nodeId, location,
                     "Function argument name is invalid: " + name, "Use letters, numbers, and underscores"));
                 continue;
             }
-            if (!names.add(name)) {
+            if (parameterId != null && !ids.add(parameterId)) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_ID_DUPLICATE", graphId, nodeId, parameterId.canonicalText(),
+                    "Function argument is declared more than once with ID " + parameterId,
+                    "Use each function parameter ID once"));
+                continue;
+            }
+            if (parameterId == null && !legacyNames.add(name)) {
                 diagnostics.add(error("FUNCTION_CALL_ARGUMENT_DUPLICATE", graphId, nodeId, name,
                     "Function argument is declared more than once: " + name, "Remove or rename the duplicate argument"));
                 continue;
@@ -305,7 +359,9 @@ public final class FlowGraphValidator {
                     "Function argument needs a specific type", "Choose the type expected by the called function"));
                 continue;
             }
-            FlowGraph.FunctionParameter parameter = new FlowGraph.FunctionParameter(name, FlowDataType.fromString(typeRef.getTypeId()));
+            FlowGraph.FunctionParameter parameter = parameterId == null
+                ? new FlowGraph.FunctionParameter(name, FlowDataType.fromString(typeRef.getTypeId()))
+                : new FlowGraph.FunctionParameter(parameterId, name, FlowDataType.fromString(typeRef.getTypeId()));
             parameter.setTypeRef(typeRef);
             parameters.add(parameter);
         }
@@ -315,15 +371,25 @@ public final class FlowGraphValidator {
     private void validateFunctionCallContract(String graphId, String nodeId, List<FlowGraph.FunctionParameter> declared,
                                               NodeDefinition signature, List<FlowGraphDiagnostic> diagnostics) {
         Map<String, NodeDefinition.PinDefinition> expected = new HashMap<>();
+        boolean identityBacked = false;
         for (NodeDefinition.PinDefinition pin : signature.getInputs()) {
             if (pin != null && !"flow".equals(pin.getName())) {
                 expected.put(pin.getName(), pin);
+                identityBacked |= pin.getName().startsWith("function-input-");
             }
         }
-        Set<String> declaredNames = new HashSet<>();
+        Set<String> declaredKeys = new HashSet<>();
         for (FlowGraph.FunctionParameter parameter : declared) {
-            declaredNames.add(parameter.getName());
-            NodeDefinition.PinDefinition expectedPin = expected.get(parameter.getName());
+            String key = parameter.getParameterId() == null
+                ? parameter.getName()
+                : CustomFunctionNodeDefinitions.parameterPinId(parameter, NodeDefinition.PinDirection.INPUT).value();
+            declaredKeys.add(key);
+            NodeDefinition.PinDefinition expectedPin = expected.get(key);
+            if (expectedPin == null && !identityBacked && parameter.getParameterId() == null) {
+                expectedPin = expected.values().stream()
+                    .filter(pin -> parameter.getName().equals(pin.getDisplayName()))
+                    .findFirst().orElse(null);
+            }
             if (expectedPin == null) {
                 diagnostics.add(error("FUNCTION_CALL_ARGUMENT_UNKNOWN", graphId, nodeId, parameter.getName(),
                     "Called function has no input named " + parameter.getName(), "Match the argument names to the function inputs"));
@@ -335,11 +401,40 @@ public final class FlowGraphValidator {
                     "Choose the same type as the function input"));
             }
         }
-        for (String expectedName : expected.keySet()) {
-            if (!declaredNames.contains(expectedName)) {
-                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_MISSING", graphId, nodeId, expectedName,
-                    "Function call does not declare " + expectedName, "Add the missing argument with the function input type"));
+        for (NodeDefinition.PinDefinition expectedPin : expected.values()) {
+            if (!declaredKeys.contains(expectedPin.getName())) {
+                diagnostics.add(error("FUNCTION_CALL_ARGUMENT_MISSING", graphId, nodeId, expectedPin.getDisplayName(),
+                    "Function call does not declare " + expectedPin.getDisplayName(), "Add the missing argument with the function input type"));
             }
+        }
+    }
+
+    private FunctionParameterId parseFunctionParameterId(Object raw, String graphId, String nodeId, String location,
+                                                         List<FlowGraphDiagnostic> diagnostics) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof FunctionParameterId parameterId) {
+            return parameterId;
+        }
+        if (raw instanceof Map<?, ?> values) {
+            Object nested = values.get("value");
+            if (nested == null) {
+                nested = values.get("canonicalText");
+            }
+            raw = nested;
+        }
+        if (raw == null) {
+            diagnostics.add(error("FUNCTION_CALL_ARGUMENT_ID_INVALID", graphId, nodeId, location,
+                "Function argument ID is invalid", "Use a canonical function parameter ID"));
+            return null;
+        }
+        try {
+            return FunctionParameterId.parseCanonicalText(raw.toString().trim());
+        } catch (IllegalArgumentException exception) {
+            diagnostics.add(error("FUNCTION_CALL_ARGUMENT_ID_INVALID", graphId, nodeId, location,
+                "Function argument ID is invalid", "Use a canonical function parameter ID"));
+            return null;
         }
     }
 
@@ -348,23 +443,52 @@ public final class FlowGraphValidator {
     }
 
     private void appendUniquePins(List<NodeDefinition.PinDefinition> target, List<NodeDefinition.PinDefinition> additions, String excludedName) {
-        Set<String> names = new HashSet<>();
+        Set<PinId> ids = new HashSet<>();
         for (NodeDefinition.PinDefinition pin : target) {
-            names.add(pin.getName());
+            if (pin != null && pin.getId() != null) {
+                ids.add(pin.getId());
+            }
         }
         for (NodeDefinition.PinDefinition pin : additions) {
-            if (pin != null && !excludedName.equals(pin.getName()) && names.add(pin.getName())) {
+            if (pin != null && !excludedName.equals(pin.getName()) && ids.add(pin.getId())) {
                 target.add(pin);
             }
         }
     }
 
     private boolean isFunctionStartType(String type) {
-        return "function.start".equals(type) || "function.function_start".equals(type);
+        return FlowRuntime.isFunctionStartType(type);
     }
 
     private boolean isFunctionEndType(String type) {
-        return "function.end".equals(type) || "function.function_end".equals(type);
+        return "function_end".equals(type) || "function.end".equals(type) || "function.function_end".equals(type)
+            || "restudio.resync/function_end".equals(type) || "builtin/function.end".equals(type);
+    }
+
+    private boolean isFunctionBoundary(String type, NodeDefinition definition) {
+        return isFunctionStart(type, definition) || isFunctionEnd(type, definition);
+    }
+
+    private boolean isFunctionStart(String type, NodeDefinition definition) {
+        if (isFunctionStartType(type)) {
+            return true;
+        }
+        return hasHandlerOperation(definition, "function_start");
+    }
+
+    private boolean isFunctionEnd(String type, NodeDefinition definition) {
+        if (isFunctionEndType(type)) {
+            return true;
+        }
+        return hasHandlerOperation(definition, "function_end");
+    }
+
+    private boolean hasHandlerOperation(NodeDefinition definition, String operation) {
+        if (definition == null || operation == null) {
+            return false;
+        }
+        Map<String, Object> handlerConfig = definition.getHandlerConfig();
+        return handlerConfig != null && operation.equals(handlerConfig.get("operation"));
     }
 
     private void validateScheduleInputs(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition,
@@ -377,7 +501,7 @@ public final class FlowGraphValidator {
             || !Set.of("schedule", "cron", "schedule_at_time").contains(operation)) {
             return;
         }
-        boolean zoneConnected = isInputConnected(graph, nodeId, "time_zone");
+        boolean zoneConnected = isInputConnected(graph, nodeId, definition, node, "time_zone");
         String zoneValue = effectiveStringInput(graph, nodeId, node, definition, "time_zone");
         ZoneId zoneId;
         try {
@@ -417,10 +541,10 @@ public final class FlowGraphValidator {
     }
 
     private String effectiveStringInput(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition, String pinName) {
-        if (isInputConnected(graph, nodeId, pinName)) {
+        if (isInputConnected(graph, nodeId, definition, node, pinName)) {
             return null;
         }
-        Object value = node.getInputValues() != null ? node.getInputValues().get(pinName) : null;
+        Object value = inputValue(node, definition, pinName);
         if (value == null) {
             NodeDefinition.PinDefinition pin = findPin(definition.getInputs(), pinName);
             value = pin != null ? pin.getDefaultValue() : null;
@@ -428,8 +552,40 @@ public final class FlowGraphValidator {
         return value instanceof String string ? string : null;
     }
 
-    private boolean isInputConnected(FlowGraph graph, String nodeId, String pinName) {
-        return graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> pinName.equals(connection.getTargetPin()));
+    private boolean isInputConnected(FlowGraph graph, String nodeId, NodeDefinition definition, FlowNode node, String pinName) {
+        if (definition == null) {
+            return graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> pinName.equals(connection.getTargetPin()));
+        }
+        NodeDefinition.PinDefinition expected = findInputPin(definition, node, pinName);
+        return graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> {
+            NodeDefinition.PinDefinition actual = findInputPin(definition, node, connection.getTargetPin());
+            return expected != null && actual != null && expected.getId().equals(actual.getId());
+        });
+    }
+
+    private Object inputValue(FlowNode node, NodeDefinition definition, String pinName) {
+        Map<String, Object> values = node != null && node.getInputValues() != null ? node.getInputValues() : Map.of();
+        NodeDefinition.PinDefinition pin = definition != null ? findPin(definition.getInputs(), pinName) : null;
+        if (pin != null) {
+            if (values.containsKey(pin.getName())) {
+                return values.get(pin.getName());
+            }
+            if (values.containsKey(pin.getRuntimeName())) {
+                return values.get(pin.getRuntimeName());
+            }
+        }
+        return values.get(pinName);
+    }
+
+    private boolean hasInputValue(Map<String, Object> values, NodeDefinition definition, String pinName) {
+        if (values == null) {
+            return false;
+        }
+        NodeDefinition.PinDefinition pin = definition != null ? findPin(definition.getInputs(), pinName) : null;
+        if (pin != null && (values.containsKey(pin.getName()) || values.containsKey(pin.getRuntimeName()))) {
+            return true;
+        }
+        return values.containsKey(pinName);
     }
 
     private boolean isPinVisible(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition, NodeDefinition.PinDefinition pin) {
@@ -437,12 +593,11 @@ public final class FlowGraphValidator {
         if (visibleWhen == null || visibleWhen.isEmpty()) {
             return true;
         }
-        Map<String, Object> inputValues = node.getInputValues();
         for (Map.Entry<String, String> condition : visibleWhen.entrySet()) {
-            if (isInputConnected(graph, nodeId, condition.getKey())) {
+            if (isInputConnected(graph, nodeId, definition, node, condition.getKey())) {
                 continue;
             }
-            Object actualValue = inputValues != null && inputValues.containsKey(condition.getKey()) ? inputValues.get(condition.getKey()) : null;
+            Object actualValue = inputValue(node, definition, condition.getKey());
             if (actualValue == null) {
                 NodeDefinition.PinDefinition controllingPin = findPin(definition.getInputs(), condition.getKey());
                 actualValue = controllingPin != null ? controllingPin.getDefaultValue() : null;
@@ -485,9 +640,11 @@ public final class FlowGraphValidator {
         return actual.equalsIgnoreCase(expected);
     }
 
-    private boolean isPinVisibilityDynamic(FlowGraph graph, String nodeId, NodeDefinition.PinDefinition pin) {
+    private boolean isPinVisibilityDynamic(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition,
+                                           NodeDefinition.PinDefinition pin) {
         Map<String, String> visibleWhen = pin.getVisibleWhen();
-        return visibleWhen != null && visibleWhen.keySet().stream().anyMatch(pinName -> isInputConnected(graph, nodeId, pinName));
+        return visibleWhen != null && visibleWhen.keySet().stream().anyMatch(pinName ->
+            isInputConnected(graph, nodeId, definition, node, pinName));
     }
 
     private String scheduleValidationMessage(RuntimeException exception) {
@@ -512,7 +669,8 @@ public final class FlowGraphValidator {
     private void validateRequiredInputs(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition, List<FlowGraphDiagnostic> diagnostics) {
         Map<String, Object> values = node.getInputValues() != null ? node.getInputValues() : Map.of();
         for (NodeDefinition.PinDefinition pin : definition.getInputs()) {
-            if (isExecution(pin) || !isPinVisible(graph, nodeId, node, definition, pin) || isPinVisibilityDynamic(graph, nodeId, pin)) {
+            if (isExecution(pin) || !isPinVisible(graph, nodeId, node, definition, pin)
+                || isPinVisibilityDynamic(graph, nodeId, node, definition, pin)) {
                 continue;
             }
             if (pin.getRepeatable() != null) {
@@ -534,8 +692,10 @@ public final class FlowGraphValidator {
 
     private void validateRequiredInput(FlowGraph graph, String nodeId, NodeDefinition definition, Map<String, Object> values, String pinName,
                                        List<FlowGraphDiagnostic> diagnostics) {
-        boolean connected = graph.getConnectionsToTarget(nodeId).stream().anyMatch(connection -> pinName.equals(connection.getTargetPin()));
-        if (!connected && (!values.containsKey(pinName) || values.get(pinName) == null)) {
+        FlowNode node = graph.getNodes().get(nodeId);
+        boolean connected = isInputConnected(graph, nodeId, definition, node, pinName);
+        Object value = inputValue(node, definition, pinName);
+        if (!connected && (!hasInputValue(values, definition, pinName) || value == null)) {
             FlowGraphDiagnostic diagnostic = definition.getSchemaVersion() >= 2
                 ? error("REQUIRED_INPUT_MISSING", graph.getId(), nodeId, pinName, "Required input has no connection or literal value", "Connect " + pinName + " or provide a value")
                 : warning("REQUIRED_INPUT_UNVERIFIED", graph.getId(), nodeId, pinName, "Legacy schema does not declare whether this unconnected input is required", "Migrate the definition to schema version 2 with explicit optional semantics");
@@ -552,7 +712,7 @@ public final class FlowGraphValidator {
             if (isEditorMetadata(value.getKey(), definition)) {
                 continue;
             }
-            NodeDefinition.PinDefinition pin = findPin(definition.getInputs(), value.getKey());
+            NodeDefinition.PinDefinition pin = findInputPin(definition, node, value.getKey());
             if (pin == null) {
                 diagnostics.add(error("INPUT_PIN_UNKNOWN", graphId, nodeId, value.getKey(), "Literal targets an unknown input pin", "Remove the stale literal or migrate the node"));
                 continue;
@@ -560,10 +720,10 @@ public final class FlowGraphValidator {
             if (!isPinVisible(graph, nodeId, node, definition, pin)) {
                 continue;
             }
-            if (isInputConnected(graph, nodeId, value.getKey())) {
+            if (isInputConnected(graph, nodeId, definition, node, value.getKey())) {
                 continue;
             }
-            if (!isRepeatablePinActive(node, pin, value.getKey())) {
+            if (!isRepeatablePinActive(node, definition, pin, value.getKey())) {
                 diagnostics.add(error("REPEATABLE_PIN_INACTIVE", graphId, nodeId, value.getKey(), "Literal targets an inactive repeatable input", "Add the repeatable item or remove the stale literal"));
                 continue;
             }
@@ -572,7 +732,7 @@ public final class FlowGraphValidator {
                 continue;
             }
             validateValueContract("LITERAL", graphId, nodeId, pin, value.getValue(), diagnostics);
-            validateCatalogLiteral(graph, nodeId, node, pin, value.getValue(), diagnostics);
+            validateCatalogLiteral(graph, nodeId, node, definition, pin, value.getValue(), diagnostics);
         }
     }
 
@@ -591,9 +751,9 @@ public final class FlowGraphValidator {
             }
             validateValueContract("DEFAULT", graphId, nodeId, pin, defaultValue, diagnostics);
             if (isPinVisible(graph, nodeId, node, definition, pin)
-                && !isInputConnected(graph, nodeId, pin.getName())
-                && (node.getInputValues() == null || !node.getInputValues().containsKey(pin.getName()))) {
-                validateCatalogLiteral(graph, nodeId, node, pin, defaultValue, diagnostics);
+                && !isInputConnected(graph, nodeId, definition, node, pin.getName())
+                && !hasInputValue(node.getInputValues(), definition, pin.getName())) {
+                validateCatalogLiteral(graph, nodeId, node, definition, pin, defaultValue, diagnostics);
             }
         }
     }
@@ -662,7 +822,8 @@ public final class FlowGraphValidator {
         }
     }
 
-    private void validateCatalogLiteral(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition.PinDefinition pin, Object value,
+    private void validateCatalogLiteral(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition,
+                                        NodeDefinition.PinDefinition pin, Object value,
                                         List<FlowGraphDiagnostic> diagnostics) {
         String graphId = graph.getId();
         if (value instanceof FlowResourceReference reference) {
@@ -673,26 +834,32 @@ public final class FlowGraphValidator {
         if (!(value instanceof String literal) || literal.isBlank() || sourceId == null || sourceId.isBlank()) {
             return;
         }
-        OptionCatalogProvider provider = catalogs != null ? catalogs.provider(sourceId) : null;
-        if (provider == null) {
+        if (catalogs == null) {
             boolean managedResource = isManagedResourceCatalog(pin, sourceId);
             diagnostics.add(error(managedResource ? "RESOURCE_CATALOG_UNAVAILABLE" : "CATALOG_UNAVAILABLE", graphId, nodeId, pin.getName(),
                 (managedResource ? "Managed-resource catalog is unavailable: " : "Option catalog is unavailable: ") + sourceId,
                 "Install or enable the catalog capability"));
             return;
         }
-        OptionCatalogQuery query = new OptionCatalogQuery(sourceId, catalogContext(graph, nodeId, node, pin));
-        Set<String> contextKeys = provider.contextKeys();
-        boolean dynamicContext = contextKeys != null && contextKeys.stream().anyMatch(key -> isInputConnected(graph, nodeId, key));
-        String status;
+        OptionCatalogQuery query = new OptionCatalogQuery(sourceId, catalogContext(graph, nodeId, node, definition, pin));
+        OptionCatalogRegistry.ResolvedCapture resolved;
         try {
-            status = provider.status(query);
+            resolved = catalogs.resolveCapture(sourceId, query);
+        } catch (OptionCatalogRegistry.ProviderUnavailable exception) {
+            boolean managedResource = isManagedResourceCatalog(pin, sourceId);
+            diagnostics.add(error(managedResource ? "RESOURCE_CATALOG_UNAVAILABLE" : "CATALOG_UNAVAILABLE", graphId, nodeId, pin.getName(),
+                (managedResource ? "Managed-resource catalog is unavailable: " : "Option catalog is unavailable: ") + sourceId,
+                "Install or enable the catalog capability"));
+            return;
         } catch (RuntimeException exception) {
-            diagnostics.add(error("CATALOG_QUERY_FAILED", graphId, nodeId, pin.getName(), "Option catalog status could not be resolved: " + sourceId,
+            diagnostics.add(error("CATALOG_QUERY_FAILED", graphId, nodeId, pin.getName(), "Option catalog capture could not be resolved: " + sourceId,
                 "Check the catalog provider and try again"));
             return;
         }
-        String normalizedStatus = status == null || status.isBlank() ? "available" : status.trim().toLowerCase(Locale.ROOT);
+        boolean dynamicContext = resolved.contextKeys().stream().anyMatch(key ->
+            isInputConnected(graph, nodeId, definition, node, key));
+        OptionCatalogCapture capture = resolved.capture();
+        String normalizedStatus = capture.status().trim().toLowerCase(Locale.ROOT);
         if (dynamicContext && "invalid".equals(normalizedStatus)) {
             return;
         }
@@ -703,12 +870,7 @@ public final class FlowGraphValidator {
                 case "rejected" -> "CATALOG_REJECTED";
                 default -> "CATALOG_UNAVAILABLE";
             };
-            String providerDiagnostic;
-            try {
-                providerDiagnostic = provider.diagnostic(query);
-            } catch (RuntimeException exception) {
-                providerDiagnostic = "";
-            }
+            String providerDiagnostic = capture.diagnostic();
             String message = providerDiagnostic != null && !providerDiagnostic.isBlank()
                 ? providerDiagnostic
                 : "Option catalog " + sourceId + " is " + normalizedStatus.replace('_', ' ');
@@ -718,14 +880,7 @@ public final class FlowGraphValidator {
         if (dynamicContext) {
             return;
         }
-        List<String> values;
-        try {
-            values = catalogs.values(sourceId, query);
-        } catch (RuntimeException exception) {
-            diagnostics.add(error("CATALOG_QUERY_FAILED", graphId, nodeId, pin.getName(), "Option catalog values could not be resolved: " + sourceId,
-                "Check the catalog provider and try again"));
-            return;
-        }
+        List<String> values = capture.values();
         boolean matches = values != null && values.stream().anyMatch(candidate -> candidate != null
             && (candidate.equals(literal) || minecraftCatalogValueMatches(sourceId, candidate, literal)));
         if (!matches) {
@@ -759,15 +914,22 @@ public final class FlowGraphValidator {
             .anyMatch(adapter -> sourceId.equals(adapter.catalogSource()));
     }
 
-    private Map<String, Object> catalogContext(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition.PinDefinition pin) {
+    private Map<String, Object> catalogContext(FlowGraph graph, String nodeId, FlowNode node, NodeDefinition definition,
+                                               NodeDefinition.PinDefinition pin) {
         Map<String, Object> context = new HashMap<>();
         if (node.getInputValues() != null) {
             context.putAll(node.getInputValues());
         }
         for (FlowConnection connection : graph.getConnectionsToTarget(nodeId)) {
             context.remove(connection.getTargetPin());
+            NodeDefinition.PinDefinition target = findInputPin(definition, node, connection.getTargetPin());
+            if (target != null) {
+                context.remove(target.getName());
+                context.remove(target.getRuntimeName());
+            }
         }
         context.remove(pin.getName());
+        context.remove(pin.getRuntimeName());
         context.put("$nodeType", node.getType() != null ? node.getType() : "");
         context.put("$pin", pin.getName());
         return context;
@@ -840,7 +1002,7 @@ public final class FlowGraphValidator {
                 diagnostics.add(error("TARGET_PIN_UNKNOWN", graph.getId(), targetNodeId, connection.getTargetPin(), "Connection ends at an unknown input pin", "Reconnect to a current input pin"));
                 continue;
             }
-            if (!isRepeatablePinActive(graph.getNodes().get(targetNodeId), target, connection.getTargetPin())) {
+            if (!isRepeatablePinActive(graph.getNodes().get(targetNodeId), targetDefinition, target, connection.getTargetPin())) {
                 diagnostics.add(error("REPEATABLE_PIN_INACTIVE", graph.getId(), targetNodeId, connection.getTargetPin(),
                     "Connection targets an inactive repeatable input", "Add the repeatable item or remove the stale connection"));
                 continue;
@@ -851,7 +1013,7 @@ public final class FlowGraphValidator {
                 diagnostics.add(error("CONNECTION_TYPE_INCOMPATIBLE", graph.getId(), targetNodeId, target.getName(),
                     "Cannot connect " + sourceRef + " to " + targetRef, "Insert an explicit conversion or choose a compatible pin"));
             }
-            String targetKey = targetNodeId + '\u0000' + connection.getTargetPin();
+            String targetKey = targetNodeId + '\u0000' + normalizedPinIdentity(target, connection.getTargetPin());
             if (!isExecution(target) && !occupiedTargets.add(targetKey)) {
                 diagnostics.add(error("CONNECTION_TARGET_DUPLICATE", graph.getId(), targetNodeId, target.getName(),
                     "Input pin has more than one connection",
@@ -889,6 +1051,14 @@ public final class FlowGraphValidator {
 
     private boolean isTemporal(FlowDataType type) {
         return type == FlowDataType.INSTANT || type == FlowDataType.DURATION;
+    }
+
+    private String normalizedPinIdentity(NodeDefinition.PinDefinition pin, String persistedName) {
+        if (pin == null) {
+            return persistedName;
+        }
+        int index = repeatableIndex(pin, persistedName);
+        return index > 1 ? pin.getName() + "_" + index : pin.getName();
     }
 
     private Map<String, Map<String, FlowTypeRef>> inferTypeBindings(FlowGraph graph, Map<String, NodeDefinition> resolved,
@@ -1127,7 +1297,7 @@ public final class FlowGraphValidator {
             return false;
         }
         String id = definition.getId();
-        return "function.start".equals(id) || "function.function_start".equals(id);
+        return isFunctionStartType(id) || hasHandlerOperation(definition, "function_start");
     }
 
     private boolean isRequiredFunctionTerminal(NodeDefinition definition) {
@@ -1135,43 +1305,113 @@ public final class FlowGraphValidator {
             return false;
         }
         String id = definition.getId();
-        return "function.function_output".equals(id) || "function.end".equals(id) || "function.function_end".equals(id) || "return".equals(id);
+        return "function_output".equals(id) || "function.function_output".equals(id)
+            || isFunctionEndType(id) || "return".equals(id)
+            || hasHandlerOperation(definition, "function_output")
+            || hasHandlerOperation(definition, "return_value");
     }
 
     private NodeDefinition.PinDefinition findPin(List<NodeDefinition.PinDefinition> pins, String name) {
-        if (name == null) {
-            return null;
-        }
-        NodeDefinition.PinDefinition direct = pins.stream().filter(pin -> name.equals(pin.getName())).findFirst().orElse(null);
-        if (direct != null) {
-            return direct;
-        }
-        for (NodeDefinition.PinDefinition pin : pins) {
-            NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
-            if (repeatable == null || !name.startsWith(pin.getName() + "_")) {
-                continue;
-            }
-            String suffix = name.substring(pin.getName().length() + 1);
-            if (!suffix.isEmpty() && suffix.length() <= 9 && suffix.chars().allMatch(Character::isDigit)) {
-                int index = Integer.parseInt(suffix);
-                if (index >= 2 && index <= repeatable.getMaxItems()) return pin;
-            }
-        }
-        if ("next".equals(name)) {
-            return pins.stream().filter(pin -> "flow".equals(pin.getName()) && isExecution(pin)).findFirst().orElse(null);
-        }
-        if ("flow".equals(name)) {
-            return pins.stream().filter(pin -> "next".equals(pin.getName()) && isExecution(pin)).findFirst().orElse(null);
-        }
-        return null;
+        return resolvePin(pins, name).pin();
     }
 
     private NodeDefinition.PinDefinition findInputPin(NodeDefinition definition, FlowNode node, String name) {
-        NodeDefinition.PinDefinition declared = findPin(definition.getInputs(), name);
-        if (declared != null || !isTemplateInput(node, name)) {
-            return declared;
+        PinResolution declared = resolvePin(definition != null ? definition.getInputs() : null, name);
+        if (declared.pin() != null || declared.ambiguous() || !isTemplateInput(node, name)) {
+            return declared.pin();
         }
-        return new NodeDefinition.PinDefinition(name, NodeDefinition.PinType.DATA, NodeDefinition.PinDirection.INPUT, FlowDataType.ANY, true);
+        return new NodeDefinition.PinDefinition(PinId.of(name), name, NodeDefinition.PinType.DATA,
+            NodeDefinition.PinDirection.INPUT, FlowDataType.ANY, true);
+    }
+
+    private PinResolution resolvePin(List<NodeDefinition.PinDefinition> pins, String name) {
+        if (pins == null || name == null || name.isBlank()) {
+            return PinResolution.missing();
+        }
+        List<NodeDefinition.PinDefinition> stableMatches = pins.stream()
+            .filter(Objects::nonNull)
+            .filter(pin -> name.equals(pin.getName()))
+            .toList();
+        if (stableMatches.size() == 1) {
+            return PinResolution.found(stableMatches.getFirst());
+        }
+        if (stableMatches.size() > 1) {
+            return PinResolution.ambiguousMatch();
+        }
+        List<NodeDefinition.PinDefinition> runtimeMatches = pins.stream()
+            .filter(Objects::nonNull)
+            .filter(pin -> name.equals(pin.getRuntimeName()))
+            .toList();
+        if (runtimeMatches.size() == 1) {
+            return PinResolution.found(runtimeMatches.getFirst());
+        }
+        if (runtimeMatches.size() > 1) {
+            return PinResolution.ambiguousMatch();
+        }
+        List<NodeDefinition.PinDefinition> repeatableMatches = new ArrayList<>();
+        for (NodeDefinition.PinDefinition pin : pins) {
+            if (pin == null || pin.getRepeatable() == null) {
+                continue;
+            }
+            String base = repeatableBase(name, pin);
+            if (base != null && isRepeatableIndex(base, name, pin.getRepeatable().getMaxItems())) {
+                repeatableMatches.add(pin);
+            }
+        }
+        if (repeatableMatches.size() == 1) {
+            return PinResolution.found(repeatableMatches.getFirst());
+        }
+        if (repeatableMatches.size() > 1) {
+            return PinResolution.ambiguousMatch();
+        }
+        if ("next".equals(name)) {
+            return executionAlias(pins, "flow");
+        }
+        if ("flow".equals(name)) {
+            return executionAlias(pins, "next");
+        }
+        return PinResolution.missing();
+    }
+
+    private PinResolution executionAlias(List<NodeDefinition.PinDefinition> pins, String stableName) {
+        List<NodeDefinition.PinDefinition> matches = pins.stream()
+            .filter(Objects::nonNull)
+            .filter(pin -> (stableName.equals(pin.getName()) || stableName.equals(pin.getRuntimeName())) && isExecution(pin))
+            .toList();
+        return matches.size() == 1 ? PinResolution.found(matches.getFirst())
+            : matches.size() > 1 ? PinResolution.ambiguousMatch() : PinResolution.missing();
+    }
+
+    private String repeatableBase(String name, NodeDefinition.PinDefinition pin) {
+        String stablePrefix = pin.getName() + "_";
+        if (name.startsWith(stablePrefix)) {
+            return pin.getName();
+        }
+        String runtimePrefix = pin.getRuntimeName() + "_";
+        return name.startsWith(runtimePrefix) ? pin.getRuntimeName() : null;
+    }
+
+    private boolean isRepeatableIndex(String base, String name, int maxItems) {
+        String suffix = name.substring(base.length() + 1);
+        if (suffix.isEmpty() || suffix.length() > 9 || !suffix.chars().allMatch(Character::isDigit)) {
+            return false;
+        }
+        int index = Integer.parseInt(suffix);
+        return index >= 2 && index <= maxItems;
+    }
+
+    private record PinResolution(NodeDefinition.PinDefinition pin, boolean ambiguous) {
+        private static PinResolution found(NodeDefinition.PinDefinition pin) {
+            return new PinResolution(pin, false);
+        }
+
+        private static PinResolution ambiguousMatch() {
+            return new PinResolution(null, true);
+        }
+
+        private static PinResolution missing() {
+            return new PinResolution(null, false);
+        }
     }
 
     private boolean isTemplateInput(FlowNode node, String name) {
@@ -1243,12 +1483,12 @@ public final class FlowGraphValidator {
             .anyMatch(repeatable -> groupId.equals(repeatable.getGroupId()));
     }
 
-    private boolean isRepeatablePinActive(FlowNode node, NodeDefinition.PinDefinition pin, String pinName) {
+    private boolean isRepeatablePinActive(FlowNode node, NodeDefinition definition, NodeDefinition.PinDefinition pin, String pinName) {
         NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
         if (repeatable == null || node == null) {
             return true;
         }
-        int index = repeatableIndex(pin.getName(), pinName);
+        int index = repeatableIndex(pin, pinName);
         if (index < 1) {
             return true;
         }
@@ -1263,7 +1503,8 @@ public final class FlowGraphValidator {
             Object removed = values.get("__removed_optional_inputs");
             if (removed instanceof Iterable<?> names) {
                 for (Object name : names) {
-                    if (pinName.equals(String.valueOf(name))) {
+                    if (name != null && normalizedInputIdentity(definition, pinName).equals(
+                        normalizedInputIdentity(definition, String.valueOf(name)))) {
                         return false;
                     }
                 }
@@ -1272,16 +1513,29 @@ public final class FlowGraphValidator {
         return index <= Math.clamp(count, repeatable.getMinItems(), repeatable.getMaxItems());
     }
 
-    private int repeatableIndex(String baseName, String pinName) {
-        if (baseName.equals(pinName)) {
-            return 1;
-        }
-        String prefix = baseName + "_";
-        if (pinName == null || !pinName.startsWith(prefix)) {
+    private String normalizedInputIdentity(NodeDefinition definition, String pinName) {
+        PinResolution resolved = resolvePin(definition != null ? definition.getInputs() : null, pinName);
+        return resolved.pin() != null ? FlowRuntime.normalizeInputPin(definition, pinName) : pinName;
+    }
+
+    private int repeatableIndex(NodeDefinition.PinDefinition pin, String pinName) {
+        if (pin == null || pinName == null) {
             return -1;
         }
-        String suffix = pinName.substring(prefix.length());
-        return !suffix.isEmpty() && suffix.length() <= 9 && suffix.chars().allMatch(Character::isDigit) ? Integer.parseInt(suffix) : -1;
+        if (pin.getName().equals(pinName) || pin.getRuntimeName().equals(pinName)) {
+            return 1;
+        }
+        for (String baseName : List.of(pin.getName(), pin.getRuntimeName())) {
+            String prefix = baseName + "_";
+            if (!pinName.startsWith(prefix)) {
+                continue;
+            }
+            String suffix = pinName.substring(prefix.length());
+            if (!suffix.isEmpty() && suffix.length() <= 9 && suffix.chars().allMatch(Character::isDigit)) {
+                return Integer.parseInt(suffix);
+            }
+        }
+        return -1;
     }
 
     private int repeatableCount(Object stored, int fallback) {

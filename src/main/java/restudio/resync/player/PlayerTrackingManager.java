@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import org.bukkit.entity.Player;
 import restudio.resync.Log;
 import restudio.resync.ReSync;
+import restudio.resync.migration.MigrationPaths;
+import restudio.resync.server.ReSyncServer;
 import restudio.resync.storage.StorageSafety;
 
 import java.io.IOException;
@@ -19,44 +21,131 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 public class PlayerTrackingManager implements PlayerTrackingService {
     private static final int MAX_RECENT_EVENTS = 250;
     private static final int MAX_SESSIONS = 100;
-    private final ReSync plugin;
-    private final Path dossierDirectory;
+    private volatile Path dossierDirectory;
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final Map<UUID, PlayerDossier> dossiers = new ConcurrentHashMap<>();
     private final List<PlayerTrackingListener> listeners = new CopyOnWriteArrayList<>();
+    private final ReentrantReadWriteLock persistenceFence = new ReentrantReadWriteLock(true);
+    private volatile PersistenceState persistenceState = PersistenceState.OPEN;
+
+    private enum PersistenceState {
+        OPEN,
+        QUIESCED
+    }
 
     public PlayerTrackingManager(ReSync plugin) {
-        this.plugin = plugin;
-        this.dossierDirectory = plugin.getDataFolder().toPath().resolve("player-dossiers");
+        this(resolveDataRoot(plugin));
+    }
+
+    public PlayerTrackingManager(Path dataRoot) {
+        Path scope = MigrationPaths.requirePath(dataRoot, "dataRoot");
+        this.dossierDirectory = scope.resolve("player-dossiers").toAbsolutePath().normalize();
         ensureDirectory();
         loadAll();
     }
 
+    public Path getDossierDirectory() {
+        return dossierDirectory;
+    }
+
+    private static Path resolveDataRoot(ReSync plugin) {
+        if (plugin == null) {
+            throw new IllegalArgumentException("Plugin is required");
+        }
+        ReSyncServer server = plugin.getReSyncServer();
+        return server == null ? plugin.getDataFolder().toPath() : server.getDataRoot();
+    }
+
+    public synchronized void flushPersistence() throws IOException {
+        persistenceFence.writeLock().lock();
+        try {
+            requireDossierDirectory();
+            StorageSafety.forceDirectory(dossierDirectory);
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public void quiescePersistence() {
+        persistenceFence.writeLock().lock();
+        try {
+            persistenceState = PersistenceState.QUIESCED;
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public void resumePersistence() throws IOException {
+        persistenceFence.writeLock().lock();
+        try {
+            healthCheckPersistenceLocked();
+            persistenceState = PersistenceState.OPEN;
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public void rebindPersistence(Path candidateDossierRoot) throws IOException {
+        persistenceFence.writeLock().lock();
+        try {
+            if (persistenceState != PersistenceState.QUIESCED) {
+                throw new IOException("Player dossier persistence must be quiesced before rebind");
+            }
+            Path candidate = requireDossierDirectory(candidateDossierRoot, "player dossier rebind root");
+            Map<UUID, PlayerDossier> loaded = readDossiers(candidate);
+            dossierDirectory = candidate;
+            dossiers.clear();
+            dossiers.putAll(loaded);
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public void healthCheckPersistence() throws IOException {
+        persistenceFence.writeLock().lock();
+        try {
+            healthCheckPersistenceLocked();
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
     @Override
     public Collection<PlayerDossier> getDossiers() {
-        List<PlayerDossier> copies = new ArrayList<>();
-        for (PlayerDossier dossier : dossiers.values()) {
-            synchronized (dossier) {
-                copies.add(dossier.copy());
+        persistenceFence.readLock().lock();
+        try {
+            List<PlayerDossier> copies = new ArrayList<>();
+            for (PlayerDossier dossier : dossiers.values()) {
+                synchronized (dossier) {
+                    copies.add(dossier.copy());
+                }
             }
+            copies.sort(Comparator.comparing(PlayerDossier::getPlayerName, String.CASE_INSENSITIVE_ORDER));
+            return copies;
+        } finally {
+            persistenceFence.readLock().unlock();
         }
-        copies.sort(Comparator.comparing(PlayerDossier::getPlayerName, String.CASE_INSENSITIVE_ORDER));
-        return copies;
     }
 
     @Override
     public PlayerDossier getDossier(UUID playerId) {
-        PlayerDossier dossier = dossiers.get(playerId);
-        if (dossier == null) {
-            return null;
-        }
-        synchronized (dossier) {
-            return dossier.copy();
+        persistenceFence.readLock().lock();
+        try {
+            PlayerDossier dossier = dossiers.get(playerId);
+            if (dossier == null) {
+                return null;
+            }
+            synchronized (dossier) {
+                return dossier.copy();
+            }
+        } finally {
+            persistenceFence.readLock().unlock();
         }
     }
 
@@ -174,15 +263,21 @@ public class PlayerTrackingManager implements PlayerTrackingService {
     }
 
     private void update(UUID playerId, String playerName, Consumer<PlayerDossier> mutator, String reason) {
-        PlayerDossier dossier = dossiers.computeIfAbsent(playerId, this::createDossier);
         PlayerDossier snapshot;
-        synchronized (dossier) {
-            if (playerName != null && !playerName.isBlank()) {
-                dossier.setPlayerName(playerName);
+        persistenceFence.readLock().lock();
+        try {
+            requirePersistenceOpen();
+            PlayerDossier dossier = dossiers.computeIfAbsent(playerId, this::createDossier);
+            synchronized (dossier) {
+                if (playerName != null && !playerName.isBlank()) {
+                    dossier.setPlayerName(playerName);
+                }
+                mutator.accept(dossier);
+                snapshot = dossier.copy();
+                save(snapshot);
             }
-            mutator.accept(dossier);
-            snapshot = dossier.copy();
-            save(snapshot);
+        } finally {
+            persistenceFence.readLock().unlock();
         }
         notifyListeners(PlayerTrackingUpdate.delta(reason, snapshot));
     }
@@ -208,6 +303,7 @@ public class PlayerTrackingManager implements PlayerTrackingService {
     private void ensureDirectory() {
         try {
             Files.createDirectories(dossierDirectory);
+            requireDossierDirectory();
         } catch (IOException e) {
             Log.warn("Failed to create dossier directory: " + e.getMessage());
         }
@@ -287,6 +383,77 @@ public class PlayerTrackingManager implements PlayerTrackingService {
         } catch (IllegalArgumentException e) {
             Log.warn("Rejected unsafe dossier id " + dossier.getPlayerId() + ": " + e.getMessage());
         }
+    }
+
+    private void requirePersistenceOpen() {
+        if (persistenceState != PersistenceState.OPEN) {
+            throw new IllegalStateException("Player dossier persistence is quiesced; mutation rejected");
+        }
+    }
+
+    private void healthCheckPersistenceLocked() throws IOException {
+        Path root = requireDossierDirectory();
+        readDossiers(root);
+        StorageSafety.forceDirectory(root);
+    }
+
+    private Path requireDossierDirectory() throws IOException {
+        return requireDossierDirectory(dossierDirectory, "player dossier root");
+    }
+
+    private Path requireDossierDirectory(Path root, String name) throws IOException {
+        Path normalized = MigrationPaths.requireDirectory(root, name);
+        MigrationPaths.requireNoSymlinkTree(normalized);
+        return normalized;
+    }
+
+    private Map<UUID, PlayerDossier> readDossiers(Path root) throws IOException {
+        Map<UUID, PlayerDossier> loaded = new LinkedHashMap<>();
+        try (var stream = Files.list(root)) {
+            for (Path path : stream.sorted().toList()) {
+                if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) {
+                    throw new IOException("Player dossier root contains a non-regular file: " + path.getFileName());
+                }
+                String fileName = path.getFileName().toString();
+                if (!fileName.endsWith(".json")) {
+                    throw new IOException("Player dossier root contains an unexpected file: " + fileName);
+                }
+                String fileId;
+                try {
+                    fileId = StorageSafety.validateId(fileName.substring(0, fileName.length() - 5));
+                } catch (IllegalArgumentException exception) {
+                    throw new IOException("Player dossier has an unsafe file name: " + fileName, exception);
+                }
+                PlayerDossier dossier;
+                try {
+                    dossier = gson.fromJson(StorageSafety.readUtf8(path), PlayerDossier.class);
+                } catch (RuntimeException exception) {
+                    throw new IOException("Failed to parse player dossier: " + fileName, exception);
+                }
+                if (dossier == null || dossier.getPlayerId() == null || dossier.getPlayerId().isBlank()) {
+                    throw new IOException("Player dossier is missing its player id: " + fileName);
+                }
+                try {
+                    StorageSafety.validateId(dossier.getPlayerId());
+                } catch (IllegalArgumentException exception) {
+                    throw new IOException("Player dossier has an unsafe player id: " + fileName, exception);
+                }
+                UUID playerId;
+                try {
+                    playerId = UUID.fromString(dossier.getPlayerId());
+                } catch (IllegalArgumentException exception) {
+                    throw new IOException("Player dossier has an invalid player id: " + fileName, exception);
+                }
+                if (!fileId.equals(dossier.getPlayerId())) {
+                    throw new IOException("Player dossier file id does not match its player id: " + fileName);
+                }
+                normalizeLoadedDossier(dossier);
+                if (loaded.put(playerId, dossier) != null) {
+                    throw new IOException("Duplicate player dossier id: " + dossier.getPlayerId());
+                }
+            }
+        }
+        return loaded;
     }
 
     private void notifyListeners(PlayerTrackingUpdate update) {

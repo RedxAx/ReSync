@@ -17,9 +17,11 @@ public class ConnectionInfo {
     private final AtomicLong bytesReceived;
     private final AtomicInteger lastInboundDataSequence;
     private volatile ConnectionState state;
+    private volatile boolean protocolResourceAccess;
     private String clientId;
     private String clientVersion;
     private Set<String> clientCapabilities = Set.of();
+    private volatile Set<String> negotiatedFlowCapabilities = Set.of();
 
     public ConnectionInfo(WebSocket webSocket, int connectionId) {
         this(webSocket, new FrameSender() {
@@ -45,6 +47,7 @@ public class ConnectionInfo {
         this.bytesReceived = new AtomicLong(0);
         this.lastInboundDataSequence = new AtomicInteger(-1);
         this.state = ConnectionState.CONNECTING;
+        this.protocolResourceAccess = false;
     }
 
     public WebSocket getWebSocket() {
@@ -53,6 +56,10 @@ public class ConnectionInfo {
 
     public FrameSender getFrameSender() {
         return frameSender;
+    }
+
+    public int getMaxEncodedFrameBytes() {
+        return frameSender == null ? FrameSender.UNBOUNDED_MAX_ENCODED_FRAME_BYTES : frameSender.getMaxEncodedFrameBytes();
     }
 
     public boolean isOpen() {
@@ -79,8 +86,16 @@ public class ConnectionInfo {
         return state;
     }
 
-    public void setState(ConnectionState state) {
+    public synchronized void setState(ConnectionState state) {
         this.state = state;
+    }
+
+    public boolean hasProtocolResourceAccess() {
+        return protocolResourceAccess;
+    }
+
+    public void setProtocolResourceAccess(boolean protocolResourceAccess) {
+        this.protocolResourceAccess = protocolResourceAccess;
     }
 
     public String getClientId() {
@@ -105,6 +120,23 @@ public class ConnectionInfo {
 
     public void setClientCapabilities(Set<String> clientCapabilities) {
         this.clientCapabilities = clientCapabilities != null ? Set.copyOf(clientCapabilities) : Set.of();
+    }
+
+    public Set<String> getNegotiatedFlowCapabilities() {
+        return negotiatedFlowCapabilities;
+    }
+
+    public void setNegotiatedFlowCapabilities(Set<String> negotiatedFlowCapabilities) {
+        this.negotiatedFlowCapabilities = negotiatedFlowCapabilities != null ? Set.copyOf(negotiatedFlowCapabilities) : Set.of();
+    }
+
+    public boolean hasNegotiatedFlowCapability(String capability) {
+        return capability != null && negotiatedFlowCapabilities.contains(capability);
+    }
+
+    public synchronized void clearProtocolSession() {
+        protocolResourceAccess = false;
+        negotiatedFlowCapabilities = Set.of();
     }
 
     public long getBytesSent() {

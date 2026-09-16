@@ -9,8 +9,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.migration.PersistenceOwnershipContext;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,9 +23,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NpcServiceTest {
+    @TempDir
+    Path temporary;
     private JavaPlugin plugin;
 
     @BeforeEach
@@ -145,8 +153,137 @@ class NpcServiceTest {
         service.shutdown();
     }
 
+    @Test
+    void replacementRuntimeDoesNotDispatchLegacyHookFallback() {
+        JsonObject definition = playerNpcDefinition();
+        definition.getAsJsonObject("hooks").addProperty("rightClickFlow", "legacy-right");
+        RecordingDispatcher dispatcher = new RecordingDispatcher();
+        TestNpcService service = service(definition, new TestPlayerNpcRuntime(), dispatcher, LegacyRuntimeActivationGate.runtime(Path.of("build", "npc-runtime-gate-test")));
+
+        service.dispatchInteraction("guide", false, null, null, location(), null, Map.of());
+
+        assertTrue(dispatcher.flowIds.isEmpty());
+        service.shutdown();
+    }
+
+    @Test
+    void replacementRuntimeDispatchesTypedNpcAction() {
+        JsonObject definition = playerNpcDefinition();
+        JsonObject action = new JsonObject();
+        action.addProperty("functionId", "typed-right");
+        definition.getAsJsonObject("hooks").add("rightClickAction", action);
+        RecordingDispatcher dispatcher = new RecordingDispatcher();
+        TestNpcService service = service(definition, new TestPlayerNpcRuntime(), dispatcher,
+            LegacyRuntimeActivationGate.runtime(Path.of("build", "npc-runtime-typed-test")));
+
+        service.dispatchInteraction("guide", false, null, null, location(), null, Map.of());
+
+        assertEquals(1, dispatcher.functionCalls.size());
+        service.shutdown();
+    }
+
+    @Test
+    void persistenceQuiesceBlocksPlayerNpcMutationsAndRestoration() throws Exception {
+        JsonObject definition = playerNpcDefinition();
+        TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
+        TestNpcService service = service(definition, runtime, new RecordingDispatcher());
+        PlayerNpcPersistenceParticipant participant = new PlayerNpcPersistenceParticipant(plugin.getDataFolder().toPath(), service);
+        participant.flush();
+        participant.quiesce();
+
+        assertNull(service.spawn("guide", location()));
+        assertFalse(service.despawn("guide"));
+        assertFalse(service.teleport("guide", location()));
+        service.reload("guide", definition, false);
+        service.restorePersistentNpcs();
+        assertEquals(0, runtime.spawnCount);
+        assertEquals(0, runtime.despawnCount);
+        participant.resume();
+        service.shutdown();
+    }
+
+    @Test
+    void activeDataRootBindsPlayerNpcServiceAndParticipantToTheSameFile() throws Exception {
+        Path activeRoot = Files.createDirectory(temporary.resolve("active"));
+        TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
+        TestNpcService service = service(playerNpcDefinition(), runtime, new RecordingDispatcher(), activeRoot);
+        PlayerNpcPersistenceParticipant participant = new PlayerNpcPersistenceParticipant(activeRoot, service);
+
+        assertEquals(activeRoot.resolve("runtime/player-npcs.json").toAbsolutePath().normalize(), service.persistenceRoot());
+        assertEquals(service.persistenceRoot(), participant.root());
+        participant.flush();
+        assertTrue(Files.isRegularFile(service.persistenceRoot()));
+        assertFalse(Files.exists(plugin.getDataFolder().toPath().resolve("runtime/player-npcs.json")));
+        service.shutdown();
+    }
+
+    @Test
+    void participantRebindAtomicallyMovesTheServiceBackingFile() throws Exception {
+        Path activeRoot = Files.createDirectory(temporary.resolve("active-rebind"));
+        Path candidateRoot = Files.createDirectory(temporary.resolve("candidate-rebind"));
+        TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
+        TestNpcService service = service(playerNpcDefinition(), runtime, new RecordingDispatcher(), activeRoot);
+        PlayerNpcPersistenceParticipant participant = new PlayerNpcPersistenceParticipant(activeRoot, service);
+        participant.flush();
+        service.spawn("guide", location());
+        assertTrue(runtime.isActive("guide"));
+        participant.quiesce();
+
+        participant.rebind(candidateRoot);
+
+        Path expected = candidateRoot.resolve("runtime/player-npcs.json").toAbsolutePath().normalize();
+        assertEquals(expected, service.persistenceRoot());
+        assertEquals(expected, participant.root());
+        assertTrue(Files.isRegularFile(expected));
+        assertFalse(runtime.isActive("guide"));
+        participant.resume();
+        service.shutdown();
+    }
+
+    @Test
+    void failedRuntimeRebindRestoresThePreviousFileAndActiveInstance() throws Exception {
+        Path activeRoot = Files.createDirectory(temporary.resolve("active-rebind-rollback"));
+        Path candidateRoot = Files.createDirectory(temporary.resolve("candidate-rebind-rollback"));
+        TestPlayerNpcRuntime runtime = new TestPlayerNpcRuntime();
+        TestNpcService service = service(playerNpcDefinition(), runtime, new RecordingDispatcher(), activeRoot);
+        PlayerNpcPersistenceParticipant participant = new PlayerNpcPersistenceParticipant(activeRoot, service);
+        participant.flush();
+        service.spawn("guide", location());
+        participant.quiesce();
+        runtime.failDespawn = true;
+
+        assertThrows(java.io.IOException.class, () -> participant.rebind(candidateRoot));
+        assertEquals(activeRoot.resolve("runtime/player-npcs.json").toAbsolutePath().normalize(), service.persistenceRoot());
+        assertTrue(runtime.isActive("guide"));
+        runtime.failDespawn = false;
+        participant.resume();
+        service.shutdown();
+    }
+
+    @Test
+    void playerNpcOwnershipIndexClaimsOnlyThePersistenceFile() throws Exception {
+        TestNpcService service = service(playerNpcDefinition(), new TestPlayerNpcRuntime(), new RecordingDispatcher());
+        PlayerNpcPersistenceParticipant participant = new PlayerNpcPersistenceParticipant(
+            plugin.getDataFolder().toPath(), service);
+        var index = participant.ownershipIndex(new PersistenceOwnershipContext(
+            plugin.getDataFolder().toPath(), participant.root()));
+
+        assertTrue(index.owns("runtime/player-npcs.json"));
+        assertFalse(index.owns("runtime/player-npcs.json.tmp"));
+        assertFalse(index.owns("runtime/player-npcs.json/nested"));
+        service.shutdown();
+    }
+
     private TestNpcService service(JsonObject definition, PlayerNpcRuntime runtime, RuntimeFlowDispatcher dispatcher) {
         return new TestNpcService(plugin, definition, runtime, dispatcher);
+    }
+
+    private TestNpcService service(JsonObject definition, PlayerNpcRuntime runtime, RuntimeFlowDispatcher dispatcher, LegacyRuntimeActivationGate gate) {
+        return new TestNpcService(plugin, definition, runtime, dispatcher, gate);
+    }
+
+    private TestNpcService service(JsonObject definition, PlayerNpcRuntime runtime, RuntimeFlowDispatcher dispatcher, Path activeDataRoot) {
+        return new TestNpcService(plugin, definition, runtime, dispatcher, activeDataRoot);
     }
 
     private JsonObject playerNpcDefinition() {
@@ -169,6 +306,18 @@ class NpcServiceTest {
             this.definition = definition;
         }
 
+        private TestNpcService(JavaPlugin plugin, JsonObject definition, PlayerNpcRuntime runtime, RuntimeFlowDispatcher dispatcher,
+                               LegacyRuntimeActivationGate gate) {
+            super(plugin, null, null, dispatcher, null, null, null, runtime, new NamespacedKey(plugin, "resync_npc_id"), gate, null);
+            this.definition = definition;
+        }
+
+        private TestNpcService(JavaPlugin plugin, JsonObject definition, PlayerNpcRuntime runtime, RuntimeFlowDispatcher dispatcher,
+                               Path activeDataRoot) {
+            super(plugin, null, null, dispatcher, null, null, null, runtime, null, activeDataRoot);
+            this.definition = definition;
+        }
+
         @Override
         public JsonObject get(String id) {
             return definition;
@@ -181,6 +330,7 @@ class NpcServiceTest {
 
     private static final class RecordingDispatcher extends RuntimeFlowDispatcher {
         private final List<String> flowIds = new ArrayList<>();
+        private final List<JsonObject> functionCalls = new ArrayList<>();
 
         private RecordingDispatcher() {
             super(null, null);
@@ -191,6 +341,12 @@ class NpcServiceTest {
             flowIds.add(flowId);
             return true;
         }
+
+        @Override
+        public boolean dispatchFunction(JsonObject call, Player player, Event event, Map<String, Object> variables) {
+            functionCalls.add(call);
+            return true;
+        }
     }
 
     private static final class TestPlayerNpcRuntime implements PlayerNpcRuntime {
@@ -199,6 +355,7 @@ class NpcServiceTest {
         private int spawnCount;
         private int despawnCount;
         private int reloadCount;
+        private boolean failDespawn;
 
         @Override
         public boolean available() {
@@ -221,6 +378,9 @@ class NpcServiceTest {
         @Override
         public boolean despawn(String id) {
             if (!isActive(id)) {
+                return false;
+            }
+            if (failDespawn) {
                 return false;
             }
             activeId = null;

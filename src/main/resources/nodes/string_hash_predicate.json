@@ -1,0 +1,230 @@
+[
+  {
+    "id": "string_md5",
+    "displayName": "MD5",
+    "description": "Create a deterministic lowercase hexadecimal MD5 hash from text. Missing or null input is treated as empty text before its UTF-8 bytes are hashed.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "hash", "md5"],
+    "legacyIds": ["string.md5"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "md5"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to hash. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "hash", "displayName": "Hash", "name": "hash", "pinType": "DATA", "dataType": "string", "description": "Returns the deterministic lowercase hexadecimal MD5 hash of the input's UTF-8 bytes."}
+    ]
+  },
+  {
+    "id": "string_sha256",
+    "displayName": "SHA-256",
+    "description": "Create a deterministic lowercase hexadecimal SHA-256 hash from text. Missing or null input is treated as empty text before its UTF-8 bytes are hashed.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "hash", "sha256"],
+    "legacyIds": ["string.sha256"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "sha256"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to hash. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "hash", "displayName": "Hash", "name": "hash", "pinType": "DATA", "dataType": "string", "description": "Returns the deterministic lowercase hexadecimal SHA-256 hash of the input's UTF-8 bytes."}
+    ]
+  },
+  {
+    "id": "string_sha512",
+    "displayName": "SHA-512",
+    "description": "Create a deterministic lowercase hexadecimal SHA-512 hash from text. Missing or null input is treated as empty text before its UTF-8 bytes are hashed.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "hash", "sha512"],
+    "legacyIds": ["string.sha512"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "sha512"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to hash. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "hash", "displayName": "Hash", "name": "hash", "pinType": "DATA", "dataType": "string", "description": "Returns the deterministic lowercase hexadecimal SHA-512 hash of the input's UTF-8 bytes."}
+    ]
+  },
+  {
+    "id": "string_is_alpha",
+    "displayName": "Is Alpha",
+    "description": "Check whether text contains only ASCII letters. Missing or null input is treated as empty text and returns false.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "alpha"],
+    "legacyIds": ["string.is_alpha"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_alpha"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to check. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "is_alpha", "displayName": "Is Alpha", "name": "is_alpha", "pinType": "DATA", "dataType": "boolean", "description": "Returns true only when the text is non-empty and contains only ASCII letters."}
+    ]
+  },
+  {
+    "id": "string_is_alphanumeric",
+    "displayName": "Is Alphanumeric",
+    "description": "Check whether text contains only ASCII letters and digits. Missing or null input is treated as empty text and returns false.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "alphanumeric"],
+    "legacyIds": ["string.is_alphanumeric"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_alphanumeric"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to check. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "is_alphanumeric", "displayName": "Is Alphanumeric", "name": "is_alphanumeric", "pinType": "DATA", "dataType": "boolean", "description": "Returns true only when the text is non-empty and contains only ASCII letters and digits."}
+    ]
+  },
+  {
+    "id": "string_is_email",
+    "displayName": "Is Email",
+    "description": "Check whether text matches the supported email format. Missing or null input is treated as empty text and returns false.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "email"],
+    "legacyIds": ["string.is_email"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "is_email"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Email text to check. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "is_email", "displayName": "Is Email", "name": "is_email", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the text matches the supported email format and false otherwise."}
+    ]
+  },
+  {
+    "id": "string_contains",
+    "displayName": "Contains",
+    "description": "Check whether text contains a substring. Each missing or null input is treated as empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "contains"],
+    "legacyIds": ["string.contains"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "contains"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to search. Missing or null input is treated as empty text."},
+      {"id": "substring", "displayName": "Substring", "name": "substring", "pinType": "DATA", "dataType": "string", "description": "Text to find. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when Value contains Substring after missing or null inputs are replaced with empty text."}
+    ]
+  },
+  {
+    "id": "string_matches",
+    "displayName": "Matches",
+    "description": "Check whether text matches a regular expression. Missing or null inputs use empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "regex"],
+    "legacyIds": ["string.matches"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "matches"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to match. Missing or null input uses empty text."},
+      {"id": "pattern", "displayName": "Pattern", "name": "pattern", "pinType": "DATA", "dataType": "string", "description": "Regular expression to apply to the value. Missing or null input uses an empty pattern."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "True when the complete value matches the regular expression."}
+    ]
+  },
+  {
+    "id": "string_equals_ignore_case",
+    "displayName": "String Equals Ignore Case",
+    "description": "Compare two text values without considering letter case. Missing or null inputs use empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "predicate", "compare"],
+    "legacyIds": ["string.equals_ignore_case"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "equals_ignore_case"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "First text value to compare. Missing or null input uses empty text."},
+      {"id": "other", "displayName": "Other", "name": "other", "pinType": "DATA", "dataType": "string", "description": "Second text value to compare. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "boolean", "description": "True when both text values are equal without considering letter case."}
+    ]
+  }
+]

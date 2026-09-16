@@ -1,212 +1,439 @@
 package restudio.resync.resources;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.AssetTransactionCoordinator.ProjectDelta;
+import restudio.resync.storage.AssetTransactionCoordinator.TransactionRequest;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JsonAssetStoreTest {
-    @TempDir
-    Path tempDir;
     private static final Gson GSON = new Gson();
 
+    @TempDir
+    Path tempDir;
+
     @Test
-    void savesLoadsListsAndDeletesAssetFiles() throws Exception {
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            tempDir.resolve("legacy"),
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
+    void coordinatesPayloadMetadataBlobAndTombstoneLineage() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+            AssetTransactionCoordinator.Snapshot metadata = coordinator.read(snapshot -> snapshot);
+            coordinator.transact(new TransactionRequest(UUID.randomUUID(), metadata.project(), List.of(),
+                List.of(ProjectDelta.set(List.of("unknown"), new JsonPrimitive("preserved")))));
+            Path icon = assets.resolve("Icons/main.png");
+            byte[] iconBytes = "icon".getBytes(StandardCharsets.UTF_8);
+            UUID saveMutation = UUID.fromString("11111111-1111-4111-8111-111111111111");
 
-        store.save(new TestResource("main", "Main"));
+            store.save(new TestResource("main", "Main"), Map.of(icon, iconBytes), saveMutation, 0L);
 
-        assertEquals("Main", store.get("main").name());
-        assertEquals("main", store.listIds().getFirst());
-        Path file = tempDir.resolve("assets").resolve("GUIs").resolve("main.json");
-        assertTrue(Files.exists(file));
-        assertTrue(Files.readString(file).contains("\"resourceType\":\"gui\""));
+            JsonAssetStore.AssetStamp live = store.readStamp("main");
+            assertEquals(1L, live.revision());
+            assertEquals(saveMutation, live.mutationId());
+            assertFalse(live.deleted());
+            assertArrayEquals(iconBytes, Files.readAllBytes(icon));
+            JsonObject project = JsonParser.parseString(Files.readString(assets.resolve("project.json"))).getAsJsonObject();
+            assertEquals("preserved", project.get("unknown").getAsString());
+            assertEquals("gui", project.getAsJsonArray("resources").get(0).getAsJsonObject().get("type").getAsString());
+            assertEquals("main", project.getAsJsonArray("resources").get(0).getAsJsonObject().get("id").getAsString());
+            assertThrows(IllegalStateException.class, () -> store.save(new TestResource("main", "Main"),
+                Map.of(icon, "changed".getBytes(StandardCharsets.UTF_8)), saveMutation, 0L));
+            Files.write(icon, "corrupt".getBytes(StandardCharsets.UTF_8));
+            assertThrows(IllegalStateException.class,
+                () -> store.save(new TestResource("main", "Main"), Map.of(icon, iconBytes), saveMutation, 0L));
+            Files.write(icon, iconBytes);
 
-        store.delete("main");
+            UUID deleteMutation = UUID.fromString("22222222-2222-4222-8222-222222222222");
+            store.delete("main", deleteMutation, live.revision());
 
-        assertFalse(Files.exists(file));
+            JsonAssetStore.AssetStamp deleted = store.readStamp("main");
+            assertEquals(2L, deleted.revision());
+            assertEquals(deleteMutation, deleted.mutationId());
+            assertEquals(live.payloadHash(), deleted.payloadHash());
+            assertTrue(deleted.deleted());
+            JsonObject afterDelete = JsonParser.parseString(Files.readString(assets.resolve("project.json"))).getAsJsonObject();
+            assertEquals("preserved", afterDelete.get("unknown").getAsString());
+            assertTrue(afterDelete.getAsJsonArray("resources").isEmpty());
+        }
     }
 
     @Test
-    void rejectsUnsafeIds() {
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            tempDir.resolve("legacy"),
-            "tab",
-            "Customization/Tabs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
+    void historicalRetryIsExactAndDoesNotRestoreStaleCacheState() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        UUID firstMutation = UUID.fromString("33333333-3333-4333-8333-333333333333");
+        UUID secondMutation = UUID.fromString("44444444-4444-4444-8444-444444444444");
+        TestResource first = new TestResource("main", "First");
+        TestResource second = new TestResource("main", "Second");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+            store.save(first, firstMutation, 0L);
+            store.save(second, secondMutation, 1L);
+        }
 
-        assertThrows(IllegalArgumentException.class, () -> store.save(new TestResource("../bad", "Bad")));
+        try (AssetTransactionCoordinator reopenedCoordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> reopened = store(assets, reopenedCoordinator)) {
+            reopened.save(first, firstMutation, 0L);
+
+            assertEquals("Second", reopened.get("main").name());
+            assertEquals(secondMutation, reopened.readStamp("main").mutationId());
+            assertEquals(2L, reopened.readStamp("main").revision());
+            assertThrows(IllegalStateException.class,
+                () -> reopened.save(new TestResource("main", "Changed"), firstMutation, 0L));
+        }
     }
 
     @Test
-    void rejectedReloadRestoresLastValidatedCachedValue() throws Exception {
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            tempDir.resolve("legacy"),
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
-        store.save(new TestResource("main", "Main"));
-        Path file = tempDir.resolve("assets").resolve("GUIs").resolve("main.json");
-        Files.writeString(file, "{\"id\":\"main\",\"name\":\"Invalid\",\"resourceType\":\"gui\"}");
+    void reopensExactDeletedStampFromCoordinatorLineage() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        UUID deleteMutation = UUID.fromString("66666666-6666-4666-8666-666666666666");
+        JsonAssetStore.AssetStamp deleted;
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+            store.save(new TestResource("main", "Main"), UUID.randomUUID(), 0L);
+            store.delete("main", deleteMutation, 1L);
+            deleted = store.readStamp("main");
+        }
 
-        assertThrows(IllegalArgumentException.class, () -> store.reload("main", value -> {
-            if ("Invalid".equals(value.name())) {
-                throw new IllegalArgumentException("Rejected");
+        try (AssetTransactionCoordinator reopenedCoordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> reopened = store(assets, reopenedCoordinator)) {
+            assertEquals(deleted, reopened.readStamp("main"));
+            assertEquals(deleteMutation, reopened.readStamp("main").mutationId());
+        }
+    }
+
+    @Test
+    void preparedBatchCommitsCanonicalSaveAndAliasDeleteTogether() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+            store.save(new TestResource("alias", "Legacy"), UUID.randomUUID(), 0L);
+            UUID mutationId = UUID.fromString("55555555-5555-4555-8555-555555555555");
+            AssetTransactionCoordinator.Snapshot snapshot = store.coordinatorSnapshot();
+            JsonAssetStore.PreparedMutation save = store.prepareSave(snapshot, new TestResource("canonical", "Current"),
+                Map.of(), mutationId, 0L);
+            JsonAssetStore.PreparedMutation delete = store.prepareDelete(snapshot, "alias", mutationId, 1L);
+
+            store.commitPrepared(mutationId, snapshot, List.of(save, delete));
+
+            assertEquals("Current", store.get("canonical").name());
+            assertNull(store.get("alias"));
+            JsonObject project = JsonParser.parseString(Files.readString(assets.resolve("project.json"))).getAsJsonObject();
+            assertEquals(1, project.getAsJsonArray("resources").size());
+            assertEquals("canonical", project.getAsJsonArray("resources").get(0).getAsJsonObject().get("id").getAsString());
+            long rootSequence = coordinator.read(current -> current.rootSequence());
+            assertEquals(2L, rootSequence);
+
+            assertEquals(List.of(new JsonAssetStore.ReplayOperation("alias", true),
+                new JsonAssetStore.ReplayOperation("canonical", false)), store.replayOperations(mutationId));
+            AssetTransactionCoordinator.Snapshot replaySnapshot = store.coordinatorSnapshot();
+            List<JsonAssetStore.PreparedMutation> replay = store.replayOperations(mutationId).stream().map(operation ->
+                operation.deleted() ? store.prepareDelete(replaySnapshot, operation.id(), mutationId, -1L)
+                    : store.prepareSave(replaySnapshot, new TestResource(operation.id(), "Current"), Map.of(), mutationId, -1L)
+            ).toList();
+            assertTrue(store.commitPrepared(mutationId, replaySnapshot, replay).replay());
+            long replayRootSequence = coordinator.read(current -> current.rootSequence());
+            assertEquals(2L, replayRootSequence);
+        }
+    }
+
+    @Test
+    void closeUnregistersStoreWithoutClosingBorrowedCoordinator() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON)) {
+            JsonAssetStore<TestResource> store = store(assets, coordinator);
+
+            store.close();
+            store.close();
+
+            coordinator.healthCheck();
+            assertThrows(IllegalStateException.class, () -> store.get("main"));
+        }
+    }
+
+    @Test
+    void payloadMergerPreservesAuthoritativeUnknownFields() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON)) {
+            try (JsonAssetStore<JsonObject> raw = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                json -> JsonParser.parseString(json).getAsJsonObject(), GSON::toJson,
+                value -> value.get("id").getAsString(), null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+                () -> true)) {
+                JsonObject initial = new JsonObject();
+                initial.addProperty("id", "main");
+                initial.addProperty("name", "Initial");
+                initial.addProperty("unknown", "preserved");
+                raw.save(initial, UUID.randomUUID(), 0L);
             }
-        }));
-        assertEquals("Main", store.get("main").name());
+            try (JsonAssetStore<TestResource> typed = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                TestResource::fromJson, TestResource::toJson, TestResource::id, null,
+                LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true, () -> () -> {
+                }, (value, existing, serialized) -> {
+                    existing.addProperty("id", value.id());
+                    existing.addProperty("name", value.name());
+                    return existing;
+                })) {
+                typed.save(new TestResource("main", "Updated"), UUID.randomUUID(), 1L);
+                JsonObject persisted = JsonParser.parseString(Files.readString(assets.resolve("GUIs/main.json"))).getAsJsonObject();
+                assertEquals("Updated", persisted.get("name").getAsString());
+                assertEquals("preserved", persisted.get("unknown").getAsString());
+            }
+        }
     }
 
     @Test
-    void migratesLegacyFilesToAssetFolder() throws Exception {
-        Path legacy = tempDir.resolve("legacy");
-        Files.createDirectories(legacy);
-        Files.writeString(legacy.resolve("main.json"), GSON.toJson(new TestResource("main", "Main")));
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            legacy,
-            "scoreboard",
-            "Customization/Scoreboards",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
+    void defaultPayloadMergerPreservesNestedAndArrayUnknownFields() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<JsonObject> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                 json -> JsonParser.parseString(json).getAsJsonObject(), GSON::toJson,
+                 value -> value.get("id").getAsString(), null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+                 () -> true)) {
+            JsonObject initial = new JsonObject();
+            initial.addProperty("id", "nested");
+            initial.addProperty("name", "Initial");
+            initial.addProperty("futureTopLevel", true);
+            JsonObject nested = new JsonObject();
+            nested.addProperty("known", "initial");
+            nested.addProperty("futureNested", "preserved");
+            initial.add("nested", nested);
+            JsonObject item = new JsonObject();
+            item.addProperty("id", "entry");
+            item.addProperty("value", "initial");
+            item.addProperty("futureEntry", 7);
+            initial.add("entries", new JsonArray());
+            initial.getAsJsonArray("entries").add(item);
+            store.save(initial, UUID.randomUUID(), 0L);
 
-        store.migrateLegacyAssets();
+            JsonObject updated = new JsonObject();
+            updated.addProperty("id", "nested");
+            updated.addProperty("name", "Updated");
+            JsonObject updatedNested = new JsonObject();
+            updatedNested.addProperty("known", "updated");
+            updated.add("nested", updatedNested);
+            JsonObject updatedItem = new JsonObject();
+            updatedItem.addProperty("id", "entry");
+            updatedItem.addProperty("value", "updated");
+            updated.add("entries", new JsonArray());
+            updated.getAsJsonArray("entries").add(updatedItem);
+            store.save(updated, UUID.randomUUID(), 1L);
 
-        Path file = tempDir.resolve("assets").resolve("Customization").resolve("Scoreboards").resolve("main.json");
-        assertTrue(Files.exists(file));
-        assertTrue(Files.readString(file).contains("\"resourceType\":\"scoreboard\""));
-        assertTrue(Files.exists(tempDir.resolve("assets").resolve("migration-backups").resolve("scoreboard").resolve("legacy").resolve("main.json")));
-        assertFalse(Files.exists(legacy));
+            JsonObject persisted = JsonParser.parseString(Files.readString(assets.resolve("GUIs/nested.json"))).getAsJsonObject();
+            assertEquals("Updated", persisted.get("name").getAsString());
+            assertTrue(persisted.get("futureTopLevel").getAsBoolean());
+            assertEquals("updated", persisted.getAsJsonObject("nested").get("known").getAsString());
+            assertEquals("preserved", persisted.getAsJsonObject("nested").get("futureNested").getAsString());
+            assertEquals(7, persisted.getAsJsonArray("entries").get(0).getAsJsonObject().get("futureEntry").getAsInt());
+        }
     }
 
     @Test
-    void retainsLegacyDirectoryWhenAnyAssetFailsValidation() throws Exception {
-        Path legacy = tempDir.resolve("legacy");
-        Files.createDirectories(legacy);
-        Files.writeString(legacy.resolve("valid.json"), GSON.toJson(new TestResource("valid", "Valid")));
-        Files.writeString(legacy.resolve("broken.json"), "{\"name\":\"Missing Id\"}");
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            legacy,
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
-
-        store.migrateLegacyAssets();
-
-        assertTrue(Files.exists(legacy.resolve("valid.json")));
-        assertTrue(Files.exists(legacy.resolve("broken.json")));
-        assertTrue(Files.exists(tempDir.resolve("assets").resolve("GUIs").resolve("valid.json")));
+    void getRetriesWhenACommitInvalidatesTheReadGeneration() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        CountDownLatch firstReadEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirstRead = new CountDownLatch(1);
+        AtomicInteger reads = new AtomicInteger();
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                 json -> {
+                     if (reads.getAndIncrement() == 0) {
+                         firstReadEntered.countDown();
+                         try {
+                             if (!releaseFirstRead.await(5, TimeUnit.SECONDS)) {
+                                 throw new IllegalStateException("Timed out waiting for the concurrent commit");
+                             }
+                         } catch (InterruptedException exception) {
+                             Thread.currentThread().interrupt();
+                             throw new IllegalStateException("Reader was interrupted", exception);
+                         }
+                     }
+                     return TestResource.fromJson(json);
+                 }, TestResource::toJson, TestResource::id, null,
+                 LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true)) {
+            store.save(new TestResource("main", "old"), UUID.randomUUID(), 0L);
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            try {
+                var pending = executor.submit(() -> store.get("main"));
+                assertTrue(firstReadEntered.await(5, TimeUnit.SECONDS));
+                store.save(new TestResource("main", "new"), UUID.randomUUID(), 1L);
+                releaseFirstRead.countDown();
+                assertEquals("new", pending.get(5, TimeUnit.SECONDS).name());
+            } finally {
+                releaseFirstRead.countDown();
+                executor.shutdownNow();
+            }
+        }
     }
 
     @Test
-    void migratesPrefixedAssetsInPlace() throws Exception {
-        Path folder = tempDir.resolve("assets").resolve("GUIs").resolve("Custom");
-        Files.createDirectories(folder);
-        Path legacy = folder.resolve("gui__main.json");
-        Files.writeString(legacy, GSON.toJson(new TestResource("main", "Main")));
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            tempDir.resolve("legacy"),
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
-
-        store.migrateLegacyAssets();
-
-        Path migrated = folder.resolve("main.json");
-        assertTrue(Files.exists(legacy));
-        assertTrue(Files.exists(migrated));
-        assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));
-        assertEquals("main", store.listIds().getFirst());
+    void validatedPublicationRejectsAConcurrentCommitWithTheDefaultLease() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        CountDownLatch publicationEnteredIdExtractor = new CountDownLatch(1);
+        CountDownLatch releasePublication = new CountDownLatch(1);
+        AtomicBoolean blockPublication = new AtomicBoolean();
+        AtomicReference<Thread> publicationThread = new AtomicReference<>();
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<TestResource> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                 TestResource::fromJson, TestResource::toJson, value -> {
+                     if (blockPublication.get() && Thread.currentThread() == publicationThread.get()
+                         && blockPublication.compareAndSet(true, false)) {
+                         publicationEnteredIdExtractor.countDown();
+                         try {
+                             if (!releasePublication.await(5, TimeUnit.SECONDS)) {
+                                 throw new IllegalStateException("Timed out waiting for the concurrent commit");
+                             }
+                         } catch (InterruptedException exception) {
+                             Thread.currentThread().interrupt();
+                             throw new IllegalStateException("Publication was interrupted", exception);
+                         }
+                     }
+                     return value.id();
+                 }, null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true)) {
+            store.save(new TestResource("main", "old"), UUID.randomUUID(), 0L);
+            JsonAssetStore.AssetStamp oldStamp = store.readStamp("main");
+            TestResource oldValue = store.readUncached("main");
+            blockPublication.set(true);
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            try {
+                var publication = executor.submit(() -> {
+                    publicationThread.set(Thread.currentThread());
+                    store.publishValidated("main", oldValue, oldStamp);
+                    return null;
+                });
+                assertTrue(publicationEnteredIdExtractor.await(5, TimeUnit.SECONDS));
+                store.save(new TestResource("main", "new"), UUID.randomUUID(), 1L);
+                releasePublication.countDown();
+                ExecutionException failure = assertThrows(ExecutionException.class,
+                    () -> publication.get(5, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof IllegalStateException);
+                assertEquals("new", store.get("main").name());
+            } finally {
+                releasePublication.countDown();
+                executor.shutdownNow();
+            }
+        }
     }
 
     @Test
-    void prefixedMigrationDoesNotOverwriteDifferentTypedIdOnlyAsset() throws Exception {
-        Path folder = tempDir.resolve("assets").resolve("Shared");
-        Files.createDirectories(folder);
-        Path existing = folder.resolve("main.json");
-        Path legacy = folder.resolve("gui__main.json");
-        Files.writeString(existing, "{\"id\":\"main\",\"resourceType\":\"scoreboard\"}");
-        Files.writeString(legacy, GSON.toJson(new TestResource("main", "Main")));
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            tempDir.resolve("legacy"),
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
+    void cachedJsonValuesAreDetachedFromCallersAndReloadValidatorsRunOutsideLeases() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        AtomicBoolean leaseHeld = new AtomicBoolean();
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<JsonObject> store = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                 json -> {
+                     assertFalse(leaseHeld.get());
+                     return JsonParser.parseString(json).getAsJsonObject();
+                 }, GSON::toJson, value -> value.get("id").getAsString(), null,
+                 LegacyRuntimeActivationGate.runtime(tempDir), coordinator, () -> true,
+                 () -> {
+                     leaseHeld.set(true);
+                     return () -> leaseHeld.set(false);
+                 })) {
+            JsonObject initial = new JsonObject();
+            initial.addProperty("id", "main");
+            initial.addProperty("name", "Stable");
+            store.save(initial, UUID.randomUUID(), 0L);
 
-        store.migrateLegacyAssets();
+            JsonObject first = store.get("main");
+            first.addProperty("name", "Mutated By Caller");
+            assertEquals("Stable", store.get("main").get("name").getAsString());
 
-        Path migrated = tempDir.resolve("assets").resolve("GUIs").resolve("gui").resolve("main.json");
-        assertTrue(Files.exists(existing));
-        assertTrue(Files.exists(legacy));
-        assertTrue(Files.exists(migrated));
-        assertTrue(Files.readString(existing).contains("\"resourceType\":\"scoreboard\""));
-        assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));
+            store.reload("main", value -> assertFalse(leaseHeld.get()));
+        }
     }
 
     @Test
-    void flatLegacyMigrationDoesNotOverwriteDifferentTypedIdOnlyAsset() throws Exception {
-        Path legacy = tempDir.resolve("legacy");
-        Path targetFolder = tempDir.resolve("assets").resolve("GUIs");
-        Files.createDirectories(legacy);
-        Files.createDirectories(targetFolder);
-        Path existing = targetFolder.resolve("main.json");
-        Files.writeString(existing, "{\"id\":\"main\",\"resourceType\":\"scoreboard\"}");
-        Files.writeString(legacy.resolve("main.json"), GSON.toJson(new TestResource("main", "Main")));
-        JsonAssetStore<TestResource> store = new JsonAssetStore<>(
-            tempDir.resolve("assets"),
-            legacy,
-            "gui",
-            "GUIs",
-            TestResource::fromJson,
-            TestResource::toJson,
-            TestResource::id
-        );
+    void reloadAndValidatedPublicationPreserveOpaqueDurableFieldsWithARestrictedWriter() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON);
+             JsonAssetStore<JsonObject> durable = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                 json -> JsonParser.parseString(json).getAsJsonObject(), GSON::toJson,
+                 value -> value.get("id").getAsString(), null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+                 () -> true)) {
+            JsonObject initial = new JsonObject();
+            initial.addProperty("id", "opaque");
+            initial.addProperty("name", "Known");
+            initial.addProperty("futureField", "preserve");
+            durable.save(initial, UUID.randomUUID(), 0L);
 
-        store.migrateLegacyAssets();
+            JsonAssetStore<JsonObject> restricted = new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs",
+                json -> JsonParser.parseString(json).getAsJsonObject(), value -> {
+                    JsonObject known = new JsonObject();
+                    known.addProperty("id", value.get("id").getAsString());
+                    known.addProperty("name", value.get("name").getAsString());
+                    return GSON.toJson(known);
+                }, value -> value.get("id").getAsString(), null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+                () -> true);
+            try (restricted) {
+                restricted.reload("opaque", value -> assertTrue(value.has("futureField")));
+                assertEquals("preserve", restricted.get("opaque").get("futureField").getAsString());
 
-        Path migrated = tempDir.resolve("assets").resolve("GUIs").resolve("gui").resolve("main.json");
-        assertTrue(Files.exists(existing));
-        assertTrue(Files.exists(migrated));
-        assertFalse(Files.exists(legacy));
-        assertTrue(Files.readString(existing).contains("\"resourceType\":\"scoreboard\""));
-        assertTrue(Files.readString(migrated).contains("\"resourceType\":\"gui\""));
+                restricted.clearCache();
+                JsonAssetStore.AssetStamp stamp = restricted.readStamp("opaque");
+                JsonObject validated = restricted.readUncached("opaque");
+                restricted.publishValidated("opaque", validated, stamp);
+
+                assertEquals("preserve", restricted.get("opaque").get("futureField").getAsString());
+            }
+        }
+    }
+
+    @Test
+    void rejectsWrongCoordinatorRootAndReservedBlobTargets() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        try (AssetTransactionCoordinator coordinator = new AssetTransactionCoordinator(assets, GSON)) {
+            assertThrows(IllegalArgumentException.class, () -> store(tempDir.resolve("other"), coordinator));
+            try (JsonAssetStore<TestResource> store = store(assets, coordinator)) {
+                Path reserved = assets.resolve(".asset-coordinator/state.json");
+                assertTrue(Files.exists(reserved));
+                byte[] original = Files.readAllBytes(reserved);
+                assertThrows(IllegalStateException.class, () -> store.save(new TestResource("main", "Main"),
+                    Map.of(reserved, "bad".getBytes(StandardCharsets.UTF_8)), UUID.randomUUID(), 0L));
+                assertArrayEquals(original, Files.readAllBytes(reserved));
+            }
+        }
+    }
+
+    @Test
+    void retainsOpaqueAdoptedLineageWithoutPretendingItIsRuntimeUuid() {
+        JsonAssetStore.AssetStamp stamp = new JsonAssetStore.AssetStamp("gui", "main", 1L, "legacy:opaque",
+            "0".repeat(64), false);
+
+        assertEquals("legacy:opaque", stamp.mutationValue());
+        assertTrue(stamp.runtimeMutationId().isEmpty());
+        assertThrows(IllegalStateException.class, stamp::mutationId);
+    }
+
+    private JsonAssetStore<TestResource> store(Path assets, AssetTransactionCoordinator coordinator) {
+        return new JsonAssetStore<>(assets, tempDir.resolve("legacy"), "gui", "GUIs", TestResource::fromJson,
+            TestResource::toJson, TestResource::id, null, LegacyRuntimeActivationGate.runtime(tempDir), coordinator,
+            () -> true);
     }
 
     private record TestResource(String id, String name) {

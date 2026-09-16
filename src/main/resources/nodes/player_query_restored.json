@@ -1,0 +1,1045 @@
+[
+  {
+    "id": "player_count_item",
+    "displayName": "Player Count Item",
+    "description": "Reads Player Count Item from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "count",
+      "item"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_count_item",
+    "handlerConfig": {
+      "operation": "player_count_item"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      },
+      {
+        "id": "material_or_item",
+        "displayName": "Material Or Item",
+        "name": "material_or_item",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the Material Or Item value used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Count value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_first_empty_slot",
+    "displayName": "Player First Empty Slot",
+    "description": "Reads Player First Empty Slot from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "first",
+      "empty",
+      "slot"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_first_empty_slot",
+    "handlerConfig": {
+      "operation": "player_get_first_empty_slot"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "slot_index",
+        "displayName": "Slot Index",
+        "name": "slot_index",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Slot Index value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_all_items",
+    "displayName": "Player Get All Items",
+    "description": "Reads Player Get All Items from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "all",
+      "items"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_all_items",
+    "handlerConfig": {
+      "operation": "player_get_all_items"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "items_list",
+        "displayName": "Items List",
+        "name": "items_list",
+        "pinType": "DATA",
+        "dataType": "list<item>",
+        "description": "Returns the Items List value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_hotbar_items",
+    "displayName": "Player Get Hotbar Items",
+    "description": "Reads Player Get Hotbar Items from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "hotbar",
+      "items"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_hotbar_items",
+    "handlerConfig": {
+      "operation": "player_get_hotbar_items"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "items_list",
+        "displayName": "Items List",
+        "name": "items_list",
+        "pinType": "DATA",
+        "dataType": "list<item>",
+        "description": "Returns the Items List value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_armor_items",
+    "displayName": "Player Get Armor Items",
+    "description": "Reads Player Get Armor Items from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "armor",
+      "items"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_armor_items",
+    "handlerConfig": {
+      "operation": "player_get_armor_items"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "helmet",
+        "displayName": "Helmet",
+        "name": "helmet",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Helmet value read from the player.",
+        "direction": "output"
+      },
+      {
+        "id": "chestplate",
+        "displayName": "Chestplate",
+        "name": "chestplate",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Chestplate value read from the player.",
+        "direction": "output"
+      },
+      {
+        "id": "leggings",
+        "displayName": "Leggings",
+        "name": "leggings",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Leggings value read from the player.",
+        "direction": "output"
+      },
+      {
+        "id": "boots",
+        "displayName": "Boots",
+        "name": "boots",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Boots value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_inventory_size",
+    "displayName": "Player Get Inventory Size",
+    "description": "Reads Player Get Inventory Size from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "inventory",
+      "size"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_inventory_size",
+    "handlerConfig": {
+      "operation": "player_get_inventory_size"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "size",
+        "displayName": "Size",
+        "name": "size",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Size value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_mainhand_item",
+    "displayName": "Player Get Mainhand Item",
+    "description": "Reads Player Get Mainhand Item from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "mainhand",
+      "item"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_mainhand_item",
+    "handlerConfig": {
+      "operation": "player_get_mainhand_item"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_offhand_item",
+    "displayName": "Player Get Offhand Item",
+    "description": "Reads Player Get Offhand Item from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "offhand",
+      "item"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_offhand_item",
+    "handlerConfig": {
+      "operation": "player_get_offhand_item"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_is_on_ground",
+    "displayName": "Player Is On Ground",
+    "description": "Reads Player Is On Ground from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "is",
+      "on",
+      "ground"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_is_on_ground",
+    "handlerConfig": {
+      "operation": "player_is_on_ground"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "on_ground",
+        "displayName": "On Ground",
+        "name": "on_ground",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the On Ground value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_is_sleeping",
+    "displayName": "Player Is Sleeping",
+    "description": "Reads Player Is Sleeping from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "is",
+      "sleeping"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_is_sleeping",
+    "handlerConfig": {
+      "operation": "player_is_sleeping"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "is_sleeping",
+        "displayName": "Is Sleeping",
+        "name": "is_sleeping",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Is Sleeping value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_bed_location",
+    "displayName": "Player Get Bed Location",
+    "description": "Reads Player Get Bed Location from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "bed",
+      "location"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_bed_location",
+    "handlerConfig": {
+      "operation": "player_get_bed_location"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "bed_location",
+        "displayName": "Bed Location",
+        "name": "bed_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Bed Location value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_last_damage",
+    "displayName": "Player Get Last Damage",
+    "description": "Reads Player Get Last Damage from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "last",
+      "damage"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_last_damage",
+    "handlerConfig": {
+      "operation": "player_get_last_damage"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "damage_cause",
+        "displayName": "Damage Cause",
+        "name": "damage_cause",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Damage Cause value read from the player.",
+        "direction": "output"
+      },
+      {
+        "id": "damage_source",
+        "displayName": "Damage Source",
+        "name": "damage_source",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Returns the Damage Source value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_killer",
+    "displayName": "Player Get Killer",
+    "description": "Reads Player Get Killer from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "killer"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_killer",
+    "handlerConfig": {
+      "operation": "player_get_killer"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "killer",
+        "displayName": "Killer",
+        "name": "killer",
+        "pinType": "DATA",
+        "dataType": "entity",
+        "description": "Returns the Killer value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_ping",
+    "displayName": "Player Get Ping",
+    "description": "Reads Player Get Ping from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "ping"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_ping",
+    "handlerConfig": {
+      "operation": "player_get_ping"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "ping_ms",
+        "displayName": "Ping Ms",
+        "name": "ping_ms",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Ping Ms value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_lore",
+    "displayName": "Player Get Lore",
+    "description": "Reads Player Get Lore from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "lore"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_lore",
+    "handlerConfig": {
+      "operation": "player_get_lore"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      },
+      {
+        "id": "hand",
+        "displayName": "Hand",
+        "name": "hand",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the Hand value used by this query.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "main",
+          "off"
+        ],
+        "defaultValue": "main"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "lore_lines_list",
+        "displayName": "Lore Lines List",
+        "name": "lore_lines_list",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Returns the Lore Lines List value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_display_name",
+    "displayName": "Player Get Display Name",
+    "description": "Reads Player Get Display Name from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "display",
+      "name"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_display_name",
+    "handlerConfig": {
+      "operation": "player_get_display_name"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "display_name",
+        "displayName": "Display Name",
+        "name": "display_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Display Name value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_player_list_name",
+    "displayName": "Player Get Player List Name",
+    "description": "Reads Player Get Player List Name from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "list",
+      "name"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_player_list_name",
+    "handlerConfig": {
+      "operation": "player_get_player_list_name"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "list_name",
+        "displayName": "List Name",
+        "name": "list_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the List Name value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_is_op",
+    "displayName": "Player Is OP",
+    "description": "Reads Player Is OP from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "is",
+      "op"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_is_op",
+    "handlerConfig": {
+      "operation": "player_is_op"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "is_op",
+        "displayName": "Is Op",
+        "name": "is_op",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Is Op value read from the player.",
+        "direction": "output"
+      }
+    ]
+  },
+  {
+    "id": "player_get_allowed_flight",
+    "displayName": "Player Get Allowed Flight",
+    "description": "Reads Player Get Allowed Flight from a player.",
+    "domain": "player",
+    "family": "queries",
+    "lifecycle": "active",
+    "handlerCapability": "player.query",
+    "selectorIntent": "typed-player",
+    "inspectorIntent": "player-query",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "queries",
+      "query",
+      "get",
+      "allowed",
+      "flight"
+    ],
+    "examples": [
+      "Provide a player and connect the typed output to a compatible input."
+    ],
+    "handler": "player_get_allowed_flight",
+    "handlerConfig": {
+      "operation": "player_get_allowed_flight"
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player used by this query.",
+        "direction": "input"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "can_fly",
+        "displayName": "Can Fly",
+        "name": "can_fly",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Can Fly value read from the player.",
+        "direction": "output"
+      }
+    ]
+  }
+]

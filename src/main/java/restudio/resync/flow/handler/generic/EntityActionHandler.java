@@ -34,6 +34,7 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowMutations;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,6 +46,7 @@ import java.util.function.BiConsumer;
 
 public class EntityActionHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public EntityActionHandler() {
         operations.put("entity_set_type", (ctx, node) -> {
@@ -729,7 +731,12 @@ public class EntityActionHandler implements NodeHandler {
         if (op == null) {
             throw new IllegalArgumentException("Unknown entity action operation: " + operation);
         }
-        op.accept(ctx, node);
+        Entity entity = ctx.getInputValue(node, "entity", Entity.class, null);
+        if (entity instanceof Player player) {
+            playerDataAdmission.mutatePlayer("flow-entity-action:" + operation, player, () -> op.accept(ctx, node));
+        } else {
+            op.accept(ctx, node);
+        }
         ctx.triggerOutput("flow");
     }
 

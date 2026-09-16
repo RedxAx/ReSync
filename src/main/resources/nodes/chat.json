@@ -1,0 +1,415 @@
+[
+  {
+    "id": "event.chat.received",
+    "displayName": "Chat Received",
+    "description": "Run at the highest priority when a player chat event enters the ReSync chat pipeline.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "received"],
+    "aliases": ["Player Chat", "Chat Start"],
+    "trigger": true,
+    "eventType": "io.papermc.paper.event.player.AsyncChatEvent",
+    "handlerConfig": {"priority": "HIGHEST"},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow when a chat message is received."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player who sent the chat message."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"}
+    ]
+  },
+  {
+    "id": "event.chat.routed",
+    "displayName": "Chat Routed",
+    "description": "Run at monitor priority after ReSync has applied chat rules, viewers, formatting, and delivery routing.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "routed"],
+    "aliases": ["Chat Delivered", "Chat Complete"],
+    "trigger": true,
+    "eventType": "io.papermc.paper.event.player.AsyncChatEvent",
+    "handlerConfig": {"priority": "MONITOR"},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow after chat routing completes."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player whose chat message was routed."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"}
+    ]
+  },
+  {
+    "id": "chat_cancel",
+    "displayName": "Cancel Chat",
+    "description": "Cancel the active asynchronous chat event while its mutation window is open.",
+    "domain": "chat",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "chat.mutation",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["chat", "cancel", "mutation"],
+    "aliases": ["Cancel Active Chat"],
+    "legacyIds": ["chat.cancel"],
+    "handler": "ChatHandler",
+    "handlerConfig": {"operation": "chat_cancel"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts cancellation of the active chat event."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the chat cancellation succeeds."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the active chat event was cancelled."}
+    ]
+  },
+  {
+    "id": "chat_set_message",
+    "displayName": "Set Chat Message",
+    "description": "Replace the active asynchronous chat message while its mutation window is open.",
+    "domain": "chat",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "chat.mutation",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["chat", "message", "mutation"],
+    "aliases": ["Edit Chat Message", "Change Chat Text"],
+    "legacyIds": ["chat.set.message"],
+    "handler": "ChatHandler",
+    "handlerConfig": {"operation": "chat_set_message"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "message", "target": "message"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the active chat message update."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player context used to render the replacement message; blank uses the event player."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "defaultValue": "", "description": "Replacement chat text."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the message update succeeds."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the active chat message was changed."}
+    ]
+  },
+  {
+    "id": "chat_add_viewer",
+    "displayName": "Add Chat Viewer",
+    "description": "Add a player to the viewer set of the active asynchronous chat event.",
+    "domain": "chat",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "chat.mutation",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["chat", "viewer", "mutation"],
+    "aliases": ["Show Chat To Player", "Add Viewer"],
+    "legacyIds": ["chat.add.viewer"],
+    "handler": "ChatHandler",
+    "handlerConfig": {"operation": "chat_add_viewer"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "viewer", "target": "viewer"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts viewer addition."},
+      {"id": "viewer", "displayName": "Viewer", "name": "viewer", "dataType": "player", "description": "Player to add to the active chat event's viewers."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the viewer set has been updated."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the player was added to the viewer set."}
+    ]
+  },
+  {
+    "id": "chat_remove_viewer",
+    "displayName": "Remove Chat Viewer",
+    "description": "Remove a player from the viewer set of the active asynchronous chat event.",
+    "domain": "chat",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "chat.mutation",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["chat", "viewer", "mutation"],
+    "aliases": ["Hide Chat From Player", "Remove Viewer"],
+    "legacyIds": ["chat.remove.viewer"],
+    "handler": "ChatHandler",
+    "handlerConfig": {"operation": "chat_remove_viewer"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "viewer", "target": "viewer"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts viewer removal."},
+      {"id": "viewer", "displayName": "Viewer", "name": "viewer", "dataType": "player", "description": "Player to remove from the active chat event's viewers."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the viewer set has been updated."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the player was removed from the viewer set."}
+    ]
+  },
+  {
+    "id": "chat_send_channel",
+    "displayName": "Send Channel Message",
+    "description": "Send a message through a configured ReSync chat channel for a player.",
+    "domain": "chat",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "chat.channel",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["chat", "channel", "send"],
+    "aliases": ["Send Channel Chat", "Post Channel Message"],
+    "legacyIds": ["chat.send.channel"],
+    "handler": "ChatHandler",
+    "handlerConfig": {"operation": "chat_send_channel"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "channel", "target": "channel"},
+        {"direction": "input", "source": "message", "target": "message"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "success", "target": "success"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts channel delivery."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Player who sends the message; blank uses the current flow player."},
+      {"id": "channel", "displayName": "Channel", "name": "channel", "dataType": "string", "description": "Configured chat channel identifier."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "widget": "MULTILINE", "description": "Message text to send through the channel."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after channel delivery has been attempted."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the message was accepted for channel delivery."}
+    ]
+  },
+  {
+    "id": "event.chat.private_message",
+    "displayName": "Private Chat Message",
+    "description": "Run when one player sends a private message to another player through ReSync chat.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "private"],
+    "aliases": ["Private Message", "Direct Message"],
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncPrivateMessageEvent",
+    "handlerConfig": {"playerEvent": true},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow for a private message."},
+      {"id": "event.player", "displayName": "Sender", "name": "event.player", "dataType": "player", "description": "Returns the player who sent the private message."},
+      {"id": "event.receiver", "displayName": "Receiver", "name": "event.receiver", "dataType": "player", "description": "Returns the player who received the private message."},
+      {"id": "event.message", "displayName": "Message", "name": "event.message", "dataType": "string", "description": "Returns the private message text."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.receiver", "target": "event.receiver"},
+      {"source": "event.message", "target": "event.message"}
+    ]
+  },
+  {
+    "id": "event.chat.mention",
+    "displayName": "Chat Mention",
+    "description": "Run when a player mentions another online player in a ReSync chat message.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "mention"],
+    "aliases": ["Player Mention", "Mention Event"],
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncMentionEvent",
+    "handlerConfig": {"playerEvent": true},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow for the mention."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player who wrote the mention."},
+      {"id": "event.mentioned", "displayName": "Mentioned Player", "name": "event.mentioned", "dataType": "player", "description": "Returns the player who was mentioned."},
+      {"id": "event.channel", "displayName": "Channel", "name": "event.channel", "dataType": "string", "description": "Returns the channel where the mention was detected."},
+      {"id": "event.message", "displayName": "Message", "name": "event.message", "dataType": "string", "description": "Returns the message containing the mention."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.mentioned", "target": "event.mentioned"},
+      {"source": "event.channel", "target": "event.channel"},
+      {"source": "event.message", "target": "event.message"}
+    ]
+  },
+  {
+    "id": "event.chat.channel_join",
+    "displayName": "Chat Channel Join",
+    "description": "Run when a player joins a configured ReSync chat channel.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "channel", "join"],
+    "aliases": ["Channel Join", "Player Joined Chat Channel"],
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelJoinEvent",
+    "handlerConfig": {"playerEvent": true},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow when a player joins."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player who joined the channel."},
+      {"id": "event.channel", "displayName": "Channel", "name": "event.channel", "dataType": "string", "description": "Returns the channel identifier that was joined."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"}
+    ]
+  },
+  {
+    "id": "event.chat.channel_leave",
+    "displayName": "Chat Channel Leave",
+    "description": "Run when a player leaves a configured ReSync chat channel.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "channel", "leave"],
+    "aliases": ["Channel Leave", "Player Left Chat Channel"],
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelLeaveEvent",
+    "handlerConfig": {"playerEvent": true},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow when a player leaves."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player who left the channel."},
+      {"id": "event.channel", "displayName": "Channel", "name": "event.channel", "dataType": "string", "description": "Returns the channel identifier that was left."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"}
+    ]
+  },
+  {
+    "id": "event.chat.channel_send",
+    "displayName": "Chat Channel Message",
+    "description": "Run when a player sends a message through a configured ReSync chat channel.",
+    "domain": "chat",
+    "family": "events",
+    "lifecycle": "active",
+    "handlerCapability": "chat.events",
+    "selectorIntent": "event-type",
+    "inspectorIntent": "event",
+    "owner": "restudio.resync",
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "EVENT",
+    "tags": ["chat", "event", "channel", "message"],
+    "aliases": ["Channel Message", "Channel Send"],
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelSendEvent",
+    "handlerConfig": {"playerEvent": true},
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the connected flow when a channel message is sent."},
+      {"id": "event.player", "displayName": "Player", "name": "event.player", "dataType": "player", "description": "Returns the player who sent the channel message."},
+      {"id": "event.channel", "displayName": "Channel", "name": "event.channel", "dataType": "string", "description": "Returns the channel identifier."},
+      {"id": "event.message", "displayName": "Message", "name": "event.message", "dataType": "string", "description": "Returns the delivered channel message text."}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"},
+      {"source": "event.message", "target": "event.message"}
+    ]
+  }
+]

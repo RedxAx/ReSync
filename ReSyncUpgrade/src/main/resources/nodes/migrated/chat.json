@@ -1,0 +1,218 @@
+[
+  {
+    "id": "event.chat.received",
+    "displayName": "Chat Received",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "io.papermc.paper.event.player.AsyncChatEvent",
+    "handlerConfig": {
+      "priority": "HIGHEST"
+    },
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat.routed",
+    "displayName": "Chat Routed",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "io.papermc.paper.event.player.AsyncChatEvent",
+    "handlerConfig": {
+      "priority": "MONITOR"
+    },
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "chat.cancel",
+    "displayName": "Cancel Chat",
+    "category": "CHAT",
+    "handler": "ChatHandler",
+    "handlerConfig": {
+      "operation": "chat_cancel"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "chat.set.message",
+    "displayName": "Set Chat Message",
+    "category": "CHAT",
+    "handler": "ChatHandler",
+    "handlerConfig": {
+      "operation": "chat_set_message"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player"},
+      {"name": "message", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "chat.add.viewer",
+    "displayName": "Add Chat Viewer",
+    "category": "CHAT",
+    "handler": "ChatHandler",
+    "handlerConfig": {
+      "operation": "chat_add_viewer"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "viewer", "dataType": "player"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "chat.remove.viewer",
+    "displayName": "Remove Chat Viewer",
+    "category": "CHAT",
+    "handler": "ChatHandler",
+    "handlerConfig": {
+      "operation": "chat_remove_viewer"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "viewer", "dataType": "player"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "chat.send.channel",
+    "displayName": "Send Channel Message",
+    "category": "CHAT",
+    "handler": "ChatHandler",
+    "handlerConfig": {
+      "operation": "chat_send_channel"
+    },
+    "inputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "player", "dataType": "player"},
+      {"name": "channel", "dataType": "string"},
+      {"name": "message", "dataType": "string"}
+    ],
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "success", "dataType": "boolean"}
+    ]
+  },
+  {
+    "id": "event.chat.private_message",
+    "displayName": "Private Message",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncPrivateMessageEvent",
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"},
+      {"name": "event.receiver", "dataType": "player"},
+      {"name": "event.message", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.receiver", "target": "event.receiver"},
+      {"source": "event.message", "target": "event.message"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat.mention",
+    "displayName": "Mention",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncMentionEvent",
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"},
+      {"name": "event.mentioned", "dataType": "player"},
+      {"name": "event.channel", "dataType": "string"},
+      {"name": "event.message", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.mentioned", "target": "event.mentioned"},
+      {"source": "event.channel", "target": "event.channel"},
+      {"source": "event.message", "target": "event.message"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat.channel_join",
+    "displayName": "Channel Join",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelJoinEvent",
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"},
+      {"name": "event.channel", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat.channel_leave",
+    "displayName": "Channel Leave",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelLeaveEvent",
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"},
+      {"name": "event.channel", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "event.chat.channel_send",
+    "displayName": "Channel Send",
+    "category": "CHAT",
+    "trigger": true,
+    "eventType": "restudio.resync.modules.chat.event.ReSyncChannelSendEvent",
+    "outputs": [
+      {"name": "flow", "pinType": "FLOW", "dataType": "execution"},
+      {"name": "event.player", "dataType": "player"},
+      {"name": "event.channel", "dataType": "string"},
+      {"name": "event.message", "dataType": "string"}
+    ],
+    "outputMappings": [
+      {"source": "event.player", "target": "event.player"},
+      {"source": "event.channel", "target": "event.channel"},
+      {"source": "event.message", "target": "event.message"}
+    ],
+    "inputs": []
+  }
+]

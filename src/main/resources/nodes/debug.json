@@ -1,0 +1,144 @@
+[
+  {
+    "id": "debug.log",
+    "displayName": "Debug Log",
+    "description": "Write a diagnostic message to the ReSync log at the selected level.",
+    "domain": "debug",
+    "family": "logging",
+    "lifecycle": "active",
+    "handlerCapability": "debug",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "Diagnostic node retained for flow compatibility and troubleshooting.",
+    "tags": ["debug", "log", "diagnostic"],
+    "aliases": ["Log Message", "Debug Message"],
+    "handler": "DebugHandler",
+    "handlerConfig": {"operation": "debug_log"},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the diagnostic log operation."},
+      {"id": "message", "direction": "input", "displayName": "Message", "name": "message", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Provides the message written to the ReSync log."},
+      {"id": "level", "direction": "input", "displayName": "Level", "name": "level", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["INFO", "WARN", "ERROR"], "defaultValue": "INFO", "description": "Selects the diagnostic log level."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the message is logged."}
+    ]
+  },
+  {
+    "id": "debug.print.variable",
+    "displayName": "Debug Print Variable",
+    "description": "Read one Flow variable, write its value to the diagnostic log, and expose it as output.",
+    "domain": "debug",
+    "family": "variables",
+    "lifecycle": "active",
+    "handlerCapability": "debug",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "Diagnostic node retained for flow compatibility and troubleshooting.",
+    "tags": ["debug", "variable", "diagnostic"],
+    "aliases": ["Print Variable", "Inspect Variable"],
+    "handler": "DebugHandler",
+    "handlerConfig": {"operation": "debug_print_variable"},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the variable inspection."},
+      {"id": "variable_name", "direction": "input", "displayName": "Variable Name", "name": "variable_name", "pinType": "DATA", "dataType": "string", "description": "Names the local or global Flow variable to inspect."}
+    ],
+    "outputs": [
+      {"id": "value", "direction": "output", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the inspected variable value, or null when it is absent."},
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is printed."}
+    ]
+  },
+  {
+    "id": "debug.dump.variables",
+    "displayName": "Debug Dump Variables",
+    "description": "Write every local or global Flow variable to the diagnostic log and return the entries.",
+    "domain": "debug",
+    "family": "variables",
+    "lifecycle": "active",
+    "handlerCapability": "debug",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "Diagnostic node retained for flow compatibility and troubleshooting.",
+    "tags": ["debug", "variables", "diagnostic"],
+    "aliases": ["Dump Variables", "List Variables"],
+    "handler": "DebugHandler",
+    "handlerConfig": {"operation": "debug_dump_variables"},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the variable dump."},
+      {"id": "scope", "direction": "input", "displayName": "Scope", "name": "scope", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["local", "global"], "defaultValue": "local", "description": "Selects local variables or global variables to dump."}
+    ],
+    "outputs": [
+      {"id": "variables", "direction": "output", "displayName": "Variables", "name": "variables", "pinType": "DATA", "dataType": "list<string>", "description": "Returns one formatted entry for each variable in the selected scope."},
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variables are dumped."}
+    ]
+  },
+  {
+    "id": "debug.stack.trace",
+    "displayName": "Debug Stack Trace",
+    "description": "Capture the current execution stack, write it to the diagnostic log, and return it as text.",
+    "domain": "debug",
+    "family": "diagnostics",
+    "lifecycle": "active",
+    "handlerCapability": "debug",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "Diagnostic node retained for flow compatibility and troubleshooting.",
+    "tags": ["debug", "stack", "diagnostic"],
+    "aliases": ["Stack Trace", "Execution Stack"],
+    "handler": "DebugHandler",
+    "handlerConfig": {"operation": "debug_stack_trace"},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the stack trace capture."}
+    ],
+    "outputs": [
+      {"id": "stack_trace", "direction": "output", "displayName": "Stack Trace", "name": "stack_trace", "pinType": "DATA", "dataType": "string", "description": "Returns the captured execution stack as newline-separated text."},
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the stack trace is captured."}
+    ]
+  },
+  {
+    "id": "debug.break",
+    "displayName": "Debug Break",
+    "description": "Pause briefly when debug mode is enabled, then continue the Flow.",
+    "domain": "debug",
+    "family": "diagnostics",
+    "lifecycle": "active",
+    "handlerCapability": "debug",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "Diagnostic node retained for flow compatibility and troubleshooting.",
+    "tags": ["debug", "breakpoint", "diagnostic"],
+    "aliases": ["Breakpoint", "Pause Debug"],
+    "handler": "DebugHandler",
+    "handlerConfig": {"operation": "debug_break"},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the debug breakpoint."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the breakpoint completes."}
+    ]
+  }
+]

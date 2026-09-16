@@ -1,0 +1,255 @@
+[
+  {
+    "id": "worldgen.validate_project",
+    "displayName": "Validate WorldGen Project",
+    "description": "Validate a WorldGen project through the authoritative compiler pipeline.",
+    "domain": "worldgen",
+    "family": "operations",
+    "lifecycle": "active",
+    "handlerCapability": "worldgen.operations",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "project", "target": "project"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "diagnostics", "target": "diagnostics"},
+        {"direction": "output", "source": "valid", "target": "valid"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "tags": ["worldgen", "project", "validate", "diagnostics"],
+    "examples": ["Connect the valid output to the next route and inspect diagnostics when validation fails."],
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_validate"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts validation when this execution route is reached."},
+      {"id": "project", "displayName": "Project", "name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen", "description": "Selects the WorldGen project to validate."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the project has been validated."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when validation reports a failure."},
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<map<any,any>>", "description": "Returns the authoritative validation result."},
+      {"id": "diagnostics", "displayName": "Diagnostics", "name": "diagnostics", "dataType": "map<any,any>", "description": "Reports validation diagnostics for the project."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "dataType": "boolean", "description": "Reports whether the project passed validation."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether validation completed successfully."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports the stable validation error code."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Explains the validation result."}
+    ]
+  },
+  {
+    "id": "worldgen.compile_project",
+    "displayName": "Compile WorldGen Project",
+    "description": "Validate and compile a WorldGen project into a versioned datapack job.",
+    "domain": "worldgen",
+    "family": "operations",
+    "lifecycle": "active",
+    "handlerCapability": "worldgen.operations",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "project", "target": "project"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "job", "target": "job"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "tags": ["worldgen", "project", "compile", "datapack", "job"],
+    "examples": ["Connect the returned job to Get Job Status or handle Job Completed to inspect the compiled pack."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_operation",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_compile"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts compilation when this execution route is reached."},
+      {"id": "project", "displayName": "Project", "name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen", "description": "Selects the WorldGen project to compile."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the compile job has been accepted."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the compile job cannot be accepted."},
+      {"id": "job", "displayName": "Job", "name": "job", "dataType": "worldgen_job", "description": "Returns the accepted WorldGen compile job."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the compile job was accepted."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports the stable compile error code."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Explains the compile result."}
+    ]
+  },
+  {
+    "id": "worldgen.install_project",
+    "displayName": "Install WorldGen Project",
+    "description": "Compile and install a WorldGen datapack for the server and an optional world.",
+    "domain": "worldgen",
+    "family": "operations",
+    "lifecycle": "active",
+    "handlerCapability": "worldgen.operations",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "project", "target": "project"},
+        {"direction": "input", "source": "world_name", "target": "world_name"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "job", "target": "job"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "tags": ["worldgen", "project", "install", "datapack", "job"],
+    "examples": ["Leave World Name empty to install for the main server world, or select a world for an additional world-owned copy."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_install"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts installation when this execution route is reached."},
+      {"id": "project", "displayName": "Project", "name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen", "description": "Selects the WorldGen project to install."},
+      {"id": "world_name", "displayName": "World Name", "name": "world_name", "dataType": "string", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:world", "optional": true, "description": "Selects an optional world-owned installation target."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the install job has been accepted."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the install job cannot be accepted."},
+      {"id": "job", "displayName": "Job", "name": "job", "dataType": "worldgen_job", "description": "Returns the accepted WorldGen install job."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the install job was accepted."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports the stable install error code."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Explains the install result."}
+    ]
+  },
+  {
+    "id": "worldgen.preview_project",
+    "displayName": "Preview WorldGen Project",
+    "description": "Create or replace an isolated preview world and return a cancellable job.",
+    "domain": "worldgen",
+    "family": "operations",
+    "lifecycle": "active",
+    "handlerCapability": "worldgen.operations",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "project", "target": "project"},
+        {"direction": "input", "source": "preview_id", "target": "preview_id"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "environment", "target": "environment"},
+        {"direction": "input", "source": "seed", "target": "seed"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "job", "target": "job"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "tags": ["worldgen", "project", "preview", "world", "job"],
+    "examples": ["Reuse the same Preview ID to replace an earlier preview without leaving an orphaned world."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_preview",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_preview"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts preview creation when this execution route is reached."},
+      {"id": "project", "displayName": "Project", "name": "project", "dataType": "worldgen_project", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:worldgen", "description": "Selects the WorldGen project to preview."},
+      {"id": "preview_id", "displayName": "Preview ID", "name": "preview_id", "dataType": "string", "optional": true, "description": "Identifies the isolated preview to create or replace."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "optional": true, "description": "Selects the player who should receive the preview world."},
+      {"id": "environment", "displayName": "Environment", "name": "environment", "dataType": "string", "widget": "DROPDOWN", "options": ["NORMAL", "NETHER", "THE_END"], "defaultValue": "NORMAL", "description": "Selects the environment used by the preview world."},
+      {"id": "seed", "displayName": "Seed", "name": "seed", "dataType": "number", "widget": "NUMBER", "defaultValue": 0, "description": "Sets the seed used by the preview world."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the preview job has been accepted."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the preview job cannot be accepted."},
+      {"id": "job", "displayName": "Job", "name": "job", "dataType": "worldgen_job", "description": "Returns the accepted WorldGen preview job."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the preview job was accepted."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports the stable preview error code."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Explains the preview result."}
+    ]
+  },
+  {
+    "id": "worldgen.stop_preview",
+    "displayName": "Stop WorldGen Preview",
+    "description": "Unload and remove an isolated WorldGen preview world.",
+    "domain": "worldgen",
+    "family": "operations",
+    "lifecycle": "active",
+    "handlerCapability": "worldgen.operations",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "preview_id", "target": "preview_id"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "job", "target": "job"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "tags": ["worldgen", "preview", "stop", "cleanup", "job"],
+    "examples": ["Provide the Preview ID used by Preview WorldGen Project to unload that isolated world."],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "worldgen_preview",
+    "handler": "WorldGenFlowHandler",
+    "handlerConfig": {"operation": "worldgen_preview_stop"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts preview cleanup when this execution route is reached."},
+      {"id": "preview_id", "displayName": "Preview ID", "name": "preview_id", "dataType": "string", "description": "Identifies the isolated preview world to remove."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the preview cleanup job has been accepted."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the preview cleanup job cannot be accepted."},
+      {"id": "job", "displayName": "Job", "name": "job", "dataType": "worldgen_job", "description": "Returns the accepted WorldGen preview cleanup job."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Reports whether the preview cleanup job was accepted."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Reports the stable preview cleanup error code."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Explains the preview cleanup result."}
+    ]
+  }
+]

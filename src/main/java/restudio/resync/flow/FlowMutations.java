@@ -3,8 +3,10 @@ package restudio.resync.flow;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.util.Vector;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 public final class FlowMutations {
     private FlowMutations() {
@@ -16,14 +18,22 @@ public final class FlowMutations {
         if (ctx != null && ctx.getEvent() instanceof EntityDamageEvent) {
             ctx.runLaterBeforeContinuation(() -> {
                 if (!entity.isValid()) throw new IllegalStateException("Mutation target is no longer valid");
-                action.run();
+                runAdmitted(entity, action);
             }, 1);
             return;
         }
         runSync(ctx, () -> {
             if (!entity.isValid()) throw new IllegalStateException("Mutation target is no longer valid");
-            action.run();
+            runAdmitted(entity, action);
         });
+    }
+
+    private static void runAdmitted(Entity entity, Runnable action) {
+        if (entity instanceof Player player) {
+            PaperPlayerDataMutationAdmission.shared().mutatePlayer("flow-player-mutation:" + player.getUniqueId(), player, action);
+            return;
+        }
+        action.run();
     }
 
     public static void applyVelocity(FlowContext ctx, Entity entity, Vector velocity) {
@@ -54,7 +64,9 @@ public final class FlowMutations {
             double previous = living.getAbsorptionAmount();
             living.setAbsorptionAmount(Math.max(previous, amount));
             ctx.runLater(() -> {
-                if (living.isValid()) living.setAbsorptionAmount(Math.min(living.getAbsorptionAmount(), previous));
+                if (living.isValid()) {
+                    runAdmitted(living, () -> living.setAbsorptionAmount(Math.min(living.getAbsorptionAmount(), previous)));
+                }
             }, duration);
         });
     }

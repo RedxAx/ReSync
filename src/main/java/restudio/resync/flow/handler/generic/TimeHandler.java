@@ -7,6 +7,8 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -20,10 +22,17 @@ import java.time.temporal.TemporalAccessor;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 public class TimeHandler implements NodeHandler {
     private static final String DEFAULT_PATTERN = "uuuu-MM-dd HH:mm:ss";
+    private static final Set<String> DATA_ONLY_OPERATIONS = Set.of(
+        "time_format",
+        "time_parse",
+        "time_add",
+        "time_diff",
+        "time_to_ticks");
     private final Clock clock;
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new HashMap<>();
 
@@ -68,14 +77,15 @@ public class TimeHandler implements NodeHandler {
 
         operations.put("time_add", (ctx, node) -> {
             long time = ctx.getInputValue(node, "time", Long.class, 0L);
-            long amount = ctx.getInputValue(node, "amount", Long.class, 0L);
             String unit = ctx.getInputValue(node, "unit", String.class, "seconds");
             try {
+                Number inputAmount = ctx.getInputValue(node, "amount", Number.class, 0L);
+                long amount = wholeNumber(inputAmount, "Time amount");
                 Instant result = add(Instant.ofEpochMilli(time), amount, unit, resolveZone(ctx, node));
-                ctx.setOutput(node, "time", result.toEpochMilli());
+                ctx.setOutput(node, "output_time", result.toEpochMilli());
                 succeed(ctx, node);
             } catch (Exception exception) {
-                ctx.setOutput(node, "time", time);
+                ctx.setOutput(node, "output_time", time);
                 fail(ctx, node, exception);
             }
         });
@@ -102,12 +112,13 @@ public class TimeHandler implements NodeHandler {
         });
 
         operations.put("time_to_ticks", (ctx, node) -> {
-            long seconds = ctx.getInputValue(node, "seconds", Long.class, 0L);
+            Number seconds = null;
             try {
-                ctx.setOutput(node, "ticks", Math.multiplyExact(seconds, 20L));
+                seconds = ctx.getInputValue(node, "seconds", Number.class, 0L);
+                ctx.setOutput(node, "ticks", toTicks(seconds));
                 succeed(ctx, node);
             } catch (Exception exception) {
-                ctx.setOutput(node, "ticks", seconds >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE);
+                ctx.setOutput(node, "ticks", secondsSentinel(seconds));
                 fail(ctx, node, exception);
             }
         });
@@ -141,7 +152,9 @@ public class TimeHandler implements NodeHandler {
             throw new IllegalArgumentException("Unknown time operation: " + operation);
         }
         handler.accept(ctx, node);
-        ctx.triggerOutput("flow");
+        if (!DATA_ONLY_OPERATIONS.contains(operation)) {
+            ctx.triggerOutput("flow");
+        }
     }
 
     private DateTimeFormatter formatter(String pattern, Locale locale) {
@@ -194,6 +207,69 @@ public class TimeHandler implements NodeHandler {
             default -> throw new IllegalArgumentException("Unknown time unit: " + unit);
         };
         return milliseconds / divisor;
+    }
+
+    private long wholeNumber(Number value, String label) {
+        BigDecimal decimal = decimalNumber(value, label);
+        BigInteger integer;
+        try {
+            integer = decimal.toBigIntegerExact();
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException(label + " must be a finite whole number");
+        }
+        try {
+            return integer.longValueExact();
+        } catch (ArithmeticException exception) {
+            throw new ArithmeticException(label + " overflow");
+        }
+    }
+
+    private long toTicks(Number seconds) {
+        BigDecimal tickValue = decimalNumber(seconds, "Time seconds").multiply(BigDecimal.valueOf(20L));
+        BigInteger ticks;
+        try {
+            ticks = tickValue.toBigIntegerExact();
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("Time seconds must produce a whole tick count");
+        }
+        try {
+            return ticks.longValueExact();
+        } catch (ArithmeticException exception) {
+            throw new ArithmeticException("long overflow");
+        }
+    }
+
+    private BigDecimal decimalNumber(Number value, String label) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof BigInteger integer) {
+            return new BigDecimal(integer);
+        }
+        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+            return BigDecimal.valueOf(value.longValue());
+        }
+        double numeric = value.doubleValue();
+        if (!Double.isFinite(numeric)) {
+            throw new IllegalArgumentException(label + " must be finite");
+        }
+        return BigDecimal.valueOf(numeric);
+    }
+
+    private long secondsSentinel(Number seconds) {
+        if (seconds instanceof BigDecimal decimal) {
+            return decimal.signum() >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+        if (seconds instanceof BigInteger integer) {
+            return integer.signum() >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+        if (seconds != null && seconds.doubleValue() >= 0.0) {
+            return Long.MAX_VALUE;
+        }
+        return Long.MIN_VALUE;
     }
 
     private ZoneId resolveZone(FlowContext context, FlowNode node) {

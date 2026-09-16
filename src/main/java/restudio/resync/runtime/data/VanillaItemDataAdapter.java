@@ -4,6 +4,7 @@ import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowTypeRef;
+import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.RuntimeDataAdapter;
 import restudio.resync.api.RuntimeDataCapability;
 import restudio.resync.api.RuntimeDataQuery;
@@ -23,6 +24,17 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
     public static final String ID = "minecraft:items";
     private final Map<Material, Set<String>> materialTags = discoverMaterialTags();
     private final List<RuntimeDataRecord> records = buildRecords();
+    private final RuntimeDataCategoryCatalog<Void> categoryCatalog = new RuntimeDataCategoryCatalog<>(this) {
+        @Override
+        public CaptureAffinity captureAffinity() {
+            return CaptureAffinity.CALLER;
+        }
+
+        @Override
+        protected Snapshot<Void> captureSnapshot() {
+            return snapshot(revision(), records, null);
+        }
+    };
 
     @Override
     public String id() {
@@ -55,6 +67,11 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
     }
 
     @Override
+    public OptionCatalogProvider categoryCatalog() {
+        return categoryCatalog;
+    }
+
+    @Override
     public List<RuntimeDataRecord> records(RuntimeDataQuery query) {
         return records;
     }
@@ -77,7 +94,15 @@ public final class VanillaItemDataAdapter implements RuntimeDataAdapter<ItemStac
     private List<RuntimeDataRecord> buildRecords() {
         List<RuntimeDataRecord> values = new ArrayList<>();
         for (Material material : Material.values()) {
-            if (!material.isItem() || material.isAir()) {
+            boolean item;
+            boolean air;
+            try {
+                item = material.isItem();
+                air = material.isAir();
+            } catch (RuntimeException exception) {
+                continue;
+            }
+            if (!item || air) {
                 continue;
             }
             Set<String> categories = categories(material);

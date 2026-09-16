@@ -19,6 +19,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -335,6 +336,8 @@ public final class NetworkPlayerStateCodec {
     }
 
     public static void validate(Captured captured, NetworkPlayerStateConfig config) {
+        Objects.requireNonNull(captured, "captured");
+        Objects.requireNonNull(config, "config");
         if (captured.families() != families(config)) {
             throw new IllegalArgumentException("Network Player State Families Do Not Match The Target Realm");
         }
@@ -344,82 +347,218 @@ public final class NetworkPlayerStateCodec {
     }
 
     public static Location apply(Player player, Captured captured, NetworkPlayerStateConfig config) {
+        return apply(player, captured, config, PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public static Location apply(Player player, Captured captured, NetworkPlayerStateConfig config,
+                                 PaperPlayerDataMutationAdmission playerDataAdmission) {
+        Objects.requireNonNull(playerDataAdmission, "playerDataAdmission");
+        if (player == null || player.getWorld() == null || player.getWorld().getWorldFolder() == null) {
+            throw new IllegalStateException("Network Player World Root Is Unavailable");
+        }
+        try (PaperPlayerDataMutationAdmission.Lease ignored = playerDataAdmission.acquirePdc(
+            "network-player-state-apply:" + player.getUniqueId(), player.getUniqueId(),
+            player.getWorld().getWorldFolder().toPath())) {
+            return applyAdmitted(player, captured, config);
+        }
+    }
+
+    private static Location applyAdmitted(Player player, Captured captured, NetworkPlayerStateConfig config) {
         validate(captured, config);
-        NetworkPlayerStateData data = captured.data();
-        if (config.attributes()) {
-            for (Map.Entry<String, Double> value : data.attributes().entrySet()) {
-                NamespacedKey key = NamespacedKey.fromString(value.getKey());
-                Attribute attribute = key == null ? null : Registry.ATTRIBUTE.get(key);
-                AttributeInstance instance = attribute == null ? null : player.getAttribute(attribute);
-                if (instance == null || !Double.isFinite(value.getValue())) {
-                    throw new IllegalArgumentException("Network Player Attribute Is Not Compatible With This Server");
+        ApplyPlan plan = preflight(player, captured.data(), config);
+        if (families(config) == 0) {
+            return applyPlan(player, config, plan);
+        }
+        Captured previous = capture(player, config);
+        ApplyPlan rollback = preflight(player, previous.data(), config);
+        byte[] persistentData = config.persistentData() || config.locationPolicy() != NetworkPlayerLocationPolicy.NEVER
+            ? persistentDataSnapshot(player) : null;
+        try {
+            return applyPlan(player, config, plan);
+        } catch (RuntimeException | Error failure) {
+            try {
+                applyPlan(player, config, rollback);
+            } catch (RuntimeException | Error compensationFailure) {
+                failure.addSuppressed(compensationFailure);
+            }
+            if (persistentData != null) {
+                try {
+                    restorePersistentData(player, persistentData);
+                } catch (RuntimeException | Error compensationFailure) {
+                    failure.addSuppressed(compensationFailure);
                 }
-                instance.setBaseValue(value.getValue());
+            }
+            throw failure;
+        }
+    }
+
+    private static ApplyPlan preflight(Player player, NetworkPlayerStateData data, NetworkPlayerStateConfig config) {
+        GameMode gameMode = null;
+        boolean allowFlight = false;
+        boolean flying = false;
+        float flySpeed = 0;
+        float walkSpeed = 0;
+        int selectedSlot = 0;
+        if (config.movement()) {
+            try {
+                gameMode = GameMode.valueOf(data.gameMode());
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Network Player Game Mode Is Not Compatible With This Server", exception);
+            }
+            allowFlight = data.allowFlight();
+            flying = data.flying();
+            if (!Float.isFinite(data.flySpeed()) || !Float.isFinite(data.walkSpeed())) {
+                throw new IllegalArgumentException("Network Player Movement Is Invalid");
+            }
+            flySpeed = Math.clamp(data.flySpeed(), -1f, 1f);
+            walkSpeed = Math.clamp(data.walkSpeed(), -1f, 1f);
+            selectedSlot = Math.clamp(data.selectedSlot(), 0, 8);
+        }
+
+        double health = 0;
+        double absorption = 0;
+        int food = 0;
+        float saturation = 0;
+        float exhaustion = 0;
+        int remainingAir = 0;
+        int fireTicks = 0;
+        int freezeTicks = 0;
+        if (config.vitals()) {
+            if (!Double.isFinite(data.health()) || !Double.isFinite(data.absorption()) || !Float.isFinite(data.saturation()) || !Float.isFinite(data.exhaustion())) {
+                throw new IllegalArgumentException("Network Player Vitals Are Invalid");
+            }
+            AttributeInstance maximumHealth = player.getAttribute(Attribute.MAX_HEALTH);
+            double maximum = maximumHealth == null ? 20 : maximumHealth.getValue();
+            if (!Double.isFinite(maximum)) {
+                throw new IllegalArgumentException("Network Player Maximum Health Is Invalid");
+            }
+            int maximumAir = player.getMaximumAir();
+            int maximumFreeze = player.getMaxFreezeTicks();
+            if (maximumAir < 0 || maximumFreeze < 0) {
+                throw new IllegalArgumentException("Network Player Vitals Are Invalid");
+            }
+            health = Math.clamp(data.health(), 0.01, Math.max(0.01, maximum));
+            absorption = Math.max(0, data.absorption());
+            food = Math.clamp(data.food(), 0, 20);
+            saturation = Math.clamp(data.saturation(), 0, 20);
+            exhaustion = Math.max(0, data.exhaustion());
+            remainingAir = Math.clamp(data.remainingAir(), 0, maximumAir);
+            fireTicks = Math.max(0, data.fireTicks());
+            freezeTicks = Math.clamp(data.freezeTicks(), 0, maximumFreeze);
+        }
+
+        int experienceLevel = 0;
+        int totalExperience = 0;
+        float experienceProgress = 0;
+        if (config.experience()) {
+            if (!Float.isFinite(data.experienceProgress())) {
+                throw new IllegalArgumentException("Network Player Experience Is Invalid");
+            }
+            experienceLevel = Math.max(0, data.experienceLevel());
+            totalExperience = Math.max(0, data.totalExperience());
+            experienceProgress = Math.clamp(data.experienceProgress(), 0, 1);
+        }
+
+        ItemStack[] inventory = config.inventory() ? items(data.inventory(), player.getInventory().getStorageContents().length) : null;
+        ItemStack[] armor = config.inventory() ? items(data.armor(), player.getInventory().getArmorContents().length) : null;
+        ItemStack offhand = config.inventory() ? item(data.offhand()) : null;
+        ItemStack cursor = config.inventory() ? item(data.cursor()) : null;
+        ItemStack[] enderChest = config.enderChest() ? items(data.enderChest(), player.getEnderChest().getSize()) : null;
+        List<PotionEffect> effects = config.effects() ? potionEffects(data.effects()) : List.of();
+        List<AttributeUpdate> attributes = config.attributes() ? attributeUpdates(player, data.attributes()) : List.of();
+        AdvancementPlan advancements = config.advancements() ? advancementPlan(player, data.advancements()) : null;
+        List<NamespacedKey> recipes = config.recipes() ? recipePlan(data.recipes()) : List.of();
+        List<StatisticUpdate> statistics = config.statistics() ? statisticPlan(data.statistics()) : List.of();
+        byte[] persistentData = config.persistentData() ? persistentDataPlan(player, config, data.persistentData()) : null;
+        byte[] locationHistory = config.locationPolicy() != NetworkPlayerLocationPolicy.NEVER ? encodeLocations(data.locations()) : null;
+        Location destination = location(config, data.locations());
+        return new ApplyPlan(gameMode, allowFlight, flying, flySpeed, walkSpeed, selectedSlot, health, absorption, food, saturation, exhaustion,
+            remainingAir, fireTicks, freezeTicks, experienceLevel, totalExperience, experienceProgress, inventory, armor,
+            offhand, cursor, enderChest, effects, attributes, advancements, recipes, statistics, persistentData,
+            locationHistory, destination);
+    }
+
+    private static Location applyPlan(Player player, NetworkPlayerStateConfig config, ApplyPlan plan) {
+        if (config.attributes()) {
+            for (AttributeUpdate update : plan.attributes()) {
+                update.instance().setBaseValue(update.value());
             }
         }
         if (config.movement()) {
-            player.setGameMode(GameMode.valueOf(data.gameMode()));
-            player.setAllowFlight(data.allowFlight());
-            player.setFlying(data.allowFlight() && data.flying());
-            player.setFlySpeed(Math.clamp(data.flySpeed(), -1f, 1f));
-            player.setWalkSpeed(Math.clamp(data.walkSpeed(), -1f, 1f));
-            player.getInventory().setHeldItemSlot(Math.clamp(data.selectedSlot(), 0, 8));
+            player.setGameMode(plan.gameMode());
+            player.setAllowFlight(plan.allowFlight());
+            player.setFlying(plan.allowFlight() && plan.flying());
+            player.setFlySpeed(plan.flySpeed());
+            player.setWalkSpeed(plan.walkSpeed());
+            player.getInventory().setHeldItemSlot(plan.selectedSlot());
         }
         if (config.vitals()) {
-            AttributeInstance maximumHealth = player.getAttribute(Attribute.MAX_HEALTH);
-            double maximum = maximumHealth == null ? 20 : maximumHealth.getValue();
-            player.setHealth(Math.clamp(data.health(), 0.01, Math.max(0.01, maximum)));
-            player.setAbsorptionAmount(Math.max(0, data.absorption()));
-            player.setFoodLevel(Math.clamp(data.food(), 0, 20));
-            player.setSaturation(Math.clamp(data.saturation(), 0, 20));
-            player.setExhaustion(Math.max(0, data.exhaustion()));
-            player.setRemainingAir(Math.clamp(data.remainingAir(), 0, player.getMaximumAir()));
-            player.setFireTicks(Math.max(0, data.fireTicks()));
-            player.setFreezeTicks(Math.clamp(data.freezeTicks(), 0, player.getMaxFreezeTicks()));
+            player.setHealth(plan.health());
+            player.setAbsorptionAmount(plan.absorption());
+            player.setFoodLevel(plan.food());
+            player.setSaturation(plan.saturation());
+            player.setExhaustion(plan.exhaustion());
+            player.setRemainingAir(plan.remainingAir());
+            player.setFireTicks(plan.fireTicks());
+            player.setFreezeTicks(plan.freezeTicks());
         }
         if (config.experience()) {
-            player.setLevel(Math.max(0, data.experienceLevel()));
-            player.setTotalExperience(Math.max(0, data.totalExperience()));
-            player.setExp(Math.clamp(data.experienceProgress(), 0, 1));
+            player.setLevel(plan.experienceLevel());
+            player.setTotalExperience(plan.totalExperience());
+            player.setExp(plan.experienceProgress());
         }
         if (config.inventory()) {
-            player.getInventory().setStorageContents(items(data.inventory(), player.getInventory().getStorageContents().length));
-            player.getInventory().setArmorContents(items(data.armor(), player.getInventory().getArmorContents().length));
-            player.getInventory().setItemInOffHand(item(data.offhand()));
-            player.setItemOnCursor(item(data.cursor()));
+            player.getInventory().setStorageContents(plan.inventory());
+            player.getInventory().setArmorContents(plan.armor());
+            player.getInventory().setItemInOffHand(plan.offhand());
+            player.setItemOnCursor(plan.cursor());
         }
         if (config.enderChest()) {
-            player.getEnderChest().setContents(items(data.enderChest(), player.getEnderChest().getSize()));
+            player.getEnderChest().setContents(plan.enderChest());
         }
         if (config.effects()) {
             player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
-            for (NetworkPlayerStateData.Effect value : data.effects()) {
-                NamespacedKey key = NamespacedKey.fromString(value.type());
-                PotionEffectType type = key == null ? null : Registry.MOB_EFFECT.get(key);
-                if (type == null) {
-                    throw new IllegalArgumentException("Network Player Effect Is Not Compatible With This Server");
-                }
-                player.addPotionEffect(new PotionEffect(type, value.duration(), value.amplifier(), value.ambient(), value.particles(), value.icon()));
-            }
+            plan.effects().forEach(effect -> player.addPotionEffect(effect));
         }
         if (config.advancements()) {
-            applyAdvancements(player, data.advancements());
+            applyAdvancements(plan.advancements());
         }
         if (config.recipes()) {
-            applyRecipes(player, data.recipes());
+            applyRecipes(player, plan.recipes());
         }
         if (config.statistics()) {
-            applyStatistics(player, data.statistics());
+            applyStatistics(player, plan.statistics());
         }
         if (config.persistentData()) {
-            applyPersistentData(player, config, data.persistentData());
+            applyPersistentData(player, config, plan.persistentData());
         }
-        Location destination = location(config, data.locations());
         if (config.locationPolicy() != NetworkPlayerLocationPolicy.NEVER) {
-            writeLocations(player, data.locations());
+            writeLocations(player, plan.locationHistory());
         }
         player.updateInventory();
-        return destination;
+        return plan.destination();
+    }
+
+    private record ApplyPlan(GameMode gameMode, boolean allowFlight, boolean flying, float flySpeed, float walkSpeed,
+                             int selectedSlot, double health, double absorption, int food, float saturation,
+                             float exhaustion, int remainingAir, int fireTicks, int freezeTicks, int experienceLevel,
+                             int totalExperience, float experienceProgress, ItemStack[] inventory, ItemStack[] armor,
+                             ItemStack offhand, ItemStack cursor, ItemStack[] enderChest, List<PotionEffect> effects,
+                             List<AttributeUpdate> attributes, AdvancementPlan advancements, List<NamespacedKey> recipes,
+                             List<StatisticUpdate> statistics, byte[] persistentData, byte[] locationHistory,
+                             Location destination) {
+    }
+
+    private record AttributeUpdate(AttributeInstance instance, double value) {
+    }
+
+    private record AdvancementPlan(List<AdvancementProgress> resets, List<AdvancementUpdate> updates) {
+    }
+
+    private record AdvancementUpdate(AdvancementProgress progress, List<String> criteria) {
+    }
+
+    private record StatisticUpdate(Statistic statistic, Material material, EntityType entityType, int value) {
     }
 
     public static int families(NetworkPlayerStateConfig config) {
@@ -450,29 +589,69 @@ public final class NetworkPlayerStateCodec {
         return Map.copyOf(values);
     }
 
-    private static void applyAdvancements(Player player, Map<String, List<String>> desired) {
-        Bukkit.advancementIterator().forEachRemaining(advancement -> {
-            AdvancementProgress progress = player.getAdvancementProgress(advancement);
-            List.copyOf(progress.getAwardedCriteria()).forEach(progress::revokeCriteria);
-        });
+    private static List<AttributeUpdate> attributeUpdates(Player player, Map<String, Double> desired) {
+        List<AttributeUpdate> updates = new ArrayList<>(desired.size());
+        for (Map.Entry<String, Double> value : desired.entrySet()) {
+            NamespacedKey key = NamespacedKey.fromString(value.getKey());
+            Attribute attribute = key == null ? null : Registry.ATTRIBUTE.get(key);
+            AttributeInstance instance = attribute == null ? null : player.getAttribute(attribute);
+            if (instance == null || !Double.isFinite(value.getValue())) {
+                throw new IllegalArgumentException("Network Player Attribute Is Not Compatible With This Server");
+            }
+            updates.add(new AttributeUpdate(instance, value.getValue()));
+        }
+        return List.copyOf(updates);
+    }
+
+    private static List<PotionEffect> potionEffects(List<NetworkPlayerStateData.Effect> desired) {
+        List<PotionEffect> effects = new ArrayList<>(desired.size());
+        Set<PotionEffectType> seen = new LinkedHashSet<>();
+        for (NetworkPlayerStateData.Effect value : desired) {
+            NamespacedKey key = NamespacedKey.fromString(value.type());
+            PotionEffectType type = key == null ? null : Registry.MOB_EFFECT.get(key);
+            if (type == null || !seen.add(type)) {
+                throw new IllegalArgumentException("Network Player Effect Is Not Compatible With This Server");
+            }
+            effects.add(new PotionEffect(type, value.duration(), value.amplifier(), value.ambient(), value.particles(), value.icon()));
+        }
+        return List.copyOf(effects);
+    }
+
+    private static AdvancementPlan advancementPlan(Player player, Map<String, List<String>> desired) {
+        List<AdvancementProgress> resets = new ArrayList<>();
+        Bukkit.advancementIterator().forEachRemaining(advancement -> resets.add(player.getAdvancementProgress(advancement)));
+        List<AdvancementUpdate> updates = new ArrayList<>(desired.size());
         for (Map.Entry<String, List<String>> entry : desired.entrySet()) {
             NamespacedKey key = NamespacedKey.fromString(entry.getKey());
             Advancement advancement = key == null ? null : Bukkit.getAdvancement(key);
             if (advancement == null) {
                 throw new IllegalArgumentException("Network Player Advancement Is Not Available On This Server");
             }
-            AdvancementProgress progress = player.getAdvancementProgress(advancement);
+            Set<String> criteria = new LinkedHashSet<>();
             for (String criterion : entry.getValue()) {
-                if (!advancement.getCriteria().contains(criterion)) {
+                if (!advancement.getCriteria().contains(criterion) || !criteria.add(criterion)) {
                     throw new IllegalArgumentException("Network Player Advancement Criterion Is Not Compatible With This Server");
                 }
-                progress.awardCriteria(criterion);
+            }
+            updates.add(new AdvancementUpdate(player.getAdvancementProgress(advancement), List.copyOf(criteria)));
+        }
+        return new AdvancementPlan(List.copyOf(resets), List.copyOf(updates));
+    }
+
+    private static void applyAdvancements(AdvancementPlan plan) {
+        for (AdvancementProgress progress : plan.resets()) {
+            List.copyOf(progress.getAwardedCriteria()).forEach(progress::revokeCriteria);
+        }
+        for (AdvancementUpdate update : plan.updates()) {
+            for (String criterion : update.criteria()) {
+                if (!update.progress().awardCriteria(criterion)) {
+                    throw new IllegalStateException("Network Player Advancement Could Not Be Applied");
+                }
             }
         }
     }
 
-    private static void applyRecipes(Player player, Set<String> desired) {
-        player.undiscoverRecipes(player.getDiscoveredRecipes());
+    private static List<NamespacedKey> recipePlan(Set<String> desired) {
         List<NamespacedKey> recipes = new ArrayList<>(desired.size());
         for (String value : desired) {
             NamespacedKey key = NamespacedKey.fromString(value);
@@ -481,7 +660,12 @@ public final class NetworkPlayerStateCodec {
             }
             recipes.add(key);
         }
-        player.discoverRecipes(recipes);
+        return List.copyOf(recipes);
+    }
+
+    private static void applyRecipes(Player player, List<NamespacedKey> desired) {
+        player.undiscoverRecipes(player.getDiscoveredRecipes());
+        player.discoverRecipes(desired);
     }
 
     private static List<NetworkPlayerStateData.StatisticValue> statistics(Player player) {
@@ -530,37 +714,70 @@ public final class NetworkPlayerStateCodec {
         }
     }
 
-    private static void applyStatistics(Player player, List<NetworkPlayerStateData.StatisticValue> desired) {
-        statistics(player).forEach(value -> setStatistic(player, value, 0));
-        desired.forEach(value -> setStatistic(player, value, value.value()));
-    }
-
-    private static void setStatistic(Player player, NetworkPlayerStateData.StatisticValue value, int amount) {
-        Statistic statistic;
-        try {
-            statistic = Statistic.valueOf(value.statistic());
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Network Player Statistic Is Not Available On This Server", exception);
+    private static List<StatisticUpdate> statisticPlan(List<NetworkPlayerStateData.StatisticValue> desired) {
+        if (desired.size() > MAXIMUM_STATISTICS) {
+            throw new IllegalArgumentException("Network Player Statistics Are Too Large");
         }
-        try {
+        List<StatisticUpdate> updates = new ArrayList<>(desired.size());
+        Set<String> identities = new LinkedHashSet<>();
+        for (NetworkPlayerStateData.StatisticValue value : desired) {
+            Statistic statistic;
+            try {
+                statistic = Statistic.valueOf(value.statistic());
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("Network Player Statistic Is Not Available On This Server", exception);
+            }
+            String identity = value.statistic() + "\u0000" + value.qualifierType() + "\u0000" + value.qualifier();
+            if (!identities.add(identity)) {
+                throw new IllegalArgumentException("Network Player Statistic Is Duplicated");
+            }
             switch (value.qualifierType()) {
-                case "NONE" -> player.setStatistic(statistic, amount);
+                case "NONE" -> {
+                    if (statistic.getType() != Statistic.Type.UNTYPED || !value.qualifier().equals("-")) {
+                        throw new IllegalArgumentException("Network Player Statistic Is Not Compatible With This Server");
+                    }
+                    updates.add(new StatisticUpdate(statistic, null, null, value.value()));
+                }
                 case "ITEM", "BLOCK" -> {
+                    if (statistic.getType() != Statistic.Type.valueOf(value.qualifierType())) {
+                        throw new IllegalArgumentException("Network Player Statistic Is Not Compatible With This Server");
+                    }
                     Material material = Material.matchMaterial(value.qualifier());
-                    if (material == null) {
+                    if (material == null || "ITEM".equals(value.qualifierType()) && !material.isItem() || "BLOCK".equals(value.qualifierType()) && !material.isBlock()) {
                         throw new IllegalArgumentException("Network Player Statistic Material Is Not Available On This Server");
                     }
-                    player.setStatistic(statistic, material, amount);
+                    updates.add(new StatisticUpdate(statistic, material, null, value.value()));
                 }
                 case "ENTITY" -> {
+                    if (statistic.getType() != Statistic.Type.ENTITY) {
+                        throw new IllegalArgumentException("Network Player Statistic Is Not Compatible With This Server");
+                    }
                     NamespacedKey key = NamespacedKey.fromString(value.qualifier());
                     EntityType entityType = key == null ? null : Registry.ENTITY_TYPE.get(key);
                     if (entityType == null) {
                         throw new IllegalArgumentException("Network Player Statistic Entity Is Not Available On This Server");
                     }
-                    player.setStatistic(statistic, entityType, amount);
+                    updates.add(new StatisticUpdate(statistic, null, entityType, value.value()));
                 }
                 default -> throw new IllegalArgumentException("Network Player Statistic Qualifier Is Invalid");
+            }
+        }
+        return List.copyOf(updates);
+    }
+
+    private static void applyStatistics(Player player, List<StatisticUpdate> desired) {
+        statisticPlan(statistics(player)).forEach(value -> setStatistic(player, value, 0));
+        desired.forEach(value -> setStatistic(player, value, value.value()));
+    }
+
+    private static void setStatistic(Player player, StatisticUpdate value, int amount) {
+        try {
+            if (value.material() != null) {
+                player.setStatistic(value.statistic(), value.material(), amount);
+            } else if (value.entityType() != null) {
+                player.setStatistic(value.statistic(), value.entityType(), amount);
+            } else {
+                player.setStatistic(value.statistic(), amount);
             }
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Network Player Statistic Is Not Compatible With This Server", exception);
@@ -587,6 +804,24 @@ public final class NetworkPlayerStateCodec {
         }
     }
 
+    private static byte[] persistentDataPlan(Player player, NetworkPlayerStateConfig config, byte[] payload) {
+        if (payload.length > MAXIMUM_PERSISTENT_DATA_BYTES) {
+            throw new IllegalArgumentException("Network Player Persistent Data Is Too Large");
+        }
+        try {
+            PersistentDataContainer validated = player.getPersistentDataContainer().getAdapterContext().newPersistentDataContainer();
+            if (payload.length > 0) {
+                validated.readFromBytes(payload);
+            }
+            if (validated.getKeys().stream().anyMatch(key -> !config.persistentDataNamespaces().contains(key.getNamespace()) || key.equals(LOCATION_HISTORY_KEY))) {
+                throw new IllegalArgumentException("Network Player Persistent Data Exceeds The Target Allowlist");
+            }
+            return payload.clone();
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Network Player Persistent Data Is Invalid", exception);
+        }
+    }
+
     private static void applyPersistentData(Player player, NetworkPlayerStateConfig config, byte[] payload) {
         try {
             PersistentDataContainer target = player.getPersistentDataContainer();
@@ -596,15 +831,26 @@ public final class NetworkPlayerStateCodec {
                 }
             }
             if (payload.length > 0) {
-                PersistentDataContainer validated = target.getAdapterContext().newPersistentDataContainer();
-                validated.readFromBytes(payload);
-                if (validated.getKeys().stream().anyMatch(key -> !config.persistentDataNamespaces().contains(key.getNamespace()) || key.equals(LOCATION_HISTORY_KEY))) {
-                    throw new IllegalArgumentException("Network Player Persistent Data Exceeds The Target Allowlist");
-                }
                 target.readFromBytes(payload, false);
             }
         } catch (IOException exception) {
             throw new IllegalStateException("Apply Network Player Persistent Data Failed", exception);
+        }
+    }
+
+    private static byte[] persistentDataSnapshot(Player player) {
+        try {
+            return player.getPersistentDataContainer().serializeToBytes();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Capture Network Player Persistent Data Snapshot Failed", exception);
+        }
+    }
+
+    private static void restorePersistentData(Player player, byte[] payload) {
+        try {
+            player.getPersistentDataContainer().readFromBytes(payload, true);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Restore Network Player Persistent Data Snapshot Failed", exception);
         }
     }
 
@@ -673,7 +919,7 @@ public final class NetworkPlayerStateCodec {
         }
     }
 
-    private static void writeLocations(Player player, Map<String, NetworkPlayerStateData.LocationValue> locations) {
+    private static byte[] encodeLocations(Map<String, NetworkPlayerStateData.LocationValue> locations) {
         if (locations.size() > MAXIMUM_LOCATIONS) {
             throw new IllegalArgumentException("Network Player Location History Is Too Large");
         }
@@ -693,10 +939,14 @@ public final class NetworkPlayerStateCodec {
                 output.writeFloat(value.pitch());
             }
             output.flush();
-            player.getPersistentDataContainer().set(LOCATION_HISTORY_KEY, PersistentDataType.BYTE_ARRAY, bytes.toByteArray());
+            return bytes.toByteArray();
         } catch (IOException exception) {
             throw new IllegalStateException("Encode Network Player Location History Failed", exception);
         }
+    }
+
+    private static void writeLocations(Player player, byte[] payload) {
+        player.getPersistentDataContainer().set(LOCATION_HISTORY_KEY, PersistentDataType.BYTE_ARRAY, payload);
     }
 
     private static long uncompressedSize(Captured captured) {

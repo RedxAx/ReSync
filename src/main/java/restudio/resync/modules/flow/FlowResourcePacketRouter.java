@@ -23,11 +23,26 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.GuiManager;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.TabListService;
+import restudio.resync.flow.automation.ScheduleDefinition;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ResourcePresentationIntent;
+import restudio.resync.flow.resource.ResourcePayloadCodecs;
 import restudio.resync.messages.MessageLogService;
-import restudio.resync.contracts.ReSyncProtocolContract;
+import restudio.resync.protocol.ReSyncProtocolContract;
+import restudio.resync.resources.AssetFileFormat;
+import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.runtime.JsonRuntimeResourceValidator;
+import restudio.resync.server.AggregateResourceCreateStorage;
+import restudio.resync.server.AuthorityEpoch;
+import restudio.resync.server.TemporaryLifecycleDiagnostics;
+import restudio.resync.storage.ProjectMetadataLineage;
+import restudio.resync.structure.StructureLibrary;
 import restudio.resync.world.WorldManagementService;
 import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSnapshot;
@@ -37,15 +52,22 @@ import restudio.resync.worldgen.data.WorldGenSerializer;
 import restudio.resync.worldgen.pipeline.PipelineCompiler;
 import restudio.resync.worldgen.pipeline.WorldGenCompileDiagnostics;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 public class FlowResourcePacketRouter {
+    private static final Pattern CANONICAL_PAYLOAD_HASH = Pattern.compile("[0-9a-f]{64}");
     private final List<FlowResourcePacketHandler<?>> handlers = new ArrayList<>();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final MessageLogService messageLogService;
@@ -54,6 +76,9 @@ public class FlowResourcePacketRouter {
     private final FlowResourceRegistry resourceRegistry;
     private final Consumer<String> resourceCatalogRefresh;
     private final JsonRuntimeResourceValidator jsonResourceValidator;
+    private final FlowResourceProtocolAuthority protocolAuthority;
+    private final AuthorityEpoch authorityEpoch;
+    private final Predicate<Session> legacyCompatibility;
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, FlowPacketSender sender) {
         this(storage, customContentStorage, null, null, sender, null, null);
@@ -89,13 +114,51 @@ public class FlowResourcePacketRouter {
 
     public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, CustomContentService customContentService, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh,
                                     FlowResourceRegistry resourceRegistry, Consumer<String> resourceCatalogRefresh, ItemAttributeSchemaService itemAttributeSchemaService) {
+        this(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService, customContentCatalogRefresh,
+            resourceRegistry, resourceCatalogRefresh, itemAttributeSchemaService, FlowResourceProtocolAuthority.shared(), requireExplicitAuthorityEpoch(sender),
+            FlowMutationPayloadReader::legacyCompatible);
+    }
+
+    public FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, CustomContentService customContentService, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh,
+                                    FlowResourceRegistry resourceRegistry, Consumer<String> resourceCatalogRefresh, ItemAttributeSchemaService itemAttributeSchemaService,
+                                    AuthorityEpoch authorityEpoch, Predicate<Session> legacyCompatibility) {
+        this(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService, customContentCatalogRefresh,
+            resourceRegistry, resourceCatalogRefresh, itemAttributeSchemaService, FlowResourceProtocolAuthority.shared(), authorityEpoch,
+            legacyCompatibility);
+    }
+
+    FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, CustomContentService customContentService, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh,
+                             FlowResourceRegistry resourceRegistry, Consumer<String> resourceCatalogRefresh, ItemAttributeSchemaService itemAttributeSchemaService,
+                             FlowResourceProtocolAuthority protocolAuthority) {
+        this(storage, customContentStorage, customContentService, jsonResourceStorage, sender, messageLogService, customContentCatalogRefresh,
+            resourceRegistry, resourceCatalogRefresh, itemAttributeSchemaService, protocolAuthority, requireExplicitAuthorityEpoch(sender),
+            FlowMutationPayloadReader::legacyCompatible);
+    }
+
+    FlowResourcePacketRouter(FlowStorage storage, CustomContentStorage customContentStorage, CustomContentService customContentService, ReSyncJsonResourceStorage jsonResourceStorage, FlowPacketSender sender, MessageLogService messageLogService, Runnable customContentCatalogRefresh,
+                             FlowResourceRegistry resourceRegistry, Consumer<String> resourceCatalogRefresh, ItemAttributeSchemaService itemAttributeSchemaService,
+                             FlowResourceProtocolAuthority protocolAuthority, AuthorityEpoch authorityEpoch,
+                             Predicate<Session> legacyCompatibility) {
         this.sender = sender;
         this.messageLogService = messageLogService;
         this.customContentCatalogRefresh = customContentCatalogRefresh;
         this.resourceRegistry = resourceRegistry != null ? resourceRegistry : new FlowResourceRegistry();
         this.resourceCatalogRefresh = resourceCatalogRefresh != null ? resourceCatalogRefresh : ignored -> {
         };
-        this.jsonResourceValidator = new JsonRuntimeResourceValidator(customContentService);
+        this.protocolAuthority = Objects.requireNonNull(protocolAuthority, "Protocol authority is required");
+        if (authorityEpoch != null && authorityEpoch.current() < 1L) {
+            throw new IllegalArgumentException("Authority epoch must be positive");
+        }
+        if (sender != null && authorityEpoch == null) {
+            throw new IllegalStateException("Authority epoch is required when packet handling is enabled");
+        }
+        this.authorityEpoch = authorityEpoch;
+        Predicate<Session> configuredLegacyCompatibility = Objects.requireNonNull(legacyCompatibility,
+            "Legacy compatibility policy is required");
+        this.legacyCompatibility = session -> configuredLegacyCompatibility.test(session)
+            && FlowMutationPayloadReader.legacyCompatible(session);
+        this.jsonResourceValidator = new JsonRuntimeResourceValidator(customContentService, null,
+            storage != null ? storage.legacyRuntimeGate() : null);
         if (storage != null) {
             registerLifecycle(graphAdapter(storage, ReSyncResourceCatalog.FLOW));
             register(graphAdapter(storage, ReSyncResourceCatalog.FUNCTION));
@@ -107,6 +170,7 @@ public class FlowResourcePacketRouter {
         register(customContentAdapter(customContentStorage, customContentService, sender,
             itemAttributeSchemaService != null ? itemAttributeSchemaService : new ItemAttributeSchemaService()));
         register(projectMetadataAdapter(storage, sender));
+        registerLifecycle(ReSyncResourceCatalog.STRUCTURE_OWNER, new StructureResourceAdapter(StructureLibrary::active));
         if (jsonResourceStorage != null) {
             for (String type : jsonResourceStorage.resourceTypes()) {
                 register(jsonAdapter(jsonResourceStorage, type, sender));
@@ -128,17 +192,24 @@ public class FlowResourcePacketRouter {
     }
 
     private <T> void register(FlowResourceAdapter<T> adapter) {
+        protocolAuthority.validateDescriptor(adapter.descriptor());
         if (resourceRegistry.get(adapter.descriptor().typeId()) == null) {
             resourceRegistry.register(adapter);
         }
         if (sender != null) {
-            handlers.add(new FlowResourcePacketHandler<>(adapter, sender, resourceRegistry));
+            handlers.add(new FlowResourcePacketHandler<>(adapter, sender, resourceRegistry, protocolAuthority,
+                authorityEpoch, legacyCompatibility));
         }
     }
 
     private void registerLifecycle(FlowResourceAdapter<?> adapter) {
+        registerLifecycle("builtin", adapter);
+    }
+
+    private void registerLifecycle(String owner, FlowResourceAdapter<?> adapter) {
+        protocolAuthority.validateDescriptor(adapter.descriptor());
         if (resourceRegistry.get(adapter.descriptor().typeId()) == null) {
-            resourceRegistry.register(adapter);
+            resourceRegistry.register(owner, adapter);
         }
     }
 
@@ -157,7 +228,7 @@ public class FlowResourcePacketRouter {
 
             @Override
             public boolean conflicts(String id) {
-                return !storage.getGraphResourceType(id).isBlank();
+                return storage.readGraphIdentity(resourceType, id) != null;
             }
 
             @Override
@@ -168,7 +239,7 @@ public class FlowResourcePacketRouter {
             @Override
             public FlowGraph deserialize(String json) {
                 FlowGraph graph = FlowSerializer.deserialize(json);
-                applyGraphIdentity(graph, resourceType);
+                requireGraphIdentity(storage, graph, resourceType);
                 return graph;
             }
 
@@ -184,8 +255,19 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void save(FlowGraph value) {
-                applyGraphIdentity(value, resourceType);
+                requireGraphIdentity(storage, value, resourceType);
                 storage.saveGraph(value);
+            }
+
+            @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null;
+            }
+
+            @Override
+            public void save(FlowGraph value, UUID mutationId, long expectedRevision) {
+                requireGraphIdentity(storage, value, resourceType);
+                storage.saveGraph(value, mutationId, expectedRevision);
             }
 
             @Override
@@ -197,13 +279,19 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteGraph(resourceType, id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return graphMutationStamp(storage.readGraphIdentity(resourceType, id), resourceType, id);
+            }
+
+            @Override
             public void validate(FlowGraph value) {
-                applyGraphIdentity(value, resourceType);
+                requireGraphIdentity(storage, value, resourceType);
                 storage.requireValidGraph(value);
-                String actualType = storage.graphResourceType(value);
-                if (!resourceType.equals(actualType)) {
-                    throw new IllegalArgumentException("Expected " + resourceType + " graph but received " + actualType);
-                }
             }
 
             @Override
@@ -220,17 +308,17 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void sendData(Session session, FlowGraph value) {
-                sender.sendJsonResourceData(session, descriptor.flowPackets().data(), serialize(value), descriptor.displayName());
+                sender.sendJsonResourceData(session, protocolAuthority.requireFlowPackets(descriptor.typeId()).data(), serialize(value), descriptor.displayName());
             }
 
             @Override
             public void sendList(Session session, List<String> ids) {
-                sender.sendJsonResourceList(session, descriptor.flowPackets().list(), ids);
+                sender.sendJsonResourceList(session, protocolAuthority.requireFlowPackets(descriptor.typeId()).list(), ids);
             }
 
             @Override
             public void sendSaveAck(Session session, String id) {
-                sender.sendJsonResourceSaveAck(session, descriptor.flowPackets().saveAck(), id);
+                sender.sendJsonResourceSaveAck(session, protocolAuthority.requireFlowPackets(descriptor.typeId()).saveAck(), id);
             }
 
             @Override
@@ -270,12 +358,20 @@ public class FlowResourcePacketRouter {
         };
     }
 
-    private void applyGraphIdentity(FlowGraph graph, String resourceType) {
+    private void requireGraphIdentity(FlowStorage storage, FlowGraph graph, String resourceType) {
         if (graph == null) {
             return;
         }
-        graph.setResourceType(resourceType);
-        graph.setFunction(ReSyncResourceCatalog.FUNCTION.equals(resourceType));
+        String declaredType = graph.getResourceType();
+        if (!declaredType.isBlank() && !resourceType.equals(declaredType)) {
+            throw new IllegalArgumentException("Expected " + resourceType + " graph but received " + declaredType);
+        }
+        FlowGraph computed = graph.copy();
+        computed.setResourceType("");
+        String computedType = storage.graphResourceType(computed);
+        if (!resourceType.equals(computedType)) {
+            throw new IllegalArgumentException("Expected " + resourceType + " graph but received " + computedType);
+        }
     }
 
     private FlowResourceAdapter<WorldGenProject> worldGenAdapter(WorldGenProjectStorage storage) {
@@ -316,13 +412,70 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null;
+            }
+
+            @Override
+            public void save(WorldGenProject value, UUID mutationId, long expectedRevision) {
+                storage.saveProject(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          WorldGenProject value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                requireWorldGenPresentation(resource, presentation);
+                Map<String, Object> requestedPayload = gson.fromJson(serialize(value), Map.class);
+                String requestedHash = ResourcePayloadCodecs.json().hashPayload(requestedPayload).canonicalText();
+                if (!requestedHash.equals(context.expectedPayloadHash())) {
+                    throw new IllegalArgumentException("WorldGen aggregate create payload does not match the exact mutation context");
+                }
+                JsonAssetStore.AggregateCreateResult created = createWorldGenAggregate(storage, value, context, presentation);
+                FlowResourceMutationStamp primaryStamp = mutationStamp(created.primaryStamp());
+                storage.completePostCommitRecovery(resource.id(), context.exactMutationId(), primaryStamp.revision(), false);
+                FlowResourceMutationStamp metadataStamp = mutationStamp(created.projectMetadataStamp());
+                Map<String, Object> primaryPayload = gson.fromJson(created.canonicalPayloadJson(), Map.class);
+                Map<String, Object> metadataPayload = gson.fromJson(created.canonicalProjectMetadataJson(), Map.class);
+                ServerResourceLocator metadataResource = new ServerResourceLocator(resource.serverId(),
+                    ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(ReSyncResourceCatalog.PROJECT_METADATA)),
+                    metadataStamp.id());
+                return new AggregateResourceCreateStorage.Result(
+                    new AggregateResourceCreateStorage.ResourceState(resource, primaryStamp, primaryPayload),
+                    new AggregateResourceCreateStorage.ResourceState(metadataResource, metadataStamp, metadataPayload));
+            }
+
+            @Override
             public void delete(String id) {
                 storage.deleteProject(id);
             }
 
             @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteProject(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return storage.readMutationStamp(id);
+            }
+
+            @Override
+            public void completePostCommitRecovery(String id, UUID mutationId, long revision, boolean deleted) {
+                storage.completePostCommitRecovery(id, mutationId, revision, deleted);
+            }
+
+            @Override
             public void validate(WorldGenProject value) {
-                WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(value);
+                WorldGenCompileDiagnostics diagnostics = PipelineCompiler.diagnoseProject(value, storage.legacyCompatibilityEnabled());
                 if (!diagnostics.isSuccess()) {
                     String message = diagnostics.getDiagnostics().isEmpty() ? "WorldGen Compile Failed" : diagnostics.getDiagnostics().getFirst().message();
                     throw new IllegalArgumentException(message);
@@ -331,9 +484,10 @@ public class FlowResourcePacketRouter {
 
             @Override
             public WorldGenProject duplicate(WorldGenProject value, String targetId) {
-                WorldGenProject copy = WorldGenSerializer.deserializeProject(WorldGenSerializer.serializeProject(value));
-                copy.setId(targetId);
-                return copy;
+                JsonObject payload = JsonAssetStore.logicalPayload(
+                    JsonParser.parseString(WorldGenSerializer.serializeProject(value)).getAsJsonObject());
+                payload.addProperty("id", targetId);
+                return WorldGenSerializer.deserializeProject(payload.toString());
             }
 
             @Override
@@ -563,8 +717,43 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null;
+            }
+
+            @Override
+            public void save(GuiDefinition value, UUID mutationId, long expectedRevision) {
+                storage.saveGui(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          GuiDefinition value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                return typedAggregateResult(resource, storage.createGui(value, context.exactMutationId(),
+                    context.expectedRevision(), presentation, context.expectedPayloadHash()));
+            }
+
+            @Override
             public void delete(String id) {
                 storage.deleteGui(id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteGui(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return resourceMutationStamp(storage.readResourceIdentity("gui", id), "gui", id);
             }
 
             @Override
@@ -680,8 +869,43 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null;
+            }
+
+            @Override
+            public void save(ScoreboardDefinition value, UUID mutationId, long expectedRevision) {
+                storage.saveScoreboard(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          ScoreboardDefinition value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                return typedAggregateResult(resource, storage.createScoreboard(value, context.exactMutationId(),
+                    context.expectedRevision(), presentation, context.expectedPayloadHash()));
+            }
+
+            @Override
             public void delete(String id) {
                 storage.deleteScoreboard(id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteScoreboard(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return resourceMutationStamp(storage.readResourceIdentity("scoreboard", id), "scoreboard", id);
             }
 
             @Override
@@ -701,7 +925,7 @@ public class FlowResourcePacketRouter {
                 if (!(context instanceof FlowContext flowContext) || flowContext.getPlayer() == null) {
                     throw new IllegalArgumentException("Scoreboard application requires a player context");
                 }
-                if (!ScoreboardTemplateManager.showTemplate(flowContext.getPlayer(), value, true)) {
+                if (value == null || !ScoreboardTemplateManager.showTemplate(flowContext.getPlayer(), value.getId(), true)) {
                     throw new IllegalStateException("Scoreboard could not be applied");
                 }
                 return true;
@@ -786,8 +1010,43 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null;
+            }
+
+            @Override
+            public void save(TabDefinition value, UUID mutationId, long expectedRevision) {
+                storage.saveTab(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          TabDefinition value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                return typedAggregateResult(resource, storage.createTab(value, context.exactMutationId(),
+                    context.expectedRevision(), presentation, context.expectedPayloadHash()));
+            }
+
+            @Override
             public void delete(String id) {
                 storage.deleteTab(id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteTab(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return resourceMutationStamp(storage.readResourceIdentity("tab", id), "tab", id);
             }
 
             @Override
@@ -890,7 +1149,6 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void validate(CustomContentDefinition value) {
-                value.setComponents(attributeSchemaService.customComponentsForMaterial(value.getMaterial(), value.getComponents()));
                 List<String> errors = validator.validate(value);
                 if (!errors.isEmpty()) {
                     throw new IllegalArgumentException(String.join("; ", errors));
@@ -907,8 +1165,63 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null && storage.supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            public void save(CustomContentDefinition value, UUID mutationId, long expectedRevision) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                storage.save(value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          CustomContentDefinition value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                JsonAssetStore.AggregateCreateResult created = storage.create(value, context.exactMutationId(),
+                    context.expectedRevision(), presentation, context.expectedPayloadHash());
+                FlowResourceMutationStamp primaryStamp = mutationStamp(created.primaryStamp());
+                FlowResourceMutationStamp metadataStamp = mutationStamp(created.projectMetadataStamp());
+                Map<String, Object> primaryPayload = gson.fromJson(created.canonicalPayloadJson(), Map.class);
+                Map<String, Object> metadataPayload = gson.fromJson(created.canonicalProjectMetadataJson(), Map.class);
+                ServerResourceLocator metadataResource = new ServerResourceLocator(resource.serverId(),
+                    ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(ReSyncResourceCatalog.PROJECT_METADATA)),
+                    metadataStamp.id());
+                return new AggregateResourceCreateStorage.Result(
+                    new AggregateResourceCreateStorage.ResourceState(resource, primaryStamp, primaryPayload),
+                    new AggregateResourceCreateStorage.ResourceState(metadataResource, metadataStamp, metadataPayload));
+            }
+
+            @Override
             public void delete(String id) {
                 storage.delete(id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                storage.delete(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                return storage.readMutationStamp(id);
+            }
+
+            @Override
+            public boolean matchesCommittedPayloadRecovery(CustomContentDefinition previous, CustomContentDefinition requested,
+                                                           CustomContentDefinition actual) {
+                return storage.matchesCommittedPayloadRecovery(previous, requested, actual);
             }
 
             @Override
@@ -1005,11 +1318,7 @@ public class FlowResourcePacketRouter {
 
             @Override
             public String get(String id) {
-                String json = storage.getProjectMetadata(id);
-                if (json == null && !"project".equals(id)) {
-                    json = storage.getProjectMetadata("project");
-                }
-                return json;
+                return storage.getProjectMetadata(id);
             }
 
             @Override
@@ -1019,17 +1328,17 @@ public class FlowResourcePacketRouter {
 
             @Override
             public String deserialize(String json) {
-                return json;
+                return projectMetadataCodec(storage, json, "deserialize");
             }
 
             @Override
             public String serialize(String value) {
-                return value;
+                return projectMetadataCodec(storage, value, "serialize");
             }
 
             @Override
             public String id(String value) {
-                return "project";
+                return storage.projectMetadataResourceId();
             }
 
             @Override
@@ -1038,8 +1347,51 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return true;
+            }
+
+            @Override
+            public void save(String value, UUID mutationId, long expectedRevision) {
+                storage.saveProjectMetadata(value, mutationId, expectedRevision);
+            }
+
+            @Override
             public void delete(String id) {
                 storage.deleteProjectMetadata(id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                storage.deleteProjectMetadata(id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                return resourceMutationStamp(storage.readProjectMetadataIdentity(id),
+                    ReSyncResourceCatalog.PROJECT_METADATA, storage.projectMetadataResourceId());
+            }
+
+            @Override
+            public FlowResourceMutationStamp recoverProjectMetadataLineage(UUID sourceMutationId, String sourceType,
+                                                                            String sourceId, long sourceRevision,
+                                                                            String sourceHash,
+                                                                            long previousMetadataRevision,
+                                                                            UUID previousMetadataMutationId,
+                                                                            String previousMetadataHash) {
+                return resourceMutationStamp(storage.recoverProjectMetadataLineage(sourceMutationId, sourceType,
+                        sourceId, sourceRevision, sourceHash, previousMetadataRevision,
+                        previousMetadataMutationId, previousMetadataHash),
+                    ReSyncResourceCatalog.PROJECT_METADATA, storage.projectMetadataResourceId());
+            }
+
+            @Override
+            public FlowResourceMutationStamp recoverUnreceiptedProjectMetadataLineage(long previousMetadataRevision,
+                                                                                       UUID previousMetadataMutationId,
+                                                                                       String previousMetadataHash) {
+                return resourceMutationStamp(storage.recoverUnreceiptedProjectMetadataLineage(previousMetadataRevision,
+                        previousMetadataMutationId, previousMetadataHash),
+                    ReSyncResourceCatalog.PROJECT_METADATA, storage.projectMetadataResourceId());
             }
 
             @Override
@@ -1054,12 +1406,12 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void sendSaveAck(Session session, String id) {
-                sender.sendProjectMetadataSaveAck(session, "project");
+                sender.sendProjectMetadataSaveAck(session, storage.projectMetadataResourceId());
             }
 
             @Override
             public void sendSaveAck(Session session, String id, String requestId) {
-                sender.sendProjectMetadataSaveAck(session, "project", requestId);
+                sender.sendProjectMetadataSaveAck(session, storage.projectMetadataResourceId(), requestId);
             }
 
             @Override
@@ -1069,12 +1421,12 @@ public class FlowResourcePacketRouter {
 
             @Override
             public String identityRules() {
-                return "singleton:project";
+                return "singleton:" + storage.projectMetadataResourceId();
             }
 
             @Override
             public String defaultRequestId() {
-                return "project";
+                return storage.projectMetadataResourceId();
             }
 
             @Override
@@ -1086,7 +1438,73 @@ public class FlowResourcePacketRouter {
             public String deleteErrorCode() {
                 return "PROJECT_METADATA_DELETE_FAILED";
             }
+
+            @Override
+            public boolean changeEvents() {
+                return true;
+            }
+
+            @Override
+            public boolean activeRefresh() {
+                return true;
+            }
         };
+    }
+
+    private JsonAssetStore.AggregateCreateResult createWorldGenAggregate(WorldGenProjectStorage storage,
+                                                                          WorldGenProject value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+        synchronized (storage) {
+            FlowResourceMutationStamp existing = storage.readMutationStamp(value.getId());
+            if (existing != null && !existing.deleted() && !context.exactMutationId().equals(existing.mutationId())) {
+                throw new IllegalStateException("WorldGen aggregate create target already has durable lineage");
+            }
+            try {
+                return storage.withCurrentCoordinator(coordinator -> {
+                    Path assetsRoot = storage.getAssetsPath();
+                    Path activeRoot = assetsRoot.getParent();
+                    if (activeRoot == null) {
+                        throw new IllegalStateException("WorldGen active asset root has no persistence scope");
+                    }
+                    try (JsonAssetStore<WorldGenProject> aggregateStore = new JsonAssetStore<>(
+                        assetsRoot,
+                        activeRoot.resolve("worldgen-projects"),
+                        ReSyncResourceCatalog.WORLDGEN,
+                        ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.WORLDGEN),
+                        WorldGenSerializer::deserializeProject,
+                        WorldGenSerializer::serializeProjectOwned,
+                        WorldGenProject::getId,
+                        null,
+                        LegacyRuntimeActivationGate.runtime(activeRoot),
+                        coordinator,
+                        () -> true,
+                        () -> () -> {
+                        },
+                        WorldGenSerializer::mergeProjectPayload,
+                        ProjectMetadataLineage.writerIfPresent(assetsRoot, gson))) {
+                        return aggregateStore.create(value, Map.of(), context.exactMutationId(),
+                            context.expectedRevision(), presentation);
+                    }
+                });
+            } catch (IOException exception) {
+                throw new IllegalStateException("WorldGen aggregate create storage is unavailable", exception);
+            }
+        }
+    }
+
+    private void requireWorldGenPresentation(ServerResourceLocator resource, ResourcePresentationIntent presentation) {
+        Objects.requireNonNull(resource, "WorldGen aggregate resource is required");
+        Objects.requireNonNull(presentation, "WorldGen aggregate presentation is required");
+        String fileName = AssetFileFormat.idOnlyFileName(resource.id());
+        String defaultPath = ReSyncResourceCatalog.defaultFolder(ReSyncResourceCatalog.WORLDGEN) + '/' + fileName;
+        String path = presentation.path();
+        if (path.equals(fileName)) {
+            throw new IllegalArgumentException("WorldGen aggregate create default path must be " + defaultPath);
+        }
+        if (!path.endsWith('/' + fileName)) {
+            throw new IllegalArgumentException("WorldGen aggregate create path must end with " + fileName);
+        }
     }
 
     private FlowResourceAdapter<JsonObject> jsonAdapter(ReSyncJsonResourceStorage storage, String type, FlowPacketSender sender) {
@@ -1108,7 +1526,11 @@ public class FlowResourcePacketRouter {
 
             @Override
             public JsonObject deserialize(String json) {
-                return gson.fromJson(json, JsonObject.class);
+                JsonObject value = gson.fromJson(json, JsonObject.class);
+                if (ReSyncResourceCatalog.SCHEDULE_DEFINITION.equals(type)) {
+                    ScheduleDefinition.from(value, id(value));
+                }
+                return value;
             }
 
             @Override
@@ -1125,6 +1547,43 @@ public class FlowResourcePacketRouter {
             }
 
             @Override
+            public boolean supportsAuthoritativeMutationIdentity() {
+                return storage != null && storage.supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            public void save(JsonObject value, UUID mutationId, long expectedRevision) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                storage.save(type, value, mutationId, expectedRevision);
+            }
+
+            @Override
+            public boolean supportsAggregateCreate() {
+                return supportsAuthoritativeMutationIdentity();
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource,
+                                                                          JsonObject value,
+                                                                          FlowResourceMutationContext context,
+                                                                          ResourcePresentationIntent presentation) {
+                requireAuthoritativeMutationIdentity(supportsAggregateCreate());
+                JsonAssetStore.AggregateCreateResult created = storage.create(type, value,
+                    context.exactMutationId(), context.expectedRevision(), presentation,
+                    context.expectedPayloadHash());
+                FlowResourceMutationStamp primaryStamp = mutationStamp(created.primaryStamp());
+                FlowResourceMutationStamp metadataStamp = mutationStamp(created.projectMetadataStamp());
+                Map<String, Object> primaryPayload = gson.fromJson(created.canonicalPayloadJson(), Map.class);
+                Map<String, Object> metadataPayload = gson.fromJson(created.canonicalProjectMetadataJson(), Map.class);
+                ServerResourceLocator metadataResource = new ServerResourceLocator(resource.serverId(),
+                    ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of("project_metadata")), metadataStamp.id());
+                return new AggregateResourceCreateStorage.Result(
+                    new AggregateResourceCreateStorage.ResourceState(resource, primaryStamp, primaryPayload),
+                    new AggregateResourceCreateStorage.ResourceState(metadataResource, metadataStamp, metadataPayload));
+            }
+
+            @Override
             public void validate(JsonObject value) {
                 jsonResourceValidator.validate(type, value);
             }
@@ -1132,6 +1591,23 @@ public class FlowResourcePacketRouter {
             @Override
             public void delete(String id) {
                 storage.delete(type, id);
+            }
+
+            @Override
+            public void delete(String id, UUID mutationId, long expectedRevision) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                storage.delete(type, id, mutationId, expectedRevision);
+            }
+
+            @Override
+            public FlowResourceMutationStamp readMutationStamp(String id) {
+                requireAuthoritativeMutationIdentity(supportsAuthoritativeMutationIdentity());
+                return storage.readMutationStamp(type, id);
+            }
+
+            @Override
+            public boolean matchesCommittedPayloadRecovery(JsonObject previous, JsonObject requested, JsonObject actual) {
+                return storage.matchesCommittedPayloadRecovery(type, previous, requested, actual);
             }
 
             @Override
@@ -1157,22 +1633,22 @@ public class FlowResourcePacketRouter {
 
             @Override
             public void sendData(Session session, JsonObject value) {
-                sender.sendJsonResourceData(session, descriptor().flowPackets().data(), gson.toJson(value), descriptor().displayName());
+                sender.sendJsonResourceData(session, protocolAuthority.requireFlowPackets(descriptor().typeId()).data(), gson.toJson(value), descriptor().displayName());
             }
 
             @Override
             public void sendList(Session session, List<String> ids) {
-                sender.sendJsonResourceList(session, descriptor().flowPackets().list(), ids);
+                sender.sendJsonResourceList(session, protocolAuthority.requireFlowPackets(descriptor().typeId()).list(), ids);
             }
 
             @Override
             public void sendSaveAck(Session session, String id) {
-                sender.sendJsonResourceSaveAck(session, descriptor().flowPackets().saveAck(), id);
+                sender.sendJsonResourceSaveAck(session, protocolAuthority.requireFlowPackets(descriptor().typeId()).saveAck(), id);
             }
 
             @Override
             public void sendSaveAck(Session session, String id, String requestId) {
-                sender.sendJsonResourceSaveAck(session, descriptor().flowPackets().saveAck(), id, requestId);
+                sender.sendJsonResourceSaveAck(session, protocolAuthority.requireFlowPackets(descriptor().typeId()).saveAck(), id, requestId);
             }
 
             @Override
@@ -1217,5 +1693,100 @@ public class FlowResourcePacketRouter {
 
     private Set<String> resourceOperationsWithDuplicateAndReload() {
         return Set.of("discover", "query", "get", "create", "validate", "save", "update", "duplicate", "delete", "reload");
+    }
+
+    private String projectMetadataCodec(FlowStorage storage, String value, String operation) {
+        long started = TemporaryLifecycleDiagnostics.start();
+        try {
+            String normalized = storage.normalizeProjectMetadataPayload(value);
+            TemporaryLifecycleDiagnostics.event("project_metadata_adapter_codec", started,
+                TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(null,
+                    ReSyncResourceCatalog.PROJECT_METADATA + ":" + storage.projectMetadataResourceId(), null, null,
+                    null, null, authorityEpoch, null), "outcome", "complete", "operation", operation,
+                    "inputChars", value == null ? 0 : value.length(), "outputChars", normalized.length()));
+            return normalized;
+        } catch (RuntimeException exception) {
+            TemporaryLifecycleDiagnostics.event("project_metadata_adapter_codec", started,
+                TemporaryLifecycleDiagnostics.with(TemporaryLifecycleDiagnostics.identity(null,
+                    ReSyncResourceCatalog.PROJECT_METADATA + ":" + storage.projectMetadataResourceId(), null, null,
+                    null, null, authorityEpoch, null), "outcome", "failed", "operation", operation,
+                    "inputChars", value == null ? 0 : value.length(), "failure", exception.getClass().getSimpleName()));
+            throw exception;
+        }
+    }
+
+    private void requireAuthoritativeMutationIdentity(boolean supported) {
+        if (!supported) {
+            throw new IllegalStateException(FlowResourceAdapter.AUTHORITATIVE_MUTATION_IDENTITY_UNAVAILABLE);
+        }
+    }
+
+    private static AuthorityEpoch requireExplicitAuthorityEpoch(FlowPacketSender sender) {
+        if (sender == null) {
+            return null;
+        }
+        throw new IllegalStateException("Authority epoch is required; use the bound-epoch constructor");
+    }
+
+    private FlowResourceMutationStamp graphMutationStamp(FlowStorage.GraphIdentity identity, String expectedType, String expectedId) {
+        if (identity == null) {
+            return null;
+        }
+        return mutationStamp(identity.type(), identity.id(), identity.revision(), identity.mutationId(),
+            identity.payloadHash(), identity.deleted(), expectedType, expectedId);
+    }
+
+    private FlowResourceMutationStamp resourceMutationStamp(FlowStorage.ResourceIdentity identity, String expectedType,
+                                                             String expectedId) {
+        if (identity == null) {
+            return null;
+        }
+        return mutationStamp(identity.type(), identity.id(), identity.revision(), identity.mutationId(),
+            identity.payloadHash(), identity.deleted(), expectedType, expectedId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private AggregateResourceCreateStorage.Result typedAggregateResult(ServerResourceLocator resource,
+                                                                        FlowStorage.TypedAggregateCreate created) {
+        FlowResourceMutationStamp primaryStamp = resourceMutationStamp(created.primaryIdentity(),
+            resource.resourceType().value(), resource.id());
+        FlowResourceMutationStamp metadataStamp = resourceMutationStamp(created.projectMetadataIdentity(),
+            ReSyncResourceCatalog.PROJECT_METADATA, created.projectMetadataIdentity().id());
+        Map<String, Object> primaryPayload = gson.fromJson(created.canonicalPayloadJson(), Map.class);
+        Map<String, Object> metadataPayload = gson.fromJson(created.canonicalProjectMetadataJson(), Map.class);
+        ServerResourceLocator metadataResource = new ServerResourceLocator(resource.serverId(),
+            ContractRef.of(OwnerId.of("restudio.resync"), ResourceTypeId.of(ReSyncResourceCatalog.PROJECT_METADATA)),
+            metadataStamp.id());
+        return new AggregateResourceCreateStorage.Result(
+            new AggregateResourceCreateStorage.ResourceState(resource, primaryStamp, primaryPayload),
+            new AggregateResourceCreateStorage.ResourceState(metadataResource, metadataStamp, metadataPayload));
+    }
+
+    private FlowResourceMutationStamp mutationStamp(JsonAssetStore.AssetStamp stamp) {
+        Objects.requireNonNull(stamp, "Asset mutation stamp is required");
+        return mutationStamp(stamp.type(), stamp.id(), stamp.revision(), stamp.mutationValue(),
+            stamp.payloadHash(), stamp.deleted(), stamp.type(), stamp.id());
+    }
+
+    private FlowResourceMutationStamp mutationStamp(String type, String id, long revision, String mutationValue,
+                                                     String payloadHash, boolean deleted, String expectedType,
+                                                     String expectedId) {
+        if (!expectedType.equals(type) || !expectedId.equals(id)) {
+            throw new IllegalStateException("Resource mutation identity does not match the requested typed resource");
+        }
+        if (revision < 1L || mutationValue == null || mutationValue.isBlank()
+            || !CANONICAL_PAYLOAD_HASH.matcher(payloadHash).matches()) {
+            throw new IllegalStateException("Resource mutation identity is incomplete");
+        }
+        UUID mutationId;
+        try {
+            mutationId = UUID.fromString(mutationValue);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("Resource mutation identity has an invalid mutation ID", exception);
+        }
+        if (!mutationId.toString().equalsIgnoreCase(mutationValue)) {
+            throw new IllegalStateException("Resource mutation identity has a non-canonical mutation ID");
+        }
+        return new FlowResourceMutationStamp(type, id, revision, mutationId, payloadHash, deleted);
     }
 }

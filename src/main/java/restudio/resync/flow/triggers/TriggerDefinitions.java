@@ -19,6 +19,7 @@ import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldSaveEvent;
 import org.bukkit.event.world.TimeSkipEvent;
 import restudio.resync.flow.jobs.FlowJobCompletedEvent;
+import restudio.resync.flow.GlobalTriggers;
 
 import java.util.Map;
 
@@ -482,14 +483,12 @@ public class TriggerDefinitions {
 
     @FlowTrigger(eventType = "player_command", eventClass = PlayerCommandPreprocessEvent.class, priority = EventPriority.LOWEST)
     public void onPlayerCommand(PlayerCommandPreprocessEvent event, Map<String, Object> vars) {
-        vars.put("event.command", event.getMessage());
-        vars.put("event.is_cancelled", event.isCancelled());
+        vars.putAll(GlobalTriggers.commandEventVariables(event.getPlayer(), event.getMessage(), event.isCancelled()));
     }
 
     @FlowTrigger(eventType = "server_command", nodeType = "event:server_command", eventClass = ServerCommandEvent.class, playerEvent = false, aliases = {"console_command"})
     public void onServerCommand(ServerCommandEvent event, Map<String, Object> vars) {
-        vars.put("event.command", event.getCommand());
-        vars.put("event.is_cancelled", event.isCancelled());
+        vars.putAll(GlobalTriggers.commandEventVariables(event.getSender(), event.getCommand(), event.isCancelled()));
     }
 
     public Player extractCraftPlayer(CraftItemEvent event) {

@@ -9,6 +9,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +17,7 @@ import java.util.function.BiConsumer;
 
 public class CustomContentHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public CustomContentHandler() {
         operations.put("give_content", (ctx, node) -> {
@@ -26,7 +28,8 @@ public class CustomContentHandler implements NodeHandler {
             if (player != null && service != null && contentId != null && !contentId.isBlank()) {
                 ItemStack item = service.createItem(contentId, amount != null ? amount : 1);
                 if (item != null) {
-                    player.getInventory().addItem(item);
+                    playerDataAdmission.mutatePlayer("flow-custom-content-give:" + player.getUniqueId(), player,
+                        () -> player.getInventory().addItem(item));
                     ctx.setOutput(node, "item", item);
                     ctx.setOutput(node, "success", true);
                 } else {

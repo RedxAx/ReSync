@@ -1,0 +1,3312 @@
+[
+  {
+    "id": "resource.build_gui",
+    "displayName": "Build GUI Definition",
+    "description": "Build a typed persistent GUI definition without raw JSON.",
+    "domain": "resource",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "gui",
+      "definition",
+      "builder"
+   ],
+   "examples": [
+     "Configure Build GUI Definition and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_gui"
+   },
+   "inputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "flow",
+       "displayName": "Flow",
+       "description": "Starts the build gui definition operation."
+     },
+     {
+       "name": "id",
+       "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build gui definition."
+      },
+      {
+        "name": "title",
+        "dataType": "string",
+        "defaultValue": "Menu",
+        "id": "title",
+        "displayName": "Title",
+        "description": "Provides the title used by build gui definition."
+      },
+      {
+        "name": "rows",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 3,
+        "id": "rows",
+        "displayName": "Rows",
+        "description": "Provides the rows used by build gui definition."
+      },
+      {
+        "name": "extend_to_inventory",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "id": "extend_to_inventory",
+        "displayName": "Extend To Inventory",
+        "description": "Provides the extend to inventory used by build gui definition."
+      },
+      {
+        "name": "click_sound",
+        "dataType": "sound",
+        "optionsSource": "server:minecraft:sound",
+        "defaultValue": "UI_BUTTON_CLICK",
+        "id": "click_sound",
+        "displayName": "Click Sound",
+        "description": "Provides the click sound used by build gui definition."
+      },
+      {
+        "name": "open_flow",
+        "dataType": "string",
+        "id": "open_flow",
+        "displayName": "Open Flow",
+        "description": "Provides the open flow used by build gui definition."
+      },
+      {
+        "name": "close_flow",
+        "dataType": "string",
+        "id": "close_flow",
+        "displayName": "Close Flow",
+        "description": "Provides the close flow used by build gui definition."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build gui definition completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "failed",
+       "displayName": "Failed",
+       "description": "Continues when build gui definition cannot complete."
+     },
+     {
+       "name": "definition",
+       "dataType": "gui_definition",
+       "id": "definition",
+       "displayName": "Definition",
+       "description": "Returns the definition produced by build gui definition."
+     },
+     {
+       "name": "result",
+        "dataType": "result<gui_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build gui definition."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build gui definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build gui definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build gui definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "rows",
+          "target": "rows"
+        },
+        {
+          "direction": "input",
+          "source": "extend_to_inventory",
+          "target": "extend_to_inventory"
+        },
+        {
+          "direction": "input",
+          "source": "click_sound",
+          "target": "click_sound"
+        },
+        {
+          "direction": "input",
+          "source": "open_flow",
+          "target": "open_flow"
+        },
+        {
+          "direction": "input",
+          "source": "close_flow",
+          "target": "close_flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_scoreboard",
+    "displayName": "Build Scoreboard Definition",
+    "description": "Build a typed persistent scoreboard definition.",
+    "domain": "resource",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "scoreboard",
+      "definition",
+      "builder"
+    ],
+   "examples": [
+     "Configure Build Scoreboard Definition and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_scoreboard"
+   },
+   "inputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "flow",
+       "displayName": "Flow",
+       "description": "Starts the build scoreboard definition operation."
+     },
+     {
+       "name": "id",
+       "dataType": "string",
+       "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build scoreboard definition."
+      },
+      {
+        "name": "title",
+        "dataType": "component",
+        "defaultValue": "Scoreboard",
+        "id": "title",
+        "displayName": "Title",
+        "description": "Provides the title used by build scoreboard definition."
+      },
+      {
+        "name": "objective_id",
+        "dataType": "string",
+        "id": "objective_id",
+        "displayName": "Objective Id",
+        "description": "Provides the objective id used by build scoreboard definition."
+      },
+      {
+        "name": "line",
+        "dataType": "component",
+        "repeatable": {
+          "groupId": "lines",
+          "minItems": 0,
+          "maxItems": 64,
+          "itemLabel": "Line"
+        },
+        "id": "line",
+        "displayName": "Line",
+        "description": "Provides the line used by build scoreboard definition."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build scoreboard definition completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build scoreboard definition cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "scoreboard_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build scoreboard definition."
+      },
+      {
+        "name": "result",
+        "dataType": "result<scoreboard_definition>",
+       "id": "result",
+       "displayName": "Result",
+       "description": "Returns the result produced by build scoreboard definition."
+     },
+     {
+       "name": "success",
+       "dataType": "boolean",
+       "id": "success",
+       "displayName": "Success",
+       "description": "Returns the success produced by build scoreboard definition."
+     },
+     {
+       "name": "error_code",
+       "dataType": "string",
+       "id": "error_code",
+       "displayName": "Error Code",
+       "description": "Returns the error code produced by build scoreboard definition."
+     },
+     {
+       "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build scoreboard definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "objective_id",
+          "target": "objective_id"
+        },
+        {
+          "direction": "input",
+          "source": "line",
+          "target": "line"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_tab",
+    "displayName": "Build Tab Definition",
+    "description": "Build a typed persistent tab-list definition.",
+    "domain": "resource",
+    "family": "tab_list",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TAB_LIST",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "tab",
+      "definition",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Tab Definition and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_tab"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build tab definition operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+       "displayName": "Id",
+       "description": "Provides the id used by build tab definition."
+     },
+     {
+       "name": "header",
+       "dataType": "component",
+       "id": "header",
+       "displayName": "Header",
+       "description": "Provides the header used by build tab definition."
+     },
+     {
+       "name": "entry_format",
+       "dataType": "component",
+       "defaultValue": "%player%",
+       "id": "entry_format",
+       "displayName": "Entry Format",
+       "description": "Provides the entry format used by build tab definition."
+     },
+     {
+       "name": "footer",
+        "dataType": "component",
+        "id": "footer",
+        "displayName": "Footer",
+        "description": "Provides the footer used by build tab definition."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build tab definition completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build tab definition cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "tab_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build tab definition."
+      },
+      {
+        "name": "result",
+        "dataType": "result<tab_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build tab definition."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build tab definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build tab definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build tab definition."
+      }
+    ],
+    "migrationMapping": {
+     "sourceSchemaVersion": 1,
+     "targetSchemaVersion": 2,
+     "complete": true,
+     "pins": [
+       {
+         "direction": "input",
+         "source": "flow",
+         "target": "flow"
+       },
+       {
+         "direction": "input",
+         "source": "id",
+         "target": "id"
+       },
+       {
+         "direction": "input",
+         "source": "header",
+         "target": "header"
+       },
+       {
+         "direction": "input",
+         "source": "entry_format",
+         "target": "entry_format"
+       },
+       {
+         "direction": "input",
+         "source": "footer",
+         "target": "footer"
+       },
+       {
+         "direction": "output",
+         "source": "flow",
+         "target": "output_flow"
+       },
+       {
+         "direction": "output",
+         "source": "failed",
+         "target": "failed"
+       },
+       {
+         "direction": "output",
+         "source": "definition",
+         "target": "definition"
+       },
+       {
+         "direction": "output",
+         "source": "result",
+         "target": "result"
+       },
+       {
+         "direction": "output",
+         "source": "success",
+         "target": "success"
+       },
+       {
+         "direction": "output",
+         "source": "error_code",
+         "target": "error_code"
+       },
+       {
+         "direction": "output",
+         "source": "message",
+         "target": "message"
+       }
+     ]
+   }
+ },
+ {
+   "id": "resource.build_custom_content",
+   "displayName": "Build Custom Content Definition",
+   "description": "Build a typed custom item, block, armor, or content definition.",
+   "domain": "resource",
+   "family": "custom_content",
+   "lifecycle": "active",
+   "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "CUSTOM_CONTENT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "custom",
+      "content",
+      "definition",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Custom Content Definition and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_custom_content"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build custom content definition operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build custom content definition."
+      },
+      {
+        "name": "display_name",
+        "dataType": "component",
+        "defaultValue": "Custom Content",
+        "id": "display_name",
+        "displayName": "Display Name",
+        "description": "Provides the display name used by build custom content definition."
+      },
+      {
+        "name": "content_type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "item",
+          "block",
+          "armor",
+          "furniture"
+        ],
+        "defaultValue": "item",
+        "id": "content_type",
+        "displayName": "Content Type",
+        "description": "Provides the content type used by build custom content definition."
+      },
+     {
+       "name": "provider",
+       "dataType": "string",
+       "widget": "DROPDOWN",
+       "optionsSource": "server:custom_content:provider",
+       "defaultValue": "vanilla",
+       "id": "provider",
+       "displayName": "Provider",
+       "description": "Provides the provider used by build custom content definition."
+     },
+     {
+       "name": "external_id",
+       "dataType": "string",
+       "widget": "SEARCHABLE_LIST",
+       "optionsSource": "server:custom_content:asset",
+       "id": "external_id",
+       "displayName": "External Id",
+       "description": "Provides the external id used by build custom content definition."
+     },
+     {
+        "name": "material",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STICK",
+        "id": "material",
+        "displayName": "Material",
+        "description": "Provides the material used by build custom content definition."
+      },
+      {
+        "name": "flow_id",
+        "dataType": "string",
+        "id": "flow_id",
+        "displayName": "Flow Id",
+        "description": "Provides the flow id used by build custom content definition."
+      },
+      {
+        "name": "lore",
+        "dataType": "component",
+        "repeatable": {
+          "groupId": "lore",
+          "minItems": 0,
+          "maxItems": 64,
+          "itemLabel": "Lore"
+        },
+        "id": "lore",
+        "displayName": "Lore",
+        "description": "Provides the lore used by build custom content definition."
+      },
+      {
+        "name": "tag",
+        "dataType": "string",
+        "repeatable": {
+          "groupId": "tags",
+          "minItems": 0,
+          "maxItems": 64,
+          "itemLabel": "Tag"
+        },
+        "id": "tag",
+        "displayName": "Tag",
+        "description": "Provides the tag used by build custom content definition."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build custom content definition completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build custom content definition cannot complete."
+      },
+     {
+       "name": "definition",
+       "dataType": "custom_content_definition",
+       "id": "definition",
+       "displayName": "Definition",
+       "description": "Returns the definition produced by build custom content definition."
+     },
+     {
+       "name": "result",
+       "dataType": "result<custom_content_definition>",
+       "id": "result",
+       "displayName": "Result",
+       "description": "Returns the result produced by build custom content definition."
+     },
+     {
+       "name": "success",
+       "dataType": "boolean",
+       "id": "success",
+       "displayName": "Success",
+       "description": "Returns the success produced by build custom content definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build custom content definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build custom content definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "display_name",
+          "target": "display_name"
+        },
+        {
+          "direction": "input",
+          "source": "content_type",
+          "target": "content_type"
+        },
+        {
+          "direction": "input",
+          "source": "provider",
+          "target": "provider"
+        },
+        {
+          "direction": "input",
+          "source": "external_id",
+          "target": "external_id"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "input",
+          "source": "tag",
+          "target": "tag"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_trade",
+    "displayName": "Build Trade",
+    "description": "Build a typed trade definition.",
+    "domain": "resource",
+    "family": "trade",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TRADE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "trade",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Trade and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_trade"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+       "id": "flow",
+       "displayName": "Flow",
+       "description": "Starts the build trade operation."
+     },
+     {
+       "name": "cost",
+       "dataType": "material",
+       "widget": "SEARCHABLE_LIST",
+       "optionsSource": "server:minecraft:material",
+       "defaultValue": "EMERALD",
+       "id": "cost",
+       "displayName": "Cost",
+       "description": "Provides the cost used by build trade."
+     },
+     {
+       "name": "cost_amount",
+       "dataType": "integer",
+       "widget": "NUMBER",
+       "defaultValue": 1,
+       "id": "cost_amount",
+        "displayName": "Cost Amount",
+        "description": "Provides the cost amount used by build trade."
+      },
+      {
+        "name": "second_cost",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "id": "second_cost",
+        "displayName": "Second Cost",
+        "description": "Provides the second cost used by build trade."
+      },
+      {
+        "name": "second_cost_amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "second_cost_amount",
+        "displayName": "Second Cost Amount",
+        "description": "Provides the second cost amount used by build trade."
+      },
+      {
+        "name": "result",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Provides the result used by build trade."
+      },
+      {
+        "name": "result_amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "result_amount",
+        "displayName": "Result Amount",
+        "description": "Provides the result amount used by build trade."
+      },
+      {
+        "name": "max_uses",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 12,
+        "id": "max_uses",
+        "displayName": "Max Uses",
+        "description": "Provides the max uses used by build trade."
+      },
+      {
+        "name": "experience",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 0,
+        "id": "experience",
+        "displayName": "Experience",
+        "description": "Provides the experience used by build trade."
+      },
+      {
+        "name": "price_multiplier",
+       "dataType": "number",
+       "widget": "NUMBER",
+       "defaultValue": 0.05,
+       "id": "price_multiplier",
+       "displayName": "Price Multiplier",
+       "description": "Provides the price multiplier used by build trade."
+     }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build trade completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build trade cannot complete."
+      },
+      {
+        "name": "trade",
+        "dataType": "trade_definition",
+        "id": "trade",
+        "displayName": "Trade",
+        "description": "Returns the trade produced by build trade."
+      },
+      {
+        "name": "result",
+        "dataType": "result<trade_definition>",
+        "id": "output_result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build trade."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build trade."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build trade."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build trade."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "direction": "input",
+          "source": "cost_amount",
+          "target": "cost_amount"
+        },
+        {
+          "direction": "input",
+          "source": "second_cost",
+          "target": "second_cost"
+        },
+        {
+          "direction": "input",
+          "source": "second_cost_amount",
+          "target": "second_cost_amount"
+        },
+        {
+          "direction": "input",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "input",
+          "source": "result_amount",
+          "target": "result_amount"
+        },
+        {
+          "direction": "input",
+          "source": "max_uses",
+          "target": "max_uses"
+        },
+        {
+          "direction": "input",
+          "source": "experience",
+          "target": "experience"
+        },
+        {
+          "direction": "input",
+          "source": "price_multiplier",
+          "target": "price_multiplier"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "trade",
+          "target": "trade"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "output_result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+   "id": "resource.build_trade_profile",
+   "displayName": "Build Trade Profile",
+   "description": "Build a typed trade profile from repeatable trade definitions.",
+   "domain": "resource",
+   "family": "trade",
+   "lifecycle": "active",
+   "handlerCapability": "resync.resource.definition",
+   "selectorIntent": "typed-resource",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "TRADE",
+   "schemaVersion": 2,
+   "kind": "ACTION",
+   "tags": [
+     "resource",
+     "trade",
+     "profile",
+     "builder"
+   ],
+   "examples": [
+      "Configure Build Trade Profile and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_trade_profile"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build trade profile operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build trade profile."
+      },
+      {
+        "name": "display_name",
+        "dataType": "component",
+        "defaultValue": "Trade Profile",
+        "id": "display_name",
+        "displayName": "Display Name",
+        "description": "Provides the display name used by build trade profile."
+      },
+      {
+        "name": "profession",
+        "dataType": "string",
+        "defaultValue": "none",
+        "id": "profession",
+        "displayName": "Profession",
+        "description": "Provides the profession used by build trade profile."
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean",
+        "defaultValue": true,
+        "id": "enabled",
+        "displayName": "Enabled",
+        "description": "Provides the enabled used by build trade profile."
+      },
+      {
+        "name": "offer",
+        "dataType": "trade_definition",
+        "repeatable": {
+          "groupId": "offers",
+          "minItems": 1,
+          "maxItems": 128,
+          "itemLabel": "Trade"
+        },
+        "id": "offer",
+        "displayName": "Offer",
+        "description": "Provides the offer used by build trade profile."
+      }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build trade profile completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "failed",
+       "displayName": "Failed",
+       "description": "Continues when build trade profile cannot complete."
+     },
+     {
+       "name": "definition",
+        "dataType": "trade_profile",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build trade profile."
+      },
+      {
+        "name": "result",
+        "dataType": "result<trade_profile>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build trade profile."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build trade profile."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build trade profile."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build trade profile."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "display_name",
+          "target": "display_name"
+        },
+        {
+          "direction": "input",
+          "source": "profession",
+          "target": "profession"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "input",
+          "source": "offer",
+          "target": "offer"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_loot_entry",
+    "displayName": "Build Loot Entry",
+    "description": "Build a typed loot-table entry.",
+    "domain": "resource",
+    "family": "loot",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOOT",
+    "schemaVersion": 2,
+   "kind": "ACTION",
+   "tags": [
+     "resource",
+     "loot",
+     "entry",
+     "builder"
+   ],
+   "examples": [
+     "Configure Build Loot Entry and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_loot_entry"
+   },
+   "inputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build loot entry operation."
+      },
+      {
+        "name": "item",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "id": "item",
+        "displayName": "Item",
+        "description": "Provides the item used by build loot entry."
+      },
+      {
+        "name": "weight",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "weight",
+        "displayName": "Weight",
+        "description": "Provides the weight used by build loot entry."
+      },
+      {
+        "name": "chance",
+        "dataType": "number",
+        "widget": "NUMBER",
+        "defaultValue": 100,
+        "id": "chance",
+        "displayName": "Chance",
+        "description": "Provides the chance used by build loot entry."
+      },
+      {
+        "name": "min_amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "min_amount",
+        "displayName": "Min Amount",
+        "description": "Provides the min amount used by build loot entry."
+      },
+      {
+        "name": "max_amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "max_amount",
+        "displayName": "Max Amount",
+        "description": "Provides the max amount used by build loot entry."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build loot entry completes."
+      },
+      {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "failed",
+       "displayName": "Failed",
+       "description": "Continues when build loot entry cannot complete."
+     },
+     {
+       "name": "entry",
+       "dataType": "loot_entry_definition",
+       "id": "entry",
+       "displayName": "Entry",
+       "description": "Returns the entry produced by build loot entry."
+     },
+     {
+       "name": "result",
+       "dataType": "result<loot_entry_definition>",
+       "id": "result",
+       "displayName": "Result",
+       "description": "Returns the result produced by build loot entry."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build loot entry."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build loot entry."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build loot entry."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "item",
+          "target": "item"
+        },
+        {
+          "direction": "input",
+          "source": "weight",
+          "target": "weight"
+        },
+        {
+          "direction": "input",
+          "source": "chance",
+          "target": "chance"
+        },
+        {
+          "direction": "input",
+          "source": "min_amount",
+          "target": "min_amount"
+        },
+        {
+          "direction": "input",
+          "source": "max_amount",
+          "target": "max_amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "entry",
+          "target": "entry"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_loot_pool",
+    "displayName": "Build Loot Pool",
+    "description": "Build a typed loot pool from repeatable entries.",
+    "domain": "resource",
+    "family": "loot",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOOT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "loot",
+      "pool",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Loot Pool and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_loot_pool"
+   },
+   "inputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "flow",
+       "displayName": "Flow",
+       "description": "Starts the build loot pool operation."
+     },
+     {
+       "name": "rolls",
+       "dataType": "integer",
+       "widget": "NUMBER",
+       "defaultValue": 1,
+       "id": "rolls",
+       "displayName": "Rolls",
+       "description": "Provides the rolls used by build loot pool."
+      },
+      {
+        "name": "entry",
+        "dataType": "loot_entry_definition",
+        "repeatable": {
+          "groupId": "entries",
+          "minItems": 1,
+          "maxItems": 128,
+          "itemLabel": "Entry"
+        },
+        "id": "entry",
+        "displayName": "Entry",
+        "description": "Provides the entry used by build loot pool."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build loot pool completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build loot pool cannot complete."
+      },
+      {
+        "name": "pool",
+        "dataType": "loot_pool_definition",
+        "id": "pool",
+        "displayName": "Pool",
+        "description": "Returns the pool produced by build loot pool."
+      },
+      {
+        "name": "result",
+        "dataType": "result<loot_pool_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build loot pool."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build loot pool."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build loot pool."
+      },
+     {
+       "name": "message",
+       "dataType": "string",
+       "id": "message",
+       "displayName": "Message",
+       "description": "Returns the message produced by build loot pool."
+     }
+   ],
+   "migrationMapping": {
+     "sourceSchemaVersion": 1,
+     "targetSchemaVersion": 2,
+    "complete": true,
+    "pins": [
+       {
+         "direction": "input",
+         "source": "flow",
+         "target": "flow"
+       },
+       {
+         "direction": "input",
+         "source": "rolls",
+         "target": "rolls"
+       },
+       {
+         "direction": "input",
+         "source": "entry",
+         "target": "entry"
+       },
+       {
+         "direction": "output",
+         "source": "flow",
+         "target": "output_flow"
+       },
+       {
+         "direction": "output",
+         "source": "failed",
+         "target": "failed"
+       },
+       {
+         "direction": "output",
+         "source": "pool",
+         "target": "pool"
+       },
+       {
+         "direction": "output",
+         "source": "result",
+         "target": "result"
+       },
+       {
+         "direction": "output",
+         "source": "success",
+         "target": "success"
+       },
+       {
+         "direction": "output",
+         "source": "error_code",
+         "target": "error_code"
+       },
+       {
+         "direction": "output",
+         "source": "message",
+         "target": "message"
+       }
+     ]
+   }
+  },
+  {
+    "id": "resource.build_loot_table",
+    "displayName": "Build Loot Table",
+    "description": "Build a typed managed loot table from repeatable pools.",
+    "domain": "resource",
+    "family": "loot",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOOT",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "loot",
+      "table",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Loot Table and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_loot_table"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build loot table operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build loot table."
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean",
+        "defaultValue": true,
+        "id": "enabled",
+        "displayName": "Enabled",
+        "description": "Provides the enabled used by build loot table."
+      },
+      {
+        "name": "pool",
+        "dataType": "loot_pool_definition",
+        "repeatable": {
+          "groupId": "pools",
+          "minItems": 1,
+          "maxItems": 32,
+         "itemLabel": "Pool"
+       },
+       "id": "pool",
+       "displayName": "Pool",
+       "description": "Provides the pool used by build loot table."
+     }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build loot table completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build loot table cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "loot_table_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build loot table."
+      },
+      {
+        "name": "result",
+        "dataType": "result<loot_table_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build loot table."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build loot table."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build loot table."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build loot table."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "input",
+          "source": "pool",
+          "target": "pool"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_npc",
+    "displayName": "Build NPC Definition",
+    "description": "Build a typed managed NPC definition.",
+    "domain": "resource",
+    "family": "npc",
+    "lifecycle": "active",
+   "handlerCapability": "resync.resource.definition",
+   "selectorIntent": "typed-resource",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "NPC",
+   "schemaVersion": 2,
+   "kind": "ACTION",
+   "tags": [
+     "resource",
+     "npc",
+     "definition",
+     "builder"
+   ],
+   "examples": [
+     "Configure Build NPC Definition and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_npc"
+   },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build npc definition operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build npc definition."
+      },
+      {
+        "name": "display_name",
+        "dataType": "component",
+        "defaultValue": "NPC",
+        "id": "display_name",
+        "displayName": "Display Name",
+        "description": "Provides the display name used by build npc definition."
+      },
+      {
+        "name": "entity_type",
+        "dataType": "entity_type",
+        "widget": "DROPDOWN",
+        "optionsSource": "server:minecraft:entity_type",
+        "defaultValue": "VILLAGER",
+        "id": "entity_type",
+        "displayName": "Entity Type",
+        "description": "Provides the entity type used by build npc definition."
+      },
+      {
+        "name": "skin_username",
+        "dataType": "string",
+        "optional": true,
+        "id": "skin_username",
+        "displayName": "Skin Username",
+        "description": "Provides the skin username used by build npc definition."
+      },
+      {
+        "name": "ai",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "id": "ai",
+        "displayName": "Ai",
+        "description": "Provides the ai used by build npc definition."
+      },
+      {
+        "name": "gravity",
+        "dataType": "boolean",
+        "defaultValue": true,
+        "id": "gravity",
+        "displayName": "Gravity",
+        "description": "Provides the gravity used by build npc definition."
+      },
+      {
+       "name": "invulnerable",
+       "dataType": "boolean",
+       "defaultValue": true,
+       "id": "invulnerable",
+       "displayName": "Invulnerable",
+       "description": "Provides the invulnerable used by build npc definition."
+     },
+     {
+       "name": "follow_player",
+       "dataType": "boolean",
+       "defaultValue": false,
+       "id": "follow_player",
+       "displayName": "Follow Player",
+       "description": "Provides the follow player used by build npc definition."
+     },
+     {
+       "name": "follow_range",
+       "dataType": "number",
+       "defaultValue": 12,
+       "id": "follow_range",
+        "displayName": "Follow Range",
+        "description": "Provides the follow range used by build npc definition."
+      },
+      {
+        "name": "main_hand",
+        "dataType": "string",
+        "optional": true,
+        "id": "main_hand",
+        "displayName": "Main Hand",
+        "description": "Provides the main hand used by build npc definition."
+      },
+      {
+        "name": "off_hand",
+        "dataType": "string",
+        "optional": true,
+        "id": "off_hand",
+        "displayName": "Off Hand",
+        "description": "Provides the off hand used by build npc definition."
+      },
+      {
+        "name": "helmet",
+        "dataType": "string",
+        "optional": true,
+        "id": "helmet",
+        "displayName": "Helmet",
+        "description": "Provides the helmet used by build npc definition."
+      },
+      {
+        "name": "chestplate",
+        "dataType": "string",
+        "optional": true,
+        "id": "chestplate",
+        "displayName": "Chestplate",
+        "description": "Provides the chestplate used by build npc definition."
+      },
+      {
+        "name": "leggings",
+        "dataType": "string",
+        "optional": true,
+        "id": "leggings",
+        "displayName": "Leggings",
+        "description": "Provides the leggings used by build npc definition."
+      },
+      {
+        "name": "boots",
+        "dataType": "string",
+        "optional": true,
+        "id": "boots",
+        "displayName": "Boots",
+        "description": "Provides the boots used by build npc definition."
+      },
+      {
+        "name": "spawn_flow",
+        "dataType": "string",
+        "optional": true,
+        "id": "spawn_flow",
+        "displayName": "Spawn Flow",
+        "description": "Provides the spawn flow used by build npc definition."
+      },
+      {
+       "name": "interact_flow",
+       "dataType": "string",
+       "optional": true,
+       "id": "interact_flow",
+       "displayName": "Interact Flow",
+       "description": "Provides the interact flow used by build npc definition."
+     },
+     {
+       "name": "right_click_flow",
+       "dataType": "string",
+       "optional": true,
+       "id": "right_click_flow",
+       "displayName": "Right Click Flow",
+       "description": "Provides the right click flow used by build npc definition."
+     },
+     {
+       "name": "left_click_flow",
+       "dataType": "string",
+       "optional": true,
+       "id": "left_click_flow",
+        "displayName": "Left Click Flow",
+        "description": "Provides the left click flow used by build npc definition."
+      },
+      {
+        "name": "damage_flow",
+        "dataType": "string",
+        "optional": true,
+        "id": "damage_flow",
+        "displayName": "Damage Flow",
+        "description": "Provides the damage flow used by build npc definition."
+      },
+      {
+        "name": "death_flow",
+        "dataType": "string",
+        "optional": true,
+        "id": "death_flow",
+        "displayName": "Death Flow",
+        "description": "Provides the death flow used by build npc definition."
+      },
+      {
+        "name": "despawn_flow",
+        "dataType": "string",
+        "optional": true,
+        "id": "despawn_flow",
+        "displayName": "Despawn Flow",
+        "description": "Provides the despawn flow used by build npc definition."
+      },
+      {
+        "name": "trade_profile",
+        "dataType": "trade_profile_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:trade_profile",
+        "optional": true,
+        "id": "trade_profile",
+        "displayName": "Trade Profile",
+        "description": "Provides the trade profile used by build npc definition."
+      },
+      {
+        "name": "dialog",
+        "dataType": "dialog_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:dialog",
+        "optional": true,
+        "id": "dialog",
+        "displayName": "Dialog",
+        "description": "Provides the dialog used by build npc definition."
+      },
+      {
+        "name": "loot_table",
+        "dataType": "loot_table_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:loot_table",
+        "optional": true,
+        "id": "loot_table",
+        "displayName": "Loot Table",
+        "description": "Provides the loot table used by build npc definition."
+      },
+      {
+        "name": "enabled",
+        "dataType": "boolean",
+       "defaultValue": true,
+       "id": "enabled",
+       "displayName": "Enabled",
+       "description": "Provides the enabled used by build npc definition."
+     }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build npc definition completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build npc definition cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "npc_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build npc definition."
+      },
+      {
+        "name": "result",
+        "dataType": "result<npc_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build npc definition."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build npc definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build npc definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build npc definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "display_name",
+          "target": "display_name"
+        },
+        {
+          "direction": "input",
+          "source": "entity_type",
+          "target": "entity_type"
+        },
+        {
+          "direction": "input",
+          "source": "skin_username",
+          "target": "skin_username"
+        },
+        {
+          "direction": "input",
+          "source": "ai",
+          "target": "ai"
+        },
+        {
+          "direction": "input",
+          "source": "gravity",
+          "target": "gravity"
+        },
+        {
+          "direction": "input",
+          "source": "invulnerable",
+          "target": "invulnerable"
+        },
+        {
+          "direction": "input",
+          "source": "follow_player",
+          "target": "follow_player"
+        },
+        {
+          "direction": "input",
+          "source": "follow_range",
+          "target": "follow_range"
+        },
+        {
+          "direction": "input",
+          "source": "main_hand",
+          "target": "main_hand"
+        },
+        {
+          "direction": "input",
+          "source": "off_hand",
+          "target": "off_hand"
+        },
+        {
+          "direction": "input",
+          "source": "helmet",
+          "target": "helmet"
+        },
+        {
+          "direction": "input",
+          "source": "chestplate",
+          "target": "chestplate"
+        },
+        {
+          "direction": "input",
+          "source": "leggings",
+          "target": "leggings"
+        },
+        {
+          "direction": "input",
+          "source": "boots",
+          "target": "boots"
+        },
+        {
+          "direction": "input",
+          "source": "spawn_flow",
+          "target": "spawn_flow"
+        },
+        {
+          "direction": "input",
+          "source": "interact_flow",
+          "target": "interact_flow"
+        },
+        {
+          "direction": "input",
+          "source": "right_click_flow",
+          "target": "right_click_flow"
+        },
+        {
+          "direction": "input",
+          "source": "left_click_flow",
+          "target": "left_click_flow"
+        },
+        {
+          "direction": "input",
+          "source": "damage_flow",
+          "target": "damage_flow"
+        },
+        {
+          "direction": "input",
+          "source": "death_flow",
+          "target": "death_flow"
+        },
+        {
+          "direction": "input",
+          "source": "despawn_flow",
+          "target": "despawn_flow"
+        },
+        {
+          "direction": "input",
+          "source": "trade_profile",
+          "target": "trade_profile"
+        },
+        {
+          "direction": "input",
+          "source": "dialog",
+          "target": "dialog"
+        },
+        {
+          "direction": "input",
+          "source": "loot_table",
+          "target": "loot_table"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_dialog",
+    "displayName": "Build Dialog Definition",
+    "description": "Build a typed managed Paper dialog definition.",
+    "domain": "resource",
+    "family": "dialog",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+   "selectorIntent": "typed-resource",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "DIALOG",
+   "schemaVersion": 2,
+   "kind": "ACTION",
+   "tags": [
+     "resource",
+     "dialog",
+     "paper",
+     "definition",
+     "builder"
+   ],
+   "examples": [
+     "Configure Build Dialog Definition and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_dialog"
+   },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build dialog definition operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build dialog definition."
+      },
+      {
+        "name": "display_name",
+        "dataType": "component",
+        "defaultValue": "Dialog",
+        "id": "display_name",
+        "displayName": "Display Name",
+        "description": "Provides the display name used by build dialog definition."
+      },
+      {
+        "name": "title",
+        "dataType": "component",
+        "defaultValue": "Dialog",
+        "id": "title",
+        "displayName": "Title",
+        "description": "Provides the title used by build dialog definition."
+      },
+      {
+        "name": "dialog_type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "minecraft:notice",
+          "minecraft:confirmation",
+          "minecraft:dialog_list",
+          "minecraft:multi_action",
+          "minecraft:server_links"
+        ],
+        "defaultValue": "minecraft:notice",
+        "id": "dialog_type",
+        "displayName": "Dialog Type",
+        "description": "Provides the dialog type used by build dialog definition."
+      },
+      {
+        "name": "body",
+        "dataType": "component",
+        "id": "body",
+        "displayName": "Body",
+        "description": "Provides the body used by build dialog definition."
+      },
+      {
+        "name": "body_width",
+        "dataType": "integer",
+        "widget": "NUMBER",
+       "defaultValue": 200,
+       "id": "body_width",
+       "displayName": "Body Width",
+       "description": "Provides the body width used by build dialog definition."
+     },
+     {
+       "name": "enabled",
+       "dataType": "boolean",
+       "defaultValue": true,
+       "id": "enabled",
+       "displayName": "Enabled",
+       "description": "Provides the enabled used by build dialog definition."
+     }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build dialog definition completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build dialog definition cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "dialog_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build dialog definition."
+      },
+      {
+        "name": "result",
+        "dataType": "result<dialog_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build dialog definition."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build dialog definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build dialog definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build dialog definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "display_name",
+          "target": "display_name"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "dialog_type",
+          "target": "dialog_type"
+        },
+        {
+          "direction": "input",
+          "source": "body",
+          "target": "body"
+        },
+        {
+          "direction": "input",
+          "source": "body_width",
+          "target": "body_width"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+ {
+   "id": "resource.build_advancement_tree",
+   "displayName": "Build Advancement Tree",
+   "description": "Build a typed managed advancement tree with a root criterion.",
+   "domain": "resource",
+   "family": "advancement",
+   "lifecycle": "active",
+   "handlerCapability": "resync.resource.definition",
+   "selectorIntent": "typed-resource",
+   "inspectorIntent": "generic",
+   "owner": "restudio.resync",
+   "category": "ADVANCEMENT",
+   "schemaVersion": 2,
+   "kind": "ACTION",
+   "tags": [
+     "resource",
+     "advancement",
+     "tree",
+     "definition",
+     "builder"
+    ],
+    "examples": [
+      "Configure Build Advancement Tree and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_advancement_tree"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build advancement tree operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build advancement tree."
+      },
+      {
+        "name": "display_name",
+        "dataType": "component",
+        "defaultValue": "Advancement Tree",
+        "id": "display_name",
+        "displayName": "Display Name",
+        "description": "Provides the display name used by build advancement tree."
+      },
+      {
+        "name": "title",
+        "dataType": "component",
+        "defaultValue": "Root",
+        "id": "title",
+        "displayName": "Title",
+        "description": "Provides the title used by build advancement tree."
+      },
+      {
+        "name": "description",
+        "dataType": "component",
+        "id": "description",
+        "displayName": "Description",
+        "description": "Provides the description used by build advancement tree."
+      },
+      {
+        "name": "icon",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "id": "icon",
+        "displayName": "Icon",
+        "description": "Provides the icon used by build advancement tree."
+      },
+      {
+        "name": "frame",
+       "dataType": "string",
+       "widget": "DROPDOWN",
+       "options": [
+         "task",
+         "goal",
+         "challenge"
+       ],
+       "defaultValue": "task",
+       "id": "frame",
+       "displayName": "Frame",
+       "description": "Provides the frame used by build advancement tree."
+     },
+     {
+       "name": "show_toast",
+       "dataType": "boolean",
+       "defaultValue": true,
+       "id": "show_toast",
+       "displayName": "Show Toast",
+       "description": "Provides the show toast used by build advancement tree."
+     },
+      {
+        "name": "announce_to_chat",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "id": "announce_to_chat",
+        "displayName": "Announce To Chat",
+        "description": "Provides the announce to chat used by build advancement tree."
+      },
+      {
+        "name": "hidden",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "id": "hidden",
+        "displayName": "Hidden",
+        "description": "Provides the hidden used by build advancement tree."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "output_flow",
+        "displayName": "Flow",
+        "description": "Continues when build advancement tree completes."
+      },
+      {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build advancement tree cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "advancement_tree_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build advancement tree."
+      },
+      {
+        "name": "result",
+        "dataType": "result<advancement_tree_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build advancement tree."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build advancement tree."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+       "description": "Returns the error code produced by build advancement tree."
+     },
+     {
+       "name": "message",
+       "dataType": "string",
+       "id": "message",
+       "displayName": "Message",
+       "description": "Returns the message produced by build advancement tree."
+     }
+   ],
+   "migrationMapping": {
+     "sourceSchemaVersion": 1,
+     "targetSchemaVersion": 2,
+   "complete": true,
+   "pins": [
+       {
+         "direction": "input",
+         "source": "flow",
+         "target": "flow"
+       },
+       {
+         "direction": "input",
+         "source": "id",
+         "target": "id"
+       },
+       {
+         "direction": "input",
+         "source": "display_name",
+         "target": "display_name"
+       },
+       {
+         "direction": "input",
+         "source": "title",
+         "target": "title"
+       },
+       {
+         "direction": "input",
+         "source": "description",
+         "target": "description"
+       },
+       {
+         "direction": "input",
+         "source": "icon",
+         "target": "icon"
+       },
+       {
+         "direction": "input",
+         "source": "frame",
+         "target": "frame"
+       },
+       {
+         "direction": "input",
+         "source": "show_toast",
+         "target": "show_toast"
+       },
+       {
+         "direction": "input",
+         "source": "announce_to_chat",
+         "target": "announce_to_chat"
+       },
+       {
+         "direction": "input",
+         "source": "hidden",
+         "target": "hidden"
+       },
+       {
+         "direction": "output",
+         "source": "flow",
+         "target": "output_flow"
+       },
+       {
+         "direction": "output",
+         "source": "failed",
+         "target": "failed"
+       },
+       {
+         "direction": "output",
+         "source": "definition",
+         "target": "definition"
+       },
+       {
+         "direction": "output",
+         "source": "result",
+         "target": "result"
+       },
+       {
+         "direction": "output",
+         "source": "success",
+         "target": "success"
+       },
+       {
+         "direction": "output",
+         "source": "error_code",
+         "target": "error_code"
+       },
+       {
+         "direction": "output",
+         "source": "message",
+         "target": "message"
+       }
+     ]
+    }
+  },
+  {
+    "id": "resource.build_recipe_ingredient",
+    "displayName": "Build Recipe Ingredient",
+    "description": "Build a typed recipe ingredient.",
+    "domain": "resource",
+    "family": "recipe",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "RECIPE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "recipe",
+      "ingredient",
+      "builder"
+    ],
+    "examples": [
+      "Configure Build Recipe Ingredient and connect its typed result to the next node."
+    ],
+    "handler": "ResourceDefinitionHandler",
+    "handlerConfig": {
+      "operation": "build_recipe_ingredient"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "flow",
+        "displayName": "Flow",
+        "description": "Starts the build recipe ingredient operation."
+      },
+      {
+        "name": "material",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "id": "material",
+        "displayName": "Material",
+        "description": "Provides the material used by build recipe ingredient."
+      },
+      {
+        "name": "amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "amount",
+        "displayName": "Amount",
+        "description": "Provides the amount used by build recipe ingredient."
+      }
+    ],
+    "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build recipe ingredient completes."
+     },
+     {
+       "name": "failed",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "failed",
+       "displayName": "Failed",
+       "description": "Continues when build recipe ingredient cannot complete."
+     },
+     {
+       "name": "ingredient",
+       "dataType": "recipe_ingredient_definition",
+       "id": "ingredient",
+        "displayName": "Ingredient",
+        "description": "Returns the ingredient produced by build recipe ingredient."
+      },
+      {
+        "name": "result",
+        "dataType": "result<recipe_ingredient_definition>",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build recipe ingredient."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build recipe ingredient."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build recipe ingredient."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build recipe ingredient."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "ingredient",
+          "target": "ingredient"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  },
+  {
+    "id": "resource.build_recipe",
+    "displayName": "Build Recipe Definition",
+    "description": "Build a typed managed recipe from repeatable ingredients.",
+    "domain": "resource",
+    "family": "recipe",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.definition",
+    "selectorIntent": "typed-resource",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "RECIPE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+     "resource",
+     "recipe",
+     "definition",
+     "builder"
+   ],
+   "examples": [
+     "Configure Build Recipe Definition and connect its typed result to the next node."
+   ],
+   "handler": "ResourceDefinitionHandler",
+   "handlerConfig": {
+     "operation": "build_recipe"
+   },
+   "inputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "flow",
+       "displayName": "Flow",
+       "description": "Starts the build recipe definition operation."
+      },
+      {
+        "name": "id",
+        "dataType": "string",
+        "required": true,
+        "id": "id",
+        "displayName": "Id",
+        "description": "Provides the id used by build recipe definition."
+      },
+      {
+        "name": "recipe_type",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "shaped",
+          "shapeless",
+          "furnace",
+          "blasting",
+          "smoking",
+          "campfire",
+          "stonecutting",
+          "smithing_transform",
+          "smithing_trim"
+        ],
+        "defaultValue": "shapeless",
+        "id": "recipe_type",
+        "displayName": "Recipe Type",
+        "description": "Provides the recipe type used by build recipe definition."
+      },
+      {
+        "name": "result",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "id": "result",
+        "displayName": "Result",
+        "description": "Provides the result used by build recipe definition."
+      },
+      {
+        "name": "result_amount",
+        "dataType": "integer",
+        "widget": "NUMBER",
+        "defaultValue": 1,
+        "id": "result_amount",
+        "displayName": "Result Amount",
+        "description": "Provides the result amount used by build recipe definition."
+      },
+      {
+        "name": "ingredient",
+        "dataType": "recipe_ingredient_definition",
+        "repeatable": {
+          "groupId": "ingredients",
+          "minItems": 1,
+          "maxItems": 64,
+          "itemLabel": "Ingredient"
+        },
+        "id": "ingredient",
+        "displayName": "Ingredient",
+        "description": "Provides the ingredient used by build recipe definition."
+     },
+     {
+       "name": "enabled",
+       "dataType": "boolean",
+       "defaultValue": true,
+       "id": "enabled",
+       "displayName": "Enabled",
+       "description": "Provides the enabled used by build recipe definition."
+     }
+   ],
+   "outputs": [
+     {
+       "name": "flow",
+       "pinType": "FLOW",
+       "dataType": "execution",
+       "id": "output_flow",
+       "displayName": "Flow",
+       "description": "Continues when build recipe definition completes."
+     },
+     {
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "id": "failed",
+        "displayName": "Failed",
+        "description": "Continues when build recipe definition cannot complete."
+      },
+      {
+        "name": "definition",
+        "dataType": "recipe_definition",
+        "id": "definition",
+        "displayName": "Definition",
+        "description": "Returns the definition produced by build recipe definition."
+      },
+      {
+        "name": "result",
+        "dataType": "result<recipe_definition>",
+        "id": "output_result",
+        "displayName": "Result",
+        "description": "Returns the result produced by build recipe definition."
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "id": "success",
+        "displayName": "Success",
+        "description": "Returns the success produced by build recipe definition."
+      },
+      {
+        "name": "error_code",
+        "dataType": "string",
+        "id": "error_code",
+        "displayName": "Error Code",
+        "description": "Returns the error code produced by build recipe definition."
+      },
+      {
+        "name": "message",
+        "dataType": "string",
+        "id": "message",
+        "displayName": "Message",
+        "description": "Returns the message produced by build recipe definition."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "id",
+          "target": "id"
+        },
+        {
+          "direction": "input",
+          "source": "recipe_type",
+          "target": "recipe_type"
+        },
+        {
+          "direction": "input",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "input",
+          "source": "result_amount",
+          "target": "result_amount"
+        },
+        {
+          "direction": "input",
+          "source": "ingredient",
+          "target": "ingredient"
+        },
+        {
+          "direction": "input",
+          "source": "enabled",
+          "target": "enabled"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "definition",
+          "target": "definition"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "output_result"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    }
+  }
+]

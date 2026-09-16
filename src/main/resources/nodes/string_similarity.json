@@ -1,0 +1,154 @@
+[
+  {
+    "id": "string_reverse",
+    "displayName": "Reverse",
+    "description": "Reverse the characters in text exactly. Missing or null text is treated as empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "reverse", "text"],
+    "legacyIds": ["string.reverse"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "reverse"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to reverse. Missing or null input is treated as empty text."}
+    ],
+    "outputs": [
+      {"id": "reversed", "displayName": "Reversed", "name": "reversed", "pinType": "DATA", "dataType": "string", "description": "Returns the input characters in reverse order, or empty text when the input is missing or null."}
+    ]
+  },
+  {
+    "id": "string_repeat",
+    "displayName": "Repeat",
+    "description": "Repeat text a bounded number of times. Missing or null text is treated as empty text, missing or null count uses one, and values outside 0 through 65536 fail before output; the resulting text must not exceed 65536 characters.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "repeat", "text"],
+    "legacyIds": ["string.repeat"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "repeat"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to repeat. Missing or null input is treated as empty text."},
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "constraints": {"min": 0, "max": 65536}, "description": "Number of repetitions from 0 through 65536 inclusive. Missing or null input uses one; values outside this range fail before output, and the repeated result must not exceed 65536 characters."}
+    ],
+    "outputs": [
+      {"id": "repeated", "displayName": "Repeated", "name": "repeated", "pinType": "DATA", "dataType": "string", "description": "Returns text repeated count times, or empty text for an empty input or zero count; results above 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_levenshtein",
+    "displayName": "Levenshtein Distance",
+    "description": "Measure the edit distance between two strings. Missing or null inputs use empty text. Each input is limited to 1024 characters; values above that limit fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "similarity", "levenshtein"],
+    "legacyIds": ["string.levenshtein"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "levenshtein"},
+    "inputs": [
+      {"id": "text1", "displayName": "Text 1", "name": "text1", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 1024}, "description": "First text to compare. Missing or null input is treated as empty text; values longer than 1024 characters fail before output."},
+      {"id": "text2", "displayName": "Text 2", "name": "text2", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 1024}, "description": "Second text to compare. Missing or null input is treated as empty text; values longer than 1024 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "distance", "displayName": "Distance", "name": "distance", "pinType": "DATA", "dataType": "number", "description": "Returns the minimum number of single-character insertions, removals, or substitutions needed to transform one input into the other."}
+    ]
+  },
+  {
+    "id": "string_shuffle",
+    "displayName": "Shuffle",
+    "description": "Return the characters of text in a random order. Missing or null input uses empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "similarity", "shuffle"],
+    "legacyIds": ["string.shuffle"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "shuffle"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text whose characters should be shuffled. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "shuffled", "displayName": "Shuffled", "name": "shuffled", "pinType": "DATA", "dataType": "string", "description": "The input characters in a random order, with every character retained exactly once."}
+    ]
+  },
+  {
+    "id": "string_soundex",
+    "displayName": "String Soundex",
+    "description": "Convert text to a Soundex phonetic code. Missing or null input uses empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "similarity", "soundex"],
+    "legacyIds": ["string.soundex"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "soundex"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to encode as a Soundex code. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "code", "displayName": "Code", "name": "code", "pinType": "DATA", "dataType": "string", "description": "The Soundex phonetic code generated from the input text."}
+    ]
+  },
+  {
+    "id": "string_metaphone",
+    "displayName": "String Metaphone",
+    "description": "Convert text to a Metaphone phonetic code. Missing or null input uses empty text.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "similarity", "metaphone"],
+    "legacyIds": ["string.metaphone"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "metaphone"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "description": "Text to encode as a Metaphone code. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "code", "displayName": "Code", "name": "code", "pinType": "DATA", "dataType": "string", "description": "The Metaphone phonetic code generated from the input text."}
+    ]
+  }
+]

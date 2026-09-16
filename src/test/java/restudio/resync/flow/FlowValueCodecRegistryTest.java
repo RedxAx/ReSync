@@ -1,23 +1,47 @@
 package restudio.resync.flow;
 
 import com.google.gson.JsonObject;
+import org.bukkit.Color;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowJobReference;
 import restudio.flow.data.FlowNpcHandle;
 import restudio.flow.data.FlowOperationResult;
 import restudio.flow.data.FlowPermission;
 import restudio.flow.data.FlowTypeRef;
 import restudio.flow.data.GuiDefinition;
+import restudio.flow.data.FlowGraph;
+import restudio.flow.data.FlowNode;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlowValueCodecRegistryTest {
+    @TempDir
+    Path temporary;
+
+    @Test
+    void legacyFlowDefinitionCodecRequiresExplicitCompatibilityMode() {
+        FlowTypeRef type = FlowTypeRef.simple("flow_definition");
+
+        assertFalse(new FlowValueCodecRegistry().hasCodec(type));
+
+        FlowValueCodecRegistry compatibility = new FlowValueCodecRegistry(LegacyRuntimeActivationGate.compatibility(temporary));
+        FlowGraph graph = new FlowGraph("legacy", Map.of("start", new FlowNode("start", 0, 0, Map.of())), List.of(), List.of());
+        Object encoded = compatibility.encode(type, graph);
+
+        assertTrue(compatibility.hasCodec(type));
+        assertEquals("legacy", assertInstanceOf(FlowGraph.class, compatibility.decode(type, encoded)).getId());
+    }
+
     @Test
     void temporalValuesPreserveExactEpochAndDurationMilliseconds() {
         FlowValueCodecRegistry codecs = new FlowValueCodecRegistry();
@@ -29,6 +53,34 @@ class FlowValueCodecRegistryTest {
 
         assertEquals(instant, decodedInstant);
         assertEquals(duration, decodedDuration);
+    }
+
+    @Test
+    void rgbColorsExpandThreeDigitHexAndEncodeCanonically() {
+        FlowValueCodecRegistry codecs = new FlowValueCodecRegistry();
+        FlowTypeRef type = FlowTypeRef.simple("rgb_color");
+
+        Color shortColor = assertInstanceOf(Color.class, codecs.decode(type, "#aBc"));
+        Color fullColor = assertInstanceOf(Color.class, codecs.decode(type, "a1B2c3"));
+
+        assertEquals(Color.fromRGB(0xAABBCC), shortColor);
+        assertEquals(Color.fromRGB(0xA1B2C3), fullColor);
+        assertEquals("#AABBCC", codecs.encode(type, shortColor));
+        assertEquals("#A1B2C3", codecs.encode(type, fullColor));
+    }
+
+    @Test
+    void rgbColorsRejectMalformedHexValues() {
+        FlowValueCodecRegistry codecs = new FlowValueCodecRegistry();
+        FlowTypeRef type = FlowTypeRef.simple("rgb_color");
+
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "#"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "#12"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "#1234"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "#1234567"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "##123456"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "12#3456"));
+        assertThrows(IllegalArgumentException.class, () -> codecs.decode(type, "#12G456"));
     }
 
     @Test

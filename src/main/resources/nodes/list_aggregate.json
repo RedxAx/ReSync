@@ -1,0 +1,202 @@
+[
+  {
+    "id": "list_sum",
+    "displayName": "List Sum",
+    "description": "Sum the numeric values in a list. Missing or null list uses an empty list; null and non-number values are ignored, an empty or number-free list returns 0, the output is always a Double numeric value, and non-finite inputs or results fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "sum", "number"],
+    "legacyIds": ["list.sum"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "sum"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to sum. Missing or null list uses an empty list; null and non-number values are ignored, numeric values must be finite, and lists over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "sum", "displayName": "Sum", "name": "sum", "pinType": "DATA", "dataType": "number", "description": "Returns the sum as a Double numeric value; an empty or number-free list returns 0, and non-finite results fail before output."}
+    ]
+  },
+  {
+    "id": "list_average",
+    "displayName": "List Average",
+    "description": "Average the numeric values in a list. Missing or null list uses an empty list; null and non-number values are ignored, an empty or number-free list returns 0, the output is always a Double numeric value, and non-finite inputs or results fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "average", "number"],
+    "legacyIds": ["list.average"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "average"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to average. Missing or null list uses an empty list; null and non-number values are ignored, numeric values must be finite, and lists over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "average", "displayName": "Average", "name": "average", "pinType": "DATA", "dataType": "number", "description": "Returns the average as a Double numeric value; an empty or number-free list returns 0, and non-finite results fail before output."}
+    ]
+  },
+  {
+    "id": "list_min",
+    "displayName": "List Minimum",
+    "description": "Find the smallest numeric value in a list. Missing or null list uses an empty list; null and non-number values are ignored, an empty or number-free list returns 0, the output is always a Double numeric value, and non-finite inputs or results fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "minimum", "number"],
+    "legacyIds": ["list.min"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "min"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect for the minimum. Missing or null list uses an empty list; null and non-number values are ignored, numeric values must be finite, and lists over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "min", "displayName": "Minimum", "name": "min", "pinType": "DATA", "dataType": "number", "description": "Returns the minimum as a Double numeric value; an empty or number-free list returns 0, and non-finite results fail before output."}
+    ]
+  },
+  {
+    "id": "list_max",
+    "displayName": "List Maximum",
+    "description": "Find the largest numeric value in a list. Missing or null list uses an empty list; null and non-number values are ignored, an empty or number-free list returns 0, the output is always a Double numeric value, and non-finite inputs or results fail before output.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "maximum", "number"],
+    "legacyIds": ["list.max"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "max"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect for the maximum. Missing or null list uses an empty list; null and non-number values are ignored, numeric values must be finite, and lists over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "max", "displayName": "Maximum", "name": "max", "pinType": "DATA", "dataType": "number", "description": "Returns the maximum as a Double numeric value; an empty or number-free list returns 0, and non-finite results fail before output."}
+    ]
+  },
+  {
+    "id": "list_median",
+    "displayName": "List Median",
+    "description": "Find the median of the numeric values in a list. Missing or null list input uses an empty list, null and non-number values are ignored, and an empty or number-free list returns 0.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "median", "number"],
+    "legacyIds": ["list.median"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "median"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect. Missing or null input uses an empty list; null and non-number values are ignored, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "median", "displayName": "Median", "name": "median", "pinType": "DATA", "dataType": "number", "description": "Returns the middle numeric value, averaging the two middle values for an even count; no numeric values returns 0."}
+    ]
+  },
+  {
+    "id": "list_mode",
+    "displayName": "List Mode",
+    "description": "Find the most frequent value in a list. Missing or null list input uses an empty list, ties keep the first value with the highest frequency, and an empty list returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "mode"],
+    "legacyIds": ["list.mode"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "mode"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Values to inspect. Missing or null input uses an empty list; inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "mode", "displayName": "Mode", "name": "mode", "pinType": "DATA", "dataType": "type:t", "description": "Returns the most frequent value, or null for an empty list."}
+    ]
+  },
+  {
+    "id": "list_variance",
+    "displayName": "List Variance",
+    "description": "Calculate the population variance of the numeric values in a list. Missing or null list input uses an empty list, null and non-number values are ignored, and an empty or number-free list returns 0.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "variance", "number"],
+    "legacyIds": ["list.variance"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "variance"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect. Missing or null input uses an empty list; null and non-number values are ignored, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "variance", "displayName": "Variance", "name": "variance", "pinType": "DATA", "dataType": "number", "description": "Returns the population variance as a number, or 0 when no numeric value is present."}
+    ]
+  },
+  {
+    "id": "list_stddev",
+    "displayName": "List Standard Deviation",
+    "description": "Calculate the population standard deviation of the numeric values in a list. Missing or null list input uses an empty list, null and non-number values are ignored, and an empty or number-free list returns 0.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "aggregate", "standard-deviation", "number"],
+    "legacyIds": ["list.stddev"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "stddev"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Numbers to inspect. Missing or null input uses an empty list; null and non-number values are ignored, and inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "stddev", "displayName": "Standard Deviation", "name": "stddev", "pinType": "DATA", "dataType": "number", "description": "Returns the population standard deviation as a number, or 0 when no numeric value is present."}
+    ]
+  }
+]

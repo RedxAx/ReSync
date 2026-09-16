@@ -1,7 +1,6 @@
 package restudio.resync.protocol;
 
 import org.junit.jupiter.api.Test;
-import restudio.resync.contracts.ReSyncProtocolContract;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ReSyncProtocolContractTest {
     @Test
     void flowPacketIdsMatchRuntimeHandlers() {
+        assertEquals(ReSyncProtocolContract.MESSAGE_PROTOCOL_ENVELOPE, MessageType.PROTOCOL_ENVELOPE.getValue());
         assertEquals(0x01, ReSyncProtocolContract.FLOW_PACKET_REQUEST);
         assertEquals(0x03, ReSyncProtocolContract.FLOW_PACKET_SAVE);
         assertEquals(0x04, ReSyncProtocolContract.FLOW_PACKET_GUI_STATE);

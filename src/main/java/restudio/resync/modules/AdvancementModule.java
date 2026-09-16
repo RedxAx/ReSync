@@ -61,6 +61,7 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.flow.data.FlowGraph;
 
@@ -76,7 +77,7 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private static final ModuleMetadata METADATA = ModuleMetadata.of("advancements", "Advancements").withDependencies("flow");
     private final AdvancementTreeValidator validator = new AdvancementTreeValidator();
     private AdvancementRuntimeBridge bridge;
-    private final AdvancementService service = new AdvancementService();
+    private final AdvancementService service;
     private AdvancementPredicateEvaluator predicates;
     private ReSyncJsonResourceStorage storage;
     private AdvancementFingerprintReconciler fingerprints;
@@ -84,6 +85,14 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     private FlowExecutor flowExecutor;
     private BukkitTask pollingTask;
     private JavaPlugin plugin;
+
+    public AdvancementModule() {
+        this(PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public AdvancementModule(PaperPlayerDataMutationAdmission playerDataAdmission) {
+        service = new AdvancementService(playerDataAdmission);
+    }
 
     @Override
     public ModuleMetadata getMetadata() {
@@ -94,12 +103,14 @@ public class AdvancementModule implements Module, Listener, ReSyncJsonResourceSt
     public void initialize(ModuleContext context) {
         plugin = context.getPlugin();
         storage = context.getRequiredService(ReSyncJsonResourceStorage.class);
-        fingerprints = new AdvancementFingerprintReconciler(context.getPlugin(), service);
+        PaperPlayerDataMutationAdmission playerDataAdmission =
+            context.getRequiredService(PaperPlayerDataMutationAdmission.class);
+        fingerprints = new AdvancementFingerprintReconciler(context.getPlugin(), service, playerDataAdmission);
         flowStorage = context.getService(FlowStorage.class);
         flowExecutor = context.getService(FlowExecutor.class);
         CustomContentService customContent = context.getService(CustomContentService.class);
         predicates = new AdvancementPredicateEvaluator(customContent);
-        bridge = new PaperAdvancementRuntimeBridge(customContent);
+        bridge = new PaperAdvancementRuntimeBridge(customContent, playerDataAdmission);
         storage.addInterceptor(this);
         context.registerService(AdvancementModule.class, this);
         context.registerService(AdvancementService.class, service);

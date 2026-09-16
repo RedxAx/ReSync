@@ -1,45 +1,106 @@
 package restudio.resync.world;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import restudio.resync.Log;
-import restudio.resync.ReSync;
+import restudio.resync.contract.canonical.CanonicalCodec;
+import restudio.resync.contract.canonical.CanonicalHash;
+import restudio.resync.contract.canonical.JsonValue;
+import restudio.resync.flow.canonical.CanonicalJson;
+import restudio.resync.migration.AtomicFiles;
+import restudio.resync.migration.LegacyFileMigrationCoordinator;
+import restudio.resync.migration.MigrationPaths;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringReader;
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public class WorldOperationSafetyService {
     private static final int DEFAULT_MAX_RECORDS = 500;
     private static final long CONFIRMATION_TTL_MILLIS = 120_000L;
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    private final Path auditFile;
     private final int maxRecords;
-    private final Map<String, ConfirmationToken> confirmations = new ConcurrentHashMap<>();
-    private final Map<String, WorldOperationResult> operationStatuses = new ConcurrentHashMap<>();
+    private final Object persistenceMonitor = new Object();
+    private final Map<String, ConfirmationToken> confirmations = new LinkedHashMap<>();
+    private final Map<String, WorldOperationResult> operationStatuses = new LinkedHashMap<>();
+    private final Map<WorldOperationAuditRecord, PendingLease> pendingRecords = new IdentityHashMap<>();
     private final List<WorldOperationAuditRecord> auditRecords = new ArrayList<>();
+    private volatile ActiveBinding activeBinding;
+    private volatile WorldExternalPersistenceCapability externalPersistenceCapability;
+    private boolean quiesced;
+    private boolean quiescing;
+    private boolean quiesceFailed;
+    private boolean closing;
+    private boolean closed;
+    private IOException persistenceFailure;
 
-    public WorldOperationSafetyService(ReSync plugin) {
-        this(plugin, DEFAULT_MAX_RECORDS);
-    }
+    private static final String DOCUMENT_KIND = "resync.world-audit";
+    private static final String MIGRATION_OWNER = "resync.world-audit";
+    private static final int DOCUMENT_VERSION = 2;
+    private static final int LEGACY_DOCUMENT_VERSION = 1;
+    private static final String LEGACY_FAILURE_REASON = "Legacy unsuccessful operation did not include a failure reason";
+    private static final long LEASE_DRAIN_TIMEOUT_MILLIS = 2_000L;
+    static final int MAXIMUM_AUDIT_FILE_BYTES = 16 * 1024 * 1024;
+    static final int MAXIMUM_LEGACY_JSON_DEPTH = 64;
+    static final long MAXIMUM_LEGACY_COLLECTION_ENTRIES = 100_000L;
+    private static final Pattern HASH_PATTERN = Pattern.compile("[0-9a-f]{64}");
+    private static final Set<String> DOCUMENT_FIELDS = Set.of("contentHash", "kind", "records", "version");
+    private static final Set<String> RECORD_FIELDS = Set.of("action", "actorClientId", "auditId", "backupAvailable", "durationMillis", "failureReason", "finishedAt", "message", "operationId", "parameters", "safetyBackupId", "startedAt", "success", "targetWorld");
 
-    public WorldOperationSafetyService(ReSync plugin, int maxRecords) {
-        this(plugin.getDataFolder().toPath().resolve("world-audit.json"), maxRecords);
+    public WorldOperationSafetyService(Path auditFile) {
+        this(auditFile, DEFAULT_MAX_RECORDS);
     }
 
     public WorldOperationSafetyService(Path auditFile, int maxRecords) {
-        this.auditFile = auditFile;
         this.maxRecords = Math.max(50, maxRecords);
-        load();
+        externalPersistenceCapability = WorldExternalPersistenceCapability.unavailable();
+        Path root = MigrationPaths.requirePath(auditFile, "auditFile");
+        try {
+            Files.createDirectories(requireParent(root));
+            DecodedRecords decoded = readRecords(root, false, true);
+            synchronized (persistenceMonitor) {
+                activeBinding = new ActiveBinding(root, 0L);
+                auditRecords.addAll(decoded.records());
+                boolean exists = Files.exists(root, LinkOption.NOFOLLOW_LINKS);
+                boolean migrationArtifacts = LegacyFileMigrationCoordinator.hasArtifacts(root,
+                    LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID);
+                if (!exists && migrationArtifacts) {
+                    throw new IOException("World audit migration source is missing while recovery artifacts exist");
+                }
+                if (!exists) {
+                    writeRecords(root, auditRecords);
+                } else if (decoded.legacy() || migrationArtifacts) {
+                    LegacyFileMigrationCoordinator.migrate(root, canonicalBytes(auditRecords), MIGRATION_OWNER,
+                        LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID, decoded.sourceVersion(), DOCUMENT_VERSION);
+                }
+            }
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalStateException("Failed to initialize world audit persistence", exception);
+        }
     }
 
     public boolean isDangerous(String action) {
@@ -55,83 +116,170 @@ public class WorldOperationSafetyService {
     }
 
     public WorldOperationResult requireConfirmation(String action, String worldName, String actorClientId, Map<String, Object> parameters) {
-        String token = UUID.randomUUID().toString().replace("-", "");
-        long now = System.currentTimeMillis();
-        confirmations.put(token, new ConfirmationToken(token, action, worldName, actorClientId, now + CONFIRMATION_TTL_MILLIS));
-        WorldOperationResult result = WorldOperationResult.failure(action, worldName, "ConfirmationRequired");
-        result.setRequiresConfirmation(true);
-        result.setActorClientId(actorClientId);
-        result.setStartedAt(now);
-        result.setFinishedAt(now);
-        result.withData("confirmationToken", token);
-        result.withData("expiresAt", now + CONFIRMATION_TTL_MILLIS);
-        result.withData("parameters", parameters == null ? Map.of() : parameters);
-        return result;
+        synchronized (persistenceMonitor) {
+            requireMutationAdmission();
+            String token = UUID.randomUUID().toString().replace("-", "");
+            long now = System.currentTimeMillis();
+            long expiresAt = now + CONFIRMATION_TTL_MILLIS;
+            confirmations.put(token, new ConfirmationToken(token, action, worldName, actorClientId, expiresAt));
+            WorldOperationResult result = WorldOperationResult.failure(action, worldName, "ConfirmationRequired");
+            result.setRequiresConfirmation(true);
+            result.setActorClientId(actorClientId);
+            result.setStartedAt(now);
+            result.setFinishedAt(now);
+            result.withData("confirmationToken", token);
+            result.withData("expiresAt", expiresAt);
+            result.withData("parameters", parameters == null ? Map.of() : new LinkedHashMap<>(parameters));
+            return result;
+        }
     }
 
     public boolean consumeConfirmation(String token, String action, String worldName, String actorClientId) {
-        if (token == null || token.isBlank()) {
-            return false;
+        synchronized (persistenceMonitor) {
+            requireMutationAdmission();
+            if (token == null || token.isBlank()) {
+                return false;
+            }
+            ConfirmationToken confirmation = confirmations.remove(token);
+            if (confirmation == null || confirmation.expiresAt < System.currentTimeMillis()) {
+                return false;
+            }
+            if (!safeEquals(confirmation.action, action)) {
+                return false;
+            }
+            if (confirmation.worldName != null && worldName != null && !safeEquals(confirmation.worldName, worldName)) {
+                return false;
+            }
+            return confirmation.actorClientId == null || actorClientId == null || safeEquals(confirmation.actorClientId, actorClientId);
         }
-        ConfirmationToken confirmation = confirmations.remove(token);
-        if (confirmation == null || confirmation.expiresAt < System.currentTimeMillis()) {
-            return false;
-        }
-        if (!safeEquals(confirmation.action, action)) {
-            return false;
-        }
-        if (confirmation.worldName != null && worldName != null && !safeEquals(confirmation.worldName, worldName)) {
-            return false;
-        }
-        return confirmation.actorClientId == null || actorClientId == null || safeEquals(confirmation.actorClientId, actorClientId);
     }
 
     public WorldOperationAuditRecord begin(String operationId, String action, String actorClientId, String targetWorld, Map<String, Object> parameters) {
-        WorldOperationAuditRecord record = new WorldOperationAuditRecord();
-        long now = System.currentTimeMillis();
-        record.setAuditId(UUID.randomUUID().toString());
-        record.setOperationId(operationId);
-        record.setAction(action);
-        record.setActorClientId(actorClientId);
-        record.setTargetWorld(targetWorld);
-        record.setParameters(parameters);
-        record.setStartedAt(now);
-        record.setBackupAvailable(false);
-        return record;
+        synchronized (persistenceMonitor) {
+            requireMutationAdmission();
+            requireText(operationId, "operationId");
+            requireText(action, "action");
+            JsonValue normalizedParameters = JsonValue.fromJava(parameters == null ? Map.of() : parameters);
+            if (!(normalizedParameters instanceof JsonValue.JsonObject)) {
+                throw new IllegalArgumentException("World audit parameters must be an object");
+            }
+            WorldOperationAuditRecord record = new WorldOperationAuditRecord();
+            long now = System.currentTimeMillis();
+            record.setAuditId(UUID.randomUUID().toString());
+            record.setOperationId(operationId);
+            record.setAction(action);
+            record.setActorClientId(actorClientId);
+            record.setTargetWorld(targetWorld);
+            Map<String, Object> safeParameters;
+            try {
+                safeParameters = copyParameterMap(parameters == null ? Map.of() : parameters);
+                record.setParameters(copyParameterMap(safeParameters));
+            } catch (IOException exception) {
+                throw new IllegalArgumentException("World audit parameters are not JSON-compatible", exception);
+            }
+            record.setStartedAt(now);
+            record.setBackupAvailable(false);
+            try {
+                pendingRecords.put(record, new PendingLease(activeBinding.generation(), record.getAuditId(), record.getOperationId(),
+                    record.getAction(), record.getActorClientId(), record.getTargetWorld(), copyParameterMap(safeParameters), record.getStartedAt()));
+            } catch (IOException exception) {
+                throw new IllegalArgumentException("World audit parameters are not JSON-compatible", exception);
+            }
+            return record;
+        }
     }
 
-    public synchronized void finish(WorldOperationAuditRecord record, WorldOperationResult result, Throwable failure) {
+    public void finish(WorldOperationAuditRecord record, WorldOperationResult result, Throwable failure) {
         if (record == null) {
             return;
         }
-        long now = System.currentTimeMillis();
-        record.setFinishedAt(now);
-        record.setDurationMillis(Math.max(0L, now - record.getStartedAt()));
-        record.setSuccess(result != null && result.isSuccess() && failure == null);
-        record.setMessage(result != null ? result.getMessage() : null);
-        record.setFailureReason(failure != null ? failure.getMessage() : result != null && !result.isSuccess() ? result.getMessage() : null);
-        record.setSafetyBackupId(result != null ? result.getSafetyBackupId() : null);
-        auditRecords.add(record);
-        auditRecords.sort(Comparator.comparingLong(WorldOperationAuditRecord::getStartedAt).reversed());
-        while (auditRecords.size() > maxRecords) {
-            auditRecords.removeLast();
+        synchronized (persistenceMonitor) {
+            if (closed) {
+                throw new IllegalStateException("World audit persistence is closed");
+            }
+            PendingLease pending = pendingRecords.get(record);
+            if (pending == null) {
+                requireMutationAdmission();
+                throw new IllegalStateException("World audit record was not admitted");
+            }
+            if (pending.generation() != activeBinding.generation()) {
+                throw new IllegalStateException("World audit record belongs to an inactive persistence generation");
+            }
+            WorldOperationResult completedResult = result == null ? null : copyResult(result);
+            pendingRecords.remove(record);
+            long now = System.currentTimeMillis();
+            WorldOperationAuditRecord completed = new WorldOperationAuditRecord();
+            completed.setAuditId(pending.auditId());
+            completed.setOperationId(pending.operationId());
+            completed.setAction(pending.action());
+            completed.setActorClientId(pending.actorClientId());
+            completed.setTargetWorld(pending.targetWorld());
+            completed.setParameters(pending.parameters());
+            completed.setStartedAt(pending.startedAt());
+            completed.setBackupAvailable(false);
+            completed.setFinishedAt(now);
+            completed.setDurationMillis(Math.max(0L, now - pending.startedAt()));
+            completed.setSuccess(completedResult != null && completedResult.isSuccess() && failure == null);
+            completed.setMessage(completedResult != null ? completedResult.getMessage() : null);
+            completed.setFailureReason(completed.isSuccess() ? null : failure != null ? failureMessage(failure) : completedResult != null ? failureMessage(completedResult.getMessage()) : "Operation failed");
+            completed.setSafetyBackupId(completedResult != null ? completedResult.getSafetyBackupId() : null);
+            completed.setBackupAvailable(completed.getSafetyBackupId() != null && !completed.getSafetyBackupId().isBlank());
+            record.setAuditId(pending.auditId());
+            record.setOperationId(pending.operationId());
+            record.setAction(pending.action());
+            record.setActorClientId(pending.actorClientId());
+            record.setTargetWorld(pending.targetWorld());
+            record.setParameters(pending.parameters());
+            record.setStartedAt(pending.startedAt());
+            record.setFinishedAt(now);
+            record.setDurationMillis(completed.getDurationMillis());
+            record.setSuccess(completed.isSuccess());
+            record.setMessage(completed.getMessage());
+            record.setFailureReason(completed.getFailureReason());
+            record.setSafetyBackupId(completed.getSafetyBackupId());
+            record.setBackupAvailable(completed.isBackupAvailable());
+            auditRecords.add(completed);
+            auditRecords.sort(recordComparator());
+            while (auditRecords.size() > maxRecords) {
+                auditRecords.removeLast();
+            }
+            try {
+                writeRecords(activeBinding.file(), auditRecords);
+            } catch (IOException exception) {
+                persistenceFailure = exception;
+                Log.warn("Failed to save world audit records: " + exception.getMessage());
+            } finally {
+                persistenceMonitor.notifyAll();
+            }
         }
-        save();
     }
 
     public void rememberStatus(WorldOperationResult result) {
-        if (result != null && result.getOperationId() != null && !result.getOperationId().isBlank()) {
-            operationStatuses.put(result.getOperationId(), result);
+        synchronized (persistenceMonitor) {
+            if (result == null || result.getOperationId() == null || result.getOperationId().isBlank()) {
+                requireMutationAdmission();
+                return;
+            }
+            if (closed || ((quiesced || quiescing || quiesceFailed || closing) && !hasPendingOperation(result.getOperationId()))) {
+                requireMutationAdmission();
+            }
+            operationStatuses.put(result.getOperationId(), copyResult(result));
         }
     }
 
     public WorldOperationResult getStatus(String operationId) {
-        return operationStatuses.get(operationId);
+        synchronized (persistenceMonitor) {
+            WorldOperationResult result = operationStatuses.get(operationId);
+            return result == null ? null : copyResult(result);
+        }
     }
 
     public List<WorldOperationAuditRecord> snapshot(int limit) {
-        int count = Math.max(1, Math.min(limit <= 0 ? 100 : limit, auditRecords.size()));
-        return new ArrayList<>(auditRecords.subList(0, count));
+        synchronized (persistenceMonitor) {
+            awaitSnapshotLeases();
+            int count = Math.min(limit <= 0 ? 100 : limit, auditRecords.size());
+            return copyRecords(auditRecords.subList(0, count));
+        }
     }
 
     public WorldOperationResult unavailableBackupResult(String action, String worldName, String actorClientId) {
@@ -145,37 +293,986 @@ public class WorldOperationSafetyService {
         return result;
     }
 
-    private synchronized void load() {
-        if (!Files.exists(auditFile)) {
-            return;
-        }
-        try {
-            String json = Files.readString(auditFile, StandardCharsets.UTF_8);
-            WorldOperationAuditRecord[] loaded = gson.fromJson(json, WorldOperationAuditRecord[].class);
-            auditRecords.clear();
-            if (loaded != null) {
-                for (WorldOperationAuditRecord record : loaded) {
-                    if (record != null) {
-                        auditRecords.add(record);
-                    }
-                }
-            }
-        } catch (Exception exception) {
-            Log.warn("Failed to load world audit records: " + exception.getMessage());
+    public Path persistenceRoot() {
+        return activeBinding.file();
+    }
+
+    public Path path() {
+        return persistenceRoot();
+    }
+
+    public long persistenceGeneration() {
+        return activeBinding.generation();
+    }
+
+    public long generation() {
+        return persistenceGeneration();
+    }
+
+    public int activeOperationCount() {
+        synchronized (persistenceMonitor) {
+            return pendingRecords.size();
         }
     }
 
-    private synchronized void save() {
-        try {
-            Files.createDirectories(auditFile.getParent());
-            Files.writeString(auditFile, gson.toJson(auditRecords), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (IOException exception) {
-            Log.warn("Failed to save world audit records: " + exception.getMessage());
+    public List<String> activeOperationIds() {
+        synchronized (persistenceMonitor) {
+            return pendingRecords.values().stream()
+                .map(PendingLease::operationId)
+                .filter(operationId -> operationId != null && !operationId.isBlank())
+                .toList();
         }
+    }
+
+    public boolean isOperationActive(String operationId) {
+        if (operationId == null || operationId.isBlank()) {
+            return false;
+        }
+        synchronized (persistenceMonitor) {
+            return pendingRecords.values().stream().anyMatch(lease -> operationId.equals(lease.operationId()));
+        }
+    }
+
+    public void bindExternalPersistence(WorldExternalPersistenceCapability capability) {
+        externalPersistenceCapability = Objects.requireNonNull(capability, "capability");
+    }
+
+    public void clearExternalPersistence() {
+        externalPersistenceCapability = WorldExternalPersistenceCapability.unavailable();
+    }
+
+    public WorldExternalPersistenceCapability externalPersistence() {
+        return externalPersistenceCapability;
+    }
+
+    public WorldExternalPersistenceCapability.MutationLease acquireExternalMutation(String action, String worldName) {
+        return externalPersistence().acquireReplacementMutation(action, worldName);
+    }
+
+    public WorldExternalPersistenceCapability.MutationLease acquireNormalMutation(String action, String worldName) {
+        return externalPersistence().acquireNormalMutation(action, worldName);
+    }
+
+    public boolean isQuiesced() {
+        synchronized (persistenceMonitor) {
+            return quiesced;
+        }
+    }
+
+    public boolean isClosed() {
+        synchronized (persistenceMonitor) {
+            return closed;
+        }
+    }
+
+    public void flushPersistence() throws IOException {
+        synchronized (persistenceMonitor) {
+            ensureNotClosed();
+            ensureHealthy();
+            try {
+                writeRecords(activeBinding.file(), auditRecords);
+            } catch (IOException exception) {
+                persistenceFailure = exception;
+                throw exception;
+            }
+        }
+    }
+
+    public void quiescePersistence() throws IOException {
+        synchronized (persistenceMonitor) {
+            ensureNotClosed();
+            if (quiesced) {
+                ensureHealthy();
+                return;
+            }
+            quiescing = true;
+            quiesceFailed = false;
+            try {
+                awaitLeases();
+                ensureHealthy();
+                writeRecords(activeBinding.file(), auditRecords);
+                quiesced = true;
+                quiescing = false;
+            } catch (IOException | RuntimeException exception) {
+                quiesceFailed = true;
+                quiescing = true;
+                if (exception instanceof IOException ioException) {
+                    throw ioException;
+                }
+                throw exception;
+            } finally {
+                persistenceMonitor.notifyAll();
+            }
+        }
+    }
+
+    public void resumePersistence() throws IOException {
+        synchronized (persistenceMonitor) {
+            ensureNotClosed();
+            if (closing || (quiescing && !quiesceFailed)) {
+                throw new IOException("World audit persistence lifecycle transition is active");
+            }
+            if (!quiesced && !quiesceFailed) {
+                return;
+            }
+            if (!pendingRecords.isEmpty()) {
+                throw new IOException("World audit persistence still has admitted operations");
+            }
+            if (persistenceFailure != null) {
+                throw new IOException("World audit persistence is unavailable", persistenceFailure);
+            }
+            List<WorldOperationAuditRecord> persisted = readRecords(activeBinding.file(), true, false).records();
+            if (!recordsEqual(persisted, auditRecords)) {
+                throw new IOException("World audit records are out of sync with the active file");
+            }
+            quiesced = false;
+            quiescing = false;
+            quiesceFailed = false;
+        }
+    }
+
+    public void rebindPersistence(Path candidateFile) throws IOException {
+        synchronized (persistenceMonitor) {
+            ensureNotClosed();
+            if (closing || quiescing || !quiesced) {
+                throw new IOException("World audit persistence must be quiesced before rebind");
+            }
+            if (!pendingRecords.isEmpty()) {
+                throw new IOException("World audit persistence has active operation records");
+            }
+            Path nextFile = MigrationPaths.requirePath(candidateFile, "candidateFile");
+            DecodedRecords decoded = readRecords(nextFile, true, true);
+            long generation;
+            try {
+                generation = Math.addExact(activeBinding.generation(), 1L);
+            } catch (ArithmeticException exception) {
+                throw new IOException("World audit persistence generation overflowed", exception);
+            }
+            if (decoded.legacy() || LegacyFileMigrationCoordinator.hasArtifacts(nextFile,
+                LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID)) {
+                LegacyFileMigrationCoordinator.migrate(nextFile, canonicalBytes(decoded.records()), MIGRATION_OWNER,
+                    LegacyFileMigrationCoordinator.WORLD_AUDIT_MIGRATION_ID, decoded.sourceVersion(), DOCUMENT_VERSION);
+            }
+            ActiveBinding nextBinding = new ActiveBinding(nextFile, generation);
+            auditRecords.clear();
+            auditRecords.addAll(decoded.records());
+            confirmations.clear();
+            operationStatuses.clear();
+            activeBinding = nextBinding;
+        }
+    }
+
+    public void healthCheckPersistence() throws IOException {
+        synchronized (persistenceMonitor) {
+            ensureNotClosed();
+            ensureHealthy();
+            List<WorldOperationAuditRecord> persisted = readRecords(activeBinding.file(), true, false).records();
+            if (!recordsEqual(persisted, auditRecords)) {
+                throw new IOException("World audit records are out of sync with the active file");
+            }
+        }
+    }
+
+    public void closePersistence() throws IOException {
+        synchronized (persistenceMonitor) {
+            if (closed) {
+                return;
+            }
+            if (closing) {
+                throw new IOException("World audit persistence shutdown is already in progress");
+            }
+            closing = true;
+            try {
+                if (!quiesced) {
+                    quiescing = true;
+                    quiesceFailed = false;
+                    awaitLeases();
+                    ensureHealthy();
+                    writeRecords(activeBinding.file(), auditRecords);
+                    quiesced = true;
+                    quiescing = false;
+                } else {
+                    ensureHealthy();
+                    List<WorldOperationAuditRecord> persisted = readRecords(activeBinding.file(), true, false).records();
+                    if (!recordsEqual(persisted, auditRecords)) {
+                        throw new IOException("World audit records are out of sync with the active file");
+                    }
+                }
+                if (!pendingRecords.isEmpty()) {
+                    throw new IOException("World audit persistence has active operation records");
+                }
+                closed = true;
+            } catch (IOException | RuntimeException exception) {
+                quiesceFailed = true;
+                quiescing = true;
+                if (exception instanceof IOException ioException) {
+                    throw ioException;
+                }
+                throw exception;
+            } finally {
+                if (!closed) {
+                    closing = false;
+                }
+                persistenceMonitor.notifyAll();
+            }
+        }
+    }
+
+    private DecodedRecords readRecords(Path file, boolean required, boolean allowLegacy) throws IOException {
+        Path normalized = MigrationPaths.requirePath(file, "auditFile");
+        if (Files.notExists(normalized, LinkOption.NOFOLLOW_LINKS)) {
+            if (required) {
+                throw new IOException("World audit file does not exist: " + normalized);
+            }
+            return new DecodedRecords(new ArrayList<>(), false, DOCUMENT_VERSION);
+        }
+        if (Files.isSymbolicLink(normalized) || !Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("World audit file is not a regular file: " + normalized);
+        }
+        try {
+            byte[] bytes = readBoundedFile(normalized);
+            JsonValue value;
+            try {
+                value = CanonicalCodec.decode(bytes);
+            } catch (IllegalArgumentException canonicalFailure) {
+                if (!allowLegacy) {
+                    throw new IOException("World audit file is not canonical: " + normalized, canonicalFailure);
+                }
+                JsonElement legacy = parseStrictJson(bytes);
+                if (!legacy.isJsonArray()) {
+                    throw new IOException("World audit file has an unsupported version: " + normalized, canonicalFailure);
+                }
+                return new DecodedRecords(decodeLegacyRecords(legacy), true, 0L);
+            }
+            if (value instanceof JsonValue.JsonObject) {
+                return decodeCanonicalRecords(value);
+            }
+            if (!allowLegacy) {
+                throw new IOException("World audit file is not a versioned document: " + normalized);
+            }
+            return new DecodedRecords(decodeLegacyRecords(parseStrictJson(bytes)), true, 0L);
+        } catch (IOException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new IOException("World audit file is malformed: " + normalized, exception);
+        }
+    }
+
+    private DecodedRecords decodeCanonicalRecords(JsonValue value) throws IOException {
+        if (!(value instanceof JsonValue.JsonObject document)) {
+            throw new IOException("World audit document must be an object");
+        }
+        requireFields(document.fields(), DOCUMENT_FIELDS, "world audit document");
+        if (!DOCUMENT_KIND.equals(requiredString(document, "kind"))) {
+            throw new IOException("World audit document kind is unsupported");
+        }
+        long version = requiredLong(document, "version");
+        if (version != DOCUMENT_VERSION && version != LEGACY_DOCUMENT_VERSION) {
+            throw new IOException("World audit document version is unsupported");
+        }
+        JsonValue recordsValue = requiredField(document, "records");
+        if (!(recordsValue instanceof JsonValue.JsonArray recordsArray)) {
+            throw new IOException("World audit records must be an array");
+        }
+        String expectedHash = requiredString(document, "contentHash");
+        if (!HASH_PATTERN.matcher(expectedHash).matches()) {
+            throw new IOException("World audit content hash is invalid");
+        }
+        List<WorldOperationAuditRecord> records = new ArrayList<>();
+        for (JsonValue item : recordsArray.values()) {
+            WorldOperationAuditRecord record = decodeCanonicalRecord(item);
+            records.add(record);
+        }
+        if (!expectedHash.equals(contentHash(records, Math.toIntExact(version)))) {
+            throw new IOException("World audit content hash does not match canonical records");
+        }
+        if (version == LEGACY_DOCUMENT_VERSION) {
+            records.forEach(this::normalizeLegacyRecord);
+        }
+        validateRecords(records);
+        List<WorldOperationAuditRecord> ordered = orderedRecords(records);
+        for (int index = 0; index < records.size(); index++) {
+            if (!Objects.equals(records.get(index).getAuditId(), ordered.get(index).getAuditId())) {
+                throw new IOException("World audit records are not in canonical order");
+            }
+        }
+        return new DecodedRecords(records, version == LEGACY_DOCUMENT_VERSION, version);
+    }
+
+    private WorldOperationAuditRecord decodeCanonicalRecord(JsonValue value) throws IOException {
+        if (!(value instanceof JsonValue.JsonObject object)) {
+            throw new IOException("World audit records must be objects");
+        }
+        requireFields(object.fields(), RECORD_FIELDS, "world audit record");
+        WorldOperationAuditRecord record = new WorldOperationAuditRecord();
+        record.setAuditId(requiredString(object, "auditId"));
+        record.setOperationId(requiredString(object, "operationId"));
+        record.setAction(requiredString(object, "action"));
+        record.setActorClientId(nullableString(object, "actorClientId"));
+        record.setTargetWorld(nullableString(object, "targetWorld"));
+        JsonValue parameters = requiredField(object, "parameters");
+        if (!(parameters instanceof JsonValue.JsonObject parameterObject)) {
+            throw new IOException("World audit parameters must be an object");
+        }
+        Object parameterJava = parameterObject.toJava();
+        if (!(parameterJava instanceof Map<?, ?> parameterMap)) {
+            throw new IOException("World audit parameters are malformed");
+        }
+        record.setParameters(copyParameterMap(parameterMap));
+        record.setSuccess(requiredBoolean(object, "success"));
+        record.setMessage(nullableString(object, "message"));
+        record.setFailureReason(nullableString(object, "failureReason"));
+        record.setSafetyBackupId(nullableString(object, "safetyBackupId"));
+        record.setBackupAvailable(requiredBoolean(object, "backupAvailable"));
+        record.setStartedAt(requiredLong(object, "startedAt"));
+        record.setFinishedAt(requiredLong(object, "finishedAt"));
+        record.setDurationMillis(requiredLong(object, "durationMillis"));
+        return record;
+    }
+
+    private List<WorldOperationAuditRecord> decodeLegacyRecords(JsonElement root) throws IOException {
+        if (!root.isJsonArray()) {
+            throw new IOException("World audit legacy data must be an array");
+        }
+        List<WorldOperationAuditRecord> records = new ArrayList<>();
+        for (JsonElement element : root.getAsJsonArray()) {
+            if (!element.isJsonObject()) {
+                throw new IOException("World audit records must be objects");
+            }
+            JsonObject object = element.getAsJsonObject();
+            requireLegacyFields(object, RECORD_FIELDS, "world audit record");
+            WorldOperationAuditRecord record = new WorldOperationAuditRecord();
+            record.setAuditId(legacyRequiredString(object, "auditId"));
+            record.setOperationId(legacyRequiredString(object, "operationId"));
+            record.setAction(legacyRequiredString(object, "action"));
+            record.setActorClientId(legacyNullableString(object, "actorClientId"));
+            record.setTargetWorld(legacyNullableString(object, "targetWorld"));
+            record.setParameters(legacyParameters(object));
+            record.setSuccess(legacyBoolean(object, "success", false));
+            record.setMessage(legacyNullableString(object, "message"));
+            record.setFailureReason(legacyNullableString(object, "failureReason"));
+            record.setSafetyBackupId(legacyNullableString(object, "safetyBackupId"));
+            record.setBackupAvailable(legacyBoolean(object, "backupAvailable", false));
+            record.setStartedAt(legacyRequiredLong(object, "startedAt"));
+            record.setFinishedAt(legacyRequiredLong(object, "finishedAt"));
+            record.setDurationMillis(legacyRequiredLong(object, "durationMillis"));
+            normalizeLegacyRecord(record);
+            records.add(record);
+        }
+        validateRecords(records);
+        return orderedRecords(records);
+    }
+
+    private void normalizeLegacyRecord(WorldOperationAuditRecord record) {
+        if (!record.isSuccess() && (record.getFailureReason() == null || record.getFailureReason().isBlank())) {
+            String message = record.getMessage();
+            record.setFailureReason(message == null || message.isBlank() ? LEGACY_FAILURE_REASON : message);
+        }
+        String backupId = record.getSafetyBackupId();
+        if (backupId == null || backupId.isBlank()) {
+            record.setSafetyBackupId(null);
+            record.setBackupAvailable(false);
+        } else {
+            record.setBackupAvailable(true);
+        }
+    }
+
+    private void validateRecords(List<WorldOperationAuditRecord> records) throws IOException {
+        Set<String> auditIds = new HashSet<>();
+        Set<String> caseFoldedIds = new HashSet<>();
+        for (WorldOperationAuditRecord record : orderedRecords(records)) {
+            validateRecord(record, auditIds, caseFoldedIds);
+        }
+    }
+
+    private void validateRecord(WorldOperationAuditRecord record, Set<String> auditIds, Set<String> caseFoldedIds) throws IOException {
+        if (record == null || record.getAuditId() == null || record.getAuditId().isBlank()
+            || record.getOperationId() == null || record.getOperationId().isBlank()
+            || record.getAction() == null || record.getAction().isBlank()) {
+            throw new IOException("World audit record has missing identity or action");
+        }
+        requireText(record.getAuditId(), "auditId");
+        requireText(record.getOperationId(), "operationId");
+        requireText(record.getAction(), "action");
+        requireNullableText(record.getActorClientId(), "actorClientId");
+        requireNullableText(record.getTargetWorld(), "targetWorld");
+        requireNullableText(record.getMessage(), "message");
+        requireNullableText(record.getFailureReason(), "failureReason");
+        requireNullableText(record.getSafetyBackupId(), "safetyBackupId");
+        if (!auditIds.add(record.getAuditId()) || !caseFoldedIds.add(record.getAuditId().toLowerCase(Locale.ROOT))) {
+            throw new IOException("World audit record has a duplicate audit ID: " + record.getAuditId());
+        }
+        if (record.getStartedAt() < 0L || record.getFinishedAt() < record.getStartedAt() || record.getDurationMillis() < 0L) {
+            throw new IOException("World audit record has invalid timing");
+        }
+        try {
+            if (Math.subtractExact(record.getFinishedAt(), record.getStartedAt()) != record.getDurationMillis()) {
+                throw new IOException("World audit record duration does not match timestamps");
+            }
+        } catch (ArithmeticException exception) {
+            throw new IOException("World audit record timing overflowed", exception);
+        }
+        if (record.isSuccess() && record.getFailureReason() != null) {
+            throw new IOException("Successful world audit records cannot have failure diagnostics");
+        }
+        if (!record.isSuccess() && (record.getFailureReason() == null || record.getFailureReason().isBlank())) {
+            throw new IOException("Failed world audit records require failure diagnostics");
+        }
+        boolean hasBackupId = record.getSafetyBackupId() != null && !record.getSafetyBackupId().isBlank();
+        if (record.isBackupAvailable() != hasBackupId) {
+            throw new IOException("World audit backup availability must match the backup ID");
+        }
+    }
+
+    private void writeRecords(Path file, List<WorldOperationAuditRecord> records) throws IOException {
+        Path normalized = MigrationPaths.requirePath(file, "auditFile");
+        Path parent = requireParent(normalized);
+        Files.createDirectories(parent);
+        AtomicFiles.write(normalized, canonicalBytes(records));
+    }
+
+    private boolean recordsEqual(List<WorldOperationAuditRecord> left, List<WorldOperationAuditRecord> right) {
+        try {
+            return Arrays.equals(canonicalBytes(left), canonicalBytes(right));
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    private void requireMutationAdmission() {
+        if (closed || closing) {
+            throw new IllegalStateException("World audit persistence is closed");
+        }
+        if (quiesced || quiescing || quiesceFailed || persistenceFailure != null) {
+            throw new IllegalStateException("World audit persistence is quiesced");
+        }
+    }
+
+    private void ensureNotClosed() {
+        if (closed) {
+            throw new IllegalStateException("World audit persistence is closed");
+        }
+    }
+
+    private boolean hasPendingOperation(String operationId) {
+        return pendingRecords.values().stream().anyMatch(lease -> operationId.equals(lease.operationId()));
+    }
+
+    private void awaitLeases() throws IOException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(LEASE_DRAIN_TIMEOUT_MILLIS);
+        while (!pendingRecords.isEmpty()) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0L) {
+                throw new IOException("World audit persistence could not drain admitted operations");
+            }
+            try {
+                long millis = Math.max(1L, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remaining));
+                persistenceMonitor.wait(Math.min(LEASE_DRAIN_TIMEOUT_MILLIS, millis));
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IOException("World audit persistence lease drain was interrupted", exception);
+            }
+        }
+    }
+
+    private void awaitSnapshotLeases() {
+        if (!quiescing && !quiesceFailed && !closing) {
+            return;
+        }
+        try {
+            awaitLeases();
+            ensureHealthy();
+        } catch (IOException exception) {
+            throw new IllegalStateException("World audit snapshot is unavailable while persistence is not ready", exception);
+        }
+    }
+
+    private void ensureHealthy() throws IOException {
+        if (persistenceFailure != null) {
+            throw new IOException("World audit persistence is unavailable", persistenceFailure);
+        }
+        if (quiesceFailed) {
+            throw new IOException("World audit persistence lease drain failed");
+        }
+    }
+
+    private byte[] canonicalBytes(List<WorldOperationAuditRecord> records) throws IOException {
+        validateRecords(records);
+        List<Map<String, Object>> values = new ArrayList<>();
+        for (WorldOperationAuditRecord record : orderedRecords(records)) {
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("auditId", record.getAuditId());
+            value.put("operationId", record.getOperationId());
+            value.put("action", record.getAction());
+            value.put("actorClientId", record.getActorClientId());
+            value.put("targetWorld", record.getTargetWorld());
+            value.put("parameters", record.getParameters() == null ? Map.of() : new LinkedHashMap<>(record.getParameters()));
+            value.put("success", record.isSuccess());
+            value.put("message", record.getMessage());
+            value.put("failureReason", record.getFailureReason());
+            value.put("safetyBackupId", record.getSafetyBackupId());
+            value.put("backupAvailable", record.isBackupAvailable());
+            value.put("startedAt", record.getStartedAt());
+            value.put("finishedAt", record.getFinishedAt());
+            value.put("durationMillis", record.getDurationMillis());
+            values.add(value);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("kind", DOCUMENT_KIND);
+        body.put("version", DOCUMENT_VERSION);
+        body.put("records", values);
+        try {
+            body.put("contentHash", CanonicalHash.sha256(JsonValue.fromJava(body)));
+            return JsonValue.fromJava(body).canonicalBytes();
+        } catch (RuntimeException exception) {
+            throw new IOException("World audit document is not canonical JSON", exception);
+        }
+    }
+
+    private String contentHash(List<WorldOperationAuditRecord> records) throws IOException {
+        return contentHash(records, DOCUMENT_VERSION);
+    }
+
+    private String contentHash(List<WorldOperationAuditRecord> records, int version) throws IOException {
+        if (version <= 0) {
+            throw new IOException("World audit content hash version is invalid");
+        }
+        List<Map<String, Object>> values = new ArrayList<>();
+        for (WorldOperationAuditRecord record : orderedRecords(records)) {
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("auditId", record.getAuditId());
+            value.put("operationId", record.getOperationId());
+            value.put("action", record.getAction());
+            value.put("actorClientId", record.getActorClientId());
+            value.put("targetWorld", record.getTargetWorld());
+            value.put("parameters", record.getParameters() == null ? Map.of() : new LinkedHashMap<>(record.getParameters()));
+            value.put("success", record.isSuccess());
+            value.put("message", record.getMessage());
+            value.put("failureReason", record.getFailureReason());
+            value.put("safetyBackupId", record.getSafetyBackupId());
+            value.put("backupAvailable", record.isBackupAvailable());
+            value.put("startedAt", record.getStartedAt());
+            value.put("finishedAt", record.getFinishedAt());
+            value.put("durationMillis", record.getDurationMillis());
+            values.add(value);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("kind", DOCUMENT_KIND);
+        body.put("version", version);
+        body.put("records", values);
+        try {
+            return CanonicalHash.sha256(JsonValue.fromJava(body));
+        } catch (RuntimeException exception) {
+            throw new IOException("World audit content hash cannot be computed", exception);
+        }
+    }
+
+    private JsonElement parseStrictJson(byte[] bytes) throws IOException {
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString();
+        } catch (CharacterCodingException exception) {
+            throw new IOException("World audit file is not valid UTF-8", exception);
+        }
+        try {
+            JsonReader reader = new JsonReader(new StringReader(text));
+            reader.setLenient(false);
+            JsonElement value = readStrictValue(reader, new LegacyJsonBudget(), 1);
+            if (reader.peek() != JsonToken.END_DOCUMENT) {
+                throw new IOException("Trailing JSON content is not allowed");
+            }
+            return value;
+        } catch (IOException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new IOException("World audit JSON is malformed", exception);
+        }
+    }
+
+    private JsonElement readStrictValue(JsonReader reader, LegacyJsonBudget budget, int depth) throws IOException {
+        budget.requireDepth(depth);
+        return switch (reader.peek()) {
+            case BEGIN_OBJECT -> {
+                reader.beginObject();
+                JsonObject object = new JsonObject();
+                Set<String> fields = new HashSet<>();
+                while (reader.hasNext()) {
+                    budget.consumeCollectionEntry();
+                    String name = reader.nextName();
+                    if (!fields.add(name)) {
+                        throw new IOException("Duplicate JSON field: " + name);
+                    }
+                    object.add(name, readStrictValue(reader, budget, depth + 1));
+                }
+                reader.endObject();
+                yield object;
+            }
+            case BEGIN_ARRAY -> {
+                reader.beginArray();
+                JsonArray array = new JsonArray();
+                while (reader.hasNext()) {
+                    budget.consumeCollectionEntry();
+                    array.add(readStrictValue(reader, budget, depth + 1));
+                }
+                reader.endArray();
+                yield array;
+            }
+            case STRING -> new JsonPrimitive(reader.nextString());
+            case BOOLEAN -> new JsonPrimitive(reader.nextBoolean());
+            case NULL -> {
+                reader.nextNull();
+                yield com.google.gson.JsonNull.INSTANCE;
+            }
+            case NUMBER -> {
+                String raw = reader.nextString();
+                BigDecimal number = new BigDecimal(raw);
+                if (!raw.equals(JsonValue.of(number).canonicalText())) {
+                    throw new IOException("Noncanonical JSON number is not allowed: " + raw);
+                }
+                yield new JsonPrimitive(number);
+            }
+            default -> throw new IOException("JSON value is required");
+        };
+    }
+
+    private byte[] readBoundedFile(Path file) throws IOException {
+        long size = Files.size(file);
+        if (size > MAXIMUM_AUDIT_FILE_BYTES) {
+            throw new IOException("World audit file exceeds the maximum byte budget: " + file);
+        }
+        try (InputStream input = Files.newInputStream(file)) {
+            byte[] bytes = input.readNBytes(MAXIMUM_AUDIT_FILE_BYTES + 1);
+            if (bytes.length > MAXIMUM_AUDIT_FILE_BYTES) {
+                throw new IOException("World audit file exceeds the maximum byte budget: " + file);
+            }
+            return bytes;
+        }
+    }
+
+    private void requireFields(Map<String, JsonValue> fields, Set<String> expected, String label) throws IOException {
+        if (!fields.keySet().equals(expected)) {
+            Set<String> unknown = new HashSet<>(fields.keySet());
+            unknown.removeAll(expected);
+            Set<String> missing = new HashSet<>(expected);
+            missing.removeAll(fields.keySet());
+            throw new IOException(label + " fields are invalid; unknown=" + unknown + ", missing=" + missing);
+        }
+    }
+
+    private void requireLegacyFields(JsonObject object, Set<String> known, String label) throws IOException {
+        for (String field : object.keySet()) {
+            if (!known.contains(field)) {
+                throw new IOException(label + " has an unknown field: " + field);
+            }
+        }
+    }
+
+    private JsonValue requiredField(JsonValue.JsonObject object, String name) throws IOException {
+        JsonValue value = object.value(name);
+        if (value == null) {
+            throw new IOException("Required world audit field is missing: " + name);
+        }
+        return value;
+    }
+
+    private String requiredString(JsonValue.JsonObject object, String name) throws IOException {
+        JsonValue value = requiredField(object, name);
+        if (!(value instanceof JsonValue.JsonString string)) {
+            throw new IOException("World audit field must be a string: " + name);
+        }
+        return string.value();
+    }
+
+    private String nullableString(JsonValue.JsonObject object, String name) throws IOException {
+        JsonValue value = requiredField(object, name);
+        if (value instanceof JsonValue.JsonNull) {
+            return null;
+        }
+        if (!(value instanceof JsonValue.JsonString string)) {
+            throw new IOException("World audit field must be a string or null: " + name);
+        }
+        return string.value();
+    }
+
+    private boolean requiredBoolean(JsonValue.JsonObject object, String name) throws IOException {
+        JsonValue value = requiredField(object, name);
+        if (!(value instanceof JsonValue.JsonBoolean booleanValue)) {
+            throw new IOException("World audit field must be a boolean: " + name);
+        }
+        return booleanValue.value();
+    }
+
+    private long requiredLong(JsonValue.JsonObject object, String name) throws IOException {
+        JsonValue value = requiredField(object, name);
+        if (!(value instanceof JsonValue.JsonNumber number)) {
+            throw new IOException("World audit field must be an integer: " + name);
+        }
+        return exactLong(number.value(), name);
+    }
+
+    private String legacyRequiredString(JsonObject object, String name) throws IOException {
+        String value = legacyNullableString(object, name);
+        if (value == null || value.isBlank()) {
+            throw new IOException("Required world audit field is missing: " + name);
+        }
+        return value;
+    }
+
+    private String legacyNullableString(JsonObject object, String name) throws IOException {
+        JsonElement value = object.get(name);
+        if (value == null || value.isJsonNull()) {
+            return null;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+            throw new IOException("World audit field must be a string or null: " + name);
+        }
+        return value.getAsString();
+    }
+
+    private boolean legacyBoolean(JsonObject object, String name, boolean defaultValue) throws IOException {
+        JsonElement value = object.get(name);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw new IOException("World audit field must be a boolean: " + name);
+        }
+        return value.getAsBoolean();
+    }
+
+    private long legacyRequiredLong(JsonObject object, String name) throws IOException {
+        JsonElement value = object.get(name);
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new IOException("World audit field must be an integer: " + name);
+        }
+        try {
+            return exactLong(value.getAsBigDecimal(), name);
+        } catch (NumberFormatException exception) {
+            throw new IOException("World audit field must be an integer: " + name, exception);
+        }
+    }
+
+    private Map<String, Object> legacyParameters(JsonObject object) throws IOException {
+        JsonElement value = object.get("parameters");
+        if (value == null || value.isJsonNull()) {
+            return new LinkedHashMap<>();
+        }
+        if (!value.isJsonObject()) {
+            throw new IOException("World audit parameters must be an object");
+        }
+        Object converted = jsonToJava(value);
+        if (!(converted instanceof Map<?, ?> map)) {
+            throw new IOException("World audit parameters are malformed");
+        }
+        return copyParameterMap(map);
+    }
+
+    private Object jsonToJava(JsonElement value) throws IOException {
+        if (value == null || value.isJsonNull()) {
+            return null;
+        }
+        if (value.isJsonObject()) {
+            Map<String, Object> object = new LinkedHashMap<>();
+            for (Map.Entry<String, JsonElement> entry : value.getAsJsonObject().entrySet()) {
+                object.put(entry.getKey(), jsonToJava(entry.getValue()));
+            }
+            return object;
+        }
+        if (value.isJsonArray()) {
+            List<Object> array = new ArrayList<>();
+            for (JsonElement item : value.getAsJsonArray()) {
+                array.add(jsonToJava(item));
+            }
+            return array;
+        }
+        JsonPrimitive primitive = value.getAsJsonPrimitive();
+        if (primitive.isBoolean()) {
+            return primitive.getAsBoolean();
+        }
+        if (primitive.isString()) {
+            return primitive.getAsString();
+        }
+        if (primitive.isNumber()) {
+            return primitive.getAsBigDecimal();
+        }
+        throw new IOException("Unsupported world audit JSON value");
+    }
+
+    private Map<String, Object> copyParameterMap(Map<?, ?> source) throws IOException {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            if (!(entry.getKey() instanceof String key)) {
+                throw new IOException("World audit parameter keys must be strings");
+            }
+            copy.put(key, copyParameterValue(entry.getValue()));
+        }
+        return copy;
+    }
+
+    private Object copyParameterValue(Object value) throws IOException {
+        if (value == null || value instanceof String || value instanceof Boolean || value instanceof Number) {
+            return value;
+        }
+        if (value instanceof Map<?, ?> map) {
+            return copyParameterMap(map);
+        }
+        if (value instanceof Iterable<?> iterable) {
+            List<Object> copy = new ArrayList<>();
+            for (Object item : iterable) {
+                copy.add(copyParameterValue(item));
+            }
+            return copy;
+        }
+        throw new IOException("World audit parameter value is not JSON-compatible");
+    }
+
+    private long exactLong(BigDecimal value, String name) throws IOException {
+        if (value.scale() > 0) {
+            throw new IOException("World audit field must be an integer: " + name);
+        }
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException exception) {
+            throw new IOException("World audit integer is out of range: " + name, exception);
+        }
+    }
+
+    private void requireText(String value, String name) {
+        if (value == null || value.isBlank() || !value.equals(value.strip())) {
+            throw new IllegalArgumentException("World audit " + name + " must be nonblank canonical text");
+        }
+    }
+
+    private void requireNullableText(String value, String name) throws IOException {
+        if (value != null && (value.isBlank() || !value.equals(value.strip()))) {
+            throw new IOException("World audit " + name + " must be canonical text");
+        }
+    }
+
+    private String failureMessage(Throwable failure) {
+        if (failure == null) {
+            return "Operation failed";
+        }
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+    }
+
+    private String failureMessage(String message) {
+        return message == null || message.isBlank() ? "Operation failed" : message;
+    }
+
+    private List<WorldOperationAuditRecord> orderedRecords(List<WorldOperationAuditRecord> records) {
+        return copyRecords(records).stream().sorted(recordComparator()).toList();
+    }
+
+    private Comparator<WorldOperationAuditRecord> recordComparator() {
+        return Comparator.comparingLong(WorldOperationAuditRecord::getStartedAt).reversed()
+            .thenComparing(WorldOperationAuditRecord::getAuditId, CanonicalJson::compareCodePoints);
+    }
+
+    private record DecodedRecords(List<WorldOperationAuditRecord> records, boolean legacy, long sourceVersion) {
+    }
+
+    private Path requireParent(Path file) throws IOException {
+        Path parent = file.getParent();
+        if (parent == null) {
+            throw new IOException("World audit file has no parent: " + file);
+        }
+        return parent;
+    }
+
+    private List<WorldOperationAuditRecord> copyRecords(List<WorldOperationAuditRecord> source) {
+        List<WorldOperationAuditRecord> copy = new ArrayList<>();
+        if (source != null) {
+            for (WorldOperationAuditRecord record : source) {
+                copy.add(copyRecord(record));
+            }
+        }
+        return copy;
+    }
+
+    private WorldOperationAuditRecord copyRecord(WorldOperationAuditRecord source) {
+        WorldOperationAuditRecord copy = new WorldOperationAuditRecord();
+        if (source == null) {
+            return copy;
+        }
+        copy.setAuditId(source.getAuditId());
+        copy.setOperationId(source.getOperationId());
+        copy.setAction(source.getAction());
+        copy.setActorClientId(source.getActorClientId());
+        copy.setTargetWorld(source.getTargetWorld());
+        try {
+            copy.setParameters(source.getParameters() == null ? Map.of() : copyParameterMap(source.getParameters()));
+        } catch (IOException exception) {
+            throw new IllegalStateException("World audit parameters are not JSON-compatible", exception);
+        }
+        copy.setSuccess(source.isSuccess());
+        copy.setMessage(source.getMessage());
+        copy.setFailureReason(source.getFailureReason());
+        copy.setSafetyBackupId(source.getSafetyBackupId());
+        copy.setBackupAvailable(source.isBackupAvailable());
+        copy.setStartedAt(source.getStartedAt());
+        copy.setFinishedAt(source.getFinishedAt());
+        copy.setDurationMillis(source.getDurationMillis());
+        return copy;
+    }
+
+    private WorldOperationResult copyResult(WorldOperationResult source) {
+        WorldOperationResult copy = new WorldOperationResult();
+        copy.setSuccess(source.isSuccess());
+        copy.setAction(source.getAction());
+        copy.setMessage(source.getMessage());
+        copy.setWorldName(source.getWorldName());
+        copy.setOperationId(source.getOperationId());
+        copy.setActorClientId(source.getActorClientId());
+        copy.setStartedAt(source.getStartedAt());
+        copy.setFinishedAt(source.getFinishedAt());
+        copy.setSafetyBackupId(source.getSafetyBackupId());
+        copy.setAuditId(source.getAuditId());
+        copy.setStatus(source.getStatus());
+        copy.setRequiresConfirmation(source.isRequiresConfirmation());
+        copy.setData(source.getData() == null ? Map.of() : new LinkedHashMap<>(source.getData()));
+        return copy;
     }
 
     private boolean safeEquals(String left, String right) {
         return left == null ? right == null : left.equalsIgnoreCase(right);
+    }
+
+    private record ActiveBinding(Path file, long generation) {
+        private ActiveBinding {
+            file = MigrationPaths.requirePath(file, "auditFile");
+            if (generation < 0L) {
+                throw new IllegalArgumentException("World audit generation must not be negative");
+            }
+        }
+    }
+
+    private record PendingLease(long generation, String auditId, String operationId, String action,
+                                String actorClientId, String targetWorld, Map<String, Object> parameters,
+                                long startedAt) {
+        private PendingLease {
+            parameters = new LinkedHashMap<>(parameters == null ? Map.of() : parameters);
+        }
+    }
+
+    private static final class LegacyJsonBudget {
+        private long collectionEntries;
+
+        private void requireDepth(int depth) throws IOException {
+            if (depth > MAXIMUM_LEGACY_JSON_DEPTH) {
+                throw new IOException("World audit legacy JSON exceeds the maximum nesting depth");
+            }
+        }
+
+        private void consumeCollectionEntry() throws IOException {
+            if (++collectionEntries > MAXIMUM_LEGACY_COLLECTION_ENTRIES) {
+                throw new IOException("World audit legacy JSON exceeds the maximum collection budget");
+            }
+        }
     }
 
     private record ConfirmationToken(String token, String action, String worldName, String actorClientId, long expiresAt) {

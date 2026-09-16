@@ -1,10 +1,12 @@
 package restudio.resync.worldgen.registry;
 
 import restudio.resync.ReSync;
+import restudio.resync.api.OptionCatalogCapture;
 import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.server.OptionCatalogCaptureExecutor;
 import restudio.resync.structure.StructureLibrary;
 import restudio.resync.structure.StructureSummary;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
@@ -13,25 +15,67 @@ import restudio.resync.worldgen.datapack.WorldGenVanillaCatalog;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 public final class WorldGenOptionCatalogs {
+    private static final List<String> SOURCES = List.of(
+        "worldgen:blocks",
+        "worldgen:biomes",
+        "worldgen:entity_types",
+        "worldgen:structures",
+        "worldgen:tree_features",
+        "worldgen:features"
+    );
+
     private WorldGenOptionCatalogs() {
     }
 
     public static void register(OptionCatalogRegistry registry) {
-        registry.register(provider("worldgen:blocks", WorldGenVanillaCatalog::blocks));
-        registry.register(provider("worldgen:biomes", WorldGenVanillaCatalog::biomes));
-        registry.register(provider("worldgen:entity_types", WorldGenVanillaCatalog::entities));
-        registry.register(provider("worldgen:structures", WorldGenOptionCatalogs::structures));
-        registry.register(provider("worldgen:tree_features", WorldGenVanillaCatalog::treeTypes));
-        registry.register(provider("worldgen:features", WorldGenVanillaCatalog::placedFeatures));
+        registry.register(provider("worldgen:blocks", WorldGenVanillaCatalog::blocks, false));
+        registry.register(provider("worldgen:biomes", WorldGenVanillaCatalog::biomes, false));
+        registry.register(provider("worldgen:entity_types", WorldGenVanillaCatalog::entities, false));
+        registry.register(provider("worldgen:structures", WorldGenVanillaCatalog::structures, true));
+        registry.register(provider("worldgen:tree_features", WorldGenVanillaCatalog::treeTypes, false));
+        registry.register(provider("worldgen:features", WorldGenVanillaCatalog::placedFeatures, false));
     }
 
-    private static OptionCatalogProvider provider(String sourceId, Function<WorldGenVanillaCatalog, List<String>> values) {
-        return new OptionCatalogProvider() {
+    public static CompletionStage<Void> prewarm(OptionCatalogRegistry registry, OptionCatalogCaptureExecutor executor) {
+        Objects.requireNonNull(registry, "Option catalog registry is required");
+        Objects.requireNonNull(executor, "Option catalog capture executor is required");
+        CompletionStage<Void> completion = CompletableFuture.completedFuture(null);
+        for (WorldGenTargetVersion target : WorldGenTargetVersion.values()) {
+            for (String sourceId : SOURCES) {
+                completion = completion.thenCompose(unused -> {
+                    OptionCatalogProvider provider = registry.provider(sourceId);
+                    if (!(provider instanceof WorldGenCatalogProvider)) {
+                        return CompletableFuture.failedFuture(new IllegalStateException(
+                            "WorldGen option catalog is not the registered provider: " + sourceId));
+                    }
+                    OptionCatalogQuery query = new OptionCatalogQuery(provider.sourceId(),
+                        Map.of(WorldGenTargetVersion.OPTION_CONTEXT_KEY, target.id()));
+                    return executor.captureAsync(provider, query).thenApply(capture -> {
+                        if (registry.provider(sourceId) != provider) {
+                            throw new IllegalStateException("WorldGen option catalog changed during prewarm: " + sourceId);
+                        }
+                        return (Void) null;
+                    });
+                });
+            }
+        }
+        return completion;
+    }
+
+    private static WorldGenCatalogProvider provider(String sourceId, Function<WorldGenVanillaCatalog, List<String>> values,
+                                                    boolean includesCustomStructures) {
+        return new WorldGenCatalogProvider() {
+            private final Map<WorldGenTargetVersion, PreparedCatalog> prepared = new ConcurrentHashMap<>();
+
             @Override
             public String sourceId() {
                 return sourceId;
@@ -43,43 +87,111 @@ public final class WorldGenOptionCatalogs {
             }
 
             @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.IO;
+            }
+
+            @Override
+            public OptionCatalogCapture capture(OptionCatalogQuery query) {
+                WorldGenTargetVersion target = target(query);
+                WorldGenVanillaCatalog catalog = WorldGenVanillaCatalog.load(target);
+                List<String> vanillaValues = List.copyOf(values.apply(catalog));
+                List<OptionCatalogItem> vanillaItems = vanillaValues.stream()
+                    .map(value -> item(sourceId, value, target))
+                    .toList();
+                OptionCatalogCapture vanillaCapture = new OptionCatalogCapture(target.id() + ":" + catalog.serverSha1() + ":"
+                    + vanillaItems.size() + ":" + vanillaItems.hashCode(), vanillaItems, "available", "");
+                PreparedCatalog captured = new PreparedCatalog(catalog.serverSha1(), vanillaValues, vanillaCapture);
+                OptionCatalogCapture capture = capture(target, captured);
+                prepared.put(target, captured);
+                return capture;
+            }
+
+            private OptionCatalogCapture capture(WorldGenTargetVersion target, PreparedCatalog captured) {
+                if (!includesCustomStructures) {
+                    return captured.vanillaCapture();
+                }
+                List<String> customStructures = customStructures();
+                if (customStructures.isEmpty()) {
+                    return captured.vanillaCapture();
+                }
+                List<String> capturedValues = structures(captured.vanillaValues(), customStructures);
+                List<OptionCatalogItem> capturedItems = capturedValues.stream()
+                    .map(value -> item(sourceId, value, target))
+                    .toList();
+                OptionCatalogCapture capture = new OptionCatalogCapture(target.id() + ":" + captured.serverSha1() + ":"
+                    + capturedItems.size() + ":" + capturedItems.hashCode(), capturedItems, "available", "");
+                return capture;
+            }
+
+            @Override
+            public OptionCatalogCapture preparedCapture(OptionCatalogQuery query) {
+                WorldGenTargetVersion target = target(query);
+                PreparedCatalog captured = prepared.get(target);
+                if (captured == null) {
+                    return unavailable(target, "WorldGen option catalog has not been captured");
+                }
+                return capture(target, captured);
+            }
+
+            @Override
             public String revision() {
-                return revision(null);
+                return preparedCapture(null).revision();
             }
 
             @Override
             public String revision(OptionCatalogQuery query) {
-                WorldGenTargetVersion target = target(query);
-                return target.id() + ":" + WorldGenVanillaCatalog.load(target).serverSha1();
+                return preparedCapture(query).revision();
             }
 
             @Override
             public List<String> values() {
-                return values(null);
+                return preparedCapture(null).values();
             }
 
             @Override
             public List<String> values(OptionCatalogQuery query) {
-                return values.apply(WorldGenVanillaCatalog.load(target(query)));
+                return preparedCapture(query).values();
+            }
+
+            @Override
+            public List<OptionCatalogItem> items() {
+                return preparedCapture(null).items();
             }
 
             @Override
             public List<OptionCatalogItem> items(OptionCatalogQuery query) {
-                WorldGenTargetVersion target = target(query);
-                return values.apply(WorldGenVanillaCatalog.load(target)).stream()
-                    .map(value -> item(sourceId, value, target))
-                    .toList();
+                return preparedCapture(query).items();
+            }
+
+            private OptionCatalogCapture unavailable(WorldGenTargetVersion target, String diagnostic) {
+                return new OptionCatalogCapture(sourceId + ":" + target.id() + ":unavailable", List.of(), "unavailable", diagnostic);
             }
         };
+    }
+
+    private interface WorldGenCatalogProvider extends OptionCatalogRegistry.PreparedCaptureProvider {
     }
 
     private static WorldGenTargetVersion target(OptionCatalogQuery query) {
         return WorldGenTargetVersion.resolve(query != null ? query.text(WorldGenTargetVersion.OPTION_CONTEXT_KEY) : null);
     }
 
-    private static List<String> structures(WorldGenVanillaCatalog catalog) {
-        List<String> custom = ReSync.getInstance() == null ? List.of() : StructureLibrary.get(ReSync.getInstance()).list().stream().map(StructureSummary::id).toList();
-        return Stream.concat(catalog.structures().stream(), custom.stream()).distinct().sorted().toList();
+    private static List<String> customStructures() {
+        return ReSync.getInstance() == null ? List.of()
+            : StructureLibrary.get(ReSync.getInstance()).list().stream().map(StructureSummary::id).toList();
+    }
+
+    private static List<String> structures(List<String> vanilla, List<String> custom) {
+        return Stream.concat(vanilla.stream(), custom.stream()).distinct().sorted().toList();
+    }
+
+    private record PreparedCatalog(String serverSha1, List<String> vanillaValues, OptionCatalogCapture vanillaCapture) {
+        private PreparedCatalog {
+            serverSha1 = Objects.requireNonNull(serverSha1, "WorldGen server SHA-1 is required");
+            vanillaValues = List.copyOf(vanillaValues);
+            Objects.requireNonNull(vanillaCapture, "Prepared WorldGen vanilla capture is required");
+        }
     }
 
     private static OptionCatalogItem item(String source, String value, WorldGenTargetVersion target) {

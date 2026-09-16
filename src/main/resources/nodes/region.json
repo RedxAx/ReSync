@@ -1,0 +1,3930 @@
+[
+  {
+    "id": "region_paste",
+    "displayName": "Paste Region",
+    "description": "Paste a saved region clipboard into the active world.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_paste"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Paste Region."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_paste"
+    },
+    "legacyIds": [
+      "region.paste"
+    ],
+    "aliases": [
+      "region.paste"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Paste Region."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Paste Region.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the location used by Paste Region."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Paste Region."
+      }
+    ]
+  },
+  {
+    "id": "region_replace",
+    "displayName": "Replace Region",
+    "description": "Replace matching blocks inside a bounded world region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_replace"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Replace Region."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_replace"
+    },
+    "legacyIds": [
+      "region.replace"
+    ],
+    "aliases": [
+      "region.replace"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "old_material",
+          "target": "old_material"
+        },
+        {
+          "direction": "input",
+          "source": "new_material",
+          "target": "new_material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Replace Region."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Replace Region."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Replace Region."
+      },
+      {
+        "id": "old_material",
+        "displayName": "Old Material",
+        "name": "old_material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the old material used by Replace Region.",
+        "defaultValue": "",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      },
+      {
+        "id": "new_material",
+        "displayName": "New Material",
+        "name": "new_material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the new material used by Replace Region.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Replace Region."
+      }
+    ]
+  },
+  {
+    "id": "region_count_blocks",
+    "displayName": "Count Blocks",
+    "description": "Count blocks of one material inside a bounded world region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_count_blocks"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Count Blocks."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_count_blocks"
+    },
+    "legacyIds": [
+      "region.count.blocks"
+    ],
+    "aliases": [
+      "region.count.blocks"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "count",
+          "target": "count"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Count Blocks."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Count Blocks."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Count Blocks."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the material used by Count Blocks.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Count Blocks."
+      },
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the count produced by Count Blocks."
+      }
+    ]
+  },
+  {
+    "id": "region_outline",
+    "displayName": "Create Outline",
+    "description": "Fill the outside outline of a bounded world region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_outline"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Create Outline."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_outline"
+    },
+    "legacyIds": [
+      "region.outline"
+    ],
+    "aliases": [
+      "region.outline"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Create Outline."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Create Outline."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Create Outline."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the material used by Create Outline.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Create Outline."
+      }
+    ]
+  },
+  {
+    "id": "region_create",
+    "displayName": "Region Create",
+    "description": "Capture blocks from a bounded world region into a clipboard.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_create"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Create."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_create"
+    },
+    "legacyIds": [
+      "region.region_create"
+    ],
+    "aliases": [
+      "region.region_create"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Create."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Create."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Create."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Create.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Create."
+      }
+    ]
+  },
+  {
+    "id": "region_delete",
+    "displayName": "Region Delete",
+    "description": "Replace every block in a bounded region with air.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_delete"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Delete."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_delete"
+    },
+    "legacyIds": [
+      "region.region_delete"
+    ],
+    "aliases": [
+      "region.region_delete"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Delete."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Delete."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Delete."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Delete."
+      }
+    ]
+  },
+  {
+    "id": "region_contains",
+    "displayName": "Region Contains",
+    "description": "Check whether a location lies inside a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "region",
+      "region_contains"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Contains."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_contains"
+    },
+    "legacyIds": [
+      "region.region_contains"
+    ],
+    "aliases": [
+      "region.region_contains"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "contains",
+          "target": "contains"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Contains."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Contains."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the location used by Region Contains."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "contains",
+        "displayName": "Contains",
+        "name": "contains",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the contains produced by Region Contains."
+      }
+    ]
+  },
+  {
+    "id": "region_get_players",
+    "displayName": "Region Get Players",
+    "description": "Find players currently inside a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "region",
+      "region_get_players"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Get Players."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_players"
+    },
+    "legacyIds": [
+      "region.region_get_players"
+    ],
+    "aliases": [
+      "region.region_get_players"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "players",
+          "target": "players"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Get Players."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Get Players."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "players",
+        "displayName": "Players",
+        "name": "players",
+        "pinType": "DATA",
+        "dataType": "list<player>",
+        "description": "Returns the players produced by Region Get Players."
+      }
+    ]
+  },
+  {
+    "id": "region_get_entities",
+    "displayName": "Region Get Entities",
+    "description": "Find entities currently inside a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "region",
+      "region_get_entities"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Get Entities."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_entities"
+    },
+    "legacyIds": [
+      "region.region_get_entities"
+    ],
+    "aliases": [
+      "region.region_get_entities"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "entities",
+          "target": "entities"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Get Entities."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Get Entities."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "entities",
+        "displayName": "Entities",
+        "name": "entities",
+        "pinType": "DATA",
+        "dataType": "list<entity>",
+        "description": "Returns the entities produced by Region Get Entities."
+      }
+    ]
+  },
+  {
+    "id": "region_get_size",
+    "displayName": "Region Get Size",
+    "description": "Calculate the width, height, and depth of a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_get_size"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Get Size."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_size"
+    },
+    "legacyIds": [
+      "region.region_get_size"
+    ],
+    "aliases": [
+      "region.region_get_size"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "size_x",
+          "target": "size_x"
+        },
+        {
+          "direction": "output",
+          "source": "size_y",
+          "target": "size_y"
+        },
+        {
+          "direction": "output",
+          "source": "size_z",
+          "target": "size_z"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Get Size."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Get Size."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "size_x",
+        "displayName": "Size X",
+        "name": "size_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the size x produced by Region Get Size."
+      },
+      {
+        "id": "size_y",
+        "displayName": "Size Y",
+        "name": "size_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the size y produced by Region Get Size."
+      },
+      {
+        "id": "size_z",
+        "displayName": "Size Z",
+        "name": "size_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the size z produced by Region Get Size."
+      }
+    ]
+  },
+  {
+    "id": "region_expand",
+    "displayName": "Region Expand",
+    "description": "Expand region bounds by the requested number of blocks.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_expand"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Expand."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_expand"
+    },
+    "legacyIds": [
+      "region.region_expand"
+    ],
+    "aliases": [
+      "region.region_expand"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "min_location",
+          "target": "output_min_location"
+        },
+        {
+          "direction": "output",
+          "source": "max_location",
+          "target": "output_max_location"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Expand."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Expand."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the amount used by Region Expand.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the min location produced by Region Expand."
+      },
+      {
+        "id": "output_max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the max location produced by Region Expand."
+      }
+    ]
+  },
+  {
+    "id": "region_contract",
+    "displayName": "Region Contract",
+    "description": "Contract region bounds by the requested number of blocks.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_contract"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Contract."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_contract"
+    },
+    "legacyIds": [
+      "region.region_contract"
+    ],
+    "aliases": [
+      "region.region_contract"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "direction": "output",
+          "source": "min_location",
+          "target": "output_min_location"
+        },
+        {
+          "direction": "output",
+          "source": "max_location",
+          "target": "output_max_location"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Contract."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Contract."
+      },
+      {
+        "id": "amount",
+        "displayName": "Amount",
+        "name": "amount",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the amount used by Region Contract.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the min location produced by Region Contract."
+      },
+      {
+        "id": "output_max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the max location produced by Region Contract."
+      }
+    ]
+  },
+  {
+    "id": "region_shift",
+    "displayName": "Region Shift",
+    "description": "Move region bounds by independent X, Y, and Z offsets.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_shift"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Shift."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_shift"
+    },
+    "legacyIds": [
+      "region.region_shift"
+    ],
+    "aliases": [
+      "region.region_shift"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "shift_x",
+          "target": "shift_x"
+        },
+        {
+          "direction": "input",
+          "source": "shift_y",
+          "target": "shift_y"
+        },
+        {
+          "direction": "input",
+          "source": "shift_z",
+          "target": "shift_z"
+        },
+        {
+          "direction": "output",
+          "source": "min_location",
+          "target": "output_min_location"
+        },
+        {
+          "direction": "output",
+          "source": "max_location",
+          "target": "output_max_location"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Shift."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Shift."
+      },
+      {
+        "id": "shift_x",
+        "displayName": "Shift X",
+        "name": "shift_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift x used by Region Shift.",
+        "defaultValue": 0
+      },
+      {
+        "id": "shift_y",
+        "displayName": "Shift Y",
+        "name": "shift_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift y used by Region Shift.",
+        "defaultValue": 0
+      },
+      {
+        "id": "shift_z",
+        "displayName": "Shift Z",
+        "name": "shift_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift z used by Region Shift.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the min location produced by Region Shift."
+      },
+      {
+        "id": "output_max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the max location produced by Region Shift."
+      }
+    ]
+  },
+  {
+    "id": "region_clone",
+    "displayName": "Region Clone",
+    "description": "Copy one clipboard into a new clipboard ID.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_clone"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Clone."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_clone"
+    },
+    "legacyIds": [
+      "region.region_clone"
+    ],
+    "aliases": [
+      "region.region_clone"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "source_clipboard_id",
+          "target": "source_clipboard_id"
+        },
+        {
+          "direction": "input",
+          "source": "new_clipboard_id",
+          "target": "new_clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Clone."
+      },
+      {
+        "id": "source_clipboard_id",
+        "displayName": "Source Clipboard Id",
+        "name": "source_clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the source clipboard id used by Region Clone.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "new_clipboard_id",
+        "displayName": "New Clipboard Id",
+        "name": "new_clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the new clipboard id used by Region Clone.",
+        "defaultValue": "cloned"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Clone."
+      }
+    ]
+  },
+  {
+    "id": "region_intersect",
+    "displayName": "Region Intersect",
+    "description": "Calculate the intersection of two bounded regions.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_intersect"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Intersect."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_intersect"
+    },
+    "legacyIds": [
+      "region.region_intersect"
+    ],
+    "aliases": [
+      "region.region_intersect"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location_a",
+          "target": "min_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_a",
+          "target": "max_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "min_location_b",
+          "target": "min_location_b"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_b",
+          "target": "max_location_b"
+        },
+        {
+          "direction": "output",
+          "source": "has_intersection",
+          "target": "has_intersection"
+        },
+        {
+          "direction": "output",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "output",
+          "source": "max_location",
+          "target": "max_location"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location_a",
+        "displayName": "Min Location A",
+        "name": "min_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location a used by Region Intersect."
+      },
+      {
+        "id": "max_location_a",
+        "displayName": "Max Location A",
+        "name": "max_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location a used by Region Intersect."
+      },
+      {
+        "id": "min_location_b",
+        "displayName": "Min Location B",
+        "name": "min_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location b used by Region Intersect."
+      },
+      {
+        "id": "max_location_b",
+        "displayName": "Max Location B",
+        "name": "max_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location b used by Region Intersect."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "has_intersection",
+        "displayName": "Has Intersection",
+        "name": "has_intersection",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the has intersection produced by Region Intersect."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the min location produced by Region Intersect."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the max location produced by Region Intersect."
+      }
+    ]
+  },
+  {
+    "id": "region_union",
+    "displayName": "Region Union",
+    "description": "Calculate bounds covering two regions.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "world",
+      "region",
+      "region_union"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Union."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_union"
+    },
+    "legacyIds": [
+      "region.region_union"
+    ],
+    "aliases": [
+      "region.region_union"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location_a",
+          "target": "min_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_a",
+          "target": "max_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "min_location_b",
+          "target": "min_location_b"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_b",
+          "target": "max_location_b"
+        },
+        {
+          "direction": "output",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "output",
+          "source": "max_location",
+          "target": "max_location"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location_a",
+        "displayName": "Min Location A",
+        "name": "min_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location a used by Region Union."
+      },
+      {
+        "id": "max_location_a",
+        "displayName": "Max Location A",
+        "name": "max_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location a used by Region Union."
+      },
+      {
+        "id": "min_location_b",
+        "displayName": "Min Location B",
+        "name": "min_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location b used by Region Union."
+      },
+      {
+        "id": "max_location_b",
+        "displayName": "Max Location B",
+        "name": "max_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location b used by Region Union."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the min location produced by Region Union."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the max location produced by Region Union."
+      }
+    ]
+  },
+  {
+    "id": "region_difference",
+    "displayName": "Region Difference",
+    "description": "Return blocks in the first region that are outside the second region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "region",
+      "region_difference"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Difference."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_difference"
+    },
+    "legacyIds": [
+      "region.region_difference"
+    ],
+    "aliases": [
+      "region.region_difference"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location_a",
+          "target": "min_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_a",
+          "target": "max_location_a"
+        },
+        {
+          "direction": "input",
+          "source": "min_location_b",
+          "target": "min_location_b"
+        },
+        {
+          "direction": "input",
+          "source": "max_location_b",
+          "target": "max_location_b"
+        },
+        {
+          "direction": "output",
+          "source": "blocks_list",
+          "target": "blocks_list"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location_a",
+        "displayName": "Min Location A",
+        "name": "min_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location a used by Region Difference."
+      },
+      {
+        "id": "max_location_a",
+        "displayName": "Max Location A",
+        "name": "max_location_a",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location a used by Region Difference."
+      },
+      {
+        "id": "min_location_b",
+        "displayName": "Min Location B",
+        "name": "min_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location b used by Region Difference."
+      },
+      {
+        "id": "max_location_b",
+        "displayName": "Max Location B",
+        "name": "max_location_b",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location b used by Region Difference."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "blocks_list",
+        "displayName": "Blocks List",
+        "name": "blocks_list",
+        "pinType": "DATA",
+        "dataType": "list<block>",
+        "description": "Returns the blocks list produced by Region Difference."
+      }
+    ]
+  },
+  {
+    "id": "region_save",
+    "displayName": "Region Save",
+    "description": "Save a clipboard region as canonical JSON under the server data folder.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_save"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Save."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_save"
+    },
+    "legacyIds": [
+      "region.region_save"
+    ],
+    "aliases": [
+      "region.region_save"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "input",
+          "source": "file_path",
+          "target": "file_path"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Save."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Save.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "file_path",
+        "displayName": "File Path",
+        "name": "file_path",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the file path used by Region Save."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Save."
+      }
+    ]
+  },
+  {
+    "id": "region_load",
+    "displayName": "Region Load",
+    "description": "Load a canonical JSON clipboard from the server data folder.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_load"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Load."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_load"
+    },
+    "legacyIds": [
+      "region.region_load"
+    ],
+    "aliases": [
+      "region.region_load"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "file_path",
+          "target": "file_path"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Load."
+      },
+      {
+        "id": "file_path",
+        "displayName": "File Path",
+        "name": "file_path",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the file path used by Region Load."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+      "dataType": "string",
+      "description": "Provides the clipboard id used by Region Load.",
+      "defaultValue": "loaded"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Load."
+      }
+    ]
+  },
+  {
+    "id": "region_set_blocks",
+    "displayName": "Region Set Blocks",
+    "description": "Fill every block in a bounded region with one material.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_set_blocks"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Set Blocks."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_set_blocks"
+    },
+    "legacyIds": [
+      "region.region_set_blocks"
+    ],
+    "aliases": [
+      "region.region_set_blocks"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Set Blocks."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Set Blocks."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Set Blocks."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the material used by Region Set Blocks.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Set Blocks."
+      }
+    ]
+  },
+  {
+    "id": "region_get_blocks",
+    "displayName": "Region Get Blocks",
+    "description": "Return every block in a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "region",
+      "region_get_blocks"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Get Blocks."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_get_blocks"
+    },
+    "legacyIds": [
+      "region.region_get_blocks"
+    ],
+    "aliases": [
+      "region.region_get_blocks"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "blocks_list",
+          "target": "blocks_list"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Get Blocks."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Get Blocks."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "blocks_list",
+        "displayName": "Blocks List",
+        "name": "blocks_list",
+        "pinType": "DATA",
+        "dataType": "list<block>",
+        "description": "Returns the blocks list produced by Region Get Blocks."
+      }
+    ]
+  },
+  {
+    "id": "region_mirror_x",
+    "displayName": "Region Mirror X",
+    "description": "Mirror a clipboard across its X axis.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_mirror_x"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Mirror X."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_x"
+    },
+    "legacyIds": [
+      "region.region_mirror_x"
+    ],
+    "aliases": [
+      "region.region_mirror_x"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Mirror X."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Mirror X.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Mirror X."
+      }
+    ]
+  },
+  {
+    "id": "region_mirror_y",
+    "displayName": "Region Mirror Y",
+    "description": "Mirror a clipboard across its Y axis.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_mirror_y"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Mirror Y."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_y"
+    },
+    "legacyIds": [
+      "region.region_mirror_y"
+    ],
+    "aliases": [
+      "region.region_mirror_y"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Mirror Y."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Mirror Y.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Mirror Y."
+      }
+    ]
+  },
+  {
+    "id": "region_mirror_z",
+    "displayName": "Region Mirror Z",
+    "description": "Mirror a clipboard across its Z axis.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_mirror_z"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Mirror Z."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror_z"
+    },
+    "legacyIds": [
+      "region.region_mirror_z"
+    ],
+    "aliases": [
+      "region.region_mirror_z"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Mirror Z."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Mirror Z.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Mirror Z."
+      }
+    ]
+  },
+  {
+    "id": "region_rotate_90",
+    "displayName": "Region Rotate 90",
+    "description": "Rotate a clipboard 90 degrees.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_rotate_90"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Rotate 90."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate_90"
+    },
+    "legacyIds": [
+      "region.region_rotate_90"
+    ],
+    "aliases": [
+      "region.region_rotate_90"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Rotate 90."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Rotate 90.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Rotate 90."
+      }
+    ]
+  },
+  {
+    "id": "region_rotate_180",
+    "displayName": "Region Rotate 180",
+    "description": "Rotate a clipboard 180 degrees.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_rotate_180"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Rotate 180."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate_180"
+    },
+    "legacyIds": [
+      "region.region_rotate_180"
+    ],
+    "aliases": [
+      "region.region_rotate_180"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Rotate 180."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Rotate 180.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Rotate 180."
+      }
+    ]
+  },
+  {
+    "id": "region_move",
+    "displayName": "Region Move",
+    "description": "Move blocks in a bounded region by independent offsets.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_move"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Move."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_move"
+    },
+    "legacyIds": [
+      "region.region_move"
+    ],
+    "aliases": [
+      "region.region_move"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "shift_x",
+          "target": "shift_x"
+        },
+        {
+          "direction": "input",
+          "source": "shift_y",
+          "target": "shift_y"
+        },
+        {
+          "direction": "input",
+          "source": "shift_z",
+          "target": "shift_z"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Move."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Move."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Move."
+      },
+      {
+        "id": "shift_x",
+        "displayName": "Shift X",
+        "name": "shift_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift x used by Region Move.",
+        "defaultValue": 0
+      },
+      {
+        "id": "shift_y",
+        "displayName": "Shift Y",
+        "name": "shift_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift y used by Region Move.",
+        "defaultValue": 0
+      },
+      {
+        "id": "shift_z",
+        "displayName": "Shift Z",
+        "name": "shift_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the shift z used by Region Move.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Move."
+      }
+    ]
+  },
+  {
+    "id": "region_stack",
+    "displayName": "Region Stack",
+    "description": "Paste a clipboard repeatedly along a direction vector.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_stack"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Stack."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_stack"
+    },
+    "legacyIds": [
+      "region.region_stack"
+    ],
+    "aliases": [
+      "region.region_stack"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "count",
+          "target": "count"
+        },
+        {
+          "direction": "input",
+          "source": "direction_x",
+          "target": "direction_x"
+        },
+        {
+          "direction": "input",
+          "source": "direction_y",
+          "target": "direction_y"
+        },
+        {
+          "direction": "input",
+          "source": "direction_z",
+          "target": "direction_z"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Stack."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Stack.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the location used by Region Stack."
+      },
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the count used by Region Stack.",
+        "defaultValue": 1
+      },
+      {
+        "id": "direction_x",
+        "displayName": "Direction X",
+        "name": "direction_x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the direction x used by Region Stack.",
+        "defaultValue": 1
+      },
+      {
+        "id": "direction_y",
+        "displayName": "Direction Y",
+        "name": "direction_y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the direction y used by Region Stack.",
+        "defaultValue": 0
+      },
+      {
+        "id": "direction_z",
+        "displayName": "Direction Z",
+        "name": "direction_z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the direction z used by Region Stack.",
+        "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Stack."
+      }
+    ]
+  },
+  {
+    "id": "region_copy",
+    "displayName": "Region Copy",
+    "description": "Copy a bounded world region into a clipboard.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_copy"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Copy."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_copy"
+    },
+    "legacyIds": [
+      "region.copy"
+    ],
+    "aliases": [
+      "region.copy"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Copy."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Copy."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Copy."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Copy.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Copy."
+      }
+    ]
+  },
+  {
+    "id": "region_cut",
+    "displayName": "Region Cut",
+    "description": "Copy a bounded world region and replace it with air.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_cut"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Cut."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_cut"
+    },
+    "legacyIds": [
+      "region.cut"
+    ],
+    "aliases": [
+      "region.cut"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Cut."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Cut."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Cut."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Cut.",
+        "defaultValue": "default"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Cut."
+      }
+    ]
+  },
+  {
+    "id": "region_rotate",
+    "displayName": "Region Rotate",
+    "description": "Rotate a clipboard by 90, 180, or 270 degrees.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_rotate"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Rotate."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_rotate"
+    },
+    "legacyIds": [
+      "region.rotate"
+    ],
+    "aliases": [
+      "region.rotate"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "angle",
+          "target": "degrees"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the rotation operation."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard ID",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Selects the clipboard to rotate.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "degrees",
+        "displayName": "Degrees",
+        "name": "angle",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Sets the clockwise rotation in degrees.",
+        "defaultValue": 90,
+        "widget": "DROPDOWN",
+        "options": [
+          90,
+          180,
+          270
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Rotate."
+      }
+    ]
+  },
+  {
+    "id": "region_mirror",
+    "displayName": "Region Mirror",
+    "description": "Mirror a clipboard across its X, Y, or Z axis.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_mirror"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Mirror."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_mirror"
+    },
+    "legacyIds": [
+      "region.mirror"
+    ],
+    "aliases": [
+      "region.mirror"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "axis",
+          "target": "axis"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the mirror operation."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard ID",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Selects the clipboard to mirror.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "axis",
+        "displayName": "Axis",
+        "name": "axis",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Selects the axis to mirror.",
+        "defaultValue": "x",
+        "widget": "DROPDOWN",
+        "options": [
+          "x",
+          "y",
+          "z"
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Mirror."
+      }
+    ]
+  },
+  {
+    "id": "region_clear",
+    "displayName": "Region Clear",
+    "description": "Clear every block in a bounded region by setting it to air.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action.region-delete.region-clear",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_delete"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Clear."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_delete"
+    },
+    "legacyIds": [
+      "region.clear"
+    ],
+    "aliases": [
+      "region.clear"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Clear."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Clear."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Clear."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Clear."
+      }
+    ]
+  },
+  {
+    "id": "region_distribute",
+    "displayName": "Region Distribute",
+    "description": "Paste a clipboard repeatedly from a location using configured spacing.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_distribute"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Distribute."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_distribute"
+    },
+    "legacyIds": [
+      "region.distribute"
+    ],
+    "aliases": [
+      "region.distribute"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "count",
+          "target": "count"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Distribute."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Region Distribute.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the location used by Region Distribute."
+      },
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Provides the count used by Region Distribute.",
+        "defaultValue": 1
+      },
+      {
+        "id": "spacing_x",
+        "displayName": "Spacing X",
+        "name": "spacing_x",
+        "pinType": "DATA",
+      "dataType": "number",
+      "description": "Provides the spacing x used by Region Distribute.",
+      "defaultValue": 0
+      },
+      {
+        "id": "spacing_y",
+        "displayName": "Spacing Y",
+        "name": "spacing_y",
+        "pinType": "DATA",
+      "dataType": "number",
+      "description": "Provides the spacing y used by Region Distribute.",
+      "defaultValue": 0
+      },
+      {
+        "id": "spacing_z",
+        "displayName": "Spacing Z",
+        "name": "spacing_z",
+        "pinType": "DATA",
+      "dataType": "number",
+      "description": "Provides the spacing z used by Region Distribute.",
+      "defaultValue": 0
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Distribute."
+      }
+    ]
+  },
+  {
+    "id": "region_walls",
+    "displayName": "Region Walls",
+    "description": "Build the vertical perimeter walls of a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_walls"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Walls."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_walls"
+    },
+    "legacyIds": [
+      "region.walls"
+    ],
+    "aliases": [
+      "region.walls"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Walls."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Walls."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Walls."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the material used by Region Walls.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Walls."
+      }
+    ]
+  },
+  {
+    "id": "region_hollow",
+    "displayName": "Region Hollow",
+    "description": "Build the complete outer shell of a bounded region.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_hollow"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Region Hollow."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_hollow"
+    },
+    "legacyIds": [
+      "region.hollow"
+    ],
+    "aliases": [
+      "region.hollow"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Region Hollow."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Region Hollow."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Region Hollow."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "dataType": "material",
+        "description": "Provides the material used by Region Hollow.",
+        "defaultValue": "STONE",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Region Hollow."
+      }
+    ]
+  },
+  {
+    "id": "region_set_air",
+    "displayName": "Set Region To Air",
+    "description": "Replace every block in a bounded region with air.",
+    "domain": "world",
+    "family": "region",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "region",
+      "region_set_air"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Set Region To Air."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "region_set_air"
+    },
+    "legacyIds": [
+      "region.set.air"
+    ],
+    "aliases": [
+      "region.set.air"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "min_location",
+          "target": "min_location"
+        },
+        {
+          "direction": "input",
+          "source": "max_location",
+          "target": "max_location"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Set Region to Air."
+      },
+      {
+        "id": "min_location",
+        "displayName": "Min Location",
+        "name": "min_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the min location used by Set Region to Air."
+      },
+      {
+        "id": "max_location",
+        "displayName": "Max Location",
+        "name": "max_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the max location used by Set Region to Air."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Set Region To Air."
+      }
+    ]
+  }
+]

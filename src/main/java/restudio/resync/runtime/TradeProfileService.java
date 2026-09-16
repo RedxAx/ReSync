@@ -22,7 +22,9 @@ import org.bukkit.inventory.MerchantRecipe;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,10 +35,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class TradeProfileService implements Listener {
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
     private final ReSyncJsonResourceStorage storage;
     private final CustomContentService customContentService;
     private final RuntimeFlowDispatcher dispatcher;
     private final JavaPlugin plugin;
+    private final LegacyRuntimeActivationGate legacyRuntimeGate;
     private final Map<UUID, TradeSession> openedProfiles = new ConcurrentHashMap<>();
     private final Map<UUID, String> appliedProfiles = new ConcurrentHashMap<>();
 
@@ -49,10 +53,16 @@ public class TradeProfileService implements Listener {
     }
 
     public TradeProfileService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher, JavaPlugin plugin) {
+        this(storage, customContentService, dispatcher, plugin, null);
+    }
+
+    public TradeProfileService(ReSyncJsonResourceStorage storage, CustomContentService customContentService, RuntimeFlowDispatcher dispatcher,
+                               JavaPlugin plugin, LegacyRuntimeActivationGate legacyRuntimeGate) {
         this.storage = storage;
         this.customContentService = customContentService;
         this.dispatcher = dispatcher;
         this.plugin = plugin;
+        this.legacyRuntimeGate = legacyRuntimeGate;
     }
 
     public JsonObject get(String id) {
@@ -373,19 +383,21 @@ public class TradeProfileService implements Listener {
     }
 
     private void giveTradeResult(Player player, ItemStack cursor, ItemStack result) {
-        if (cursor == null || cursor.getType().isAir()) {
-            player.setItemOnCursor(result);
-            return;
-        }
-        if (cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize()) {
-            cursor.setAmount(cursor.getAmount() + result.getAmount());
-            player.setItemOnCursor(cursor);
-            return;
-        }
-        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
-        for (ItemStack leftover : leftovers.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
+        playerDataAdmission.mutatePlayer("trade-result:" + player.getUniqueId(), player, () -> {
+            if (cursor == null || cursor.getType().isAir()) {
+                player.setItemOnCursor(result);
+                return;
+            }
+            if (cursor.isSimilar(result) && cursor.getAmount() + result.getAmount() <= cursor.getMaxStackSize()) {
+                cursor.setAmount(cursor.getAmount() + result.getAmount());
+                player.setItemOnCursor(cursor);
+                return;
+            }
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(result);
+            for (ItemStack leftover : leftovers.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        });
     }
 
     protected ItemStack createReferencedItem(String reference, int amount) {
@@ -419,10 +431,26 @@ public class TradeProfileService implements Listener {
             dispatcher.dispatchFunction(hooks.getAsJsonObject(hook), player, event, variables);
             return;
         }
+        if (!legacyAllowed()) {
+            if (hooks.has(hook) || hooks.has(hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook)) {
+                recordBlockedLegacyHook(profileId, hook);
+            }
+            return;
+        }
         String legacyHook = hook.endsWith("Action") ? hook.substring(0, hook.length() - "Action".length()) + "Flow" : hook;
         String flowId = text(hooks, legacyHook);
         if (!flowId.isBlank()) {
             dispatcher.dispatch(flowId, player, event, variables);
+        }
+    }
+
+    private boolean legacyAllowed() {
+        return legacyRuntimeGate == null || legacyRuntimeGate.allowsLegacyRuntime();
+    }
+
+    private void recordBlockedLegacyHook(String profileId, String hook) {
+        if (legacyRuntimeGate != null) {
+            legacyRuntimeGate.recordBlocked("Trade profile " + profileId + " " + hook + " legacy hook fallback");
         }
     }
 

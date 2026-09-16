@@ -1,19 +1,13 @@
 package restudio.resync.network;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import restudio.resync.contract.canonical.CanonicalDigests;
 
 public final class NetworkPayloads {
     private NetworkPayloads() {
     }
 
     public static String sha256(byte[] payload) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload == null ? new byte[0] : payload));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 Is Unavailable", exception);
-        }
+        return CanonicalDigests.hex(CanonicalDigests.sha256(payload == null ? new byte[0] : payload));
     }
 
     public static void requireLimit(byte[] payload, int maximumBytes) {

@@ -15,8 +15,6 @@ import restudio.resync.flow.registry.NodeDefinitionValidator;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,12 +56,7 @@ class NodeDefinitionRegistryIntegrityTest {
         new ReSyncRuntimeResourceHandler().registerTo(handlers);
         NodeDefinitionLoader loader = new NodeDefinitionLoader();
         loader.setValidator(new NodeDefinitionValidator(handlers, catalogs, true));
-        Path path = Path.of("src", "main", "resources", "nodes", "migrated", "resync_runtime_resources.json");
-
-        List<NodeDefinition> definitions;
-        try (InputStream input = Files.newInputStream(path)) {
-            definitions = loader.parse(input, path.toString());
-        }
+        List<NodeDefinition> definitions = loadReplacement(loader, "resync_runtime_resources.json");
         NodeDefinitionRegistry registry = new NodeDefinitionRegistry();
         loader.validateAndRegister(definitions, registry, handlers, "json-classpath");
 
@@ -85,12 +78,7 @@ class NodeDefinitionRegistryIntegrityTest {
         new TextResourceHandler(null).registerTo(handlers);
         NodeDefinitionLoader loader = new NodeDefinitionLoader();
         loader.setValidator(new NodeDefinitionValidator(handlers, catalogs, true));
-        Path path = Path.of("src", "main", "resources", "nodes", "migrated", "text_resources.json");
-
-        List<NodeDefinition> definitions;
-        try (InputStream input = Files.newInputStream(path)) {
-            definitions = loader.parse(input, path.toString());
-        }
+        List<NodeDefinition> definitions = loadReplacement(loader, "text_resources.json");
         NodeDefinitionRegistry registry = new NodeDefinitionRegistry();
         loader.validateAndRegister(definitions, registry, handlers, "json-classpath");
 
@@ -266,7 +254,7 @@ class NodeDefinitionRegistryIntegrityTest {
     @Test
     void customContentStartNodesDeclareFlowInputsWithoutDesignerConfiguration() {
         NodeDefinitionRegistry registry = new NodeDefinitionRegistry();
-        registry.registerAll("production", new NodeDefinitionLoader().loadFromClasspath("nodes"));
+        registry.registerAll("production", new NodeDefinitionLoader().loadReplacementFromClasspath("nodes"));
         Set<String> persistedFields = Set.of("content_id", "name", "material", "provider", "external_id", "custom_model_data", "components", "lore", "tags",
             "enabled", "priority", "cooldown_scope", "cooldown_ticks", "permission", "cancel_event", "consume_event", "require_sneaking",
             "require_on_ground", "allowed_worlds", "denied_worlds", "chance_percent", "max_activations_per_tick");
@@ -303,5 +291,18 @@ class NodeDefinitionRegistryIntegrityTest {
                 return List.of();
             }
         });
+    }
+
+    private List<NodeDefinition> loadReplacement(NodeDefinitionLoader loader, String fileName) throws Exception {
+        String resource = "nodes/" + fileName;
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = NodeDefinitionLoader.class.getClassLoader();
+        }
+        InputStream input = classLoader.getResourceAsStream(resource);
+        assertNotNull(input, resource);
+        try (input) {
+            return loader.parseReplacement(input, resource);
+        }
     }
 }

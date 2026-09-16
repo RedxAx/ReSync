@@ -4,13 +4,14 @@ import restudio.flow.data.FlowDataType;
 import restudio.resync.flow.contract.FlowCategoryMetadata;
 import restudio.resync.flow.contract.FlowTypeMetadata;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public class NodeRegistrySnapshot {
-    public static final int CURRENT_CONTRACT_VERSION = 2;
-    public static final int MINIMUM_SUPPORTED_CONTRACT_VERSION = 2;
     private int contractVersion;
     private int minimumClientContractVersion;
     private String serverIdentity = "";
@@ -21,6 +22,13 @@ public class NodeRegistrySnapshot {
     private String baseRegistryChecksum = "";
     private String registryChecksum;
     private long generatedAt;
+    private long catalogGeneration = -1L;
+    private String catalogChecksum = "";
+    private String catalogProjectionIdentity = "";
+    private List<Map<String, Object>> dropContributions = new ArrayList<>();
+    private List<Map<String, Object>> functionBoundaries = new ArrayList<>();
+    private Map<String, Object> catalogMetadata = Map.of();
+    private Map<String, Object> opaqueData = Map.of();
     private List<String> nodeIds = new ArrayList<>();
     private List<NodePluginPayload> plugins = new ArrayList<>();
     private List<String> removedPlugins = new ArrayList<>();
@@ -115,6 +123,70 @@ public class NodeRegistrySnapshot {
 
     public void setGeneratedAt(long generatedAt) {
         this.generatedAt = generatedAt;
+    }
+
+    public long getCatalogGeneration() {
+        return catalogGeneration;
+    }
+
+    public void setCatalogGeneration(long catalogGeneration) {
+        this.catalogGeneration = catalogGeneration;
+    }
+
+    public String getCatalogChecksum() {
+        return catalogChecksum != null ? catalogChecksum : "";
+    }
+
+    public void setCatalogChecksum(String catalogChecksum) {
+        this.catalogChecksum = catalogChecksum != null ? catalogChecksum : "";
+    }
+
+    public String getCatalogProjectionIdentity() {
+        return catalogProjectionIdentity != null ? catalogProjectionIdentity : "";
+    }
+
+    public void setCatalogProjectionIdentity(String catalogProjectionIdentity) {
+        this.catalogProjectionIdentity = catalogProjectionIdentity != null ? catalogProjectionIdentity : "";
+    }
+
+    public List<Map<String, Object>> getDropContributions() {
+        return dropContributions != null ? dropContributions : List.of();
+    }
+
+    public void setDropContributions(List<Map<String, Object>> dropContributions) {
+        this.dropContributions = copyEntries(dropContributions);
+    }
+
+    public List<Map<String, Object>> getFunctionBoundaries() {
+        return functionBoundaries != null ? functionBoundaries : List.of();
+    }
+
+    public void setFunctionBoundaries(List<Map<String, Object>> functionBoundaries) {
+        this.functionBoundaries = copyEntries(functionBoundaries);
+    }
+
+    public List<Map<String, Object>> getFunctionBoundaryIntents() {
+        return getFunctionBoundaries();
+    }
+
+    public void setFunctionBoundaryIntents(List<Map<String, Object>> functionBoundaryIntents) {
+        setFunctionBoundaries(functionBoundaryIntents);
+    }
+
+    public Map<String, Object> getCatalogMetadata() {
+        return catalogMetadata != null ? catalogMetadata : Map.of();
+    }
+
+    public void setCatalogMetadata(Map<String, Object> catalogMetadata) {
+        this.catalogMetadata = copyMap(catalogMetadata);
+    }
+
+    public Map<String, Object> getOpaqueData() {
+        return opaqueData != null ? opaqueData : Map.of();
+    }
+
+    public void setOpaqueData(Map<String, Object> opaqueData) {
+        this.opaqueData = copyMap(opaqueData);
     }
 
     public List<String> getNodeIds() {
@@ -224,5 +296,56 @@ public class NodeRegistrySnapshot {
 
     public void setConversionRules(List<FlowConversionRule> conversionRules) {
         this.conversionRules = conversionRules != null ? conversionRules : new ArrayList<>();
+    }
+
+    private static List<Map<String, Object>> copyEntries(List<Map<String, Object>> values) {
+        if (values == null || values.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Map<String, Object>> copy = new ArrayList<>(values.size());
+        for (Map<String, Object> value : values) {
+            copy.add(value != null ? copyMap(value) : null);
+        }
+        return Collections.unmodifiableList(copy);
+    }
+
+    private static Map<String, Object> copyMap(Map<String, Object> value) {
+        if (value == null || value.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : value.entrySet()) {
+            copy.put(entry.getKey(), copyValue(entry.getValue()));
+        }
+        return Collections.unmodifiableMap(copy);
+    }
+
+    private static Object copyValue(Object value) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+            return value;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key)) {
+                    throw new IllegalArgumentException("Registry metadata map keys must be strings");
+                }
+                copy.put(key, copyValue(entry.getValue()));
+            }
+            return Collections.unmodifiableMap(copy);
+        }
+        if (value instanceof Iterable<?> iterable) {
+            return Collections.unmodifiableList(java.util.stream.StreamSupport.stream(iterable.spliterator(), false)
+                .map(NodeRegistrySnapshot::copyValue).toList());
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            List<Object> copy = new ArrayList<>(length);
+            for (int index = 0; index < length; index++) {
+                copy.add(copyValue(Array.get(value, index)));
+            }
+            return Collections.unmodifiableList(copy);
+        }
+        return String.valueOf(value);
     }
 }

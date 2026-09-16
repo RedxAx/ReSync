@@ -1,0 +1,302 @@
+[
+  {
+    "id": "format.color",
+    "displayName": "Color",
+    "description": "Apply a named or legacy numeric text color to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "color"],
+    "examples": ["Connect text and choose a color, then use the formatted component in another text node."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_color"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "text", "target": "text"},
+        {"direction": "input", "source": "color", "target": "color"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to color; missing input uses empty text."},
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "string", "widget": "DROPDOWN", "options": ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"], "defaultValue": "white", "direction": "input", "description": "Chooses the named or legacy numeric color to apply."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with the selected color."}
+    ]
+  },
+  {
+    "id": "format.bold",
+    "displayName": "Bold",
+    "description": "Apply bold styling to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "bold"],
+    "examples": ["Connect a text component and use Result where bold text is needed."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_bold"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to make bold; missing input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with bold styling enabled."}
+    ]
+  },
+  {
+    "id": "format.italic",
+    "displayName": "Italic",
+    "description": "Apply italic styling to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "italic"],
+    "examples": ["Connect a text component and use Result where italic text is needed."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_italic"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to italicize; missing input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with italic styling enabled."}
+    ]
+  },
+  {
+    "id": "format.underline",
+    "displayName": "Underline",
+    "description": "Apply underlined styling to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "underline"],
+    "examples": ["Connect a text component and use Result where underlined text is needed."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_underline"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to underline; missing input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with underlined styling enabled."}
+    ]
+  },
+  {
+    "id": "format.strikethrough",
+    "displayName": "Strikethrough",
+    "description": "Apply strikethrough styling to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "strikethrough"],
+    "examples": ["Connect a text component and use Result where crossed-out text is needed."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_strikethrough"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to strike through; missing input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with strikethrough styling enabled."}
+    ]
+  },
+  {
+    "id": "format.reset",
+    "displayName": "Reset",
+    "description": "Reset color and common text decorations on a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "reset"],
+    "examples": ["Connect a styled component and use Result to continue with white, undecorated text."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_reset"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component whose color and common decorations should reset."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns white text with bold, italic, underline, strikethrough, and obfuscated styling disabled."}
+    ]
+  },
+  {
+    "id": "text.format_gradient",
+    "displayName": "Format Gradient",
+    "description": "Apply a MiniMessage gradient to text and return legacy-formatted text.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "gradient"],
+    "examples": ["Provide text and a red:blue-style color list, then connect the legacy-formatted Result."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_gradient"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "input", "source": "colors", "target": "colors"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the text that receives the gradient."},
+      {"id": "colors", "displayName": "Colors", "name": "colors", "dataType": "string", "defaultValue": "red:blue", "direction": "input", "description": "Provides the colon-separated gradient colors understood by MiniMessage."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "string", "direction": "output", "description": "Returns the gradient text serialized with the legacy section format."}
+    ]
+  },
+  {
+    "id": "text.format_mini_message",
+    "displayName": "Format Mini Message",
+    "description": "Parse MiniMessage or legacy text and return legacy-formatted text.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "mini_message"],
+    "examples": ["Provide MiniMessage text such as <green>Ready</green>, then connect the formatted Result."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "format_mini_message"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides MiniMessage or legacy text to parse."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "string", "direction": "output", "description": "Returns the parsed text serialized with the legacy section format."}
+    ]
+  },
+  {
+    "id": "format.obfuscated",
+    "displayName": "Obfuscated",
+    "description": "Apply obfuscated styling to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "obfuscated"],
+    "examples": ["Connect a text component and use Result for obfuscated text."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "obfuscated"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component to obfuscate; missing input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with obfuscated styling enabled."}
+    ]
+  },
+  {
+    "id": "format.hover",
+    "displayName": "Hover",
+    "description": "Attach text shown when a player hovers over a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "hover"],
+    "examples": ["Provide text and hover text, then use Result in a message or item description."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "hover"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "input", "source": "hover_text", "target": "hover_text"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component that receives the hover event."},
+      {"id": "hover_text", "displayName": "Hover Text", "name": "hover_text", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the MiniMessage or legacy text shown on hover."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with a hover-text event attached."}
+    ]
+  },
+  {
+    "id": "format.click",
+    "displayName": "Click",
+    "description": "Attach a click action to a text component.",
+    "domain": "text",
+    "family": "format",
+    "lifecycle": "active",
+    "handlerCapability": "text.format",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["text", "format", "click"],
+    "examples": ["Provide text, a click action, and its value, then use Result in a message."],
+    "handler": "TextFormatHandler",
+    "handlerConfig": {"operation": "click"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [{"direction": "input", "source": "text", "target": "text"}, {"direction": "input", "source": "action", "target": "action"}, {"direction": "input", "source": "value", "target": "value"}, {"direction": "output", "source": "result", "target": "result"}]},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "component", "defaultValue": "", "direction": "input", "description": "Provides the text component that receives the click action."},
+      {"id": "action", "displayName": "Action", "name": "action", "dataType": "string", "widget": "DROPDOWN", "options": ["open_url", "run_command", "suggest_command", "copy_to_clipboard", "change_page"], "defaultValue": "open_url", "direction": "input", "description": "Chooses the click action supported by the text component."},
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "string", "defaultValue": "", "direction": "input", "description": "Provides the URL, command, page, or text copied by the selected action."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "component", "direction": "output", "description": "Returns the text component with the selected click action attached."}
+    ]
+  }
+]

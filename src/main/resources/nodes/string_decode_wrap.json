@@ -1,0 +1,129 @@
+[
+  {
+    "id": "string_base64_decode",
+    "displayName": "Base64 Decode",
+    "description": "Decode strict standard Base64 into UTF-8 text. Missing or null input uses empty text; malformed Base64 fails before output, and encoded input or decoded results longer than 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "encoding", "base64", "decode"],
+    "legacyIds": ["string.base64_decode"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "base64_decode"},
+    "inputs": [
+      {"id": "encoded", "displayName": "Encoded", "name": "encoded", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Strict standard Base64 text to decode as UTF-8. Missing or null input uses empty text; malformed Base64 or input longer than 65536 characters fails before output."}
+    ],
+    "outputs": [
+      {"id": "decoded", "displayName": "Decoded", "name": "decoded", "pinType": "DATA", "dataType": "string", "description": "UTF-8 text decoded from the Base64 input. Results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_url_decode",
+    "displayName": "URL Decode",
+    "description": "Decode URL form text as UTF-8. Missing or null input uses empty text; plus signs become spaces, malformed percent escapes fail before output, and encoded input or decoded results longer than 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "encoding", "url", "decode"],
+    "legacyIds": ["string.url_decode"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "url_decode"},
+    "inputs": [
+      {"id": "encoded", "displayName": "Encoded", "name": "encoded", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "URL form text to decode as UTF-8. Plus signs become spaces; malformed percent escapes or input longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "decoded", "displayName": "Decoded", "name": "decoded", "pinType": "DATA", "dataType": "string", "description": "UTF-8 text decoded with URL form semantics. Results longer than 65536 characters fail before output."}
+    ]
+  },
+  {
+    "id": "string_word_wrap",
+    "displayName": "Word Wrap",
+    "description": "Wrap text into lines using Unicode whitespace separation. Whitespace collapses between words, overlong words remain unsplit, text and results are limited to 65536 characters, and width must be a finite whole number from 1 through 65536; invalid values fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "format", "wrap"],
+    "legacyIds": ["string.word_wrap"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "word_wrap"},
+    "inputs": [
+      {"id": "text", "displayName": "Text", "name": "text", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to wrap. Unicode whitespace separates words and collapses between them; input longer than 65536 characters fails before output."},
+      {"id": "width", "displayName": "Width", "name": "width", "pinType": "DATA", "dataType": "number", "defaultValue": 80, "constraints": {"min": 1, "max": 65536}, "description": "Maximum whole-number line width. Missing or null input uses 80; the value must be finite and from 1 through 65536, and invalid values fail before output."}
+    ],
+    "outputs": [
+      {"id": "wrapped_lines_list", "displayName": "Wrapped Lines", "name": "wrapped_lines_list", "pinType": "DATA", "dataType": "list<string>", "description": "Wrapped lines in order. Whitespace is collapsed, overlong words are not split, and each produced line is limited to 65536 characters."}
+    ]
+  },
+  {
+    "id": "string_to_json",
+    "displayName": "String To Json",
+    "description": "Serialize a value as JSON text. Missing or null input produces the JSON literal null.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "json", "encode"],
+    "legacyIds": ["string.to_json"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "to_json"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value to serialize as JSON. Missing or null input produces the JSON literal null."}
+    ],
+    "outputs": [
+      {"id": "json", "displayName": "JSON", "name": "json", "pinType": "DATA", "dataType": "string", "description": "JSON text representing the input value."}
+    ]
+  },
+  {
+    "id": "string_from_json",
+    "displayName": "String From Json",
+    "description": "Parse JSON text as a string, list, or map. Missing or null JSON input uses empty text, and type_name defaults to string.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "json", "decode"],
+    "legacyIds": ["string.from_json"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "from_json"},
+    "inputs": [
+      {"id": "json", "displayName": "JSON", "name": "json", "pinType": "DATA", "dataType": "string", "description": "JSON text to parse. Missing or null input uses empty text."},
+      {"id": "type_name", "displayName": "Type Name", "name": "type_name", "pinType": "DATA", "dataType": "string", "defaultValue": "string", "description": "Target type name. Use string, list, or map; missing or null input uses string."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "any", "description": "The parsed string, list, or map value selected by type_name."}
+    ]
+  }
+]

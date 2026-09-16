@@ -1,19 +1,30 @@
 package restudio.resync.flow.triggers;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.EventExecutor;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.resync.Log;
+import restudio.resync.flow.CompiledTriggerExecution;
+import restudio.resync.flow.CompiledRuntimeContextAdapter;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.automation.AutomationReferences;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.identity.NodeId;
+import restudio.resync.server.TemporaryLifecycleDiagnostics;
 
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -25,7 +36,11 @@ public class TriggerDispatcher implements Listener {
     private final Plugin plugin;
     private final Map<String, TriggerEntry> entriesByType = new ConcurrentHashMap<>();
     private final Map<String, TriggerEntry> entriesByLookup = new ConcurrentHashMap<>();
+    private final Map<ContractRef<NodeId>, TriggerEntry> entriesByDefinition = new ConcurrentHashMap<>();
     private final Set<TriggerEntry> entries = ConcurrentHashMap.newKeySet();
+    private final Map<String, FlowGraph> graphSnapshots = new ConcurrentHashMap<>();
+    private volatile CompiledTriggerExecution compiledExecution;
+    private boolean definitionAdmissionOpen = true;
 
     private static final Map<String, String> LEGACY_EVENT_ALIASES = Map.ofEntries(
             Map.entry("chat", "async_chat"),
@@ -64,11 +79,41 @@ public class TriggerDispatcher implements Listener {
         this.plugin = plugin;
     }
 
-    public void registerDefinition(String eventType, String nodeType, Class<? extends Event> eventClass,
-                                   EventPriority priority, boolean ignoreCancelled,
-                                   Function<Event, Map<String, Object>> variableExtractor,
-                                   Function<Event, Player> playerExtractor,
-                                   String[] aliases) {
+    public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
+        this.compiledExecution = compiledExecution;
+        if (compiledExecution != null) {
+            graphSnapshots.entrySet().removeIf(entry -> !prepare(entry.getKey(), entry.getValue(), compiledExecution));
+        }
+    }
+
+    public CompiledTriggerExecution getCompiledExecution() {
+        return compiledExecution;
+    }
+
+    public synchronized void shutdown() {
+        HandlerList.unregisterAll(this);
+        entriesByType.clear();
+        entriesByLookup.clear();
+        entriesByDefinition.clear();
+        entries.clear();
+        graphSnapshots.clear();
+        compiledExecution = null;
+    }
+
+    public synchronized void closeDefinitionAdmission() {
+        definitionAdmissionOpen = false;
+        shutdown();
+    }
+
+    public synchronized void registerDefinition(String eventType, String nodeType, Class<? extends Event> eventClass,
+                                                EventPriority priority, boolean ignoreCancelled,
+                                                Function<Event, Map<String, Object>> variableExtractor,
+                                                Function<Event, Player> playerExtractor,
+                                                String[] aliases) {
+        if (!definitionAdmissionOpen || plugin == null || !plugin.isEnabled()) {
+            shutdown();
+            return;
+        }
         String normalizedEventType = normalizeEventKey(eventType);
         TriggerEntry existing = normalizedEventType != null ? entriesByType.get(normalizedEventType) : null;
         if (existing != null && existing.eventClass.equals(eventClass)) {
@@ -80,9 +125,11 @@ public class TriggerDispatcher implements Listener {
         Method getPlayer = findMethod(eventClass, "getPlayer");
         Method getEntity = findMethod(eventClass, "getEntity");
         Method getWhoClicked = findMethod(eventClass, "getWhoClicked");
+        Method getDefinitionId = findMethod(eventClass, "getDefinitionId");
+        Method getEventType = findMethod(eventClass, "getEventType");
         TriggerEntry entry = new TriggerEntry(eventType, nodeType, eventClass, priority,
                 ignoreCancelled, variableExtractor, playerExtractor, triggerMap,
-                getPlayer, getEntity, getWhoClicked);
+                getPlayer, getEntity, getWhoClicked, getDefinitionId, getEventType, aliases);
         entries.add(entry);
         indexEntryLookups(entry, eventType, nodeType, aliases);
 
@@ -93,38 +140,236 @@ public class TriggerDispatcher implements Listener {
         plugin.getServer().getPluginManager().registerEvent(eventClass, this, priority, bukkitExecutor, plugin, ignoreCancelled);
     }
 
-    private void dispatch(TriggerEntry entry, Event event) {
-        Map<String, Object> customVars = entry.variableExtractor.apply(event);
-        if (customVars == null) return;
-
-        Player player = entry.playerExtractor != null ? entry.playerExtractor.apply(event) : null;
-
-        for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
-            FlowGraph graph = storage.getGraph("flow", trigger.getKey());
-            if (graph == null) continue;
-            if (!matchesAutomationBinding(graph, trigger.getValue(), event)) continue;
-
-            Map<String, Object> eventVars = new HashMap<>();
-            if (player != null) {
-                eventVars.put("event.player", player);
+    public synchronized void replaceManagedDefinitions(Set<String> managedNodeTypes, Collection<ManagedDefinition> replacements) {
+        if (!definitionAdmissionOpen || plugin == null || !plugin.isEnabled()) {
+            shutdown();
+            return;
+        }
+        Set<String> managed = managedNodeTypes == null ? Set.of() : Set.copyOf(managedNodeTypes);
+        Map<String, Map<String, String>> bindings = snapshotBindings();
+        List<ManagedDefinition> previous = entries.stream().map(TriggerEntry::definition).toList();
+        List<ManagedDefinition> retained = entries.stream()
+            .filter(entry -> !managed.contains(entry.nodeType))
+            .map(TriggerEntry::definition)
+            .toList();
+        try {
+            HandlerList.unregisterAll(this);
+            entriesByType.clear();
+            entriesByLookup.clear();
+            entriesByDefinition.clear();
+            entries.clear();
+            registerDefinitions(retained);
+            registerDefinitions(replacements == null ? List.of() : replacements);
+            restoreBindings(bindings);
+        } catch (RuntimeException | Error failure) {
+            try {
+                HandlerList.unregisterAll(this);
+                entriesByType.clear();
+                entriesByLookup.clear();
+                entriesByDefinition.clear();
+                entries.clear();
+                registerDefinitions(previous);
+                restoreBindings(bindings);
+            } catch (RuntimeException | Error rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
             }
-            for (Map.Entry<String, Object> varEntry : customVars.entrySet()) {
-                String key = varEntry.getKey();
-                if (key == null || key.isBlank()) {
-                    continue;
-                }
-                Object value = varEntry.getValue();
-                if (value == null) {
-                    eventVars.remove(key);
-                } else {
-                    eventVars.put(key, value);
-                }
-            }
-            executor.execute(graph, trigger.getValue(), player, event, eventVars);
+            throw failure;
         }
     }
 
-    private boolean matchesAutomationBinding(FlowGraph graph, String startNodeId, Event event) {
+    private void registerDefinitions(Collection<ManagedDefinition> definitions) {
+        for (ManagedDefinition definition : definitions) {
+            registerDefinition(definition.eventType(), definition.nodeType(), definition.eventClass(), definition.priority(),
+                definition.ignoreCancelled(), definition.variableExtractor(), definition.playerExtractor(), definition.aliases());
+        }
+    }
+
+    private void restoreBindings(Map<String, Map<String, String>> bindings) {
+        bindings.forEach((eventType, values) -> values.forEach((flowId, startNodeId) -> registerBinding(eventType, flowId, startNodeId)));
+    }
+
+    private Map<String, Map<String, String>> snapshotBindings() {
+        Map<String, Map<String, String>> bindings = new LinkedHashMap<>();
+        for (TriggerEntry entry : entries) {
+            bindings.computeIfAbsent(entry.eventType, ignored -> new LinkedHashMap<>()).putAll(entry.triggerMap);
+        }
+        return bindings;
+    }
+
+    private void dispatch(TriggerEntry entry, Event event) {
+        long started = System.nanoTime();
+        boolean measured = event instanceof BlockBreakEvent && !entry.triggerMap.isEmpty();
+        try {
+            CompletableFuture<Void> completion = dispatchEvent(entry, event);
+            if (measured) {
+                completion.whenComplete((ignored, failure) -> TemporaryLifecycleDiagnostics.recordTiming(
+                    TemporaryLifecycleDiagnostics.ExecutionPhase.EVENT_COMPLETION, System.nanoTime() - started));
+            }
+        } catch (RuntimeException failure) {
+            if (measured) {
+                TemporaryLifecycleDiagnostics.recordTiming(TemporaryLifecycleDiagnostics.ExecutionPhase.EVENT_COMPLETION,
+                    System.nanoTime() - started);
+            }
+            throw failure;
+        } finally {
+            if (measured) {
+                TemporaryLifecycleDiagnostics.recordTiming(TemporaryLifecycleDiagnostics.ExecutionPhase.BLOCK_DISPATCH,
+                    System.nanoTime() - started);
+            }
+        }
+    }
+
+    private CompletableFuture<Void> dispatchEvent(TriggerEntry entry, Event event) {
+        Map<String, Object> customVars;
+        Player player;
+        try {
+            customVars = entry.variableExtractor.apply(event);
+            if (customVars == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            player = entry.playerExtractor != null ? entry.playerExtractor.apply(event) : null;
+        } catch (RuntimeException failure) {
+            for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
+                CorrelationId invocationId = CorrelationId.random();
+                long started = TemporaryLifecycleDiagnostics.start();
+                Map<String, Object> ingress = ingressIdentity(entry, trigger, invocationId);
+                TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingress, "failed",
+                    "TRIGGER.CONTEXT_REJECTED", "event-extraction-failed");
+                CompiledTriggerExecution.warnInvocation("event|" + trigger.getKey() + "|TRIGGER.CONTEXT_REJECTED",
+                    "Event trigger invocation failed correlationId=" + invocationId.canonicalText()
+                        + " diagnosticCode=TRIGGER.CONTEXT_REJECTED");
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
+        List<DeferredInvocation> deferred = new ArrayList<>();
+        List<CompletableFuture<Void>> completions = new ArrayList<>();
+        CompiledRuntimeContextAdapter.Result eventSnapshot = null;
+        for (Map.Entry<String, String> trigger : entry.triggerMap.entrySet()) {
+            CorrelationId invocationId = CorrelationId.random();
+            long started = TemporaryLifecycleDiagnostics.start();
+            Map<String, Object> ingress = ingressIdentity(entry, trigger, invocationId);
+            Map<String, Object> terminalIdentity = ingress;
+            boolean ingressEmitted = false;
+            String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
+            String failureReason = "graph-resolution-failed";
+            try {
+                FlowGraph graph = graphSnapshots.get(trigger.getKey());
+                if (graph == null || !graph.isEnabled()) {
+                    TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
+                    TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingress, "rejected",
+                        "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
+                    CompiledTriggerExecution.warnInvocation("event|" + trigger.getKey() + "|TRIGGER.GRAPH_UNAVAILABLE",
+                        "Event trigger invocation rejected correlationId=" + invocationId.canonicalText()
+                            + " diagnosticCode=TRIGGER.GRAPH_UNAVAILABLE");
+                    continue;
+                }
+                failureCode = "TRIGGER.BINDING_REJECTED";
+                failureReason = "binding-match-failed";
+                if (!matchesAutomationBinding(entry, graph, trigger.getValue(), event)) {
+                    continue;
+                }
+                TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
+                ingressEmitted = true;
+
+                Map<String, Object> identity = TemporaryLifecycleDiagnostics.with(ingress,
+                    "revision", graph.getResourceRevision(),
+                    "startNodeId", trigger.getValue(), "graphHash", graph.getResourceHash(), "outcome", "matched");
+                terminalIdentity = identity;
+                TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started,
+                    TemporaryLifecycleDiagnostics.with(identity, "outcome", "selected"));
+
+                failureCode = "TRIGGER.CONTEXT_REJECTED";
+                failureReason = "context-adaptation-failed";
+                Map<String, Object> eventVars = new HashMap<>();
+                if (player != null) {
+                    eventVars.put("event.player", player);
+                }
+                for (Map.Entry<String, Object> varEntry : customVars.entrySet()) {
+                    String key = varEntry.getKey();
+                    if (key == null || key.isBlank()) {
+                        continue;
+                    }
+                    Object value = varEntry.getValue();
+                    if (value == null) {
+                        eventVars.remove(key);
+                    } else {
+                        eventVars.put(key, value);
+                    }
+                }
+                CompiledTriggerExecution execution = compiledExecution;
+                if (execution != null) {
+                    failureCode = "TRIGGER.EXECUTOR_REJECTED";
+                    failureReason = "synchronous-rejection";
+                    if (execution.requiresSynchronousEventWindow(graph)) {
+                        eventSnapshot = null;
+                        long phaseStarted = System.nanoTime();
+                        CompletableFuture<Void> future = execution.execute(graph, trigger.getValue(), player, event, eventVars,
+                            null, invocationId);
+                        completions.add(future);
+                        TemporaryLifecycleDiagnostics.synchronousCancellationPrefix(System.nanoTime() - phaseStarted);
+                        execution.observe(future, invocationId, "event:" + trigger.getKey());
+                    } else {
+                        if (eventSnapshot == null) {
+                            eventSnapshot = execution.snapshotEvent(player, event, eventVars);
+                        }
+                        deferred.add(new DeferredInvocation(execution, graph, trigger.getValue(), player,
+                            eventSnapshot, invocationId, "event:" + trigger.getKey()));
+                    }
+                } else {
+                    TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, identity, "rejected",
+                        "TRIGGER.EXECUTOR_UNAVAILABLE", "compiled-executor-unavailable");
+                    CompiledTriggerExecution.warnInvocation("event|" + trigger.getKey() + "|TRIGGER.EXECUTOR_UNAVAILABLE",
+                        "Event trigger invocation rejected correlationId=" + invocationId.canonicalText()
+                            + " diagnosticCode=TRIGGER.EXECUTOR_UNAVAILABLE");
+                }
+            } catch (RuntimeException failure) {
+                if (!ingressEmitted) {
+                    TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingress);
+                }
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, terminalIdentity, "failed",
+                    failureCode, failureReason);
+                CompiledTriggerExecution.warnInvocation("event|" + trigger.getKey() + "|" + failureCode,
+                    "Event trigger invocation failed correlationId=" + invocationId.canonicalText()
+                        + " diagnosticCode=" + failureCode);
+            }
+        }
+        if (!deferred.isEmpty()) {
+            TemporaryLifecycleDiagnostics.deferredBatch();
+            CompletableFuture<Void> batch = new CompletableFuture<>();
+            completions.add(batch);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                List<CompletableFuture<Void>> results = new ArrayList<>();
+                for (DeferredInvocation invocation : deferred) {
+                    try {
+                        results.add(invocation.execute());
+                    } catch (RuntimeException failure) {
+                        results.add(CompletableFuture.failedFuture(failure));
+                    }
+                }
+                CompletableFuture.allOf(results.toArray(CompletableFuture[]::new)).whenComplete((ignored, failure) -> {
+                    if (failure == null) {
+                        batch.complete(null);
+                    } else {
+                        batch.completeExceptionally(failure);
+                    }
+                });
+            });
+        }
+        return CompletableFuture.allOf(completions.toArray(CompletableFuture[]::new));
+    }
+
+    private Map<String, Object> ingressIdentity(TriggerEntry entry, Map.Entry<String, String> trigger,
+                                                CorrelationId invocationId) {
+        return TemporaryLifecycleDiagnostics.with(
+            TemporaryLifecycleDiagnostics.identity(null, "flow:" + trigger.getKey(), "trigger-execution", null, null,
+                invocationId, null, null, null, null),
+            "source", "event", "eventType", entry.eventType, "bindingDefinition", entry.nodeType,
+            "startNodeId", trigger.getValue(), "outcome", "matched");
+    }
+
+    private boolean matchesAutomationBinding(TriggerEntry entry, FlowGraph graph, String startNodeId, Event event) {
         if (graph == null || startNodeId == null || event == null || graph.getNodes() == null) {
             return true;
         }
@@ -132,7 +377,7 @@ public class TriggerDispatcher implements Listener {
         if (node == null || node.getInputValues() == null) {
             return true;
         }
-        Method definitionGetter = findMethod(event.getClass(), "getDefinitionId");
+        Method definitionGetter = entry.cachedDefinitionId;
         if (definitionGetter != null) {
             String selected = "";
             for (String pin : List.of("variable", "timer", "schedule")) {
@@ -146,7 +391,7 @@ public class TriggerDispatcher implements Listener {
                 return false;
             }
         }
-        Method eventTypeGetter = findMethod(event.getClass(), "getEventType");
+        Method eventTypeGetter = entry.cachedEventType;
         Object selectedType = "event.schedule".equals(node.getType()) ? "fired" : node.getInputValues().get("event");
         if (eventTypeGetter != null && selectedType != null && !selectedType.toString().isBlank()) {
             Object actual = invoke(eventTypeGetter, event);
@@ -170,7 +415,51 @@ public class TriggerDispatcher implements Listener {
     public void registerBinding(String eventType, String flowId, String startNodeId) {
         TriggerEntry entry = resolveEntry(eventType);
         if (entry != null) {
+            if (storage != null) {
+                FlowGraph graph = storage.getGraph("flow", flowId);
+                if (graph == null) {
+                    graphSnapshots.remove(flowId);
+                    return;
+                }
+                CompiledTriggerExecution execution = compiledExecution;
+                if (execution != null && !prepare(flowId, graph, execution)) {
+                    return;
+                }
+                graphSnapshots.put(flowId, graph);
+            }
             entry.triggerMap.put(flowId, startNodeId);
+        }
+    }
+
+    public void refreshGraph(String flowId) {
+        if (flowId == null || flowId.isBlank()) {
+            return;
+        }
+        FlowGraph graph = storage.getGraph("flow", flowId);
+        if (graph == null) {
+            graphSnapshots.remove(flowId);
+            CompiledTriggerExecution execution = compiledExecution;
+            if (execution != null) {
+                execution.retire("flow", flowId);
+            }
+        } else {
+            CompiledTriggerExecution execution = compiledExecution;
+            if (execution != null && !prepare(flowId, graph, execution)) {
+                unregisterBinding(flowId);
+                return;
+            }
+            graphSnapshots.put(flowId, graph);
+        }
+    }
+
+    private boolean prepare(String flowId, FlowGraph graph, CompiledTriggerExecution execution) {
+        try {
+            execution.prepare(graph);
+            return true;
+        } catch (RuntimeException exception) {
+            Log.warn("Rejected runtime flow " + flowId + ": " + exception.getMessage(), exception);
+            execution.retire("flow", flowId);
+            return false;
         }
     }
 
@@ -178,12 +467,18 @@ public class TriggerDispatcher implements Listener {
         for (TriggerEntry entry : entries) {
             entry.triggerMap.remove(flowId);
         }
+        graphSnapshots.remove(flowId);
+        CompiledTriggerExecution execution = compiledExecution;
+        if (execution != null) {
+            execution.retire("flow", flowId);
+        }
     }
 
     public void clearBindings() {
         for (TriggerEntry entry : entries) {
             entry.triggerMap.clear();
         }
+        graphSnapshots.clear();
     }
 
     public String getNodeType(String eventType) {
@@ -198,6 +493,21 @@ public class TriggerDispatcher implements Listener {
 
     public Set<String> getEventTypes() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(entriesByType.keySet()));
+    }
+
+    public record ManagedDefinition(
+        String eventType,
+        String nodeType,
+        Class<? extends Event> eventClass,
+        EventPriority priority,
+        boolean ignoreCancelled,
+        Function<Event, Map<String, Object>> variableExtractor,
+        Function<Event, Player> playerExtractor,
+        String[] aliases
+    ) {
+        public ManagedDefinition {
+            aliases = aliases == null ? new String[0] : aliases.clone();
+        }
     }
 
     public boolean hasEventType(String eventType) {
@@ -220,6 +530,9 @@ public class TriggerDispatcher implements Listener {
     }
 
     private void indexEntryLookups(TriggerEntry entry, String eventType, String nodeType, String[] aliases) {
+        if (nodeType != null && nodeType.contains("/")) {
+            entriesByDefinition.put(ContractRef.parseCanonicalText(nodeType, NodeId::new), entry);
+        }
         indexLookup(eventType, entry, true);
         for (String alias : aliases) {
             indexLookup(alias, entry, true);
@@ -254,6 +567,13 @@ public class TriggerDispatcher implements Listener {
     }
 
     private TriggerEntry resolveEntry(String eventType) {
+        if (eventType != null && eventType.contains("/")) {
+            try {
+                return entriesByDefinition.get(ContractRef.parseCanonicalText(eventType, NodeId::new));
+            } catch (IllegalArgumentException invalidReference) {
+                return null;
+            }
+        }
         String normalized = normalizeEventKey(eventType);
         if (normalized == null) {
             return null;
@@ -292,6 +612,13 @@ public class TriggerDispatcher implements Listener {
     private String normalizeEventKey(String key) {
         if (key == null) {
             return null;
+        }
+        if (key.contains("/")) {
+            try {
+                return ContractRef.parseCanonicalText(key, NodeId::new).canonicalText();
+            } catch (IllegalArgumentException invalidReference) {
+                return null;
+            }
         }
         String normalized = key.trim().toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) {
@@ -418,13 +745,18 @@ public class TriggerDispatcher implements Listener {
         final Method cachedGetPlayer;
         final Method cachedGetEntity;
         final Method cachedGetWhoClicked;
+        final Method cachedDefinitionId;
+        final Method cachedEventType;
+        final String[] aliases;
 
         TriggerEntry(String eventType, String nodeType, Class<? extends Event> eventClass,
                      EventPriority priority, boolean ignoreCancelled,
                      Function<Event, Map<String, Object>> variableExtractor,
                      Function<Event, Player> playerExtractor,
                      ConcurrentHashMap<String, String> triggerMap,
-                     Method cachedGetPlayer, Method cachedGetEntity, Method cachedGetWhoClicked) {
+                     Method cachedGetPlayer, Method cachedGetEntity, Method cachedGetWhoClicked,
+                     Method cachedDefinitionId, Method cachedEventType,
+                     String[] aliases) {
             this.eventType = eventType;
             this.nodeType = nodeType;
             this.eventClass = eventClass;
@@ -436,6 +768,29 @@ public class TriggerDispatcher implements Listener {
             this.cachedGetPlayer = cachedGetPlayer;
             this.cachedGetEntity = cachedGetEntity;
             this.cachedGetWhoClicked = cachedGetWhoClicked;
+            this.cachedDefinitionId = cachedDefinitionId;
+            this.cachedEventType = cachedEventType;
+            this.aliases = aliases == null ? new String[0] : aliases.clone();
+        }
+
+        ManagedDefinition definition() {
+            return new ManagedDefinition(eventType, nodeType, eventClass, priority, ignoreCancelled,
+                variableExtractor, playerExtractor, aliases);
+        }
+    }
+
+    private record DeferredInvocation(CompiledTriggerExecution execution, FlowGraph graph, String startNodeId,
+                                      Player player, CompiledRuntimeContextAdapter.Result snapshot, CorrelationId invocationId,
+                                      String source) {
+        private CompletableFuture<Void> execute() {
+            long phaseStarted = System.nanoTime();
+            CompletableFuture<Void> future = execution.executeDeferred(graph, startNodeId, player, snapshot, invocationId);
+            future.whenComplete((ignored, failure) -> {
+                long completed = System.nanoTime();
+                TemporaryLifecycleDiagnostics.deferredExecution(completed - phaseStarted);
+            });
+            execution.observe(future, invocationId, source);
+            return future;
         }
     }
 }

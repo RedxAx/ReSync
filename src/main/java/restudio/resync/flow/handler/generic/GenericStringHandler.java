@@ -4,10 +4,13 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.modules.flow.FlowPacketSender;
 
-import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -15,7 +18,9 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
@@ -27,6 +32,15 @@ public class GenericStringHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
     private static final Gson GSON = new Gson();
     private static final String TEMPLATE_INPUT = "template";
+    private static final int MAX_LEVENSHTEIN_INPUT_LENGTH = 1024;
+    private static final Set<String> DATA_ONLY_OPERATIONS = Set.of(
+        "concat", "upper", "lower", "trim", "length", "is_empty", "is_blank", "is_numeric",
+        "md5", "sha256", "sha512", "is_alpha", "is_alphanumeric", "is_email", "contains",
+        "starts_with", "ends_with", "replace", "base64_encode", "url_encode", "join",
+        "pad_left", "pad_right", "truncate", "reverse", "repeat", "levenshtein", "substring", "split",
+        "base64_decode", "url_decode", "word_wrap", "template", "capitalize", "slugify", "camel_case", "pascal_case", "snake_case", "kebab_case",
+        "matches", "equals_ignore_case", "to_json", "from_json", "shuffle", "soundex", "metaphone",
+        "index_of", "last_index_of", "replace_regex");
 
     public GenericStringHandler() {
         registerBasicOperations();
@@ -41,15 +55,23 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("template", (ctx, node) -> {
             String template = ctx.getInputValue(node, TEMPLATE_INPUT, String.class, "");
-            ctx.setOutput(node, "result", template);
+            validateStringValue(template, "Template source");
+            String result = template != null ? template : "";
+            validateStringValue(result, "Template result");
+            ctx.setOutput(node, "result", result);
         });
         operations.put("substring", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
             Integer start = ctx.getInputValue(node, "start", Integer.class, 0);
             Integer length = ctx.getInputValue(node, "length", Integer.class, null);
-            if (value != null && start >= 0 && start < value.length()) {
-                int end = length != null ? Math.min(start + length, value.length()) : value.length();
-                ctx.setOutput(node, "result", value.substring(start, end));
+            validateStringValue(value, "Substring source");
+            validateSubstringBound(start, "Substring start");
+            validateSubstringBound(length, "Substring length");
+            int safeStart = start != null ? start : 0;
+            if (value != null && safeStart <= value.length()) {
+                int end = length != null ? (int) Math.min((long) safeStart + length, value.length()) : value.length();
+                validateStringResultLength(end - safeStart);
+                ctx.setOutput(node, "result", value.substring(safeStart, end));
             } else {
                 ctx.setOutput(node, "result", "");
             }
@@ -57,6 +79,8 @@ public class GenericStringHandler implements NodeHandler {
         operations.put("split", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
             String delimiter = ctx.getInputValue(node, "delimiter", String.class, ",");
+            validateStringValue(value, "Split value");
+            validateStringValue(delimiter, "Split delimiter");
             if (value != null && delimiter != null) {
                 ctx.setOutput(node, "result", List.of(value.split(Pattern.quote(delimiter), -1)));
             } else {
@@ -86,28 +110,29 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("upper", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
-            ctx.setOutput(node, "result", value != null ? value.toUpperCase() : "");
+            ctx.setOutput(node, "result", value != null ? value.toUpperCase(Locale.ROOT) : "");
         });
         operations.put("lower", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
-            ctx.setOutput(node, "result", value != null ? value.toLowerCase() : "");
+            ctx.setOutput(node, "result", value != null ? value.toLowerCase(Locale.ROOT) : "");
         });
         operations.put("capitalize", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
+            validateStringValue(value, "Capitalize source");
+            String result = "";
             if (value != null && !value.isEmpty()) {
-                String[] words = value.split("\\s+");
-                StringBuilder result = new StringBuilder();
+                List<String> words = splitWhitespaceWords(value);
+                StringBuilder builder = new StringBuilder();
                 for (String word : words) {
                     if (!word.isEmpty()) {
-                        result.append(Character.toUpperCase(word.charAt(0)));
-                        if (word.length() > 1) result.append(word.substring(1).toLowerCase());
-                        result.append(" ");
+                        builder.append(capitalizeFirstCodePoint(word));
+                        builder.append(" ");
                     }
                 }
-                ctx.setOutput(node, "result", result.toString().trim());
-            } else {
-                ctx.setOutput(node, "result", "");
+                result = builder.toString().trim();
             }
+            validateStringValue(result, "Capitalize result");
+            ctx.setOutput(node, "result", result);
         });
         operations.put("trim", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
@@ -118,15 +143,25 @@ public class GenericStringHandler implements NodeHandler {
             ctx.setOutput(node, "result", value != null ? value.length() : 0);
         });
         operations.put("reverse", (ctx, node) -> {
-            String text = getStringInput(ctx, node, "text", "value");
+            String text = ctx.getInputValue(node, "text", String.class, "");
             String reversed = text != null ? new StringBuilder(text).reverse().toString() : "";
-            setStringOutput(ctx, node, reversed, "reversed", "result");
+            ctx.setOutput(node, "reversed", reversed);
         });
         operations.put("repeat", (ctx, node) -> {
-            String text = getStringInput(ctx, node, "text", "value");
+            String text = ctx.getInputValue(node, "text", String.class, "");
             Integer count = ctx.getInputValue(node, "count", Integer.class, 1);
-            String repeated = text != null && count > 0 ? text.repeat(count) : "";
-            setStringOutput(ctx, node, repeated, "repeated", "result");
+            int safeCount = count != null ? count : 1;
+            validateRepeatCount(safeCount);
+            String repeated = "";
+            if (text != null && safeCount > 0) {
+                long resultLength = (long) text.length() * safeCount;
+                if (resultLength > FlowPacketSender.MAX_STRING_LENGTH) {
+                    throw new IllegalArgumentException("Repeated string result cannot exceed "
+                        + FlowPacketSender.MAX_STRING_LENGTH + " characters");
+                }
+                repeated = text.repeat(safeCount);
+            }
+            ctx.setOutput(node, "repeated", repeated);
         });
         operations.put("contains", (ctx, node) -> {
             String value = ctx.getInputValue(node, "value", String.class, "");
@@ -203,10 +238,9 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("base64_decode", (ctx, node) -> {
             String encoded = ctx.getInputValue(node, "encoded", String.class, "");
-            String decoded = "";
-            if (encoded != null && !encoded.isEmpty()) {
-                decoded = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
-            }
+            validateStringValue(encoded, "Base64 input");
+            String decoded = decodeBase64(encoded);
+            validateStringValue(decoded, "Base64 result");
             ctx.setOutput(node, "decoded", decoded);
         });
         operations.put("url_encode", (ctx, node) -> {
@@ -216,7 +250,9 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("url_decode", (ctx, node) -> {
             String encoded = ctx.getInputValue(node, "encoded", String.class, "");
-            String decoded = encoded != null ? URLDecoder.decode(encoded, StandardCharsets.UTF_8) : "";
+            validateStringValue(encoded, "URL input");
+            String decoded = decodeUrlForm(encoded);
+            validateStringValue(decoded, "URL result");
             ctx.setOutput(node, "decoded", decoded);
         });
         operations.put("md5", (ctx, node) -> {
@@ -232,8 +268,9 @@ public class GenericStringHandler implements NodeHandler {
             ctx.setOutput(node, "hash", hash(text, "SHA-512"));
         });
         operations.put("pad_left", (ctx, node) -> {
-            String text = ctx.getInputValue(node, "text", String.class, "");
             Integer length = ctx.getInputValue(node, "length", Integer.class, 0);
+            validateStringLength(length);
+            String text = ctx.getInputValue(node, "text", String.class, "");
             String padChar = ctx.getInputValue(node, "pad_char", String.class, " ");
             String padded = text != null ? text : "";
             if (length != null && length > 0 && padded.length() < length) {
@@ -243,8 +280,9 @@ public class GenericStringHandler implements NodeHandler {
             ctx.setOutput(node, "padded", padded);
         });
         operations.put("pad_right", (ctx, node) -> {
-            String text = ctx.getInputValue(node, "text", String.class, "");
             Integer length = ctx.getInputValue(node, "length", Integer.class, 0);
+            validateStringLength(length);
+            String text = ctx.getInputValue(node, "text", String.class, "");
             String padChar = ctx.getInputValue(node, "pad_char", String.class, " ");
             String padded = text != null ? text : "";
             if (length != null && length > 0 && padded.length() < length) {
@@ -254,8 +292,9 @@ public class GenericStringHandler implements NodeHandler {
             ctx.setOutput(node, "padded", padded);
         });
         operations.put("truncate", (ctx, node) -> {
-            String text = ctx.getInputValue(node, "text", String.class, "");
             Integer length = ctx.getInputValue(node, "length", Integer.class, 0);
+            validateStringLength(length);
+            String text = ctx.getInputValue(node, "text", String.class, "");
             Boolean addEllipsis = ctx.getInputValue(node, "add_ellipsis", Boolean.class, false);
             String truncated = text != null ? text : "";
             if (length != null && length > 0 && truncated.length() > length) {
@@ -269,30 +308,32 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("word_wrap", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
-            Integer width = ctx.getInputValue(node, "width", Integer.class, 80);
+            Object widthInput = ctx.getInputValue(node, "width", Object.class, 80);
+            validateStringValue(text, "Word wrap text");
+            int width = validateWordWrapWidth(widthInput);
             List<String> lines = new ArrayList<>();
-            if (text != null && width != null && width > 0) {
-                String[] words = text.split("\\s+");
-                StringBuilder currentLine = new StringBuilder();
-                for (String word : words) {
-                    if (currentLine.isEmpty()) {
-                        currentLine.append(word);
-                    } else if (currentLine.length() + 1 + word.length() <= width) {
-                        currentLine.append(" ").append(word);
-                    } else {
-                        lines.add(currentLine.toString());
-                        currentLine = new StringBuilder(word);
-                    }
-                }
-                if (!currentLine.isEmpty()) {
+            StringBuilder currentLine = new StringBuilder();
+            for (String word : splitWhitespaceWords(text != null ? text : "")) {
+                if (currentLine.isEmpty()) {
+                    currentLine.append(word);
+                } else if (currentLine.length() + 1 + word.length() <= width) {
+                    currentLine.append(" ").append(word);
+                } else {
                     lines.add(currentLine.toString());
+                    currentLine.setLength(0);
+                    currentLine.append(word);
                 }
             }
-            ctx.setOutput(node, "wrapped_lines_list", lines);
+            if (!currentLine.isEmpty()) {
+                lines.add(currentLine.toString());
+            }
+            ctx.setOutput(node, "wrapped_lines_list", new ArrayList<>(lines));
         });
         operations.put("levenshtein", (ctx, node) -> {
             String text1 = ctx.getInputValue(node, "text1", String.class, "");
             String text2 = ctx.getInputValue(node, "text2", String.class, "");
+            validateLevenshteinInput(text1);
+            validateLevenshteinInput(text2);
             int distance = 0;
             if (text1 != null && text2 != null) {
                 int len1 = text1.length();
@@ -312,73 +353,79 @@ public class GenericStringHandler implements NodeHandler {
         });
         operations.put("slugify", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
+            validateStringValue(text, "Slugify source");
             String slug = "";
             if (text != null) {
-                slug = text.toLowerCase().trim();
+                slug = text.toLowerCase(Locale.ROOT).trim();
                 slug = slug.replaceAll("[^a-z0-9\\s-]", "");
                 slug = slug.replaceAll("\\s+", "-");
                 slug = slug.replaceAll("-+", "-");
                 slug = slug.replaceAll("^-+", "");
                 slug = slug.replaceAll("-+$", "");
             }
+            validateStringValue(slug, "Slugify result");
             ctx.setOutput(node, "slug", slug);
         });
         operations.put("camel_case", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
+            validateStringValue(text, "Camel case source");
             String camelCase = "";
             if (text != null && !text.isEmpty()) {
-                String[] words = text.replaceAll("[^a-zA-Z0-9\\s]", " ").split("\\s+");
+                List<String> words = splitWords(text, false);
                 StringBuilder result = new StringBuilder();
-                for (int i = 0; i < words.length; i++) {
-                    String word = words[i].toLowerCase();
+                for (int i = 0; i < words.size(); i++) {
+                    String word = words.get(i).toLowerCase(Locale.ROOT);
                     if (!word.isEmpty()) {
                         if (i == 0) {
                             result.append(word);
                         } else {
-                            result.append(Character.toUpperCase(word.charAt(0)));
-                            if (word.length() > 1) result.append(word.substring(1));
+                            result.append(capitalizeFirstCodePoint(word));
                         }
                     }
                 }
                 camelCase = result.toString();
             }
+            validateStringValue(camelCase, "Camel case result");
             ctx.setOutput(node, "camel_case", camelCase);
         });
         operations.put("pascal_case", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
+            validateStringValue(text, "Pascal case source");
             String pascalCase = "";
             if (text != null && !text.isEmpty()) {
-                String[] words = text.replaceAll("[^a-zA-Z0-9\\s]", " ").split("\\s+");
+                List<String> words = splitWords(text, false);
                 StringBuilder result = new StringBuilder();
                 for (String word : words) {
-                    String lowerWord = word.toLowerCase();
+                    String lowerWord = word.toLowerCase(Locale.ROOT);
                     if (!lowerWord.isEmpty()) {
-                        result.append(Character.toUpperCase(lowerWord.charAt(0)));
-                        if (lowerWord.length() > 1) result.append(lowerWord.substring(1));
+                        result.append(capitalizeFirstCodePoint(lowerWord));
                     }
                 }
                 pascalCase = result.toString();
             }
+            validateStringValue(pascalCase, "Pascal case result");
             ctx.setOutput(node, "pascal_case", pascalCase);
         });
         operations.put("snake_case", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
+            validateStringValue(text, "Snake case source");
             String snakeCase = "";
             if (text != null) {
-                snakeCase = text.replaceAll("[^a-zA-Z0-9\\s]", " ");
-                snakeCase = snakeCase.replaceAll("([a-z])([A-Z])", "$1 $2");
-                snakeCase = snakeCase.trim().toLowerCase().replaceAll("\\s+", "_");
+                List<String> words = splitWords(text, true);
+                snakeCase = String.join("_", words.stream().map(word -> word.toLowerCase(Locale.ROOT)).toList());
             }
+            validateStringValue(snakeCase, "Snake case result");
             ctx.setOutput(node, "snake_case", snakeCase);
         });
         operations.put("kebab_case", (ctx, node) -> {
             String text = ctx.getInputValue(node, "text", String.class, "");
+            validateStringValue(text, "Kebab case source");
             String kebabCase = "";
             if (text != null) {
-                kebabCase = text.replaceAll("[^a-zA-Z0-9\\s]", " ");
-                kebabCase = kebabCase.replaceAll("([a-z])([A-Z])", "$1 $2");
-                kebabCase = kebabCase.trim().toLowerCase().replaceAll("\\s+", "-");
+                List<String> words = splitWords(text, true);
+                kebabCase = String.join("-", words.stream().map(word -> word.toLowerCase(Locale.ROOT)).toList());
             }
+            validateStringValue(kebabCase, "Kebab case result");
             ctx.setOutput(node, "kebab_case", kebabCase);
         });
         operations.put("shuffle", (ctx, node) -> {
@@ -420,14 +467,107 @@ public class GenericStringHandler implements NodeHandler {
         });
     }
 
-    private static String getStringInput(FlowContext ctx, FlowNode node, String primaryPin, String legacyPin) {
-        String primary = ctx.getInputValue(node, primaryPin, String.class, null);
-        return primary != null ? primary : ctx.getInputValue(node, legacyPin, String.class, "");
+    private static void validateStringLength(Integer length) {
+        if (length != null && (length < 0 || length > FlowPacketSender.MAX_STRING_LENGTH)) {
+            throw new IllegalArgumentException("String length must be between 0 and " + FlowPacketSender.MAX_STRING_LENGTH);
+        }
     }
 
-    private static void setStringOutput(FlowContext ctx, FlowNode node, String value, String primaryPin, String legacyPin) {
-        ctx.setOutput(node, primaryPin, value);
-        ctx.setOutput(node, legacyPin, value);
+    private static List<String> splitWords(String text, boolean splitCamelCase) {
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        int previousCodePoint = -1;
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            boolean wordCodePoint = Character.isLetterOrDigit(codePoint)
+                || (!word.isEmpty() && isMark(codePoint));
+            if (!wordCodePoint) {
+                appendWord(words, word);
+                previousCodePoint = -1;
+            } else {
+                if (splitCamelCase && !word.isEmpty()
+                        && Character.isUpperCase(codePoint) && Character.isLowerCase(previousCodePoint)) {
+                    appendWord(words, word);
+                }
+                word.appendCodePoint(codePoint);
+                if (Character.isLetterOrDigit(codePoint)) {
+                    previousCodePoint = codePoint;
+                }
+            }
+            offset += Character.charCount(codePoint);
+        }
+        appendWord(words, word);
+        return words;
+    }
+
+    private static List<String> splitWhitespaceWords(String text) {
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            if (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)) {
+                appendWord(words, word);
+            } else {
+                word.appendCodePoint(codePoint);
+            }
+            offset += Character.charCount(codePoint);
+        }
+        appendWord(words, word);
+        return words;
+    }
+
+    private static void appendWord(List<String> words, StringBuilder word) {
+        if (!word.isEmpty()) {
+            words.add(word.toString());
+            word.setLength(0);
+        }
+    }
+
+    private static boolean isMark(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.NON_SPACING_MARK
+            || type == Character.COMBINING_SPACING_MARK
+            || type == Character.ENCLOSING_MARK;
+    }
+
+    private static String capitalizeFirstCodePoint(String word) {
+        if (word.isEmpty()) {
+            return "";
+        }
+        int firstCodePointLength = Character.charCount(word.codePointAt(0));
+        String first = word.substring(0, firstCodePointLength).toUpperCase(Locale.ROOT);
+        String rest = word.substring(firstCodePointLength).toLowerCase(Locale.ROOT);
+        return first + rest;
+    }
+
+    private static void validateStringValue(String value, String label) {
+        if (value != null && value.length() > FlowPacketSender.MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException(label + " cannot exceed " + FlowPacketSender.MAX_STRING_LENGTH + " characters");
+        }
+    }
+
+    private static void validateSubstringBound(Integer bound, String label) {
+        if (bound != null && (bound < 0 || bound > FlowPacketSender.MAX_STRING_LENGTH)) {
+            throw new IllegalArgumentException(label + " must be between 0 and " + FlowPacketSender.MAX_STRING_LENGTH);
+        }
+    }
+
+    private static void validateRepeatCount(int count) {
+        if (count < 0 || count > FlowPacketSender.MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException("Repeat count must be between 0 and " + FlowPacketSender.MAX_STRING_LENGTH);
+        }
+    }
+
+    private static void validateStringResultLength(int length) {
+        if (length > FlowPacketSender.MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException("Substring result cannot exceed " + FlowPacketSender.MAX_STRING_LENGTH + " characters");
+        }
+    }
+
+    private static void validateLevenshteinInput(String text) {
+        if (text != null && text.length() > MAX_LEVENSHTEIN_INPUT_LENGTH) {
+            throw new IllegalArgumentException("Levenshtein input cannot exceed " + MAX_LEVENSHTEIN_INPUT_LENGTH + " characters");
+        }
     }
 
     private static String hash(String text, String algorithm) {
@@ -643,6 +783,104 @@ public class GenericStringHandler implements NodeHandler {
         registry.register("GenericStringHandler", this);
     }
 
+    private static String decodeBase64(String encoded) {
+        if (encoded == null || encoded.isEmpty()) {
+            return "";
+        }
+        if ((encoded.length() & 3) != 0) {
+            throw new IllegalArgumentException("Base64 input is malformed");
+        }
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Base64 input is malformed", exception);
+        }
+        if (!encoded.equals(Base64.getEncoder().encodeToString(bytes))) {
+            throw new IllegalArgumentException("Base64 input is malformed");
+        }
+        return decodeUtf8(bytes, "Base64 input must be valid UTF-8");
+    }
+
+    private static String decodeUrlForm(String encoded) {
+        if (encoded == null || encoded.isEmpty()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder(encoded.length());
+        for (int index = 0; index < encoded.length();) {
+            char character = encoded.charAt(index);
+            if (character == '+') {
+                result.append(' ');
+                index++;
+            } else if (character == '%') {
+                int byteStart = index;
+                while (index < encoded.length() && encoded.charAt(index) == '%') {
+                    if (index + 2 >= encoded.length()) {
+                        throw new IllegalArgumentException("URL input is malformed");
+                    }
+                    if (hexDigit(encoded.charAt(index + 1)) < 0 || hexDigit(encoded.charAt(index + 2)) < 0) {
+                        throw new IllegalArgumentException("URL input is malformed");
+                    }
+                    index += 3;
+                }
+                byte[] bytes = new byte[(index - byteStart) / 3];
+                int byteIndex = 0;
+                for (int offset = byteStart; offset < index; offset += 3) {
+                    bytes[byteIndex++] = (byte) ((hexDigit(encoded.charAt(offset + 1)) << 4)
+                        | hexDigit(encoded.charAt(offset + 2)));
+                }
+                result.append(decodeUtf8(bytes, "URL input must be valid UTF-8"));
+            } else {
+                result.append(character);
+                index++;
+            }
+            if (result.length() > FlowPacketSender.MAX_STRING_LENGTH) {
+                throw new IllegalArgumentException("URL result cannot exceed "
+                    + FlowPacketSender.MAX_STRING_LENGTH + " characters");
+            }
+        }
+        return result.toString();
+    }
+
+    private static String decodeUtf8(byte[] bytes, String message) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
+        } catch (CharacterCodingException exception) {
+            throw new IllegalArgumentException(message, exception);
+        }
+    }
+
+    private static int hexDigit(char character) {
+        if (character >= '0' && character <= '9') {
+            return character - '0';
+        }
+        if (character >= 'A' && character <= 'F') {
+            return character - 'A' + 10;
+        }
+        if (character >= 'a' && character <= 'f') {
+            return character - 'a' + 10;
+        }
+        return -1;
+    }
+
+    private static int validateWordWrapWidth(Object value) {
+        if (!(value instanceof Number number)) {
+            throw new IllegalArgumentException("Word wrap width must be a finite whole number between 1 and "
+                + FlowPacketSender.MAX_STRING_LENGTH);
+        }
+        double numericWidth = number.doubleValue();
+        if (!Double.isFinite(numericWidth) || numericWidth != Math.rint(numericWidth)
+                || numericWidth < 1 || numericWidth > FlowPacketSender.MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException("Word wrap width must be a finite whole number between 1 and "
+                + FlowPacketSender.MAX_STRING_LENGTH);
+        }
+        return (int) numericWidth;
+    }
+
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
         String operation = node.getHandlerConfig().getString("operation");
@@ -651,6 +889,8 @@ public class GenericStringHandler implements NodeHandler {
             throw new IllegalArgumentException("Unknown string operation: " + operation);
         }
         op.accept(ctx, node);
-        ctx.triggerOutput("flow");
+        if (!DATA_ONLY_OPERATIONS.contains(operation)) {
+            ctx.triggerOutput("flow");
+        }
     }
 }

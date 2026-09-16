@@ -1,0 +1,17 @@
+{
+  "kind":"plan",
+  "migrationId":"77777777-7777-5777-8777-777777777777",
+  "sourceSnapshotId":"88888888-8888-4888-8888-888888888888",
+  "sourceManifestHash":"7777777777777777777777777777777777777777777777777777777777777777",
+  "sourceBuild":"b2941e66d762ffb76391715fbf4487c068fe12ea",
+  "sourceContract":"legacy-current-head",
+  "targetContract":{"minor":0,"generation":1},
+  "catalogChecksum":"8888888888888888888888888888888888888888888888888888888888888888",
+  "ruleSetHash":"9999999999999999999999999999999999999999999999999999999999999999",
+  "operations":[],
+  "quarantines":[],
+  "outputManifestHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "requiredFreeBytes":1048576,
+  "diagnostics":[],
+  "planHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

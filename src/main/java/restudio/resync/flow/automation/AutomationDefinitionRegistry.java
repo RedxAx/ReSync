@@ -6,6 +6,7 @@ import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.List;
+import java.util.Map;
 
 public final class AutomationDefinitionRegistry {
     private final ReSyncJsonResourceStorage storage;
@@ -45,7 +46,7 @@ public final class AutomationDefinitionRegistry {
             case ScheduleDefinition ignored -> ReSyncResourceCatalog.SCHEDULE_DEFINITION;
             default -> throw new IllegalArgumentException("Unsupported automation definition: " + definition.getClass().getName());
         };
-        return new FlowResourceReference(kind, definition.id(), "server", true, java.util.Map.of(
+        return new FlowResourceReference(kind, definition.id(), "builtin", true, Map.of(
             "name", definition.name(),
             "scope", definition.scope().name().toLowerCase(),
             "persistent", definition.persistent()

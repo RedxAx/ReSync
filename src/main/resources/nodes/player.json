@@ -1,0 +1,1030 @@
+[
+  {
+    "id": "player.properties",
+    "displayName": "Player Properties",
+    "description": "Reads a selected property from a player.",
+    "domain": "player",
+    "family": "properties",
+    "lifecycle": "active",
+    "handlerCapability": "player.properties",
+    "selectorIntent": "player-property",
+    "inspectorIntent": "player-property",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "player",
+      "properties",
+      "query"
+    ],
+    "examples": [
+      "Provide a player, choose a property, and connect the typed output."
+    ],
+    "handler": "player",
+    "handlerConfig": {
+      "operation": "get"
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player selected for this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Action to apply to the selected target.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Property name used for this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "location",
+          "health",
+          "max_health",
+          "food_level",
+          "gamemode",
+          "sneak",
+          "fly",
+          "name",
+          "uuid",
+          "world",
+          "inventory",
+          "item_in_hand",
+          "display_name",
+          "xp_level",
+          "walk_speed",
+          "fly_speed",
+          "exp",
+          "total_exp",
+          "exp_to_level",
+          "allow_flight",
+          "on_ground",
+          "sleeping",
+          "bed_spawn_location",
+          "last_damage",
+          "killer",
+          "ping",
+          "player_list_name",
+          "op",
+          "offhand_item",
+          "saturation",
+          "exhaustion",
+          "sprint",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "xp_progress",
+          "compass_target",
+          "ip",
+          "is_flying",
+          "online",
+          "whitelisted",
+          "banned",
+          "sleep_ticks",
+          "locale",
+          "view_distance",
+          "is_op",
+          "item_in_offhand",
+          "armor"
+        ],
+        "defaultValue": "location"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the requested player value is available.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Location value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "location"
+        }
+      },
+      {
+        "id": "health",
+        "displayName": "Health",
+        "name": "health",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Health value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "health"
+        }
+      },
+      {
+        "id": "max_health",
+        "displayName": "Max Health",
+        "name": "max_health",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Max Health value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_health"
+        }
+      },
+      {
+        "id": "food_level",
+        "displayName": "Food Level",
+        "name": "food_level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Food Level value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "food_level"
+        }
+      },
+      {
+        "id": "gamemode",
+        "displayName": "Gamemode",
+        "name": "gamemode",
+        "pinType": "DATA",
+        "dataType": "gamemode",
+        "description": "Returns the Gamemode value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "gamemode"
+        }
+      },
+      {
+        "id": "sneak",
+        "displayName": "Sneak",
+        "name": "sneak",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Sneak value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sneak"
+        }
+      },
+      {
+        "id": "fly",
+        "displayName": "Fly",
+        "name": "fly",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Fly value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly"
+        }
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Name value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "id": "uuid",
+        "displayName": "UUID",
+        "name": "uuid",
+        "pinType": "DATA",
+        "dataType": "uuid",
+        "description": "Returns the UUID value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "uuid"
+        }
+      },
+      {
+        "id": "world",
+        "displayName": "World",
+        "name": "world",
+        "pinType": "DATA",
+        "dataType": "world",
+        "description": "Returns the World value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "world"
+        }
+      },
+      {
+        "id": "inventory",
+        "displayName": "Inventory",
+        "name": "inventory",
+        "pinType": "DATA",
+        "dataType": "inventory",
+        "description": "Returns the Inventory value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "inventory"
+        }
+      },
+      {
+        "id": "item_in_hand",
+        "displayName": "Item In Hand",
+        "name": "item_in_hand",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item In Hand value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "item_in_hand"
+        }
+      },
+      {
+        "id": "display_name",
+        "displayName": "Display Name",
+        "name": "display_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Display Name value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "display_name"
+        }
+      },
+      {
+        "id": "xp_level",
+        "displayName": "XP Level",
+        "name": "xp_level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the XP Level value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp_level"
+        }
+      },
+      {
+        "id": "walk_speed",
+        "displayName": "Walk Speed",
+        "name": "walk_speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Walk Speed value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "walk_speed"
+        }
+      },
+      {
+        "id": "fly_speed",
+        "displayName": "Fly Speed",
+        "name": "fly_speed",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Fly Speed value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fly_speed"
+        }
+      },
+      {
+        "id": "exp",
+        "displayName": "Exp",
+        "name": "exp",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Exp value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exp"
+        }
+      },
+      {
+        "id": "total_exp",
+        "displayName": "Total Exp",
+        "name": "total_exp",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Total Exp value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "total_exp"
+        }
+      },
+      {
+        "id": "exp_to_level",
+        "displayName": "Exp To Level",
+        "name": "exp_to_level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Exp To Level value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exp_to_level"
+        }
+      },
+      {
+        "id": "allow_flight",
+        "displayName": "Allow Flight",
+        "name": "allow_flight",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Allow Flight value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "allow_flight"
+        }
+      },
+      {
+        "id": "on_ground",
+        "displayName": "On Ground",
+        "name": "on_ground",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the On Ground value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "on_ground"
+        }
+      },
+      {
+        "id": "sleeping",
+        "displayName": "Sleeping",
+        "name": "sleeping",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Sleeping value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sleeping"
+        }
+      },
+      {
+        "id": "bed_spawn_location",
+        "displayName": "Bed Spawn Location",
+        "name": "bed_spawn_location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Bed Spawn Location value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "bed_spawn_location"
+        }
+      },
+      {
+        "id": "last_damage",
+        "displayName": "Last Damage",
+        "name": "last_damage",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Last Damage value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "last_damage"
+        }
+      },
+      {
+        "id": "killer",
+        "displayName": "Killer",
+        "name": "killer",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Returns the Killer value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "killer"
+        }
+      },
+      {
+        "id": "ping",
+        "displayName": "Ping",
+        "name": "ping",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Ping value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ping"
+        }
+      },
+      {
+        "id": "player_list_name",
+        "displayName": "Player List Name",
+        "name": "player_list_name",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Player List Name value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "player_list_name"
+        }
+      },
+      {
+        "id": "op",
+        "displayName": "Op",
+        "name": "op",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Op value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "op"
+        }
+      },
+      {
+        "id": "offhand_item",
+        "displayName": "Offhand Item",
+        "name": "offhand_item",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Offhand Item value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "offhand_item"
+        }
+      },
+      {
+        "id": "saturation",
+        "displayName": "Saturation",
+        "name": "saturation",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Saturation value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "saturation"
+        }
+      },
+      {
+        "id": "exhaustion",
+        "displayName": "Exhaustion",
+        "name": "exhaustion",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Exhaustion value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "exhaustion"
+        }
+      },
+      {
+        "id": "sprint",
+        "displayName": "Sprint",
+        "name": "sprint",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Sprint value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sprint"
+        }
+      },
+      {
+        "id": "vanish",
+        "displayName": "Vanish",
+        "name": "vanish",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Vanish value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "vanish"
+        }
+      },
+      {
+        "id": "glowing",
+        "displayName": "Glowing",
+        "name": "glowing",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Glowing value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "glowing"
+        }
+      },
+      {
+        "id": "invulnerable",
+        "displayName": "Invulnerable",
+        "name": "invulnerable",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Invulnerable value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "invulnerable"
+        }
+      },
+      {
+        "id": "fire_ticks",
+        "displayName": "Fire Ticks",
+        "name": "fire_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Fire Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "fire_ticks"
+        }
+      },
+      {
+        "id": "freeze_ticks",
+        "displayName": "Freeze Ticks",
+        "name": "freeze_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Freeze Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "freeze_ticks"
+        }
+      },
+      {
+        "id": "no_damage_ticks",
+        "displayName": "No Damage Ticks",
+        "name": "no_damage_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the No Damage Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "no_damage_ticks"
+        }
+      },
+      {
+        "id": "remaining_air",
+        "displayName": "Remaining Air",
+        "name": "remaining_air",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Remaining Air value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "remaining_air"
+        }
+      },
+      {
+        "id": "max_air",
+        "displayName": "Max Air",
+        "name": "max_air",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Max Air value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_air"
+        }
+      },
+      {
+        "id": "xp_progress",
+        "displayName": "XP Progress",
+        "name": "xp_progress",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the XP Progress value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "xp_progress"
+        }
+      },
+      {
+        "id": "compass_target",
+        "displayName": "Compass Target",
+        "name": "compass_target",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Returns the Compass Target value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "compass_target"
+        }
+      },
+      {
+        "id": "ip",
+        "displayName": "IP",
+        "name": "ip",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the IP value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "ip"
+        }
+      },
+      {
+        "id": "is_flying",
+        "displayName": "Is Flying",
+        "name": "is_flying",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Is Flying value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_flying"
+        }
+      },
+      {
+        "id": "online",
+        "displayName": "Online",
+        "name": "online",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Online value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "online"
+        }
+      },
+      {
+        "id": "whitelisted",
+        "displayName": "Whitelisted",
+        "name": "whitelisted",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Whitelisted value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "whitelisted"
+        }
+      },
+      {
+        "id": "banned",
+        "displayName": "Banned",
+        "name": "banned",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Banned value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "banned"
+        }
+      },
+      {
+        "id": "sleep_ticks",
+        "displayName": "Sleep Ticks",
+        "name": "sleep_ticks",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the Sleep Ticks value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sleep_ticks"
+        }
+      },
+      {
+        "id": "locale",
+        "displayName": "Locale",
+        "name": "locale",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the Locale value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "locale"
+        }
+      },
+      {
+        "id": "view_distance",
+        "displayName": "View Distance",
+        "name": "view_distance",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the View Distance value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "view_distance"
+        }
+      },
+      {
+        "id": "is_op",
+        "displayName": "Is Op",
+        "name": "is_op",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the Is Op value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_op"
+        }
+      },
+      {
+        "id": "item_in_offhand",
+        "displayName": "Item In Offhand",
+        "name": "item_in_offhand",
+        "pinType": "DATA",
+        "dataType": "itemstack",
+        "description": "Returns the Item In Offhand value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "item_in_offhand"
+        }
+      },
+      {
+        "id": "armor",
+        "displayName": "Armor",
+        "name": "armor",
+        "pinType": "DATA",
+        "dataType": "list<item>",
+        "description": "Returns the Armor value produced by this operation.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "get",
+          "property": "armor"
+        }
+      }
+    ]
+  },
+  {
+    "id": "player.actions",
+    "displayName": "Player Actions",
+    "description": "Reads or updates a selected player property.",
+    "domain": "player",
+    "family": "actions",
+    "lifecycle": "active",
+    "handlerCapability": "player.actions",
+    "selectorIntent": "player-action",
+    "inspectorIntent": "player-action",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "FAMILY",
+    "tags": [
+      "player",
+      "actions",
+      "family"
+    ],
+    "examples": [
+      "Connect Flow, provide the player inputs, then continue from the Flow output."
+    ],
+    "handler": "player",
+    "handlerConfig": {
+      "operation": "set"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts Player Actions when execution reaches this node.",
+        "direction": "input"
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Player selected for this operation.",
+        "direction": "input"
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Action to apply to the selected target.",
+        "direction": "input",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Property name used for this operation.",
+        "direction": "input",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "location",
+          "health",
+          "max_health",
+          "food_level",
+          "gamemode",
+          "sneak",
+          "fly",
+          "name",
+          "uuid",
+          "world",
+          "inventory",
+          "item_in_hand",
+          "display_name",
+          "xp_level",
+          "walk_speed",
+          "fly_speed",
+          "exp",
+          "total_exp",
+          "exp_to_level",
+          "allow_flight",
+          "on_ground",
+          "sleeping",
+          "bed_spawn_location",
+          "last_damage",
+          "killer",
+          "ping",
+          "player_list_name",
+          "op",
+          "offhand_item",
+          "saturation",
+          "exhaustion",
+          "sprint",
+          "vanish",
+          "glowing",
+          "invulnerable",
+          "fire_ticks",
+          "freeze_ticks",
+          "no_damage_ticks",
+          "remaining_air",
+          "max_air",
+          "xp_progress",
+          "compass_target",
+          "ip",
+          "is_flying",
+          "online",
+          "whitelisted",
+          "banned",
+          "sleep_ticks",
+          "locale",
+          "view_distance",
+          "is_op",
+          "item_in_offhand",
+          "armor"
+        ],
+        "defaultValue": "location"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Value to apply to the selected property.",
+        "direction": "input",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues execution after Player Actions completes.",
+        "direction": "output"
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether Player Actions completed successfully.",
+        "direction": "output",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        }
+      ]
+    }
+  }
+]

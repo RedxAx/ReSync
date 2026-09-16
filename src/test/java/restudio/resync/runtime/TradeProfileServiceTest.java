@@ -3,13 +3,19 @@ package restudio.resync.runtime;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.inventory.MerchantRecipe;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -85,6 +91,21 @@ class TradeProfileServiceTest {
         assertTrue(service.recipes("profile").isEmpty());
     }
 
+    @Test
+    void replacementRuntimeDoesNotDispatchLegacyHookFallback() {
+        RecordingDispatcher dispatcher = new RecordingDispatcher();
+        TestTradeProfileService service = new TestTradeProfileService("""
+            {
+              "enabled": true,
+              "hooks": { "openFlow": "legacy-open" }
+            }
+            """, dispatcher, LegacyRuntimeActivationGate.runtime(Path.of("build", "trade-runtime-gate-test")));
+        Player player = MockBukkit.getMock().addPlayer();
+
+        assertTrue(service.openVirtualTrades(player, "profile"));
+        assertTrue(dispatcher.flowIds.isEmpty());
+    }
+
     private static class TestTradeProfileService extends TradeProfileService {
         private final JsonObject profile;
 
@@ -93,10 +114,29 @@ class TradeProfileServiceTest {
             this.profile = JsonParser.parseString(json).getAsJsonObject();
         }
 
+        TestTradeProfileService(String json, RuntimeFlowDispatcher dispatcher, LegacyRuntimeActivationGate gate) {
+            super(null, null, dispatcher, null, gate);
+            this.profile = JsonParser.parseString(json).getAsJsonObject();
+        }
+
         @Override
         public JsonObject get(String id) {
             return profile;
         }
 
+    }
+
+    private static final class RecordingDispatcher extends RuntimeFlowDispatcher {
+        private final List<String> flowIds = new ArrayList<>();
+
+        private RecordingDispatcher() {
+            super(null, null);
+        }
+
+        @Override
+        public boolean dispatch(String flowId, Player player, Event event, Map<String, Object> variables) {
+            flowIds.add(flowId);
+            return true;
+        }
     }
 }

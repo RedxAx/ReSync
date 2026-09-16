@@ -1,0 +1,52 @@
+[
+  {
+    "id": "math_min",
+    "displayName": "Minimum",
+    "description": "Returns the smallest finite number in the list. Non-number values are ignored, an empty or number-free list returns 0, and non-finite numbers fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "aggregate", "minimum"],
+    "legacyIds": ["math.min", "math.min_list"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "min"},
+    "inputs": [
+      {"id": "values_list", "displayName": "Values List", "name": "values_list", "pinType": "DATA", "dataType": "list<any>", "description": "Numbers to inspect in order. Non-number values are ignored. An absent list uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "min", "displayName": "Minimum", "name": "min", "pinType": "DATA", "dataType": "number", "description": "Returns the smallest finite number, or 0 when no number is present."}
+    ]
+  },
+  {
+    "id": "math_max",
+    "displayName": "Maximum",
+    "description": "Returns the largest finite number in the list. Non-number values are ignored, an empty or number-free list returns 0, and non-finite numbers fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "aggregate", "maximum"],
+    "legacyIds": ["math.max", "math.max_list"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "max"},
+    "inputs": [
+      {"id": "values_list", "displayName": "Values List", "name": "values_list", "pinType": "DATA", "dataType": "list<any>", "description": "Numbers to inspect in order. Non-number values are ignored. An absent list uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "max", "displayName": "Maximum", "name": "max", "pinType": "DATA", "dataType": "number", "description": "Returns the largest finite number, or 0 when no number is present."}
+    ]
+  }
+]

@@ -1,0 +1,550 @@
+[
+  {
+    "id": "file_write",
+    "displayName": "Write File",
+    "description": "Write UTF-8 text inside the managed ReSync Flow-files area. The capability normalizes and authorizes the logical path before writing, and the Result output reports any policy or storage failure.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.write"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "write", "text", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_write"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "input", "source": "content", "target": "content"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the write when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the UTF-8 file to replace."},
+      {"id": "content", "displayName": "Content", "name": "content", "direction": "input", "dataType": "string", "description": "UTF-8 text that replaces the file contents."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file was written successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the write operation fails."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports whether the write completed and includes a stable failure code when it did not."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the file was written."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the write failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable write result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_append",
+    "displayName": "Append File",
+    "description": "Append UTF-8 text inside the managed ReSync Flow-files area. The capability validates the logical path before changing the file and exposes the operation outcome as a Result.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.append"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "append", "text", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_append"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "input", "source": "content", "target": "content"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the append when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the UTF-8 file to extend."},
+      {"id": "content", "displayName": "Content", "name": "content", "direction": "input", "dataType": "string", "description": "UTF-8 text added after the existing file contents."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when text was appended successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the append operation fails."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports whether the append completed and includes a stable failure code when it did not."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when text was appended."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the append failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable append result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_read",
+    "displayName": "Read File",
+    "description": "Read UTF-8 text from the managed ReSync Flow-files area. The capability validates the logical path and returns an empty content value on a failed operation together with its stable Result code.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.read"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "read", "text", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_read"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "content", "target": "content"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the read when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the UTF-8 file to read."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file was read successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the read operation fails."},
+      {"id": "content", "displayName": "Content", "name": "content", "direction": "output", "dataType": "string", "description": "UTF-8 text read from the managed file, or an empty string after failure."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<string>", "description": "Reports the file text on success or a stable read failure."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the file was read."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the read failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable read result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_read_lines",
+    "displayName": "Read File Lines",
+    "description": "Read a managed UTF-8 file as an ordered list of lines. Path access is validated before reading, and failed reads take the Failed route with a stable Result code.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.read.lines"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "read", "lines", "list"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_read_lines"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "lines", "target": "lines"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the line read when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the UTF-8 file to read as lines."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file lines were read successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the line read fails."},
+      {"id": "lines", "displayName": "Lines", "name": "lines", "direction": "output", "dataType": "list<string>", "description": "Returns the file lines in source order, or an empty list after failure."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<list<string>>", "description": "Reports the ordered lines on success or a stable read failure."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the file lines were read."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the line read failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable line read result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_delete",
+    "displayName": "Delete File",
+    "description": "Preview or delete a managed file inside the ReSync Flow-files area. Preview reports the target without changing it; an actual delete requires the trusted flow policy and reports a stable Result.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.delete"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "delete", "preview", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_delete"},
+    "authorizationPolicy": "trusted_server_flow",
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "input", "source": "preview", "target": "preview"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "preview", "target": "output_preview"},
+        {"direction": "output", "source": "would_delete", "target": "would_delete"},
+        {"direction": "output", "source": "deleted", "target": "deleted"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the delete or preview when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the file to inspect or delete."},
+      {"id": "preview", "displayName": "Preview", "name": "preview", "direction": "input", "dataType": "boolean", "defaultValue": false, "description": "When true, reports what would be deleted without changing the file."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the requested delete or preview completes successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the path is invalid, unavailable, missing, or cannot be deleted."},
+      {"id": "output_preview", "displayName": "Preview", "name": "preview", "direction": "output", "dataType": "boolean", "description": "Reports whether the operation was a preview."},
+      {"id": "would_delete", "displayName": "Would Delete", "name": "would_delete", "direction": "output", "dataType": "boolean", "description": "Reports whether the target existed and would be deleted by a non-preview operation."},
+      {"id": "deleted", "displayName": "Deleted", "name": "deleted", "direction": "output", "dataType": "boolean", "description": "True only when a non-preview delete removed the file."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports the deletion outcome and stable failure information."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True when the preview or deletion completed successfully."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the delete failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable delete result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_exists",
+    "displayName": "File Exists",
+    "description": "Check whether a managed logical path exists in the ReSync Flow-files area. The node validates the path and returns false with a stable Result when storage is unavailable or the operation fails.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.exists"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "exists", "query", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_exists"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "exists", "target": "exists"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the existence check when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path to inspect."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the existence check completes."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the existence check fails."},
+      {"id": "exists", "displayName": "Exists", "name": "exists", "direction": "output", "dataType": "boolean", "description": "Reports whether the managed path exists. Failure also returns false."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports the existence value or a stable failure code."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "Reports whether the existence check itself completed without failure."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the check failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable existence result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_copy",
+    "displayName": "Copy File",
+    "description": "Copy a managed file to another logical path inside the ReSync Flow-files area. Both paths are normalized under the capability boundary before the copy is attempted.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.copy"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "copy", "storage", "path"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_copy"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "source_path", "target": "source_path"},
+        {"direction": "input", "source": "dest_path", "target": "dest_path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the copy when execution reaches this node."},
+      {"id": "source_path", "displayName": "Source Path", "name": "source_path", "direction": "input", "dataType": "string", "description": "Managed logical path of the existing file to copy."},
+      {"id": "dest_path", "displayName": "Destination Path", "name": "dest_path", "direction": "input", "dataType": "string", "description": "Managed logical path receiving the copied file."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file copy succeeds."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when either path is invalid or the copy fails."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports whether the copy completed and includes stable failure information."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the destination was copied successfully."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the copy failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable copy result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_move",
+    "displayName": "Move File",
+    "description": "Move a managed file to another logical path inside the ReSync Flow-files area. The capability validates both paths and keeps the operation inside the managed storage boundary.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.move"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "move", "storage", "path"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_move"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "source_path", "target": "source_path"},
+        {"direction": "input", "source": "dest_path", "target": "dest_path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the move when execution reaches this node."},
+      {"id": "source_path", "displayName": "Source Path", "name": "source_path", "direction": "input", "dataType": "string", "description": "Managed logical path of the existing file to move."},
+      {"id": "dest_path", "displayName": "Destination Path", "name": "dest_path", "direction": "input", "dataType": "string", "description": "Managed logical path receiving the moved file."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file move succeeds."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when either path is invalid or the move fails."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports whether the move completed and includes stable failure information."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the source was moved successfully."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the move failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable move result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_list_dir",
+    "displayName": "List Directory",
+    "description": "List direct entries in a managed ReSync Flow-files directory. The returned paths are normalized logical paths, and inaccessible directories fail closed with an empty list and stable Result code.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.list.dir"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "directory", "list", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_list_dir"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "files", "target": "files"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the directory listing when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical directory path to list."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the directory was listed successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or listing fails."},
+      {"id": "files", "displayName": "Files", "name": "files", "direction": "output", "dataType": "list<string>", "description": "Returns direct managed entries in deterministic path order, or an empty list after failure."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<list<string>>", "description": "Reports the listed paths or a stable listing failure."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the directory listing completed."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why listing failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable listing result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_create_dir",
+    "displayName": "Create Directory",
+    "description": "Create a directory inside the managed ReSync Flow-files area. Existing directories are reported as successful without being replaced, while invalid or unavailable paths use the Failed route.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.create.dir"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "directory", "create", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_create_dir"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "created", "target": "created"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts directory creation when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical directory path to create."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the directory exists after the operation."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or creation fails."},
+      {"id": "created", "displayName": "Created", "name": "created", "direction": "output", "dataType": "boolean", "description": "True when a new directory was created; false when it already existed."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<boolean>", "description": "Reports the directory operation and stable failure information."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True when the directory exists after the operation."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why creation failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable directory result or failure explanation."}
+    ]
+  },
+  {
+    "id": "file_get_size",
+    "displayName": "Get File Size",
+    "description": "Read the byte size of a managed file in the ReSync Flow-files area. The path is normalized and authorized before reading, and failure is reported without exposing host paths.",
+    "domain": "core",
+    "family": "file",
+    "lifecycle": "active",
+    "handlerCapability": "managed-flow-file",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["file.get.size"],
+    "category": "DATABASE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["file", "size", "bytes", "storage"],
+    "handler": "FileHandler",
+    "handlerConfig": {"operation": "file_get_size"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "path", "target": "path"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "size", "target": "size"},
+        {"direction": "output", "source": "result", "target": "result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the size read when execution reaches this node."},
+      {"id": "path", "displayName": "Path", "name": "path", "direction": "input", "dataType": "string", "description": "Managed logical path of the file whose size should be read."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when the file size was read successfully."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues when path policy, storage availability, or the size read fails."},
+      {"id": "size", "displayName": "Size", "name": "size", "direction": "output", "dataType": "number", "description": "Returns the file size in bytes, or zero after failure."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<number>", "description": "Reports the byte size or a stable failure code."},
+      {"id": "success", "displayName": "Success", "name": "success", "direction": "output", "dataType": "boolean", "description": "True only when the file size was read."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "direction": "output", "dataType": "string", "description": "Stable code describing why the size read failed, or an empty string after success."},
+      {"id": "message", "displayName": "Message", "name": "message", "direction": "output", "dataType": "string", "description": "Human-readable size result or failure explanation."}
+    ]
+  }
+]

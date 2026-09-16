@@ -1,0 +1,845 @@
+[
+  {
+    "id": "discord_webhook_send",
+    "displayName": "Send Discord Webhook",
+    "description": "Send plain content to an official Discord webhook and report the asynchronous delivery result.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "send"],
+    "aliases": ["Discord Send", "Send Discord Message"],
+    "legacyIds": ["discord.webhook.send"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_delivery",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_webhook_send"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "content", "target": "content"},
+        {"direction": "input", "source": "username", "target": "username"},
+        {"direction": "input", "source": "avatar_url", "target": "avatar_url"},
+        {"direction": "input", "source": "tts", "target": "tts"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the asynchronous Discord webhook request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "content", "displayName": "Content", "name": "content", "dataType": "string", "widget": "MULTILINE", "defaultValue": "", "description": "Plain message content to send."},
+      {"id": "username", "displayName": "Username", "name": "username", "dataType": "string", "optional": true, "description": "Optional username override for the webhook message."},
+      {"id": "avatar_url", "displayName": "Avatar URL", "name": "avatar_url", "dataType": "string", "optional": true, "description": "Optional HTTPS avatar URL for the webhook message."},
+      {"id": "tts", "displayName": "Text To Speech", "name": "tts", "dataType": "boolean", "defaultValue": false, "description": "Requests Discord text-to-speech delivery when true."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues when Discord accepts the webhook request."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the request fails or Discord rejects it."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured success or failure result for the webhook request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when Discord returns a successful response."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful request."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable delivery result message."}
+    ]
+  },
+  {
+    "id": "discord_webhook_send_embed",
+    "displayName": "Send Discord Embed",
+    "description": "Send one embed object to an official Discord webhook and report the asynchronous delivery result.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "embed", "send"],
+    "aliases": ["Send Embed To Discord", "Discord Embed Message"],
+    "legacyIds": ["discord.webhook.send.embed"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_delivery",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_webhook_send_embed"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the asynchronous embed request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed object produced by the Discord embed builder nodes."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues when Discord accepts the embed request."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the request fails or Discord rejects it."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured success or failure result for the embed request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when Discord returns a successful response."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful request."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable delivery result message."}
+    ]
+  },
+  {
+    "id": "discord_webhook_send_multiple",
+    "displayName": "Send Multiple Discord Messages",
+    "description": "Send a sequence of content and embed messages to one official Discord webhook in order.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "batch", "send"],
+    "aliases": ["Send Discord Batch", "Send Multiple Discord Messages"],
+    "legacyIds": ["discord.webhook.send.multiple"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_delivery",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_webhook_send_multiple"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "messages", "target": "messages"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the ordered batch request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "messages", "displayName": "Messages", "name": "messages", "dataType": "list<any>", "optional": true, "description": "Ordered message maps. Each map may contain content and an embed value; an empty list sends nothing."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after every message in the batch has been accepted."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when any message in the batch fails."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured result for the ordered batch request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when every message in the batch succeeds."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful batch."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable batch result message."}
+    ]
+  },
+  {
+    "id": "discord_create_embed",
+    "displayName": "Create Discord Embed",
+    "description": "Build an embed map from title, text, color, media, author, footer, and timestamp values.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "builder"],
+    "aliases": ["Build Discord Embed", "New Discord Embed"],
+    "legacyIds": ["discord.embed.create"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_create_embed"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "title", "target": "title"},
+        {"direction": "input", "source": "description", "target": "description"},
+        {"direction": "input", "source": "color", "target": "color"},
+        {"direction": "input", "source": "url", "target": "url"},
+        {"direction": "input", "source": "thumbnail", "target": "thumbnail"},
+        {"direction": "input", "source": "image", "target": "image"},
+        {"direction": "input", "source": "author_name", "target": "author_name"},
+        {"direction": "input", "source": "author_url", "target": "author_url"},
+        {"direction": "input", "source": "author_icon", "target": "author_icon"},
+        {"direction": "input", "source": "footer_text", "target": "footer_text"},
+        {"direction": "input", "source": "footer_icon", "target": "footer_icon"},
+        {"direction": "input", "source": "timestamp", "target": "timestamp"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts embed construction."},
+      {"id": "title", "displayName": "Title", "name": "title", "dataType": "string", "optional": true, "description": "Optional embed title."},
+      {"id": "description", "displayName": "Description", "name": "description", "dataType": "string", "widget": "MULTILINE", "optional": true, "description": "Optional embed description."},
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "optional": true, "description": "Optional Discord RGB color integer."},
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Optional URL attached to the embed title."},
+      {"id": "thumbnail", "displayName": "Thumbnail URL", "name": "thumbnail", "dataType": "string", "optional": true, "description": "Optional thumbnail image URL."},
+      {"id": "image", "displayName": "Image URL", "name": "image", "dataType": "string", "optional": true, "description": "Optional main image URL."},
+      {"id": "author_name", "displayName": "Author Name", "name": "author_name", "dataType": "string", "optional": true, "description": "Optional author display name."},
+      {"id": "author_url", "displayName": "Author URL", "name": "author_url", "dataType": "string", "optional": true, "description": "Optional author link."},
+      {"id": "author_icon", "displayName": "Author Icon URL", "name": "author_icon", "dataType": "string", "optional": true, "description": "Optional author icon URL."},
+      {"id": "footer_text", "displayName": "Footer Text", "name": "footer_text", "dataType": "string", "optional": true, "description": "Optional footer text."},
+      {"id": "footer_icon", "displayName": "Footer Icon URL", "name": "footer_icon", "dataType": "string", "optional": true, "description": "Optional footer icon URL."},
+      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "dataType": "string", "optional": true, "description": "Optional timestamp text in Discord's accepted timestamp format."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the embed map has been built."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map ready for sending or further field edits."}
+    ]
+  },
+  {
+    "id": "discord_add_field",
+    "displayName": "Add Discord Embed Field",
+    "description": "Append a named value field to an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "field"],
+    "aliases": ["Add Embed Field", "Discord Field"],
+    "legacyIds": ["discord.embed.add.field"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_add_field"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "input", "source": "inline", "target": "inline"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts field insertion."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "defaultValue": "", "description": "Field name shown by Discord."},
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "string", "widget": "MULTILINE", "defaultValue": "", "description": "Field value shown by Discord."},
+      {"id": "inline", "displayName": "Inline", "name": "inline", "dataType": "boolean", "defaultValue": false, "description": "Places the field beside other inline fields when true."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the field has been appended."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "The updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_add_embed",
+    "displayName": "Add Embed To Discord Webhook Data",
+    "description": "Append an embed map to the embeds list in a webhook data map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "embed", "builder"],
+    "aliases": ["Append Discord Embed", "Add Webhook Embed"],
+    "legacyIds": ["discord.webhook.add.embed"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_add_embed"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_data", "target": "webhook_data"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "webhook_data", "target": "output_webhook_data"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts webhook data editing."},
+      {"id": "webhook_data", "displayName": "Webhook Data", "name": "webhook_data", "dataType": "map<any,any>", "description": "Webhook data map to update."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "optional": true, "description": "Embed map to append to the webhook data."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the embed has been appended."},
+      {"id": "output_webhook_data", "displayName": "Webhook Data", "name": "webhook_data", "dataType": "map<any,any>", "description": "Updated webhook data containing the embed list."}
+    ]
+  },
+  {
+    "id": "discord_set_color",
+    "displayName": "Set Discord Embed Color",
+    "description": "Set or replace the RGB color integer on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "color"],
+    "aliases": ["Set Embed Color", "Discord Color"],
+    "legacyIds": ["discord.embed.set.color"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_color"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "color", "target": "color"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts color assignment."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "optional": true, "description": "Discord RGB color integer; absent input leaves the existing color unchanged."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after color assignment."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_color_from_hex",
+    "displayName": "Discord Color From Hex",
+    "description": "Parse six hexadecimal RGB digits, with or without a leading hash, into a Discord color integer.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "color", "hex"],
+    "aliases": ["Parse Discord Hex Color", "Hex To Discord Color"],
+    "legacyIds": ["discord.color.from.hex"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_color_from_hex"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "hex_color", "target": "hex_color"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "color", "target": "color"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts hexadecimal color parsing."},
+      {"id": "hex_color", "displayName": "Hex Color", "name": "hex_color", "dataType": "string", "widget": "COLOR", "defaultValue": "#000000", "description": "Six hexadecimal RGB digits, optionally prefixed with #."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the color has been parsed."},
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "description": "Parsed Discord RGB color integer."}
+    ]
+  },
+  {
+    "id": "discord_color_from_rgb",
+    "displayName": "Discord Color From RGB",
+    "description": "Pack red, green, and blue channels from 0 through 255 into a Discord color integer.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "color", "rgb"],
+    "aliases": ["Pack Discord RGB", "RGB To Discord Color"],
+    "legacyIds": ["discord.color.from.rgb"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_color_from_rgb"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "red", "target": "red"},
+        {"direction": "input", "source": "green", "target": "green"},
+        {"direction": "input", "source": "blue", "target": "blue"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "color", "target": "color"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts RGB color packing."},
+      {"id": "red", "displayName": "Red", "name": "red", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 255, "step": 1}, "description": "Red channel from 0 through 255."},
+      {"id": "green", "displayName": "Green", "name": "green", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 255, "step": 1}, "description": "Green channel from 0 through 255."},
+      {"id": "blue", "displayName": "Blue", "name": "blue", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 255, "step": 1}, "description": "Blue channel from 0 through 255."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after RGB packing."},
+      {"id": "color", "displayName": "Color", "name": "color", "dataType": "number", "description": "Packed Discord RGB color integer."}
+    ]
+  },
+  {
+    "id": "discord_webhook_edit",
+    "displayName": "Edit Discord Webhook Message",
+    "description": "Edit an existing Discord webhook message with optional content and embeds.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "message", "edit"],
+    "aliases": ["Edit Discord Message", "Update Discord Webhook"],
+    "legacyIds": ["discord.webhook.edit"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_delivery",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_webhook_edit"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "message_id", "target": "message_id"},
+        {"direction": "input", "source": "content", "target": "content"},
+        {"direction": "input", "source": "embeds", "target": "embeds"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the asynchronous edit request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "message_id", "displayName": "Message ID", "name": "message_id", "dataType": "string", "description": "Numeric Discord message ID to edit."},
+      {"id": "content", "displayName": "Content", "name": "content", "dataType": "string", "widget": "MULTILINE", "optional": true, "description": "Optional replacement message content."},
+      {"id": "embeds", "displayName": "Embeds", "name": "embeds", "dataType": "list<any>", "optional": true, "description": "Optional replacement list of embed maps."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues when Discord accepts the edit."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the edit fails or Discord rejects it."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured result for the edit request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when Discord accepts the edit."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful edit."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable edit result message."}
+    ]
+  },
+  {
+    "id": "discord_webhook_delete",
+    "displayName": "Delete Discord Webhook Message",
+    "description": "Delete an existing Discord webhook message and report the asynchronous result.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "message", "delete"],
+    "aliases": ["Delete Discord Message", "Remove Discord Webhook Message"],
+    "legacyIds": ["discord.webhook.delete"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_deletion",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_webhook_delete"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "message_id", "target": "message_id"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the asynchronous delete request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "message_id", "displayName": "Message ID", "name": "message_id", "dataType": "string", "description": "Numeric Discord message ID to delete."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues when Discord accepts the deletion."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the deletion fails or Discord rejects it."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured result for the deletion request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when Discord accepts the deletion."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful deletion."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable deletion result message."}
+    ]
+  },
+  {
+    "id": "discord_set_thumbnail",
+    "displayName": "Set Discord Embed Thumbnail",
+    "description": "Set or remove the thumbnail URL on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "thumbnail"],
+    "aliases": ["Set Embed Thumbnail", "Discord Thumbnail"],
+    "legacyIds": ["discord.embed.set.thumbnail"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_thumbnail"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "url", "target": "url"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts thumbnail editing."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Thumbnail URL; blank input removes the thumbnail."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after thumbnail editing."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_set_image",
+    "displayName": "Set Discord Embed Image",
+    "description": "Set or remove the main image URL on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "image"],
+    "aliases": ["Set Embed Image", "Discord Image"],
+    "legacyIds": ["discord.embed.set.image"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_image"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "url", "target": "url"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts image editing."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Main image URL; blank input removes the image."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after image editing."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_set_author",
+    "displayName": "Set Discord Embed Author",
+    "description": "Set or remove the author object on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "author"],
+    "aliases": ["Set Embed Author", "Discord Author"],
+    "legacyIds": ["discord.embed.set.author"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_author"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "url", "target": "url"},
+        {"direction": "input", "source": "icon_url", "target": "icon_url"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts author editing."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "name", "displayName": "Name", "name": "name", "dataType": "string", "optional": true, "description": "Author display name; blank values remove the author when all fields are blank."},
+      {"id": "url", "displayName": "URL", "name": "url", "dataType": "string", "optional": true, "description": "Optional author link."},
+      {"id": "icon_url", "displayName": "Icon URL", "name": "icon_url", "dataType": "string", "optional": true, "description": "Optional author icon URL."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after author editing."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_set_footer",
+    "displayName": "Set Discord Embed Footer",
+    "description": "Set or remove the footer object on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "footer"],
+    "aliases": ["Set Embed Footer", "Discord Footer"],
+    "legacyIds": ["discord.embed.set.footer"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_footer"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "text", "target": "text"},
+        {"direction": "input", "source": "icon_url", "target": "icon_url"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts footer editing."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "text", "displayName": "Text", "name": "text", "dataType": "string", "optional": true, "description": "Footer text; blank values remove the footer when all fields are blank."},
+      {"id": "icon_url", "displayName": "Icon URL", "name": "icon_url", "dataType": "string", "optional": true, "description": "Optional footer icon URL."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after footer editing."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_set_timestamp",
+    "displayName": "Set Discord Embed Timestamp",
+    "description": "Set or remove the timestamp field on an embed map.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.embed",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "embed", "timestamp"],
+    "aliases": ["Set Embed Timestamp", "Discord Timestamp"],
+    "legacyIds": ["discord.embed.set.timestamp"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_set_timestamp"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "embed", "target": "embed"},
+        {"direction": "input", "source": "timestamp", "target": "timestamp"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "embed", "target": "output_embed"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts timestamp editing."},
+      {"id": "embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Embed map to update."},
+      {"id": "timestamp", "displayName": "Timestamp", "name": "timestamp", "dataType": "string", "optional": true, "description": "Timestamp text accepted by Discord; blank input removes the timestamp."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after timestamp editing."},
+      {"id": "output_embed", "displayName": "Embed", "name": "embed", "dataType": "map<any,any>", "description": "Updated embed map."}
+    ]
+  },
+  {
+    "id": "discord_create_webhook_data",
+    "displayName": "Create Discord Webhook Data",
+    "description": "Create a webhook data map with content, identity overrides, text-to-speech, and an empty embed list.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "builder"],
+    "aliases": ["Build Discord Webhook Data", "New Webhook Data"],
+    "legacyIds": ["discord.webhook.data.create"],
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_create_webhook_data"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "content", "target": "content"},
+        {"direction": "input", "source": "username", "target": "username"},
+        {"direction": "input", "source": "avatar_url", "target": "avatar_url"},
+        {"direction": "input", "source": "tts", "target": "tts"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "webhook_data", "target": "webhook_data"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts webhook data construction."},
+      {"id": "content", "displayName": "Content", "name": "content", "dataType": "string", "widget": "MULTILINE", "optional": true, "description": "Optional webhook message content."},
+      {"id": "username", "displayName": "Username", "name": "username", "dataType": "string", "optional": true, "description": "Optional webhook username override."},
+      {"id": "avatar_url", "displayName": "Avatar URL", "name": "avatar_url", "dataType": "string", "optional": true, "description": "Optional webhook avatar URL."},
+      {"id": "tts", "displayName": "Text To Speech", "name": "tts", "dataType": "boolean", "defaultValue": false, "description": "Requests text-to-speech delivery when the data is sent."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the webhook data map has been created."},
+      {"id": "webhook_data", "displayName": "Webhook Data", "name": "webhook_data", "dataType": "map<any,any>", "description": "Webhook data map ready for embed additions or sending."}
+    ]
+  },
+  {
+    "id": "discord_send_webhook_data",
+    "displayName": "Send Discord Webhook Data",
+    "description": "Send a prepared webhook data map to an official Discord webhook and report the asynchronous result.",
+    "domain": "integration",
+    "family": "discord",
+    "lifecycle": "active",
+    "handlerCapability": "discord.webhook",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DISCORD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["discord", "webhook", "send", "data"],
+    "aliases": ["Send Prepared Discord Message", "Send Webhook Data"],
+    "legacyIds": ["discord.webhook.data.send"],
+    "authorizationPolicy": "external_webhook",
+    "auditPolicy": "external_delivery",
+    "handler": "DiscordHandler",
+    "handlerConfig": {"operation": "discord_send_webhook_data"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "webhook_url", "target": "webhook_url"},
+        {"direction": "input", "source": "webhook_data", "target": "webhook_data"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "failed", "target": "failed"},
+        {"direction": "output", "source": "operation_result", "target": "operation_result"},
+        {"direction": "output", "source": "success", "target": "success"},
+        {"direction": "output", "source": "error_code", "target": "error_code"},
+        {"direction": "output", "source": "message", "target": "message"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the asynchronous prepared-data request."},
+      {"id": "webhook_url", "displayName": "Webhook URL", "name": "webhook_url", "dataType": "string", "description": "Official HTTPS Discord webhook URL."},
+      {"id": "webhook_data", "displayName": "Webhook Data", "name": "webhook_data", "dataType": "map<any,any>", "description": "Prepared content, embed, username, avatar, and text-to-speech values."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues when Discord accepts the prepared webhook data."},
+      {"id": "failed", "displayName": "Failed", "name": "failed", "pinType": "FLOW", "dataType": "execution", "description": "Continues when the request fails or Discord rejects it."},
+      {"id": "operation_result", "displayName": "Operation Result", "name": "operation_result", "dataType": "result<boolean>", "description": "Structured result for the prepared webhook request."},
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "True when Discord returns a successful response."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Stable failure code, or empty text after a successful request."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Human-readable delivery result message."}
+    ]
+  }
+]

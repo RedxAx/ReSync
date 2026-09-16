@@ -3,9 +3,6 @@ package restudio.resync.server;
 import restudio.resync.Log;
 import restudio.resync.protocol.Codec;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -13,18 +10,27 @@ import java.util.Properties;
 import java.util.UUID;
 
 public class ConfigLoader {
+    public static ReSyncConfig load(Path dataRoot) {
+        Path root = dataRoot.toAbsolutePath().normalize();
+        return loadConfig(root.resolve(ConfigurationPersistenceParticipant.FILE_NAME));
+    }
+
     public static ReSyncConfig load(String configPath) {
+        return loadConfig(Path.of(configPath));
+    }
+
+    private static ReSyncConfig loadConfig(Path configPath) {
         ReSyncConfig config = new ReSyncConfig();
-        Path configFile = Path.of(configPath);
+        Path absoluteConfigFile = configPath.toAbsolutePath().normalize();
 
         Properties props = new Properties();
+        ConfigurationPersistenceParticipant persistence = null;
 
-        if (Files.exists(configFile)) {
-            try (FileInputStream fis = new FileInputStream(configFile.toFile())) {
-                props.load(fis);
-            } catch (Exception e) {
-                Log.error("Failed to load config: " + e.getMessage(), e);
-            }
+        try {
+            persistence = new ConfigurationPersistenceParticipant(absoluteConfigFile.getParent(), absoluteConfigFile, false);
+            props.putAll(persistence.properties());
+        } catch (Exception exception) {
+            throw new IllegalStateException("ReSync Configuration Could Not Be Loaded", exception);
         }
 
         ensureDefault(props, "enabled", "true");
@@ -92,27 +98,10 @@ public class ConfigLoader {
         config.setPlayerTracking(playerTracking);
         validateProductionConfig(config, props);
 
-        saveConfig(configFile, props);
+        persistence.replaceProperties(props);
+        config.setPersistenceParticipant(persistence);
 
         return config;
-    }
-
-    private static void saveConfig(Path configFile, Properties props) {
-        try {
-            Path parent = configFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-        } catch (Exception e) {
-            Log.error("Failed to create config directory: " + e.getMessage(), e);
-            return;
-        }
-
-        try (FileOutputStream fos = new FileOutputStream(configFile.toFile())) {
-            props.store(fos, "ReSync Configuration");
-        } catch (Exception e) {
-            Log.error("Failed to save config: " + e.getMessage(), e);
-        }
     }
 
     private static String generateApiKey() {
@@ -123,17 +112,6 @@ public class ConfigLoader {
         if (!props.containsKey(key)) {
             props.setProperty(key, value);
         }
-    }
-
-    private static List<String> parseNames(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(value.split("[,;\\r\\n]+"))
-                .map(String::strip)
-                .filter(name -> !name.isBlank())
-                .distinct()
-                .toList();
     }
 
     private static void validateProductionConfig(ReSyncConfig config, Properties props) {
@@ -163,6 +141,17 @@ public class ConfigLoader {
             Log.error("ReSync TLS subject alternative names are empty. WebSocket API disabled.");
             config.setEnabled(false);
         }
+    }
+
+    private static List<String> parseNames(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split("[,;\\r\\n]+"))
+                .map(String::strip)
+                .filter(name -> !name.isBlank())
+                .distinct()
+                .toList();
     }
 
     private static boolean isLoopbackBind(String bindHost) {

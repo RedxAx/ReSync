@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import restudio.flow.data.FlowTypeRef;
+import restudio.resync.flow.migration.FlowNodeMigrationMap;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class NodeDefinitionBuildValidator {
+    public static final String NODE_DEFINITIONS_PROPERTY = "resync.upgrade.node-definitions";
     private static final Set<String> KNOWN_DATA_TYPES = Set.of("execution", "any", "string", "number", "boolean");
     private static final Set<String> CLOCK_DOMAINS = Set.of("wall_time", "monotonic_elapsed", "server_ticks", "world_day_time");
     private static final Pattern OPTION_SOURCE_ID = Pattern.compile("[a-z0-9_.-]+(?::[a-z0-9_.-]+)+");
@@ -39,8 +41,11 @@ public final class NodeDefinitionBuildValidator {
     }
 
     public static void main(String[] args) throws IOException {
-        Path projectDir = args.length > 0 ? Path.of(args[0]) : Path.of("");
-        Path nodeRoot = projectDir.resolve("src/main/resources/nodes/migrated");
+        Path projectDir = args.length > 0 ? Path.of(args[0]).toAbsolutePath().normalize() : Path.of("").toAbsolutePath().normalize();
+        Path nodeRoot = resolveNodeRoot(projectDir, args);
+        Path migrationMap = projectDir.resolve("ReSyncCore/src/main/resources")
+            .resolve(FlowNodeMigrationMap.RESOURCE.substring(1));
+        Path productionNodeRoot = projectDir.resolve("src/main/resources/nodes");
         Path sourceRoot = projectDir.resolve("src/main/java");
 
         List<String> errors = new ArrayList<>();
@@ -48,9 +53,10 @@ public final class NodeDefinitionBuildValidator {
         Map<String, Set<String>> handlerOperations = loadHandlerOperations(sourceRoot.resolve("restudio/resync/flow/handler"));
         Set<String> handlerIds = loadHandlerIds(sourceRoot.resolve("restudio/resync/flow/handler"), handlerOperations);
         List<JsonObject> definitions = loadDefinitions(nodeRoot, errors);
+        List<JsonObject> productionDefinitions = loadDefinitions(productionNodeRoot, errors);
 
         validateDefinitions(definitions, dataTypes, handlerIds, handlerOperations, errors);
-        validateMigrationMap(nodeRoot.resolve("_id_migration_map.json"), definitions, errors);
+        validateMigrationMap(migrationMap, productionDefinitions, errors);
 
         System.out.println("definitions=" + definitions.size()
             + " handlers=" + handlerIds.size()
@@ -62,6 +68,19 @@ public final class NodeDefinitionBuildValidator {
             errors.stream().limit(100).forEach(error -> System.err.println("[node-definition-validation] " + error));
             throw new IllegalStateException("Node definition validation failed with " + errors.size() + " error(s)");
         }
+    }
+
+    private static Path resolveNodeRoot(Path projectDir, String[] args) throws IOException {
+        String configured = args.length > 1 ? args[1] : System.getProperty(NODE_DEFINITIONS_PROPERTY);
+        if (configured == null || configured.isBlank()) {
+            throw new IllegalArgumentException("A production node definition directory is required as the second argument or through -D" + NODE_DEFINITIONS_PROPERTY);
+        }
+        Path candidate = Path.of(configured);
+        Path nodeRoot = (candidate.isAbsolute() ? candidate : projectDir.resolve(candidate)).toAbsolutePath().normalize();
+        if (!Files.isDirectory(nodeRoot)) {
+            throw new IOException("Production node definition directory is missing: " + nodeRoot);
+        }
+        return nodeRoot;
     }
 
     private static Set<String> loadDataTypes(Path flowDataType) throws IOException {

@@ -7,6 +7,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
 import restudio.resync.Log;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -36,9 +37,21 @@ public final class WorldPlayerStateCodec {
     }
 
     public static void apply(Player player, WorldPlayerState state) {
+        apply(player, state, PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public static void apply(Player player, WorldPlayerState state,
+                              PaperPlayerDataMutationAdmission playerDataAdmission) {
         if (player == null || state == null) {
             return;
         }
+        try (PaperPlayerDataMutationAdmission.Lease ignored = playerDataAdmission.acquirePdc(
+            "world-player-state-apply:" + player.getUniqueId(), player.getUniqueId(), player.getWorld().getWorldFolder().toPath())) {
+            applyAdmitted(player, state);
+        }
+    }
+
+    private static void applyAdmitted(Player player, WorldPlayerState state) {
         if (state.getGameMode() != null && !state.getGameMode().isBlank()) {
             try {
                 player.setGameMode(GameMode.valueOf(state.getGameMode()));

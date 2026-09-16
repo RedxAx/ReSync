@@ -1,0 +1,9 @@
+{
+  "id": "fixture-flow",
+  "version": 1,
+  "resourceType": "flow",
+  "resourceRevision": 1,
+  "mutationId": "legacy-overlay-001",
+  "nodes": {"start": {"type": "event.server_start", "inputs": {}}},
+  "connections": []
+}

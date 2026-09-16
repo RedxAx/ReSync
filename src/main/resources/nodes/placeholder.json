@@ -1,0 +1,727 @@
+[
+  {
+    "id": "placeholder.parse",
+    "displayName": "Parse Placeholder",
+    "description": "Resolve PlaceholderAPI placeholders for a player.",
+    "domain": "placeholder",
+    "family": "player",
+    "lifecycle": "active",
+    "handlerCapability": "placeholderapi",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PLAYER",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "placeholder.parse",
+      "placeholder_parse"
+    ],
+    "tags": [
+      "placeholder",
+      "player",
+      "placeholder-parse"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "PlaceholderAPI",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": false,
+    "destructive": false,
+    "auditPolicy": "none",
+    "confirmationPolicy": "none",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_parse"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the placeholder operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the text value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the placeholder operation completes."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the resolved or transformed text."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when PlaceholderAPI cannot resolve the text."
+      },
+      {
+        "id": "operation_result",
+        "displayName": "Operation Result",
+        "name": "operation_result",
+        "pinType": "DATA",
+        "dataType": "result<string>",
+        "description": "Returns the structured success or failure result."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the stable error code when the operation fails."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the placeholder operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "operation_result",
+          "target": "operation_result"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    },
+    "aliases": [
+      "placeholder parse"
+    ]
+  },
+  {
+    "id": "placeholder.placeholder_set",
+    "displayName": "Parse Relational Placeholder",
+    "description": "Resolve relational PlaceholderAPI placeholders for two players.",
+    "domain": "placeholder",
+    "family": "text",
+    "lifecycle": "active",
+    "handlerCapability": "placeholderapi",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "placeholder.placeholder_set",
+      "placeholder_set",
+      "placeholder_set_relational",
+      "placeholder.set.relational"
+    ],
+    "tags": [
+      "placeholder",
+      "text",
+      "placeholder-set"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "PlaceholderAPI",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": false,
+    "destructive": false,
+    "auditPolicy": "none",
+    "confirmationPolicy": "none",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_set"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the placeholder operation when this execution route is reached."
+      },
+      {
+        "id": "player_one",
+        "displayName": "Player One",
+        "name": "player_one",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the first player used by the operation."
+      },
+      {
+        "id": "player_two",
+        "displayName": "Player Two",
+        "name": "player_two",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the second player used by the operation."
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the text value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the resolved or transformed text."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the placeholder operation completes."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when PlaceholderAPI cannot resolve the text."
+      },
+      {
+        "id": "operation_result",
+        "displayName": "Operation Result",
+        "name": "operation_result",
+        "pinType": "DATA",
+        "dataType": "result<string>",
+        "description": "Returns the structured success or failure result."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the stable error code when the operation fails."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the placeholder operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player_one",
+          "target": "player_one"
+        },
+        {
+          "direction": "input",
+          "source": "player_two",
+          "target": "player_two"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "operation_result",
+          "target": "operation_result"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    },
+    "aliases": [
+      "placeholder set"
+    ]
+  },
+  {
+    "id": "placeholder.placeholder_remove",
+    "displayName": "Parse Bracket Placeholder",
+    "description": "Resolve bracket-style PlaceholderAPI placeholders.",
+    "domain": "placeholder",
+    "family": "text",
+    "lifecycle": "active",
+    "handlerCapability": "placeholderapi",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "placeholder.placeholder_remove",
+      "placeholder_remove"
+    ],
+    "tags": [
+      "placeholder",
+      "text",
+      "placeholder-remove"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "PlaceholderAPI",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": false,
+    "destructive": false,
+    "auditPolicy": "none",
+    "confirmationPolicy": "none",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_remove"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the placeholder operation when this execution route is reached."
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the text value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the resolved or transformed text."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the placeholder operation completes."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when PlaceholderAPI cannot resolve the text."
+      },
+      {
+        "id": "operation_result",
+        "displayName": "Operation Result",
+        "name": "operation_result",
+        "pinType": "DATA",
+        "dataType": "result<string>",
+        "description": "Returns the structured success or failure result."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the stable error code when the operation fails."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the placeholder operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "operation_result",
+          "target": "operation_result"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    },
+    "aliases": [
+      "placeholder remove"
+    ]
+  },
+  {
+    "id": "placeholder.strip.brackets",
+    "displayName": "Strip Placeholder Brackets",
+    "description": "Remove placeholder marker characters from text without contacting PlaceholderAPI.",
+    "domain": "placeholder",
+    "family": "text",
+    "lifecycle": "active",
+    "handlerCapability": "placeholder.text",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "UTILITY",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "placeholder.strip.brackets",
+      "placeholder_strip_brackets"
+    ],
+    "tags": [
+      "placeholder",
+      "text",
+      "placeholder-strip-brackets"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "PlaceholderAPI",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": false,
+    "destructive": false,
+    "auditPolicy": "none",
+    "confirmationPolicy": "none",
+    "handler": "PlaceholderHandler",
+    "handlerConfig": {
+      "operation": "placeholder_strip_brackets"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the placeholder operation when this execution route is reached."
+      },
+      {
+        "id": "text",
+        "displayName": "Text",
+        "name": "text",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the text value used by this operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues after the placeholder operation completes."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the resolved or transformed text."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when PlaceholderAPI cannot resolve the text."
+      },
+      {
+        "id": "operation_result",
+        "displayName": "Operation Result",
+        "name": "operation_result",
+        "pinType": "DATA",
+        "dataType": "result<string>",
+        "description": "Returns the structured success or failure result."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the stable error code when the operation fails."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the placeholder operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "text",
+          "target": "text"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "operation_result",
+          "target": "operation_result"
+        },
+        {
+          "direction": "output",
+          "source": "error_code",
+          "target": "error_code"
+        },
+        {
+          "direction": "output",
+          "source": "message",
+          "target": "message"
+        }
+      ]
+    },
+    "aliases": [
+      "placeholder strip brackets"
+    ]
+  }
+]

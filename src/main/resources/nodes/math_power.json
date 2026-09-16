@@ -1,0 +1,130 @@
+[
+  {
+    "id": "math_log",
+    "displayName": "Log",
+    "description": "Returns the natural logarithm of a positive finite number. Non-positive or non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "logarithm", "natural-log"],
+    "legacyIds": ["math.log"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "log"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Positive finite number whose natural logarithm should be returned. Non-positive or non-finite inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "log", "displayName": "Log", "name": "log", "pinType": "DATA", "dataType": "number", "description": "Returns the natural logarithm of the input."}
+    ]
+  },
+  {
+    "id": "math_log10",
+    "displayName": "Log10",
+    "description": "Returns the base-10 logarithm of a positive finite number. Non-positive or non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "logarithm", "base-10"],
+    "legacyIds": ["math.log10"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "log10"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Positive finite number whose base-10 logarithm should be returned. Non-positive or non-finite inputs fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "log10", "displayName": "Log10", "name": "log10", "pinType": "DATA", "dataType": "number", "description": "Returns the base-10 logarithm of the input."}
+    ]
+  },
+  {
+    "id": "math_pow",
+    "displayName": "Power",
+    "description": "Raises a finite base to a finite exponent. Non-finite inputs or results fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "power"],
+    "legacyIds": ["math.pow"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "pow"},
+    "inputs": [
+      {"id": "base", "displayName": "Base", "name": "base", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to raise to the exponent."},
+      {"id": "exponent", "displayName": "Exponent", "name": "exponent", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Finite exponent applied to the base. Non-finite inputs or results fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the base raised to the exponent."}
+    ]
+  },
+  {
+    "id": "math_power",
+    "displayName": "Power Alias",
+    "description": "Raises a finite base to a finite exponent using the power operation. Non-finite inputs or results fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "power", "alias"],
+    "legacyIds": ["math.power"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "power"},
+    "inputs": [
+      {"id": "base", "displayName": "Base", "name": "base", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to raise to the exponent."},
+      {"id": "exponent", "displayName": "Exponent", "name": "exponent", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite exponent applied to the base. Non-finite inputs or results fail before a result is published."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the base raised to the exponent."}
+    ]
+  },
+  {
+    "id": "math_round_decimal",
+    "displayName": "Round Decimal",
+    "description": "Rounds a finite number to the requested decimal places. Decimal places are clamped to [-15, 15] before rounding. Non-finite numeric inputs or results fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "rounding", "decimal"],
+    "legacyIds": ["math.round_decimal"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "round_decimal"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to round. Non-finite numeric inputs or results fail before a result is published."},
+      {"id": "decimal_places", "displayName": "Decimal Places", "name": "decimal_places", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Number of decimal places to retain. Decimal places are clamped to [-15, 15] before rounding."}
+    ],
+    "outputs": [
+      {"id": "rounded", "displayName": "Rounded", "name": "rounded", "pinType": "DATA", "dataType": "number", "description": "Returns the rounded number."}
+    ]
+  }
+]

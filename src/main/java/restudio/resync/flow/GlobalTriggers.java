@@ -1,32 +1,36 @@
 package restudio.resync.flow;
 
-import com.google.gson.Gson;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.FlowGraph;
 import restudio.resync.Log;
+import restudio.resync.server.TemporaryLifecycleDiagnostics;
 import restudio.resync.flow.triggers.TriggerBinding;
 import restudio.resync.flow.triggers.TriggerDefinitions;
 import restudio.resync.flow.triggers.TriggerDispatcher;
 import restudio.resync.flow.triggers.TriggerRegistry;
 import restudio.resync.flow.triggers.TriggerType;
+import restudio.resync.flow.identity.CorrelationId;
 import restudio.resync.text.ReTextService;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -38,44 +42,94 @@ public class GlobalTriggers implements Listener {
     private final TriggerDispatcher triggerDispatcher;
     private final ReTextService text;
     private SystemEventListener systemEventListener;
-    private final Gson gson = new Gson();
-
-    private final Map<String, CommandTrigger> commandTriggers = new ConcurrentHashMap<>();
+    private volatile boolean runtimeBindingsActive;
+    private volatile Map<String, CommandTrigger> commandTriggers = Map.of();
     private final Map<String, RuntimeFlowCommand> runtimeCommands = new ConcurrentHashMap<>();
-    private static final Set<String> RESYNC_COMMAND_EVENT_TYPES = Set.of("event.resync.command", "event:resync_command");
-
     private static class CommandTrigger {
+        private final String bindingId;
         private final String flowId;
         private final String startNode;
         private final String command;
+        private final List<String> aliases;
         private final List<String> subcommands;
         private final List<List<String>> commandPaths;
         private final boolean structured;
+        private final boolean enabled;
+        private final String permission;
+        private final String permissionMessage;
+        private final String description;
+        private final String usage;
+        private final Map<String, Object> metadata;
+        private final FlowGraph graph;
 
-        private CommandTrigger(String flowId, String startNode, String command, List<String> subcommands, List<List<String>> commandPaths, boolean structured) {
-            this.flowId = flowId;
-            this.startNode = startNode;
-            this.command = command;
-            this.subcommands = subcommands;
-            this.commandPaths = commandPaths;
-            this.structured = structured;
+        private CommandTrigger(TypedCommandGraphAdapter.CommandBinding binding, FlowGraph graph) {
+            this.bindingId = binding.bindingId();
+            this.flowId = binding.graphId();
+            this.startNode = binding.nodeId();
+            this.command = binding.command();
+            this.aliases = binding.aliases();
+            this.subcommands = binding.subcommands();
+            this.commandPaths = binding.commandPaths();
+            this.structured = binding.structured();
+            this.enabled = binding.enabled();
+            this.permission = binding.permission();
+            this.permissionMessage = binding.permissionMessage();
+            this.description = binding.description();
+            this.usage = binding.usage();
+            this.metadata = binding.metadata();
+            this.graph = Objects.requireNonNull(graph, "Command Graph Snapshot Is Required");
         }
-    }
 
-    private static class CommandContextPayload {
-        private String command;
-        private List<String> subcommands;
-        private Boolean structured;
+        private boolean matchesLabel(String label) {
+            return command.equals(label) || aliases.contains(label);
+        }
     }
 
     private class RuntimeFlowCommand extends Command {
         private final String baseLabel;
+        private final CommandTrigger trigger;
 
-        private RuntimeFlowCommand(String label) {
-            super(label);
-            this.baseLabel = label;
-            setDescription("ReSync flow command");
-            setUsage("/" + label);
+        private RuntimeFlowCommand(CommandTrigger trigger) {
+            super(trigger.command);
+            this.baseLabel = trigger.command;
+            this.trigger = trigger;
+            setDescription(trigger.description.isBlank() ? "ReSync flow command" : trigger.description);
+            setUsage(trigger.usage.isBlank() ? "/" + trigger.command : trigger.usage);
+            if (!trigger.permission.isBlank()) {
+                setPermission(trigger.permission);
+            }
+            if (!trigger.permissionMessage.isBlank()) {
+                setPermissionMessage(trigger.permissionMessage);
+            }
+            if (!trigger.aliases.isEmpty()) {
+                setAliases(trigger.aliases);
+            }
+        }
+
+        private List<String> aliases() {
+            return trigger.aliases;
+        }
+
+        private boolean matches(CommandTrigger expected, Map<String, Command> knownCommands, String pluginPrefix) {
+            if (!trigger.bindingId.equals(expected.bindingId)
+                || trigger.graph.getResourceRevision() != expected.graph.getResourceRevision()
+                || !Objects.equals(trigger.graph.getResourceHash(), expected.graph.getResourceHash())
+                || !trigger.command.equals(expected.command)
+                || !trigger.aliases.equals(expected.aliases)
+                || !trigger.subcommands.equals(expected.subcommands)
+                || !trigger.commandPaths.equals(expected.commandPaths)
+                || trigger.structured != expected.structured
+                || trigger.enabled != expected.enabled
+                || !trigger.permission.equals(expected.permission)
+                || !trigger.permissionMessage.equals(expected.permissionMessage)
+                || !trigger.description.equals(expected.description)
+                || !trigger.usage.equals(expected.usage)
+                || !trigger.metadata.equals(expected.metadata)) {
+                return false;
+            }
+            return knownCommands == null
+                || knownCommands.get(baseLabel) == this
+                || knownCommands.get(pluginPrefix + baseLabel) == this;
         }
 
         @Override
@@ -84,16 +138,11 @@ public class GlobalTriggers implements Listener {
                 return false;
             }
             String normalizedLabel = normalizeCommandLabel(commandLabel);
-            String joinedArgs = String.join(" ", args);
-            Player player = sender instanceof Player p ? p : null;
-            boolean isConsole = !(sender instanceof Player);
-            boolean handled = false;
-            for (CommandTrigger trigger : commandTriggers.values()) {
-                if (trigger.command.equals(normalizedLabel) && executeCommandTrigger(trigger, normalizedLabel, joinedArgs, player, null, isConsole)) {
-                    handled = true;
-                }
+            if (!testPermission(sender)) {
+                return true;
             }
-            return handled;
+            return trigger.matchesLabel(normalizedLabel)
+                && executeCommandTrigger(trigger, normalizedLabel, List.of(args), sender);
         }
 
         @Override
@@ -114,7 +163,7 @@ public class GlobalTriggers implements Listener {
                 }
             }
             for (CommandTrigger trigger : commandTriggers.values()) {
-                if (!trigger.command.equals(normalizedLabel) || trigger.commandPaths.isEmpty()) {
+                if (!trigger.matchesLabel(normalizedLabel) || trigger.commandPaths.isEmpty()) {
                     continue;
                 }
                 completions.addAll(collectPathSuggestions(trigger, argsTokens, currentArg));
@@ -124,6 +173,11 @@ public class GlobalTriggers implements Listener {
     }
 
     public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry, ReTextService text) {
+        this(storage, executor, triggerRegistry, text, true);
+    }
+
+    public GlobalTriggers(FlowStorage storage, FlowExecutor executor, TriggerRegistry triggerRegistry, ReTextService text,
+                          boolean activateBindings) {
         this.plugin = triggerRegistry.getPlugin();
         this.storage = storage;
         this.executor = executor;
@@ -131,12 +185,42 @@ public class GlobalTriggers implements Listener {
         this.text = text;
         this.triggerDispatcher = new TriggerDispatcher(storage, executor, triggerRegistry.getPlugin());
         this.triggerDispatcher.registerFromContainer(new TriggerDefinitions());
-        this.systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
-        refreshBindings();
+        if (activateBindings) {
+            activateRuntimeBindings();
+        }
+    }
+
+    public void activateRuntimeBindings() {
+        if (systemEventListener == null) {
+            systemEventListener = new SystemEventListener(storage, executor, triggerRegistry);
+            systemEventListener.setCompiledExecution(triggerDispatcher.getCompiledExecution());
+        }
+        runtimeBindingsActive = true;
+        storage.setTypedCommandGraphChangeListener(ignored -> refreshBindings());
+        try {
+            refreshBindings();
+        } catch (RuntimeException | Error failure) {
+            try {
+                shutdownRuntimeCommands();
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
     }
 
     public TriggerDispatcher getTriggerDispatcher() {
         return triggerDispatcher;
+    }
+
+    public void setCompiledExecution(CompiledTriggerExecution compiledExecution) {
+        triggerDispatcher.setCompiledExecution(compiledExecution);
+        if (compiledExecution != null) {
+            commandTriggers.values().stream().map(trigger -> trigger.graph).distinct().forEach(compiledExecution::prepare);
+            if (systemEventListener != null) {
+                systemEventListener.setCompiledExecution(compiledExecution);
+            }
+        }
     }
 
     public SystemEventListener getSystemEventListener() {
@@ -163,7 +247,7 @@ public class GlobalTriggers implements Listener {
         }
 
         String startNode = findStartNodeForEvent(graph, eventType);
-        if (startNode == null) {
+        if (startNode == null && !eventType.contains("/")) {
             startNode = findStartNode(graph);
         }
         if (startNode == null) {
@@ -172,65 +256,6 @@ public class GlobalTriggers implements Listener {
         }
 
         triggerDispatcher.registerBinding(eventType.toLowerCase(), flowId, startNode);
-    }
-
-    private void registerCommandTrigger(TriggerBinding binding) {
-        if (binding == null || binding.getFlowId() == null) {
-            return;
-        }
-        FlowGraph graph = storage.getGraph("command", binding.getFlowId());
-        if (graph == null || !graph.isEnabled()) {
-            return;
-        }
-        String startNode = null;
-        for (var entry : graph.getNodes().entrySet()) {
-            if (entry.getValue() != null && RESYNC_COMMAND_EVENT_TYPES.contains(entry.getValue().getType())) {
-                startNode = entry.getKey();
-                break;
-            }
-        }
-        if (startNode == null) {
-            startNode = findStartNode(graph);
-        }
-        if (startNode == null) {
-            return;
-        }
-        String context = binding.getContext();
-        if (context == null || context.isBlank()) {
-            return;
-        }
-        String command = null;
-        List<String> subcommands = new ArrayList<>();
-        boolean structured = false;
-        String trimmed = context.trim();
-        if (trimmed.startsWith("{")) {
-            try {
-                CommandContextPayload payload = gson.fromJson(trimmed, CommandContextPayload.class);
-                if (payload != null) {
-                    command = payload.command;
-                    if (payload.subcommands != null) {
-                        for (String subcommand : payload.subcommands) {
-                            if (subcommand != null && !subcommand.isBlank()) {
-                                subcommands.add(subcommand.trim());
-                            }
-                        }
-                    }
-                    structured = payload.structured != null && payload.structured;
-                }
-            } catch (RuntimeException exception) {
-                Log.warn("Rejected invalid command trigger context for " + binding.getFlowId() + ": " + exception.getMessage());
-                return;
-            }
-        } else {
-            command = trimmed;
-        }
-        String normalizedCommand = normalizeCommandLabel(command);
-        if (normalizedCommand == null) {
-            return;
-        }
-        List<List<String>> commandPaths = parseCommandPaths(subcommands);
-        String key = binding.getId() != null ? binding.getId() : binding.getFlowId() + ":" + normalizedCommand;
-        commandTriggers.put(key, new CommandTrigger(binding.getFlowId(), startNode, normalizedCommand, subcommands, commandPaths, structured));
     }
 
     private String normalizeCommandLabel(String label) {
@@ -262,28 +287,6 @@ public class GlobalTriggers implements Listener {
             }
         }
         return parsed;
-    }
-
-    private List<List<String>> parseCommandPaths(List<String> entries) {
-        List<List<String>> paths = new ArrayList<>();
-        if (entries == null) {
-            return paths;
-        }
-        for (String entry : entries) {
-            if (entry == null || entry.isBlank()) {
-                continue;
-            }
-            List<String> tokens = new ArrayList<>();
-            for (String token : entry.trim().split("\\s+")) {
-                if (!token.isBlank()) {
-                    tokens.add(token.trim());
-                }
-            }
-            if (!tokens.isEmpty()) {
-                paths.add(tokens);
-            }
-        }
-        return paths;
     }
 
     private List<String> resolveDynamicTokenValues(String token) {
@@ -451,35 +454,101 @@ public class GlobalTriggers implements Listener {
         return token != null && token.toLowerCase(Locale.ROOT).startsWith("<text:") && token.endsWith(">");
     }
 
-    private boolean executeCommandTrigger(CommandTrigger trigger, String commandLabel, String args, Player player, Event event, boolean isConsole) {
+    private boolean executeCommandTrigger(CommandTrigger trigger, String commandLabel, List<String> argsList, CommandSender sender) {
         if (trigger == null || commandLabel == null) {
             return false;
         }
-        List<String> argsList = parseArgsList(args);
-        String firstArg = argsList.isEmpty() ? "" : argsList.getFirst();
         if (trigger.structured && !trigger.commandPaths.isEmpty()) {
             boolean matchedPath = trigger.commandPaths.stream().anyMatch(path -> matchesCommandPath(path, argsList));
             if (!matchedPath) {
                 return false;
             }
         }
-        FlowGraph graph = storage.getGraph("command", trigger.flowId);
-        if (graph == null || !graph.isEnabled()) {
+        CorrelationId invocationId = CorrelationId.random();
+        long started = TemporaryLifecycleDiagnostics.start();
+        Map<String, Object> ingressIdentity = TemporaryLifecycleDiagnostics.with(
+            TemporaryLifecycleDiagnostics.identity(null, "command:" + trigger.flowId, "trigger-execution", null, null,
+                invocationId, null, null, null, null),
+            "source", "command", "bindingId", trigger.bindingId, "startNodeId", trigger.startNode,
+            "outcome", "matched");
+        TemporaryLifecycleDiagnostics.event("trigger_ingress", started, ingressIdentity);
+        Map<String, Object> terminalIdentity = ingressIdentity;
+        String failureCode = "TRIGGER.GRAPH_UNAVAILABLE";
+        String failureReason = "graph-resolution-failed";
+        try {
+            FlowGraph graph = trigger.graph;
+            if (graph == null || !graph.isEnabled()) {
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, ingressIdentity, "rejected",
+                    "TRIGGER.GRAPH_UNAVAILABLE", graph == null ? "graph-unavailable" : "graph-disabled");
+                CompiledTriggerExecution.warnInvocation("command|" + trigger.flowId + "|TRIGGER.GRAPH_UNAVAILABLE",
+                    "Command trigger invocation rejected correlationId=" + invocationId.canonicalText()
+                        + " diagnosticCode=TRIGGER.GRAPH_UNAVAILABLE");
+                return false;
+            }
+            Map<String, Object> bindingIdentity = TemporaryLifecycleDiagnostics.with(ingressIdentity,
+                "revision", graph.getResourceRevision(), "graphHash", graph.getResourceHash(), "outcome", "selected");
+            terminalIdentity = bindingIdentity;
+            TemporaryLifecycleDiagnostics.event("trigger_binding_selected", started, bindingIdentity);
+            failureCode = "TRIGGER.CONTEXT_REJECTED";
+            failureReason = "context-adaptation-failed";
+            Player player = sender instanceof Player current ? current : null;
+            Map<String, Object> eventVars = commandVariables(sender, trigger.command, commandLabel, argsList);
+            eventVars.put("event.command_structured", trigger.structured);
+            eventVars.put("event.command_allowed_subcommands", trigger.subcommands);
+            CompiledTriggerExecution execution = triggerDispatcher.getCompiledExecution();
+            if (execution == null) {
+                TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, bindingIdentity, "rejected",
+                    "TRIGGER.EXECUTOR_UNAVAILABLE", "compiled-executor-unavailable");
+                CompiledTriggerExecution.warnInvocation("command|" + trigger.flowId + "|TRIGGER.EXECUTOR_UNAVAILABLE",
+                    "Command trigger invocation rejected correlationId=" + invocationId.canonicalText()
+                        + " diagnosticCode=TRIGGER.EXECUTOR_UNAVAILABLE");
+                return false;
+            }
+            failureCode = "TRIGGER.EXECUTOR_REJECTED";
+            failureReason = "synchronous-rejection";
+            CompletableFuture<Void> future = execution.execute(graph, trigger.startNode, player, null, eventVars, null, invocationId);
+            execution.observe(future, invocationId, "command:" + trigger.flowId);
+        } catch (RuntimeException failure) {
+            TemporaryLifecycleDiagnostics.terminal("trigger_execution_terminal", started, terminalIdentity, "failed",
+                failureCode, failureReason);
+            CompiledTriggerExecution.warnInvocation("command|" + trigger.flowId + "|" + failureCode,
+                "Command trigger invocation failed correlationId=" + invocationId.canonicalText()
+                    + " diagnosticCode=" + failureCode);
             return false;
         }
-        Map<String, Object> eventVars = new HashMap<>();
-        setEventVariables(player, eventVars);
-        eventVars.put("event.command_label", commandLabel);
-        eventVars.put("event.args", args);
-        eventVars.put("event.args_list", new ArrayList<>(argsList));
-        eventVars.put("event.args_count", argsList.size());
-        eventVars.put("event.command_subcommand", firstArg);
-        eventVars.put("event.command_structured", trigger.structured);
-        eventVars.put("event.command_allowed_subcommands", new ArrayList<>(trigger.subcommands));
-        eventVars.put("event.is_console", isConsole);
-        eventVars.put("event.bound_command", trigger.command);
-        executor.execute(graph, trigger.startNode, player, event, eventVars);
         return true;
+    }
+
+    public static Map<String, Object> commandVariables(CommandSender sender, String boundCommand, String commandLabel, List<String> arguments) {
+        List<String> args = List.copyOf(arguments);
+        Map<String, Object> variables = new HashMap<>();
+        if (sender instanceof Player player) {
+            variables.put("event.player", player);
+        }
+        String joined = String.join(" ", args);
+        variables.put("event.command", (sender instanceof Player ? "/" : "") + commandLabel + (joined.isEmpty() ? "" : " " + joined));
+        variables.put("event.is_cancelled", false);
+        variables.put("event.bound_command", boundCommand);
+        variables.put("event.command_label", commandLabel);
+        variables.put("event.args", joined);
+        variables.put("event.args_list", args);
+        variables.put("event.args_count", args.size());
+        variables.put("event.is_console", sender instanceof ConsoleCommandSender);
+        variables.put("event.command_subcommand", args.isEmpty() ? "" : args.getFirst());
+        variables.put("event.command_structured", false);
+        variables.put("event.command_allowed_subcommands", List.of());
+        return variables;
+    }
+
+    public static Map<String, Object> commandEventVariables(CommandSender sender, String command, boolean cancelled) {
+        String content = command.startsWith("/") ? command.substring(1) : command;
+        String[] tokens = content.strip().split("\\s+");
+        String label = tokens.length == 0 ? "" : tokens[0];
+        List<String> args = tokens.length < 2 ? List.of() : List.of(tokens).subList(1, tokens.length);
+        Map<String, Object> variables = commandVariables(sender, "", label, args);
+        variables.put("event.command", command);
+        variables.put("event.is_cancelled", cancelled);
+        return variables;
     }
 
     private CommandMap resolveCommandMap() {
@@ -501,10 +570,12 @@ public class GlobalTriggers implements Listener {
     }
 
     public void shutdownRuntimeCommands() {
+        runtimeBindingsActive = false;
+        storage.setTypedCommandGraphChangeListener(null);
         CommandMap commandMap = resolveCommandMap();
         if (commandMap == null) {
             runtimeCommands.clear();
-            commandTriggers.clear();
+            commandTriggers = Map.of();
             return;
         }
         Map<String, Command> knownCommands = resolveKnownCommands(commandMap);
@@ -515,10 +586,14 @@ public class GlobalTriggers implements Listener {
             if (knownCommands != null) {
                 knownCommands.remove(entry.getKey(), command);
                 knownCommands.remove(pluginPrefix + entry.getKey(), command);
+                command.aliases().forEach(alias -> {
+                    knownCommands.remove(alias, command);
+                    knownCommands.remove(pluginPrefix + alias, command);
+                });
             }
         }
         runtimeCommands.clear();
-        commandTriggers.clear();
+        commandTriggers = Map.of();
     }
 
     private void refreshRuntimeCommands() {
@@ -527,43 +602,68 @@ public class GlobalTriggers implements Listener {
             return;
         }
         Map<String, Command> knownCommands = resolveKnownCommands(commandMap);
-        Set<String> desired = new HashSet<>();
-        for (CommandTrigger trigger : commandTriggers.values()) {
-            desired.add(trigger.command);
-        }
+        Map<String, CommandTrigger> desired = new LinkedHashMap<>();
+        commandTriggers.values().forEach(trigger -> desired.put(trigger.command, trigger));
         String pluginPrefix = plugin.getName().toLowerCase(Locale.ROOT) + ":";
 
         for (Map.Entry<String, RuntimeFlowCommand> entry : new ArrayList<>(runtimeCommands.entrySet())) {
-            if (desired.contains(entry.getKey())) {
+            if (desired.containsKey(entry.getKey()) && entry.getValue().matches(desired.get(entry.getKey()), knownCommands, pluginPrefix)) {
                 continue;
             }
             RuntimeFlowCommand command = entry.getValue();
             command.unregister(commandMap);
             runtimeCommands.remove(entry.getKey());
             if (knownCommands != null) {
-                knownCommands.remove(entry.getKey());
-                knownCommands.remove(pluginPrefix + entry.getKey());
+                knownCommands.remove(entry.getKey(), command);
+                knownCommands.remove(pluginPrefix + entry.getKey(), command);
+                command.aliases().forEach(alias -> {
+                    knownCommands.remove(alias, command);
+                    knownCommands.remove(pluginPrefix + alias, command);
+                });
             }
         }
 
-        for (String commandLabel : desired) {
+        for (Map.Entry<String, CommandTrigger> desiredEntry : desired.entrySet()) {
+            String commandLabel = desiredEntry.getKey();
+            CommandTrigger trigger = desiredEntry.getValue();
             RuntimeFlowCommand current = runtimeCommands.get(commandLabel);
-            if (current != null && (knownCommands == null || knownCommands.get(commandLabel) == current || knownCommands.get(pluginPrefix + commandLabel) == current)) {
+            if (current != null && current.matches(trigger, knownCommands, pluginPrefix)) {
                 continue;
             }
             if (current != null) {
                 current.unregister(commandMap);
                 runtimeCommands.remove(commandLabel);
+                if (knownCommands != null) {
+                    knownCommands.remove(commandLabel, current);
+                    knownCommands.remove(pluginPrefix + commandLabel, current);
+                    current.aliases().forEach(alias -> {
+                        knownCommands.remove(alias, current);
+                        knownCommands.remove(pluginPrefix + alias, current);
+                    });
+                }
+            }
+            boolean externalCollision = knownCommands != null
+                && triggerLabelsOwnedByOtherCommand(trigger, knownCommands, pluginPrefix);
+            if (externalCollision) {
+                Log.warn("Rejected typed command registration because a server command already owns: " + commandLabel);
+                continue;
             }
             removeKnownRuntimeCommand(commandMap, knownCommands, commandLabel);
             removeKnownRuntimeCommand(commandMap, knownCommands, pluginPrefix + commandLabel);
-            RuntimeFlowCommand command = new RuntimeFlowCommand(commandLabel);
+            RuntimeFlowCommand command = new RuntimeFlowCommand(trigger);
             commandMap.register(plugin.getName().toLowerCase(Locale.ROOT), command);
             runtimeCommands.put(commandLabel, command);
         }
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
             onlinePlayer.updateCommands();
         }
+    }
+
+    private boolean triggerLabelsOwnedByOtherCommand(CommandTrigger trigger, Map<String, Command> knownCommands, String pluginPrefix) {
+        return trigger.aliases.stream().anyMatch(alias -> (knownCommands.containsKey(alias) && !isRuntimeFlowCommand(knownCommands.get(alias)))
+                || (knownCommands.containsKey(pluginPrefix + alias) && !isRuntimeFlowCommand(knownCommands.get(pluginPrefix + alias))))
+            || (knownCommands.containsKey(trigger.command) && !isRuntimeFlowCommand(knownCommands.get(trigger.command)))
+            || (knownCommands.containsKey(pluginPrefix + trigger.command) && !isRuntimeFlowCommand(knownCommands.get(pluginPrefix + trigger.command)));
     }
 
     private void removeKnownRuntimeCommand(CommandMap commandMap, Map<String, Command> knownCommands, String key) {
@@ -583,38 +683,78 @@ public class GlobalTriggers implements Listener {
             return false;
         }
         return command instanceof RuntimeFlowCommand
-            || RuntimeFlowCommand.class.getName().equals(command.getClass().getName())
-            || "ReSync flow command".equals(command.getDescription());
+            || RuntimeFlowCommand.class.getName().equals(command.getClass().getName());
     }
 
     public void refreshBindings() {
+        if (!runtimeBindingsActive) {
+            return;
+        }
+        long started = TemporaryLifecycleDiagnostics.start();
         if (!Bukkit.isPrimaryThread()) {
             try {
                 Bukkit.getScheduler().callSyncMethod(plugin, () -> {
                     refreshBindingsNow();
                     return null;
                 }).get(10, TimeUnit.SECONDS);
+                TemporaryLifecycleDiagnostics.event("command_refresh_wait", started,
+                    TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "outcome", "complete",
+                        "queueWaitMs", elapsedMillis(started))));
             } catch (Exception exception) {
+                TemporaryLifecycleDiagnostics.terminal("command_refresh_wait", started, Map.of("operation", "refreshBindings"),
+                    "failed", "COMMAND_REFRESH.WAIT_FAILED", exception.getClass().getSimpleName());
                 throw new IllegalStateException("Could not refresh flow commands on the server thread", exception);
             }
             return;
         }
         refreshBindingsNow();
+        TemporaryLifecycleDiagnostics.event("command_refresh_wait", started,
+            TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "outcome", "complete",
+                "queueWaitMs", 0L)));
     }
 
     private synchronized void refreshBindingsNow() {
+        if (!runtimeBindingsActive) {
+            return;
+        }
+        long started = TemporaryLifecycleDiagnostics.start();
+        TypedCommandGraphAdapter.Snapshot commandSnapshot = storage.getTypedCommandGraphSnapshot();
+        commandSnapshot.rejections().forEach(rejection -> Log.warn("Rejected typed command graph " + rejection.graphId() + ": " + rejection.detail()));
+        Map<String, CommandTrigger> nextCommands = new LinkedHashMap<>();
+        for (TypedCommandGraphAdapter.CommandBinding binding : commandSnapshot.activeBindings()) {
+            FlowGraph graph = storage.getCommandGraph(binding.graphId());
+            if (graph == null) {
+                Log.warn("Rejected typed command graph " + binding.graphId() + ": command graph snapshot is unavailable");
+                continue;
+            }
+            CompiledTriggerExecution execution = triggerDispatcher.getCompiledExecution();
+            if (execution != null) {
+                try {
+                    execution.prepare(graph);
+                } catch (RuntimeException exception) {
+                    Log.warn("Rejected typed command graph " + binding.graphId() + ": " + exception.getMessage(), exception);
+                    execution.retire("command", binding.graphId());
+                    continue;
+                }
+            }
+            CommandTrigger trigger = new CommandTrigger(binding, graph);
+            for (String label : binding.labels()) {
+                nextCommands.put(label + "\u0000" + binding.bindingId(), trigger);
+            }
+        }
         triggerDispatcher.clearBindings();
-        commandTriggers.clear();
+        commandTriggers = Collections.unmodifiableMap(new LinkedHashMap<>(nextCommands));
 
         if (triggerRegistry == null) {
+            TemporaryLifecycleDiagnostics.event("command_refresh", started,
+                TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "activeCount", commandSnapshot.activeBindings().size(),
+                    "rejectionCount", commandSnapshot.rejections().size(), "runtimeCount", runtimeCommands.size(),
+                    "outcome", "noTriggerRegistry")));
             return;
         }
 
         for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.EVENT)) {
             registerTrigger(binding.getContext(), binding.getFlowId());
-        }
-        for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.COMMAND)) {
-            registerCommandTrigger(binding);
         }
         refreshRuntimeCommands();
 
@@ -623,6 +763,25 @@ public class GlobalTriggers implements Listener {
             for (TriggerBinding binding : triggerRegistry.getBindings(TriggerType.SYSTEM)) {
                 systemEventListener.registerTrigger(binding.getContext(), binding.getFlowId());
             }
+        }
+        TemporaryLifecycleDiagnostics.event("command_refresh", started,
+            TemporaryLifecycleDiagnostics.with(Map.of("operation", "refreshBindings", "activeCount", commandSnapshot.activeBindings().size(),
+                "rejectionCount", commandSnapshot.rejections().size(), "runtimeCount", runtimeCommands.size(),
+                "eventCount", triggerRegistry.getBindings(TriggerType.EVENT).size(),
+                "systemCount", triggerRegistry.getBindings(TriggerType.SYSTEM).size(), "outcome", "complete")));
+    }
+
+    private static long elapsedMillis(long started) {
+        return started == 0L ? 0L : TimeUnit.NANOSECONDS.toMillis(Math.max(0L, System.nanoTime() - started));
+    }
+
+    public void refreshGraph(String graphId) {
+        if (!runtimeBindingsActive) {
+            return;
+        }
+        triggerDispatcher.refreshGraph(graphId);
+        if (systemEventListener != null) {
+            systemEventListener.refreshGraph(graphId);
         }
     }
 
@@ -637,6 +796,15 @@ public class GlobalTriggers implements Listener {
     }
 
     private String findStartNodeForEvent(FlowGraph graph, String eventType) {
+        if (eventType != null && eventType.contains("/")) {
+            if (!triggerDispatcher.hasEventType(eventType)) {
+                return null;
+            }
+            return graph.getNodes().entrySet().stream()
+                .filter(entry -> entry.getValue() != null && (eventType.equals(entry.getValue().getType())
+                    || eventType.equals(executor.eventBindingContext(entry.getValue().getType()))))
+                .map(Map.Entry::getKey).findFirst().orElse(null);
+        }
         String normalizedRequested = normalizeEventKey(eventType);
         String canonicalRequested = triggerDispatcher.resolveEventType(normalizedRequested);
 

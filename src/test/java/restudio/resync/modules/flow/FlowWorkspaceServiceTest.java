@@ -4,14 +4,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowSerializer;
 import restudio.resync.core.CollaborationIdentity;
 import restudio.resync.core.ConnectionInfo;
 import restudio.resync.core.Session;
-import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.ResourceRevisionConflictException;
 import restudio.resync.protocol.FrameSender;
 import restudio.resync.flow.workspace.WorkspacePatch;
@@ -19,7 +17,6 @@ import restudio.resync.resources.ReSyncManagedResource;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,26 +74,27 @@ class FlowWorkspaceServiceTest {
     }
 
     @Test
-    void cleanupDoesNotWaitForWorkspaceBroadcasts(@TempDir Path directory) throws Exception {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void cleanupDoesNotWaitForWorkspaceBroadcasts() throws Exception {
         FlowGraph graph = new FlowGraph();
         graph.setId("shared");
         graph.setResourceType("flow");
         graph.getNodes().put("first", new FlowNode("event:startup", 10, 20, Map.of()));
-        storage.saveGraph(graph);
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter(graph);
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        resources.register(adapter);
         BlockingWorkspaceSender sender = new BlockingWorkspaceSender();
-        FlowWorkspaceService workspaceService = new FlowWorkspaceService(storage, sender, null);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, sender, null, resources);
         Session first = session("first");
         Session second = session("second");
         ByteBuffer join = jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """);
         workspaceService.handleJoin(first, join.duplicate());
         workspaceService.handleJoin(second, join.duplicate());
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             executor.submit(() -> workspaceService.handleOperation(first, jsonBuffer("""
-                {"type":"flow","resourceId":"shared","operationId":"move","baseSequence":0,
+                {"type":"fixture:graph","resourceId":"shared","operationId":"move","baseSequence":0,
                  "patches":[{"op":"set","path":"/nodes/first/x","value":80}]}
                 """)));
             assertTrue(sender.operationStarted.await(1, TimeUnit.SECONDS));
@@ -153,8 +152,129 @@ class FlowWorkspaceServiceTest {
     }
 
     @Test
-    void graphWorkspacePersistencePublishesTheAuthoritativeCommit(@TempDir Path directory) {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void workspaceDurableCompletionRunsExactlyOnceAfterPersist() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+
+        workspaceService.persistDocument("fixture:designer", "designer", object("""
+            {"id":"designer","value":"Saved"}
+            """));
+
+        assertEquals("Saved", adapter.values.get("designer").value());
+        assertEquals(1, adapter.afterSaves.get());
+        assertTrue(resources.save("fixture:designer", new FixtureResource("designer", "Next")).success());
+    }
+
+    @Test
+    void workspaceCancelsDroppedCompletionAfterPostSaveSerializationFailure() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        adapter.failSerializationAt(1);
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+
+        assertThrows(IllegalStateException.class, () -> workspaceService.persistDocument("fixture:designer", "designer", object("""
+            {"id":"designer","value":"Dropped"}
+            """)));
+
+        adapter.failSerializationAt(0);
+        workspaceService.persistDocument("fixture:designer", "designer", object("""
+            {"id":"designer","value":"Recovered"}
+            """));
+        assertEquals("Recovered", adapter.values.get("designer").value());
+    }
+
+    @Test
+    void workspaceCleanupCancelsPendingSessionContinuation() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+        resources.setWorkspaceService(workspaceService);
+        Session editor = session("editor");
+
+        resources.saveFromSession(editor, adapter, new FixtureResource("designer", "Pending"));
+        workspaceService.cleanup(editor);
+
+        assertTrue(resources.save("fixture:designer", new FixtureResource("designer", "Recovered")).success());
+    }
+
+    @Test
+    void workspaceShutdownClosesPendingSessionSavesWithoutMembership() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+        resources.setWorkspaceService(workspaceService);
+        Session editor = session("editor");
+
+        resources.saveFromSession(editor, adapter, new FixtureResource("designer", "Pending"));
+        workspaceService.shutdown();
+
+        assertTrue(resources.save("fixture:designer", new FixtureResource("designer", "Recovered")).success());
+        assertThrows(IllegalStateException.class,
+            () -> resources.saveFromSession(editor, adapter, new FixtureResource("designer", "Rejected")));
+    }
+
+    @Test
+    void workspaceRejectsSameKeyReentryBeforeCreatingAnotherCompletion() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+        AtomicReference<RuntimeException> duplicateFailure = new AtomicReference<>();
+        resources.setCommitListener(new FlowResourceCommitListener() {
+            @Override
+            public void saved(String type, String resourceId, String payload) {
+                try {
+                    workspaceService.persistDocument(type, resourceId, object("""
+                        {"id":"designer","value":"Reentered"}
+                        """));
+                } catch (RuntimeException exception) {
+                    duplicateFailure.set(exception);
+                }
+            }
+
+            @Override
+            public void deleted(String type, String resourceId) {
+            }
+        });
+
+        workspaceService.persistDocument("fixture:designer", "designer", object("""
+            {"id":"designer","value":"Saved"}
+            """));
+
+        assertTrue(duplicateFailure.get() instanceof IllegalStateException);
+        assertEquals(1, adapter.saves.get());
+    }
+
+    @Test
+    void workspaceDoesNotCancelForeignSameKeyCompletion() {
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        FixtureAdapter adapter = new FixtureAdapter();
+        adapter.values.put("designer", new FixtureResource("designer", "Initial"));
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, null, null, resources);
+        FlowResourceMutationLease.DeferredCompletion foreign = resources.saveAuthoritativeDurableHandle("fixture:designer",
+            new FixtureResource("designer", "Foreign"));
+
+        workspaceService.resourceDeleted("fixture:designer", "designer");
+
+        assertFalse(resources.save("fixture:designer", new FixtureResource("designer", "Blocked")).success());
+        assertTrue(foreign.cancel());
+        assertTrue(resources.save("fixture:designer", new FixtureResource("designer", "Recovered")).success());
+    }
+
+    @Test
+    void nonCoreGraphWorkspacePersistencePublishesTheAuthoritativeCommit() {
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter();
         FlowResourceRegistry resources = new FlowResourceRegistry();
         AtomicReference<String> committed = new AtomicReference<>("");
         resources.setCommitListener(new FlowResourceCommitListener() {
@@ -167,88 +287,48 @@ class FlowWorkspaceServiceTest {
             public void deleted(String type, String resourceId) {
             }
         });
-        resources.register(new FlowResourceAdapter<FlowGraph>() {
-            private final ReSyncManagedResource descriptor = new ReSyncManagedResource("flow", "Flow", "assets/Blueprints/Flows", null, true);
-
-            @Override
-            public ReSyncManagedResource descriptor() {
-                return descriptor;
-            }
-
-            @Override
-            public FlowGraph get(String id) {
-                return storage.getGraph("flow", id);
-            }
-
-            @Override
-            public List<String> listIds() {
-                return List.of();
-            }
-
-            @Override
-            public FlowGraph deserialize(String json) {
-                return FlowSerializer.deserialize(json);
-            }
-
-            @Override
-            public String serialize(FlowGraph value) {
-                return FlowSerializer.serialize(value);
-            }
-
-            @Override
-            public String id(FlowGraph value) {
-                return value.getId();
-            }
-
-            @Override
-            public void save(FlowGraph value) {
-                storage.saveGraph(value);
-            }
-
-            @Override
-            public void delete(String id) {
-            }
-        });
-        FlowWorkspaceService graphService = new FlowWorkspaceService(storage, null, null, null, resources);
+        resources.register(adapter);
+        FlowWorkspaceService graphService = new FlowWorkspaceService(null, null, null, null, resources);
         JsonObject document = object("""
             {"id":"shared","resourceType":"flow","version":2,"nodes":{},"connections":[],"localVariables":[]}
             """);
 
-        graphService.persistDocument("flow", "shared", document);
+        graphService.persistDocument("fixture:graph", "shared", document);
 
-        assertEquals("flow:shared", committed.get());
-        assertEquals(1L, storage.getGraph("flow", "shared").getResourceRevision());
+        assertEquals("fixture:graph:shared", committed.get());
+        assertEquals(1L, adapter.get("shared").getResourceRevision());
     }
 
     @Test
-    void requiresEachTransportToJoinTheWorkspace(@TempDir Path directory) {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void requiresEachTransportToJoinTheWorkspace() {
         FlowGraph original = new FlowGraph();
         original.setId("shared");
         original.setResourceType("flow");
         original.getNodes().put("first", new FlowNode("event:startup", 10, 20, Map.of()));
-        storage.saveGraph(original);
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter(original);
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        resources.register(adapter);
         RecordingWorkspaceSender sender = new RecordingWorkspaceSender();
-        FlowWorkspaceService workspaceService = new FlowWorkspaceService(storage, sender, null);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, sender, null, resources);
         Session direct = session("direct");
         direct.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "restudio"));
         Session bridge = session("bridge");
         bridge.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "minecraft"));
         workspaceService.handleJoin(direct, jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """));
         workspaceService.handleJoin(bridge, jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """));
         workspaceService.handleOperation(bridge, jsonBuffer("""
-            {"type":"flow","resourceId":"shared","operationId":"move-x","baseSequence":0,
+            {"type":"fixture:graph","resourceId":"shared","operationId":"move-x","baseSequence":0,
              "patches":[{"op":"set","path":"/nodes/first/x","value":80}]}
             """));
         workspaceService.handleAwareness(bridge, jsonBuffer("""
-            {"type":"flow","resourceId":"shared","state":{"x":0.5,"y":0.5}}
+            {"type":"fixture:graph","resourceId":"shared","state":{"x":0.5,"y":0.5}}
             """));
         workspaceService.handleJoin(session("observer"), jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """));
 
         JsonObject snapshot = JsonParser.parseString(sender.latestSnapshot.get()).getAsJsonObject();
@@ -258,22 +338,23 @@ class FlowWorkspaceServiceTest {
     }
 
     @Test
-    void leavingWorkspaceDiscardsUnsavedChanges(@TempDir Path directory) {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void leavingWorkspaceDiscardsUnsavedChanges() {
         FlowGraph graph = new FlowGraph();
         graph.setId("shared");
         graph.setResourceType("command");
         graph.getNodes().put("first", new FlowNode("event.resync.command", 10, 20, Map.of()));
-        storage.saveGraph(graph);
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter(graph);
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        resources.register(adapter);
         RecordingWorkspaceSender sender = new RecordingWorkspaceSender();
-        FlowWorkspaceService workspaceService = new FlowWorkspaceService(storage, sender, null);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, sender, null, resources);
         Session editor = session("editor");
         ByteBuffer target = jsonBuffer("""
-            {"type":"command","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """);
         workspaceService.handleJoin(editor, target.duplicate());
         workspaceService.handleOperation(editor, jsonBuffer("""
-            {"type":"command","resourceId":"shared","operationId":"move","baseSequence":0,
+            {"type":"fixture:graph","resourceId":"shared","operationId":"move","baseSequence":0,
              "patches":[{"op":"set","path":"/nodes/first/x","value":80}]}
             """));
         workspaceService.handleLeave(editor, target.duplicate());
@@ -281,58 +362,56 @@ class FlowWorkspaceServiceTest {
 
         JsonObject snapshot = JsonParser.parseString(sender.latestSnapshot.get()).getAsJsonObject();
         assertEquals(10, snapshot.getAsJsonObject("document").getAsJsonObject("nodes").getAsJsonObject("first").get("x").getAsInt());
-        assertEquals(10, storage.getGraph("command", "shared").getNodes().get("first").getX());
-        assertEquals(1L, storage.getGraph("command", "shared").getResourceRevision());
+        assertEquals(10, adapter.get("shared").getNodes().get("first").getX());
+        assertEquals(1L, adapter.get("shared").getResourceRevision());
     }
 
     @Test
-    void collaboratorSaveDoesNotOverwriteAnExternalCommit(@TempDir Path directory) throws Exception {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void collaboratorSaveDoesNotOverwriteAnExternalCommit() {
         FlowGraph original = new FlowGraph();
         original.setId("shared");
         original.setResourceType("flow");
         original.getNodes().put("first", new FlowNode("event:startup", 10, 20, Map.of()));
-        storage.saveGraph(original);
-        StorageGraphAdapter adapter = new StorageGraphAdapter(storage);
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter(original);
         FlowResourceRegistry resources = new FlowResourceRegistry();
         resources.register(adapter);
-        FlowWorkspaceService workspaceService = new FlowWorkspaceService(storage, null, new RecordingWorkspaceSender(), null, resources);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, new RecordingWorkspaceSender(), null, resources);
         Session editor = session("editor");
         workspaceService.handleJoin(editor, jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """));
         workspaceService.handleOperation(editor, jsonBuffer("""
-            {"type":"flow","resourceId":"shared","operationId":"move-x","baseSequence":0,
+            {"type":"fixture:graph","resourceId":"shared","operationId":"move-x","baseSequence":0,
              "patches":[{"op":"set","path":"/nodes/first/x","value":80}]}
             """));
-        FlowGraph external = FlowSerializer.deserialize(FlowSerializer.serialize(storage.getGraph("flow", "shared")));
+        FlowGraph external = adapter.get("shared");
         external.getNodes().get("first").setY(70);
-        storage.saveGraph(external);
+        adapter.save(external);
         FlowGraph submitted = FlowSerializer.deserialize(FlowSerializer.serialize(original));
         submitted.getNodes().get("first").setX(80);
         submitted.getNodes().get("first").setY(90);
 
         assertThrows(ResourceRevisionConflictException.class, () -> workspaceService.save(editor, adapter, submitted));
 
-        FlowGraph stored = storage.getGraph("flow", "shared");
+        FlowGraph stored = adapter.get("shared");
         assertEquals(2L, stored.getResourceRevision());
         assertEquals(70, stored.getNodes().get("first").getY());
     }
 
     @Test
-    void collaboratorSaveCannotChangeAuthoritativeActivation(@TempDir Path directory) {
-        FlowStorage storage = new FlowStorage(directory.toFile());
+    void collaboratorSaveCannotChangeAuthoritativeActivation() {
         FlowGraph original = new FlowGraph();
         original.setId("shared");
         original.setResourceType("flow");
         original.setEnabled(false);
         original.getNodes().put("first", new FlowNode("event:startup", 10, 20, Map.of()));
-        storage.saveGraph(original);
-        StorageGraphAdapter adapter = new StorageGraphAdapter(storage);
-        FlowWorkspaceService workspaceService = new FlowWorkspaceService(storage, null, new RecordingWorkspaceSender(), null, null);
+        FixtureGraphAdapter adapter = new FixtureGraphAdapter(original);
+        FlowResourceRegistry resources = new FlowResourceRegistry();
+        resources.register(adapter);
+        FlowWorkspaceService workspaceService = new FlowWorkspaceService(null, null, new RecordingWorkspaceSender(), null, resources);
         Session editor = session("editor");
         workspaceService.handleJoin(editor, jsonBuffer("""
-            {"type":"flow","resourceId":"shared"}
+            {"type":"fixture:graph","resourceId":"shared"}
             """));
         FlowGraph submitted = FlowSerializer.deserialize(FlowSerializer.serialize(original));
         submitted.setEnabled(true);
@@ -341,8 +420,8 @@ class FlowWorkspaceServiceTest {
         FlowGraph saved = workspaceService.save(editor, adapter, submitted);
 
         assertFalse(saved.isEnabled());
-        assertFalse(storage.getGraph("flow", "shared").isEnabled());
-        assertEquals(80, storage.getGraph("flow", "shared").getNodes().get("first").getX());
+        assertFalse(adapter.get("shared").isEnabled());
+        assertEquals(80, adapter.get("shared").getNodes().get("first").getX());
     }
 
     @Test
@@ -405,6 +484,10 @@ class FlowWorkspaceServiceTest {
     private static final class FixtureAdapter implements FlowResourceAdapter<FixtureResource> {
         private final Map<String, FixtureResource> values = new LinkedHashMap<>();
         private final ReSyncManagedResource descriptor = new ReSyncManagedResource("fixture:designer", "Designer", "fixture/designers", null, true);
+        private final AtomicInteger failAtSerialization = new AtomicInteger();
+        private final AtomicInteger serializationCalls = new AtomicInteger();
+        private final AtomicInteger afterSaves = new AtomicInteger();
+        private final AtomicInteger saves = new AtomicInteger();
 
         @Override
         public ReSyncManagedResource descriptor() {
@@ -428,13 +511,32 @@ class FlowWorkspaceServiceTest {
         }
 
         @Override
+        public String serialize(FixtureResource value) {
+            int call = serializationCalls.incrementAndGet();
+            if (call == failAtSerialization.get()) {
+                throw new IllegalStateException("Fixture serialization rejected");
+            }
+            return "{\"id\":\"" + value.id() + "\",\"value\":\"" + value.value() + "\"}";
+        }
+
+        @Override
         public String id(FixtureResource value) {
             return value.id();
         }
 
         @Override
         public void save(FixtureResource value) {
+            saves.incrementAndGet();
             values.put(value.id(), value);
+        }
+
+        @Override
+        public void afterSave(FixtureResource value) {
+            afterSaves.incrementAndGet();
+        }
+
+        private void failSerializationAt(int call) {
+            failAtSerialization.set(call);
         }
 
         @Override
@@ -499,12 +601,18 @@ class FlowWorkspaceServiceTest {
         }
     }
 
-    private static final class StorageGraphAdapter implements FlowResourceAdapter<FlowGraph> {
-        private final FlowStorage storage;
-        private final ReSyncManagedResource descriptor = new ReSyncManagedResource("flow", "Flow", "assets/Blueprints/Flows", null, true);
+    private static final class FixtureGraphAdapter implements FlowResourceAdapter<FlowGraph> {
+        private final Map<String, FlowGraph> values = new LinkedHashMap<>();
+        private final ReSyncManagedResource descriptor = new ReSyncManagedResource("fixture:graph", "Graph", "fixture/graphs", null, true);
 
-        private StorageGraphAdapter(FlowStorage storage) {
-            this.storage = storage;
+        private FixtureGraphAdapter() {
+        }
+
+        private FixtureGraphAdapter(FlowGraph graph) {
+            FlowGraph initial = copy(graph);
+            initial.setResourceRevision(1L);
+            graph.setResourceRevision(1L);
+            values.put(initial.getId(), initial);
         }
 
         @Override
@@ -514,12 +622,13 @@ class FlowWorkspaceServiceTest {
 
         @Override
         public FlowGraph get(String id) {
-            return storage.getGraph("flow", id);
+            FlowGraph value = values.get(id);
+            return value != null ? copy(value) : null;
         }
 
         @Override
         public List<String> listIds() {
-            return List.of("shared");
+            return List.copyOf(values.keySet());
         }
 
         @Override
@@ -539,11 +648,24 @@ class FlowWorkspaceServiceTest {
 
         @Override
         public void save(FlowGraph value) {
-            storage.saveGraph(value);
+            FlowGraph current = values.get(value.getId());
+            long currentRevision = current != null ? current.getResourceRevision() : 0L;
+            if (value.getResourceRevision() != currentRevision) {
+                throw new ResourceRevisionConflictException(value.getId(), value.getResourceRevision(), currentRevision);
+            }
+            FlowGraph stored = copy(value);
+            stored.setResourceRevision(Math.addExact(currentRevision, 1L));
+            value.setResourceRevision(stored.getResourceRevision());
+            values.put(stored.getId(), stored);
         }
 
         @Override
         public void delete(String id) {
+            values.remove(id);
+        }
+
+        private static FlowGraph copy(FlowGraph graph) {
+            return FlowSerializer.deserialize(FlowSerializer.serialize(graph));
         }
     }
 }

@@ -3,27 +3,40 @@ package restudio.resync.storage;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import restudio.resync.flow.CoreGraphStorageBoundary;
 import restudio.resync.resources.AssetFileFormat;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
+import java.util.function.Consumer;
 
 public final class AssetIntegrityService {
     private static final Set<String> GRAPH_TYPES = Set.of("flow", "function", "command");
     private static final Set<String> NON_FILE_TYPES = Set.of("world");
+    private static final Set<String> INTERNAL_DIRECTORIES = Set.of(".transactions", ".snapshots", ".quarantine", ".durability",
+        ".tombstones", ".migrations", ".asset-coordinator", ".mutation-intents", "migration-backups");
     private final Path assetsRoot;
+    private final CoreGraphStorageBoundary coreGraphs = new CoreGraphStorageBoundary();
+    private final Consumer<Path> traversalObserver;
 
     public AssetIntegrityService(Path assetsRoot) {
+        this(assetsRoot, null);
+    }
+
+    AssetIntegrityService(Path assetsRoot, Consumer<Path> traversalObserver) {
         this.assetsRoot = assetsRoot.toAbsolutePath().normalize();
+        this.traversalObserver = traversalObserver;
     }
 
     public HealthReport scan(int recoveredTransactions) {
@@ -33,13 +46,43 @@ public final class AssetIntegrityService {
             issues.add(new Issue(Severity.CRITICAL, "ASSET_ROOT_MISSING", "", assetsRoot.toString(), "Asset storage is missing"));
             return report(issues, resources, recoveredTransactions);
         }
-        try (Stream<Path> paths = Files.walk(assetsRoot)) {
-            for (Path file : paths.filter(Files::isRegularFile).filter(path -> path.getFileName().toString().endsWith(".json")).toList()) {
-                if (isInternal(file) || file.equals(assetsRoot.resolve("project.json"))) {
-                    continue;
+        try {
+            Files.walkFileTree(assetsRoot, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                    observe(directory);
+                    return !directory.equals(assetsRoot) && isInternal(directory)
+                        ? FileVisitResult.SKIP_SUBTREE
+                        : FileVisitResult.CONTINUE;
                 }
-                inspect(file, resources, issues);
-            }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    observe(file);
+                    if (isInternal(file) || file.equals(assetsRoot.resolve("project.json"))
+                        || !file.getFileName().toString().endsWith(".json")) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (!attributes.isRegularFile() || attributes.isSymbolicLink()) {
+                        throw new IOException("Asset candidate is not a regular non-symbolic-link file: " + assetsRoot.relativize(file));
+                    }
+                    inspect(file, resources, issues);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException failure) throws IOException {
+                    throw failure;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path directory, IOException failure) throws IOException {
+                    if (failure != null) {
+                        throw failure;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException failure) {
             issues.add(new Issue(Severity.CRITICAL, "ASSET_SCAN_FAILED", "", assetsRoot.toString(), failure.getMessage()));
         }
@@ -68,7 +111,7 @@ public final class AssetIntegrityService {
             if (id.isBlank()) {
                 issues.add(issue(Severity.CRITICAL, "MISSING_RESOURCE_ID", "", file, "Resource id is missing"));
             }
-            if (!AssetFileFormat.verify(file)) {
+            if (!verifyIntegrity(file, object, type)) {
                 issues.add(issue(Severity.CRITICAL, "HASH_MISMATCH", id, file, "Resource integrity check failed"));
             }
             resources.add(new ResourceIdentity(type, id, file, AssetFileFormat.readRevision(file), AssetFileFormat.readContentHash(file)));
@@ -198,9 +241,23 @@ public final class AssetIntegrityService {
             return null;
         }
         String folder = text(resource, "path");
-        Path directory = folder.isBlank() ? assetsRoot : assetsRoot.resolve(folder);
-        Path path = directory.resolve(AssetFileFormat.idOnlyFileName(id)).toAbsolutePath().normalize();
+        Path path = folder.endsWith(".json")
+            ? assetsRoot.resolve(folder).toAbsolutePath().normalize()
+            : (folder.isBlank() ? assetsRoot : assetsRoot.resolve(folder))
+                .resolve(AssetFileFormat.idOnlyFileName(id)).toAbsolutePath().normalize();
         return path.startsWith(assetsRoot) ? path : null;
+    }
+
+    private boolean verifyIntegrity(Path file, JsonObject object, String type) throws IOException {
+        if (GRAPH_TYPES.contains(type) && object.has(CoreGraphStorageBoundary.CORE_PAYLOAD_KIND)) {
+            try {
+                coreGraphs.decode(Files.readAllBytes(file));
+                return true;
+            } catch (RuntimeException exception) {
+                return false;
+            }
+        }
+        return AssetFileFormat.verify(file);
     }
 
     private boolean isCanonical(ResourceIdentity resource, Path expected) {
@@ -244,9 +301,13 @@ public final class AssetIntegrityService {
         if (relative.getNameCount() == 0) {
             return false;
         }
-        String first = relative.getName(0).toString();
-        return first.equals(".transactions") || first.equals(".snapshots") || first.equals(".quarantine") || first.equals(".durability")
-            || first.equals(".tombstones") || first.equals(".migrations") || first.equals("migration-backups");
+        return INTERNAL_DIRECTORIES.contains(relative.getName(0).toString());
+    }
+
+    private void observe(Path path) {
+        if (traversalObserver != null) {
+            traversalObserver.accept(path.toAbsolutePath().normalize());
+        }
     }
 
     private String text(JsonObject object, String key) {

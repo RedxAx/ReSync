@@ -22,9 +22,11 @@ import restudio.resync.flow.handler.generic.TextFormatHandler;
 import restudio.resync.flow.handler.generic.TimeHandler;
 import restudio.resync.flow.handler.generic.UuidHandler;
 import restudio.resync.flow.handler.generic.VariableScopeHandler;
+import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionLoader;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +40,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings("unchecked")
 class FlowExecutorProductionMegaGraphTest {
+    private static final Map<String, Set<String>> REQUIRED_PRODUCTION_NODE_IDS = Map.of(
+        "control", Set.of("variable.access", "logic.switch_case", "branch.all"),
+        "string", Set.of("string.trim", "string.upper", "string.replace", "string.base64_encode",
+            "string.base64_decode", "string.split", "string.sha256"),
+        "list", Set.of("list.unique", "list.sort", "list.join", "list.size", "list.first", "list.last",
+            "list.contains", "list.sum", "list.average"),
+        "math and map", Set.of("math.add", "math.multiply", "core.map.set", "core.map.get", "core.map.keys"),
+        "structured data", Set.of("json.parse", "json.get", "json.has", "json.to.string", "to.number",
+            "to.boolean", "to.string", "core.logic.compare_equals", "core.logic.compare_greater", "logic.logic_and"),
+        "utility", Set.of("color.from.hex", "color.invert", "color.to.hex", "uuid.from.string", "uuid.to.string",
+            "utility.uuid_version", "time.parse", "time.format", "math.vector_create", "math.vector_multiply",
+            "math.vector_split", "math.hypotenuse", "text.format_mini_message")
+    );
     private HandlerRegistry handlers;
     private NodeDefinitionRegistry definitions;
     private FlowExecutor executor;
@@ -132,7 +147,7 @@ class FlowExecutorProductionMegaGraphTest {
 
         assertEquals(4, completedBranches.get());
         assertEquals(List.of("async", "assert", "second", "third", "fourth"), branchOrder);
-        assertTrue(definitions.getAllDefinitions().size() >= 1_300);
+        assertRequiredProductionDefinitions();
     }
 
     private void executionNodes(FlowGraph graph) {
@@ -196,9 +211,9 @@ class FlowExecutorProductionMegaGraphTest {
         graph.getNodes().put("average", node("list.average", Map.of("list", List.of(2, 4L, 6.0, 8.0F))));
         graph.getNodes().put("math_add", node("math.add", Map.of("a", 12.0, "b", 8.0)));
         graph.getNodes().put("math_multiply", node("math.multiply", Map.of("b", 2.0)));
-        graph.getNodes().put("map_set", node("map.set", Map.of("map", Map.of("alpha", 1), "key", "beta")));
-        graph.getNodes().put("map_get", node("map.get", Map.of("key", "beta")));
-        graph.getNodes().put("map_keys", node("map.keys", Map.of()));
+        graph.getNodes().put("map_set", node("core.map.set", Map.of("map", Map.of("alpha", 1), "key", "beta")));
+        graph.getNodes().put("map_get", node("core.map.get", Map.of("key", "beta")));
+        graph.getNodes().put("map_keys", node("core.map.keys", Map.of()));
         connect(graph, "math_add", "result", "math_multiply", "a");
         connect(graph, "math_multiply", "result", "map_set", "value");
         connect(graph, "map_set", "map", "map_get", "map");
@@ -213,8 +228,8 @@ class FlowExecutorProductionMegaGraphTest {
         graph.getNodes().put("converted_number", node("to.number", Map.of("value", "42.5")));
         graph.getNodes().put("converted_boolean", node("to.boolean", Map.of("value", "yes")));
         graph.getNodes().put("converted_string", node("to.string", Map.of()));
-        graph.getNodes().put("equals", node("logic.compare_equals", Map.of()));
-        graph.getNodes().put("greater", node("logic.compare_greater", Map.of("b", 41.0)));
+        graph.getNodes().put("equals", node("core.logic.compare_equals", Map.of()));
+        graph.getNodes().put("greater", node("core.logic.compare_greater", Map.of("b", 41.0)));
         graph.getNodes().put("logic", node("logic.logic_and", Map.of()));
         connect(graph, "json_parse", "object", "json_get", "object");
         connect(graph, "json_parse", "object", "json_has", "object");
@@ -280,8 +295,8 @@ class FlowExecutorProductionMegaGraphTest {
     }
 
     private FlowNode node(String type, Map<String, Object> inputs) {
-        assertTrue(definitions.get(type) != null, type);
-        return new FlowNode(type, 0, 0, inputs);
+        NodeDefinition definition = resolveDefinition(type);
+        return new FlowNode(definition.getId(), 0, 0, canonicalInputs(definition, inputs));
     }
 
     private FlowNode direct(String type, Map<String, Object> inputs) {
@@ -289,7 +304,103 @@ class FlowExecutorProductionMegaGraphTest {
     }
 
     private void connect(FlowGraph graph, String sourceNode, String sourcePin, String targetNode, String targetPin) {
-        graph.getConnections().add(new FlowConnection(sourceNode, sourcePin, targetNode, targetPin));
+        FlowNode source = graph.getNodes().get(sourceNode);
+        FlowNode target = graph.getNodes().get(targetNode);
+        graph.getConnections().add(new FlowConnection(sourceNode, canonicalPin(source, sourcePin, NodeDefinition.PinDirection.OUTPUT),
+            targetNode, canonicalPin(target, targetPin, NodeDefinition.PinDirection.INPUT)));
+    }
+
+    private NodeDefinition resolveDefinition(String requestedType) {
+        List<NodeDefinition> exact = definitions.getAllDefinitions().values().stream()
+            .filter(definition -> requestedType.equals(definition.getId()))
+            .toList();
+        if (!exact.isEmpty()) {
+            assertEquals(1, exact.size(), "Ambiguous exact node ID: " + requestedType);
+            return exact.getFirst();
+        }
+        List<NodeDefinition> legacy = definitions.getAllDefinitions().values().stream()
+            .filter(definition -> definition.getLegacyIds().contains(requestedType))
+            .toList();
+        assertEquals(1, legacy.size(), "Expected one canonical node for legacy ID: " + requestedType);
+        return legacy.getFirst();
+    }
+
+    private void assertRequiredProductionDefinitions() {
+        REQUIRED_PRODUCTION_NODE_IDS.forEach((family, expectedIds) -> {
+            Set<String> actualIds = Set.copyOf(expectedIds.stream()
+                .map(this::resolveDefinition)
+                .map(NodeDefinition::getId)
+                .toList());
+            assertEquals(expectedIds.size(), actualIds.size(), "Production semantic family: " + family);
+        });
+    }
+
+    private Map<String, Object> canonicalInputs(NodeDefinition definition, Map<String, Object> inputs) {
+        if (inputs == null || inputs.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> canonical = new LinkedHashMap<>();
+        inputs.forEach((name, value) -> {
+            NodeDefinition.PinDefinition pin = resolvePin(definition, name, NodeDefinition.PinDirection.INPUT);
+            canonical.put(pin != null ? pin.getName() : name, value);
+        });
+        return canonical;
+    }
+
+    private String canonicalPin(FlowNode node, String requestedPin, NodeDefinition.PinDirection direction) {
+        if (node == null || node.getType() == null) {
+            return requestedPin;
+        }
+        NodeDefinition definition = definitions.get(node.getType());
+        if (definition == null) {
+            return requestedPin;
+        }
+        NodeDefinition.PinDefinition pin = resolvePin(definition, requestedPin, direction);
+        return pin != null ? pin.getName() : requestedPin;
+    }
+
+    private NodeDefinition.PinDefinition resolvePin(NodeDefinition definition, String requestedPin,
+                                                     NodeDefinition.PinDirection direction) {
+        if (definition == null || requestedPin == null || requestedPin.isBlank()) {
+            return null;
+        }
+        List<NodeDefinition.PinDefinition> pins = direction == NodeDefinition.PinDirection.INPUT
+            ? definition.getInputs() : definition.getOutputs();
+        List<NodeDefinition.PinDefinition> matches = pins.stream()
+            .filter(pin -> requestedPin.equals(pin.getName()) || requestedPin.equals(pin.getRuntimeName()))
+            .toList();
+        if (matches.isEmpty()) {
+            matches = pins.stream()
+                .filter(pin -> matchesRepeatablePin(pin, requestedPin))
+                .toList();
+        }
+        if (matches.size() > 1) {
+            throw new IllegalStateException("Ambiguous " + direction + " pin " + requestedPin
+                + " for node " + definition.getId());
+        }
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
+    private boolean matchesRepeatablePin(NodeDefinition.PinDefinition pin, String requestedPin) {
+        NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
+        if (repeatable == null) {
+            return false;
+        }
+        for (String base : List.of(pin.getName(), pin.getRuntimeName())) {
+            String prefix = base + "_";
+            if (!requestedPin.startsWith(prefix)) {
+                continue;
+            }
+            String suffix = requestedPin.substring(prefix.length());
+            if (suffix.isEmpty() || suffix.length() > 9 || !suffix.chars().allMatch(Character::isDigit)) {
+                continue;
+            }
+            int index = Integer.parseInt(suffix);
+            if (index >= 1 && index <= repeatable.getMaxItems()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String[] pair(String node, String pin) {

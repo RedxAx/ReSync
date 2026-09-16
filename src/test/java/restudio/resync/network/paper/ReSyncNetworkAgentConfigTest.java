@@ -1,8 +1,10 @@
 package restudio.resync.network.paper;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
@@ -52,7 +54,8 @@ class ReSyncNetworkAgentConfigTest {
             """);
 
         ReSyncNetworkAgentConfig config = ReSyncNetworkAgentConfig.load(directory);
-        config.saveCredential("issued-credential");
+        NetworkCredentialStore credentialStore = new NetworkCredentialStore(config.credentialFile(), config.credential());
+        credentialStore.save("issued-credential");
         ReSyncNetworkAgentConfig reloaded = ReSyncNetworkAgentConfig.load(directory);
 
         assertTrue(config.enabled());
@@ -79,8 +82,38 @@ class ReSyncNetworkAgentConfigTest {
         assertEquals("issued-credential", reloaded.credential());
         assertTrue(Files.exists(directory.resolve("network/node.credential")));
 
-        reloaded.clearCredential();
+        credentialStore.clear();
         assertFalse(Files.exists(directory.resolve("network/node.credential")));
+    }
+
+    @Test
+    void loadsStablePropertiesAndMutableCredentialFromSeparateRoots() throws Exception {
+        Path operatorRoot = Files.createDirectory(directory.resolve("operator"));
+        Path activeRoot = Files.createDirectory(directory.resolve("active"));
+        Files.createDirectories(operatorRoot.resolve("network"));
+        Files.createDirectories(activeRoot.resolve("network"));
+        Files.writeString(operatorRoot.resolve("resync.properties"), """
+            network.enabled=true
+            network.id=network-one
+            network.node-id=lobby-one
+            network.hub-url=ws://127.0.0.1:12442
+            network.enrollment-token=operator-token
+            network.display-name=Operator
+            network.credential-file=network/node.credential
+            """);
+        Files.writeString(activeRoot.resolve("resync.properties"), """
+            network.id=active-value
+            network.hub-url=ws://10.0.0.10:12442
+            """);
+        Files.writeString(operatorRoot.resolve("network/node.credential"), "operator-credential");
+        Files.writeString(activeRoot.resolve("network/node.credential"), "active-credential");
+
+        ReSyncNetworkAgentConfig config = ReSyncNetworkAgentConfig.load(operatorRoot, activeRoot);
+
+        assertEquals("network-one", config.networkId());
+        assertEquals("Operator", config.displayName());
+        assertEquals("active-credential", config.credential());
+        assertEquals(activeRoot.resolve("network/node.credential").toAbsolutePath().normalize(), config.credentialFile());
     }
 
     @Test
@@ -158,5 +191,33 @@ class ReSyncNetworkAgentConfigTest {
         Files.writeString(directory.resolve("resync.properties"), "network.chat.retention-millis=31536000001");
 
         assertThrows(IllegalArgumentException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+    }
+
+    @Test
+    void rejectsACredentialPathThatIsNotARegularNonSymbolicFile() throws Exception {
+        Files.writeString(directory.resolve("resync.properties"), """
+            network.credential-file=network/node.credential
+            """);
+        Files.createDirectories(directory.resolve("network/node.credential"));
+
+        assertThrows(IOException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+    }
+
+    @Test
+    void rejectsACredentialSymbolicLinkBeforeReadingItsTarget() throws Exception {
+        Files.writeString(directory.resolve("resync.properties"), """
+            network.credential-file=network/node.credential
+            """);
+        Files.createDirectories(directory.resolve("network"));
+        Path target = directory.resolve("outside-credential");
+        Files.writeString(target, "secret");
+        try {
+            Files.createSymbolicLink(directory.resolve("network/node.credential"), target);
+        } catch (UnsupportedOperationException | IOException exception) {
+            Assumptions.assumeTrue(false);
+        }
+
+        assertThrows(IOException.class, () -> ReSyncNetworkAgentConfig.load(directory));
+        assertEquals("secret", Files.readString(target));
     }
 }

@@ -1,0 +1,397 @@
+[
+  {
+    "id": "list_create",
+    "displayName": "Create List",
+    "description": "Create an empty list of values.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "create", "collection"],
+    "legacyIds": ["list.create"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "create"},
+    "outputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "description": "Returns a new empty list."}
+    ],
+    "inputs": []
+  },
+  {
+    "id": "list_add",
+    "displayName": "List Add",
+    "description": "Add a value to a copy of a list. Missing or null list input uses an empty list, and missing or null value input uses null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "add", "mutation"],
+    "legacyIds": ["list.add"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "add"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before adding a value. Missing or null input uses an empty list."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to append. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list with the value appended."}
+    ]
+  },
+  {
+    "id": "list_remove",
+    "displayName": "List Remove",
+    "description": "Remove the first matching value from a copy of a list. Missing or null list input uses an empty list, and missing or null value input uses null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "remove", "mutation"],
+    "legacyIds": ["list.remove"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "remove"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before removing a value. Missing or null input uses an empty list."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to remove. Missing or null input uses null; no match leaves the copied list unchanged."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list without its first matching value, or unchanged when no match exists."}
+    ]
+  },
+  {
+    "id": "list_remove_at",
+    "displayName": "Remove At",
+    "description": "Remove one item by zero-based index from a copied list. Missing or null list input uses an empty list, index defaults to 0, and an invalid index leaves the copied list unchanged.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "remove", "index", "mutation"],
+    "legacyIds": ["list.remove_at"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "remove_at"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "index", "target": "index"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before removing an item. Missing or null input uses an empty list."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index leaves the copied list unchanged."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list after removal, or unchanged when the index is invalid."}
+    ]
+  },
+  {
+    "id": "list_clear",
+    "displayName": "List Clear",
+    "description": "Return an empty copy of a list. Missing or null list input uses an empty list.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "clear", "mutation"],
+    "legacyIds": ["list.clear"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "clear"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy and clear. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns an empty list."}
+    ]
+  },
+  {
+    "id": "list_get",
+    "displayName": "List Get",
+    "description": "Read one item by zero-based index. Missing or null list input uses an empty list, index defaults to 0, and an invalid index returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "get", "index", "query"],
+    "legacyIds": ["list.get"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "get"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to read. Missing or null input uses an empty list."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index returns null."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Returns the item at the index, or null when the index is invalid."}
+    ]
+  },
+  {
+    "id": "list_set",
+    "displayName": "List Set",
+    "description": "Replace one item by zero-based index in a copied list. Missing or null list input uses an empty list, index defaults to 0, value defaults to null, and an invalid index leaves the copied list unchanged.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "set", "index", "mutation"],
+    "legacyIds": ["list.set"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "set"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "index", "target": "index"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to copy before replacing an item. Missing or null input uses an empty list."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based item index. Missing or null input uses 0; a negative or out-of-range index leaves the copied list unchanged."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Replacement value. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "Returns the copied list after replacement, or unchanged when the index is invalid."}
+    ]
+  },
+  {
+    "id": "list_size",
+    "displayName": "List Size",
+    "description": "Count the items in a list. Missing or null list input uses an empty list and returns 0.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "size", "query"],
+    "legacyIds": ["list.size"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "size"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "description": "List to count. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "size", "displayName": "Size", "name": "size", "pinType": "DATA", "dataType": "number", "description": "Returns the number of items, or 0 when the list is missing or null."}
+    ]
+  },
+  {
+    "id": "list_is_empty",
+    "displayName": "List Is Empty",
+    "description": "Check whether a list has no items. Missing or null list input uses an empty list and returns true.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "empty", "query"],
+    "legacyIds": ["list.is_empty"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "is_empty"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "description": "List to check. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "empty", "displayName": "Empty", "name": "empty", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the list has no items, including when the input is missing or null."}
+    ]
+  },
+  {
+    "id": "list_contains",
+    "displayName": "Contains",
+    "description": "Check whether a list contains a value. Missing or null list input uses an empty list, and missing or null value input uses null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "contains", "query"],
+    "legacyIds": ["list.contains"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "contains"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to find. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "contains", "displayName": "Contains", "name": "contains", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when the list contains the value and false otherwise."}
+    ]
+  },
+  {
+    "id": "list_add_at",
+    "displayName": "Add At",
+    "description": "Insert a value at a zero-based index in a list. Missing or null list input uses an empty list, index defaults to 0, value defaults to null, and an invalid index leaves the list unchanged.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "add", "index", "mutation"],
+    "legacyIds": ["list.add_at"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "add_at"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "input", "source": "index", "target": "index"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0; a negative or out-of-range index leaves the list unchanged."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to insert. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns the list after insertion, or unchanged when the index is invalid."}
+    ]
+  },
+  {
+    "id": "list_insert",
+    "displayName": "List Insert",
+    "description": "Insert an item at a zero-based index in a list. Missing or null list input uses an empty list, index defaults to 0, item defaults to null, and an invalid index leaves the list unchanged.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "insert", "index", "mutation"],
+    "legacyIds": ["list.insert"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "insert"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to update. Missing or null input uses an empty list; inputs over 65536 items fail before output."},
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Zero-based insertion index. Missing or null input uses 0; a negative or out-of-range index leaves the list unchanged."},
+      {"id": "item", "displayName": "Item", "name": "item", "pinType": "DATA", "dataType": "type:t", "description": "Item to insert. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns the list after insertion, or unchanged when the index is invalid."}
+    ]
+  },
+  {
+    "id": "list_of",
+    "displayName": "List Of",
+    "description": "Return the supplied values as a list. Missing or null input uses an empty list, and the values are retained in order.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "create", "collection"],
+    "legacyIds": ["list.of"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "of"},
+    "inputs": [
+      {"id": "items", "displayName": "Items", "name": "items", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Values to expose as a list. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<any>", "constraints": {"min": 0, "max": 65536}, "description": "Returns the supplied values in their original order."}
+    ]
+  }
+]

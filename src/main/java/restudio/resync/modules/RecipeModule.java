@@ -68,6 +68,7 @@ import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowPredicateSupport;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.FunctionCallSupport;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.text.ReTextService;
 
@@ -89,6 +90,7 @@ public class RecipeModule implements Module, Listener {
     private FlowStorage flowStorage;
     private FlowExecutor flowExecutor;
     private JavaPlugin plugin;
+    private PaperPlayerDataMutationAdmission playerDataAdmission;
     private final Set<NamespacedKey> registered = new HashSet<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final BoundedDiagnosticDeduplicator reportedRegistrationFailures = new BoundedDiagnosticDeduplicator(512);
@@ -96,6 +98,11 @@ public class RecipeModule implements Module, Listener {
     private ReSyncJsonResourceStorage.ResourceListener recipeResourceListener;
 
     public RecipeModule() {
+        this(PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public RecipeModule(PaperPlayerDataMutationAdmission playerDataAdmission) {
+        this.playerDataAdmission = playerDataAdmission;
     }
 
     RecipeModule(JavaPlugin plugin, ReSyncJsonResourceStorage storage) {
@@ -116,6 +123,7 @@ public class RecipeModule implements Module, Listener {
         customContentService = context.getService(CustomContentService.class);
         flowStorage = context.getService(FlowStorage.class);
         flowExecutor = context.getService(FlowExecutor.class);
+        playerDataAdmission = context.getRequiredService(PaperPlayerDataMutationAdmission.class);
         context.registerService(RecipeModule.class, this);
     }
 
@@ -279,6 +287,11 @@ public class RecipeModule implements Module, Listener {
     }
 
     private void handleCraftTake(JsonObject definition, InventoryClickEvent event, Player player, CraftingInventory inventory) {
+        playerDataAdmission.mutatePlayer("recipe-craft:" + player.getUniqueId(), player,
+            () -> handleCraftTakeAdmitted(definition, event, player, inventory));
+    }
+
+    private void handleCraftTakeAdmitted(JsonObject definition, InventoryClickEvent event, Player player, CraftingInventory inventory) {
         boolean allowed = conditionsPass(definition, player) && ingredientsPass(definition, inventory);
         if (!allowed) {
             event.setCancelled(true);
@@ -345,7 +358,9 @@ public class RecipeModule implements Module, Listener {
             event.setCancelled(true);
             return;
         }
-        Bukkit.getScheduler().runTask(plugin, () -> consumeExtraSmithingIngredients(definition, event.getInventory()));
+        Bukkit.getScheduler().runTask(plugin, () -> playerDataAdmission.mutatePlayer(
+            "recipe-smithing:" + player.getUniqueId(), player,
+            () -> consumeExtraSmithingIngredients(definition, event.getInventory())));
     }
 
     @EventHandler
@@ -402,7 +417,9 @@ public class RecipeModule implements Module, Listener {
         }
         EquipmentSlot hand = event.getHand();
         Location location = event.getClickedBlock().getLocation();
-        Bukkit.getScheduler().runTask(plugin, () -> consumeCampfireExtra(player, hand, location, before, amount));
+        Bukkit.getScheduler().runTask(plugin, () -> playerDataAdmission.mutatePlayer(
+            "recipe-campfire:" + player.getUniqueId(), player,
+            () -> consumeCampfireExtra(player, hand, location, before, amount)));
     }
 
     @EventHandler
@@ -466,29 +483,31 @@ public class RecipeModule implements Module, Listener {
             return;
         }
         StonecutterInventory inventory = (StonecutterInventory) event.getView().getTopInventory();
-        if (!conditionsPass(definition, player) || !itemMatches(inputDefinition(definition), inventory.getInputItem())) {
+        playerDataAdmission.mutatePlayer("recipe-stonecutting:" + player.getUniqueId(), player, () -> {
+            if (!conditionsPass(definition, player) || !itemMatches(inputDefinition(definition), inventory.getInputItem())) {
+                event.setCancelled(true);
+                return;
+            }
+            int amount = stonecuttingAmount(definition, event, inventory);
+            if (amount <= 0) {
+                event.setCancelled(true);
+                return;
+            }
+            ItemStack output = event.getCurrentItem();
+            if (output == null || output.getType() == Material.AIR) {
+                event.setCancelled(true);
+                return;
+            }
+            output = output.clone();
+            output.setAmount(output.getAmount() * amount);
+            if (!deliverClickResult(event, player, output)) {
+                event.setCancelled(true);
+                return;
+            }
             event.setCancelled(true);
-            return;
-        }
-        int amount = stonecuttingAmount(definition, event, inventory);
-        if (amount <= 0) {
-            event.setCancelled(true);
-            return;
-        }
-        ItemStack output = event.getCurrentItem();
-        if (output == null || output.getType() == Material.AIR) {
-            event.setCancelled(true);
-            return;
-        }
-        output = output.clone();
-        output.setAmount(output.getAmount() * amount);
-        if (!deliverClickResult(event, player, output)) {
-            event.setCancelled(true);
-            return;
-        }
-        event.setCancelled(true);
-        consumeStonecuttingInput(definition, inventory, amount);
-        player.updateInventory();
+            consumeStonecuttingInput(definition, inventory, amount);
+            player.updateInventory();
+        });
     }
 
     private Recipe createRecipe(JsonObject definition) {

@@ -1,6 +1,7 @@
 package restudio.flow.data;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -10,6 +11,7 @@ public final class FlowJobReference<T> {
     public enum State {
         PENDING,
         RUNNING,
+        CANCELLING,
         SUCCEEDED,
         FAILED,
         CANCELLED
@@ -100,21 +102,58 @@ public final class FlowJobReference<T> {
     }
 
     public boolean cancel() {
+        if (!requestCancellation()) {
+            return false;
+        }
+        try {
+            runCancellationAction();
+        } finally {
+            completeCancellation();
+        }
+        return true;
+    }
+
+    public boolean requestCancellation() {
         cancellationRequested.set(true);
         while (true) {
             State current = state.get();
-            if (current == State.SUCCEEDED || current == State.FAILED || current == State.CANCELLED) {
+            if (current == State.SUCCEEDED || current == State.FAILED || current == State.CANCELLED
+                || current == State.CANCELLING) {
                 return false;
             }
-            if (state.compareAndSet(current, State.CANCELLED)) {
+            if (state.compareAndSet(current, State.CANCELLING)) {
                 break;
             }
         }
+        return true;
+    }
+
+    public void runCancellationAction() {
         Runnable action = cancellation;
         if (action != null) {
             action.run();
         }
-        completion.complete(FlowOperationResult.failure("JOB_CANCELLED", "Job Cancelled", Map.of("jobId", id)));
+    }
+
+    public boolean completeCancellation() {
+        return completeCancellation("Job Cancelled", Map.of());
+    }
+
+    public boolean completeCancellation(String message, Map<String, Object> details) {
+        if (!state.compareAndSet(State.CANCELLING, State.CANCELLED)) {
+            return false;
+        }
+        Map<String, Object> outcomeDetails = new LinkedHashMap<>();
+        outcomeDetails.put("jobId", id);
+        if (details != null) {
+            details.forEach((key, value) -> {
+                if (key != null && value != null) {
+                    outcomeDetails.put(key, value);
+                }
+            });
+        }
+        String outcomeMessage = message == null || message.isBlank() ? "Job Cancelled" : message;
+        completion.complete(FlowOperationResult.failure("JOB_CANCELLED", outcomeMessage, outcomeDetails));
         return true;
     }
 

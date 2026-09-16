@@ -1,0 +1,4055 @@
+[
+  {
+    "id": "perm.set.group",
+    "displayName": "Set Primary Group",
+    "description": "Set the player's primary LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.set.group",
+      "perm_set_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-set-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Set Group",
+      "perm set group"
+    ]
+  },
+  {
+    "id": "perm.get.groups",
+    "displayName": "Get Groups",
+    "description": "List the LuckPerms groups inherited by a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.groups",
+      "perm_get_groups"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-groups"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_groups"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "groups",
+        "displayName": "Groups",
+        "name": "groups",
+        "pinType": "DATA",
+        "dataType": "list<permission_group>",
+        "description": "Returns the groups found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "groups",
+          "target": "groups"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Groups",
+      "perm get groups"
+    ]
+  },
+  {
+    "id": "perm.get.prefix",
+    "displayName": "Get Prefix",
+    "description": "Read the player's active LuckPerms prefix.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.prefix",
+      "perm_get_prefix"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-prefix"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_prefix"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "prefix",
+        "displayName": "Prefix",
+        "name": "prefix",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the player's new prefix. Leave it empty to clear the prefix."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "prefix",
+          "target": "prefix"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Prefix",
+      "perm get prefix"
+    ]
+  },
+  {
+    "id": "perm.get.suffix",
+    "displayName": "Get Suffix",
+    "description": "Read the player's active LuckPerms suffix.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.suffix",
+      "perm_get_suffix"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-suffix"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_suffix"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "suffix",
+        "displayName": "Suffix",
+        "name": "suffix",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the player's new suffix. Leave it empty to clear the suffix."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "suffix",
+          "target": "suffix"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Suffix",
+      "perm get suffix"
+    ]
+  },
+  {
+    "id": "permission.perm_has",
+    "displayName": "Check Permission",
+    "description": "Check one or more permissions for a player using the selected match mode and context.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_has",
+      "perm_has",
+      "perm.check",
+      "perm_check"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-has"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_has"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "mode",
+        "displayName": "Mode",
+        "name": "mode",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "Find Any",
+          "Find All",
+          "Find None",
+          "Count"
+        ],
+        "defaultValue": "Find Any",
+        "description": "Chooses whether any, all, none, or the count of permissions should be matched."
+      },
+      {
+        "id": "permission",
+        "displayName": "Permission",
+        "name": "permission",
+        "pinType": "DATA",
+        "dataType": "permission",
+        "repeatable": {
+          "groupId": "permissions",
+          "minItems": 1,
+          "maxItems": 32,
+          "itemLabel": "Permission"
+        },
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      },
+      {
+        "id": "context",
+        "displayName": "Context",
+        "name": "context",
+        "pinType": "DATA",
+        "dataType": "permission_context",
+        "optional": true,
+        "description": "Provides optional LuckPerms context values for the permission check."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the requested permission or group condition is true."
+      },
+      {
+        "id": "count",
+        "displayName": "Count",
+        "name": "count",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Reports how many supplied permissions matched."
+      },
+      {
+        "id": "resolved_context",
+        "displayName": "Resolved Context",
+        "name": "resolved_context",
+        "pinType": "DATA",
+        "dataType": "permission_context",
+        "description": "Returns the effective LuckPerms context used for the check."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "mode",
+          "target": "mode"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "input",
+          "source": "context",
+          "target": "context"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "count",
+          "target": "count"
+        },
+        {
+          "direction": "output",
+          "source": "resolved_context",
+          "target": "resolved_context"
+        }
+      ]
+    },
+    "aliases": [
+      "perm has"
+    ]
+  },
+  {
+    "id": "permission.perm_add",
+    "displayName": "Grant Permission",
+    "description": "Grant a permission to a player and persist the change through LuckPerms.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_add",
+      "perm_add",
+      "perm.grant",
+      "perm_grant"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-add"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "perm add"
+    ]
+  },
+  {
+    "id": "permission.perm_remove",
+    "displayName": "Revoke Permission",
+    "description": "Revoke a permission from a player and persist the change through LuckPerms.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_remove",
+      "perm_remove",
+      "perm.revoke",
+      "perm_revoke"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-remove"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "perm remove"
+    ]
+  },
+  {
+    "id": "permission.perm_in_group",
+    "displayName": "Check Group",
+    "description": "Check whether a player inherits a selected LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_in_group",
+      "perm_in_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-in-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_in_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the requested permission or group condition is true."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        }
+      ]
+    },
+    "aliases": [
+      "perm in group"
+    ]
+  },
+  {
+    "id": "permission.perm_add_temp",
+    "displayName": "Grant Temporary Permission",
+    "description": "Grant a permission to a player for a number of seconds.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_add_temp",
+      "perm_add_temp"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-add-temp"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add_temp"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      },
+      {
+        "id": "duration",
+        "displayName": "Duration",
+        "name": "duration",
+        "pinType": "DATA",
+        "dataType": "number",
+        "defaultValue": 3600,
+        "constraints": {
+          "min": 1,
+          "max": 315360000
+        },
+        "description": "Sets how many seconds the temporary permission remains active."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "input",
+          "source": "duration",
+          "target": "duration"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "perm add temp"
+    ]
+  },
+  {
+    "id": "permission.perm_get_meta",
+    "displayName": "Read Meta",
+    "description": "Read a LuckPerms metadata value from a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_get_meta",
+      "perm_get_meta"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-meta"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_meta"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "key",
+        "displayName": "Key",
+        "name": "key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Names the metadata key to read, write, or remove."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides the metadata value to write."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "key",
+          "target": "key"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        }
+      ]
+    },
+    "aliases": [
+      "perm get meta"
+    ]
+  },
+  {
+    "id": "permission.perm_set_meta",
+    "displayName": "Write Meta",
+    "description": "Write a LuckPerms metadata value for a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_set_meta",
+      "perm_set_meta"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-set-meta"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_meta"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "key",
+        "displayName": "Key",
+        "name": "key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Names the metadata key to read, write, or remove."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the metadata value to write."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "key",
+          "target": "key"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "perm set meta"
+    ]
+  },
+  {
+    "id": "permission.perm_remove_meta",
+    "displayName": "Remove Meta",
+    "description": "Remove a LuckPerms metadata key from a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_remove_meta",
+      "perm_remove_meta"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-remove-meta"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove_meta"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "key",
+        "displayName": "Key",
+        "name": "key",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Names the metadata key to read, write, or remove."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "key",
+          "target": "key"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "perm remove meta"
+    ]
+  },
+  {
+    "id": "permission.perm_get_all_perms",
+    "displayName": "List Player Permissions",
+    "description": "List the positive permissions currently effective for a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_get_all_perms",
+      "perm_get_all_perms"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-all-perms"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_all_perms"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "permissions",
+        "displayName": "Permissions",
+        "name": "permissions",
+        "pinType": "DATA",
+        "dataType": "list<permission>",
+        "description": "Returns the permissions found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "permissions",
+          "target": "permissions"
+        }
+      ]
+    },
+    "aliases": [
+      "perm get all perms"
+    ]
+  },
+  {
+    "id": "permission.perm_check_inheritance",
+    "displayName": "Check Parent",
+    "description": "Check whether one LuckPerms group inherits another.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "permission.perm_check_inheritance",
+      "perm_check_inheritance"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-check-inheritance"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_check_inheritance"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      },
+      {
+        "id": "parent_group",
+        "displayName": "Parent Group",
+        "name": "parent_group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the possible parent LuckPerms group."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "inherits",
+        "displayName": "Inherits",
+        "name": "inherits",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the inherits value used by this operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "input",
+          "source": "parent_group",
+          "target": "parent_group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "inherits",
+          "target": "inherits"
+        }
+      ]
+    },
+    "aliases": [
+      "perm check inheritance"
+    ]
+  },
+  {
+    "id": "perm.add.group",
+    "displayName": "Add Group to Player",
+    "description": "Add a LuckPerms group to a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.add.group",
+      "perm_add_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-add-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_add_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Add Group",
+      "perm add group"
+    ]
+  },
+  {
+    "id": "perm.remove.group",
+    "displayName": "Remove Group from Player",
+    "description": "Remove a LuckPerms group from a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.remove.group",
+      "perm_remove_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-remove-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_remove_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Remove Group",
+      "perm remove group"
+    ]
+  },
+  {
+    "id": "perm.has.group",
+    "displayName": "Player Has Group",
+    "description": "Check whether a player inherits a LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.has.group",
+      "perm_has_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-has-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_has_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the requested permission or group condition is true."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        }
+      ]
+    },
+    "aliases": [
+      "Has Group",
+      "perm has group"
+    ]
+  },
+  {
+    "id": "perm.get.permissions",
+    "displayName": "Get Player Permissions",
+    "description": "List the direct permissions assigned to a player.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.permissions",
+      "perm_get_permissions"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-permissions"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_permissions"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "permissions",
+        "displayName": "Permissions",
+        "name": "permissions",
+        "pinType": "DATA",
+        "dataType": "list<permission>",
+        "description": "Returns the permissions found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "permissions",
+          "target": "permissions"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Permissions",
+      "perm get permissions"
+    ]
+  },
+  {
+    "id": "perm.get.primary.group",
+    "displayName": "Get Primary Group",
+    "description": "Read a player's primary LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.primary.group",
+      "perm_get_primary_group"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-primary-group"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_primary_group"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "group",
+          "target": "group"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Primary Group",
+      "perm get primary group"
+    ]
+  },
+  {
+    "id": "perm.get.all.groups",
+    "displayName": "Get All Groups",
+    "description": "List the loaded LuckPerms groups.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.all.groups",
+      "perm_get_all_groups"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-all-groups"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_all_groups"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "groups",
+        "displayName": "Groups",
+        "name": "groups",
+        "pinType": "DATA",
+        "dataType": "list<permission_group>",
+        "description": "Returns the groups found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "groups",
+          "target": "groups"
+        }
+      ]
+    },
+    "aliases": [
+      "Get All Groups",
+      "perm get all groups"
+    ]
+  },
+  {
+    "id": "perm.group.add.permission",
+    "displayName": "Add Permission to Group",
+    "description": "Grant a permission to a LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.group.add.permission",
+      "perm_group_add_permission"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-group-add-permission"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_add_permission"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Group Add Permission",
+      "perm group add permission"
+    ]
+  },
+  {
+    "id": "perm.group.has.permission",
+    "displayName": "Group Has Permission",
+    "description": "Check whether a LuckPerms group grants a permission.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.group.has.permission",
+      "perm_group_has_permission"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-group-has-permission"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_has_permission"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the requested permission or group condition is true."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        }
+      ]
+    },
+    "aliases": [
+      "Group Has Permission",
+      "perm group has permission"
+    ]
+  },
+  {
+    "id": "perm.group.remove.permission",
+    "displayName": "Remove Permission from Group",
+    "description": "Revoke a permission from a LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.group.remove.permission",
+      "perm_group_remove_permission"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-group-remove-permission"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_group_remove_permission"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      },
+      {
+        "id": "permission",
+      "displayName": "Permission",
+      "name": "permission",
+      "pinType": "DATA",
+        "dataType": "permission",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:permission",
+        "description": "Provides the permission node to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "input",
+          "source": "permission",
+          "target": "permission"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Group Remove Permission",
+      "perm group remove permission"
+    ]
+  },
+  {
+    "id": "perm.get.group.permissions",
+    "displayName": "Get Group Permissions",
+    "description": "List the direct permissions assigned to a LuckPerms group.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.get.group.permissions",
+      "perm_get_group_permissions"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-get-group-permissions"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_get_group_permissions"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "group",
+        "displayName": "Group",
+        "name": "group",
+        "pinType": "DATA",
+        "dataType": "permission_group",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:group",
+        "description": "Selects the LuckPerms group to inspect or change."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      },
+      {
+        "id": "permissions",
+        "displayName": "Permissions",
+        "name": "permissions",
+        "pinType": "DATA",
+        "dataType": "list<permission>",
+        "description": "Returns the permissions found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "group",
+          "target": "group"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        },
+        {
+          "direction": "output",
+          "source": "permissions",
+          "target": "permissions"
+        }
+      ]
+    },
+    "aliases": [
+      "Get Group Permissions",
+      "perm get group permissions"
+    ]
+  },
+  {
+    "id": "perm.set.prefix",
+    "displayName": "Set Player Prefix",
+    "description": "Set or clear a player's LuckPerms prefix.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.set.prefix",
+      "perm_set_prefix"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-set-prefix"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_prefix"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "prefix",
+        "displayName": "Prefix",
+        "name": "prefix",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the player's new prefix. Leave it empty to clear the prefix."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "prefix",
+          "target": "prefix"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Set Prefix",
+      "perm set prefix"
+    ]
+  },
+  {
+    "id": "perm.set.suffix",
+    "displayName": "Set Player Suffix",
+    "description": "Set or clear a player's LuckPerms suffix.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.set.suffix",
+      "perm_set_suffix"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-set-suffix"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_set_suffix"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "suffix",
+        "displayName": "Suffix",
+        "name": "suffix",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the player's new suffix. Leave it empty to clear the suffix."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "error",
+        "displayName": "Error",
+        "name": "error",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains why the operation failed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "suffix",
+          "target": "suffix"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "error",
+          "target": "error"
+        }
+      ]
+    },
+    "aliases": [
+      "Set Suffix",
+      "perm set suffix"
+    ]
+  },
+  {
+    "id": "perm.promote",
+    "displayName": "Promote Track",
+    "description": "Promote a player on a LuckPerms track.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.promote"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-promote"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_promote"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "track",
+        "displayName": "Track",
+        "name": "track",
+        "pinType": "DATA",
+        "dataType": "permission_track",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:track",
+        "description": "Selects the LuckPerms track used for promotion or demotion."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "success_flow",
+        "displayName": "Success Flow",
+        "name": "success_flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the track operation succeeds."
+      },
+      {
+        "id": "failure_flow",
+        "displayName": "Failure Flow",
+        "name": "failure_flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the track operation fails."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the LuckPerms track operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "track",
+          "target": "track"
+        },
+        {
+          "direction": "output",
+          "source": "success_flow",
+          "target": "success_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failure_flow",
+          "target": "failure_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "aliases": [
+      "Promote",
+      "perm promote"
+    ]
+  },
+  {
+    "id": "perm.demote",
+    "displayName": "Demote Track",
+    "description": "Demote a player on a LuckPerms track.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.demote"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-demote"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": true,
+    "auditPolicy": "high_impact",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_demote"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "dataType": "player",
+        "description": "Selects the player affected by the permission operation."
+      },
+      {
+        "id": "track",
+        "displayName": "Track",
+        "name": "track",
+        "pinType": "DATA",
+        "dataType": "permission_track",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:luckperms:track",
+        "description": "Selects the LuckPerms track used for promotion or demotion."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "success_flow",
+        "displayName": "Success Flow",
+        "name": "success_flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the track operation succeeds."
+      },
+      {
+        "id": "failure_flow",
+        "displayName": "Failure Flow",
+        "name": "failure_flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the track operation fails."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Reports the LuckPerms track operation result."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "track",
+          "target": "track"
+        },
+        {
+          "direction": "output",
+          "source": "success_flow",
+          "target": "success_flow"
+        },
+        {
+          "direction": "output",
+          "source": "failure_flow",
+          "target": "failure_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "aliases": [
+      "Demote",
+      "perm demote"
+    ]
+  },
+  {
+    "id": "perm.list.tracks",
+    "displayName": "List Permission Tracks",
+    "description": "List the loaded LuckPerms tracks.",
+    "domain": "permission",
+    "family": "luckperms",
+    "lifecycle": "active",
+    "handlerCapability": "permission.luckperms",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "PERMISSION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "perm.list.tracks"
+    ],
+    "tags": [
+      "permission",
+      "luckperms",
+      "perm-list-tracks"
+    ],
+    "examples": [
+      "Connect Flow, provide the required inputs, then handle the operation result."
+    ],
+    "availability": {
+      "plugin": "LuckPerms",
+      "platform": "bukkit"
+    },
+    "authorizationPolicy": "trusted_server_flow",
+    "sensitive": true,
+    "destructive": false,
+    "auditPolicy": "sensitive",
+    "confirmationPolicy": "none",
+    "handler": "PermissionHandler",
+    "handlerConfig": {
+      "operation": "perm_list_tracks"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the operation when this execution route is reached."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the operation completed successfully."
+      },
+      {
+        "id": "tracks",
+        "displayName": "Tracks",
+        "name": "tracks",
+        "pinType": "DATA",
+        "dataType": "list<permission_track>",
+        "description": "Returns the tracks found by the operation."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "tracks",
+          "target": "tracks"
+        }
+      ]
+    },
+    "aliases": [
+      "List Tracks",
+      "perm list tracks"
+    ]
+  }
+]

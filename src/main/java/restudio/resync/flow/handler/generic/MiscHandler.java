@@ -1,7 +1,6 @@
 package restudio.resync.flow.handler.generic;
 
 import org.bukkit.Bukkit;
-import org.bukkit.event.Cancellable;
 import restudio.flow.data.FlowNode;
 import restudio.resync.Log;
 import restudio.resync.flow.FlowContext;
@@ -62,13 +61,11 @@ public class MiscHandler implements NodeHandler {
         });
 
         operations.put("event_type", (ctx, node) -> {
-            String type = ctx.getEvent() != null ? ctx.getEvent().getClass().getSimpleName() : "";
-            ctx.setOutput(node, "type", type);
+            ctx.setOutput(node, "type", ctx.eventType());
         });
 
         operations.put("event_is_cancelled", (ctx, node) -> {
-            boolean cancelled = ctx.getEvent() instanceof Cancellable c && c.isCancelled();
-            ctx.setOutput(node, "is_cancelled", cancelled);
+            ctx.setOutput(node, "is_cancelled", ctx.isEventCancelled());
         });
 
         operations.put("time_current_ticks", (ctx, node) -> {

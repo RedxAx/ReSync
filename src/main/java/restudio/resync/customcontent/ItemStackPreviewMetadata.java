@@ -24,7 +24,7 @@ public final class ItemStackPreviewMetadata {
         if (service == null || definition == null || definition.getId() == null || definition.getId().isBlank()) {
             return Map.of();
         }
-        ItemStack stack = service.createItem(definition.getId(), 1);
+        ItemStack stack = service.createItemFromDefinition(definition, 1);
         Map<String, Object> metadata = fromStack(stack);
         if (!metadata.containsKey("material") && definition.getMaterial() != null && !definition.getMaterial().isBlank()) {
             metadata.put("material", definition.getMaterial());

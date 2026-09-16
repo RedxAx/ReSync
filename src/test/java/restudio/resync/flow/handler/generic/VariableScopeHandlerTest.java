@@ -1,15 +1,29 @@
 package restudio.resync.flow.handler.generic;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowResourceReference;
+import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRuntime;
+import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.resync.flow.automation.AutomationDefinitionRegistry;
+import restudio.resync.flow.automation.VariableService;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.CanonicalProjectMetadataFixture;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VariableScopeHandlerTest {
+    private ReSyncJsonResourceStorage storage;
+    private AssetPersistenceGate assetsGate;
+    private AssetTransactionCoordinator coordinator;
     private VariableScopeHandler handler;
     private FlowGraph graph;
     private FlowRuntime runtime;
@@ -28,6 +45,16 @@ class VariableScopeHandlerTest {
     @BeforeEach
     void setUp() {
         MockBukkit.mock();
+        JavaPlugin plugin = MockBukkit.createMockPlugin();
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        assetsGate = new AssetPersistenceGate(scope);
+        try {
+            coordinator = new AssetTransactionCoordinator(scope.resolve("assets"), new Gson());
+            CanonicalProjectMetadataFixture.seed(coordinator);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to open variable scope test persistence", exception);
+        }
+        storage = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
         handler = new VariableScopeHandler();
         graph = new FlowGraph();
         graph.setId("variable-scope-test");
@@ -35,8 +62,20 @@ class VariableScopeHandlerTest {
     }
 
     @AfterEach
-    void tearDown() {
-        MockBukkit.unmock();
+    void tearDown() throws Exception {
+        try {
+            if (storage != null) {
+                storage.closePersistence();
+            }
+            if (assetsGate != null) {
+                assetsGate.quiesce();
+            }
+            if (coordinator != null) {
+                coordinator.close();
+            }
+        } finally {
+            MockBukkit.unmock();
+        }
     }
 
     @Test
@@ -75,6 +114,34 @@ class VariableScopeHandlerTest {
         assertDoesNotThrow(() -> handler.execute(new FlowContext(runtime, null, null), node));
         assertNull(runtime.getNodeOutput("node", "value"));
         assertEquals(false, runtime.getNodeOutput("node", "exists"));
+    }
+
+    @Test
+    void modernAutomationVariableUsesAuthoredOutputPins() {
+        JsonObject definition = new JsonObject();
+        definition.addProperty("id", "score");
+        definition.addProperty("name", "Score");
+        definition.addProperty("valueType", "number");
+        definition.addProperty("scope", "server");
+        definition.addProperty("defaultValue", 0);
+        storage.save(ReSyncResourceCatalog.VARIABLE_DEFINITION, definition);
+
+        VariableService variables = new VariableService(new AutomationDefinitionRegistry(storage), new FlowValueCodecRegistry());
+        VariableScopeHandler modernHandler = new VariableScopeHandler(variables);
+        FlowResourceReference reference = new FlowResourceReference("variable_definition", "score", "server", true, Map.of());
+        FlowNode node = new FlowNode("automation.variable", 0, 0, Map.of(
+            "variable", reference,
+            "action", "Set",
+            "value", 8.0));
+        node.setHandlerConfig(Map.of("operation", "variable_access"));
+        graph.getNodes().put("node", node);
+
+        modernHandler.execute(new FlowContext(runtime, null, null), node);
+
+        assertEquals("score", ((FlowResourceReference) output("output_variable")).id());
+        assertEquals(8.0, output("output_value"));
+        assertNull(output("value"));
+        assertEquals("output_flow", runtime.getTriggeredOutputPin());
     }
 
     private void execute(String mode, Map<String, Object> additions) {

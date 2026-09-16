@@ -1,0 +1,283 @@
+[
+  {
+    "id": "call_function",
+    "displayName": "Call Function",
+    "description": "Call a selected Function with named arguments and expose the returned values. The executor resolves the callable graph, preserves typed parameter identities, and reports dispatch or execution failures through Result.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["call.function"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["function", "call", "execute", "typed"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "call_function"},
+    "authorizationPolicy": "trusted_server_flow",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "function", "target": "function"},
+        {"direction": "input", "source": "arguments", "target": "arguments"},
+        {"direction": "input", "source": "continue_on_failure", "target": "continue_on_failure"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "results", "target": "results"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the function call when execution reaches this node."},
+      {"id": "function", "displayName": "Function", "name": "function", "direction": "input", "dataType": "function", "widget": "SEARCHABLE_LIST", "optionsSource": "server:resync:function", "description": "Selects the callable Function to execute."},
+      {"id": "arguments", "displayName": "Arguments", "name": "arguments", "direction": "input", "dataType": "map<string,any>", "optional": true, "description": "Provides named Function arguments. A single input may be connected directly; multiple inputs should use Add Function Argument nodes."},
+      {"id": "continue_on_failure", "displayName": "Continue On Failure", "name": "continue_on_failure", "direction": "input", "dataType": "boolean", "widget": "TOGGLE", "defaultValue": false, "description": "Keeps the Flow moving with a failed Result instead of stopping at a function failure."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Continues after the Function call completes or is retained by the failure policy."},
+      {"id": "results", "displayName": "Results", "name": "results", "direction": "output", "dataType": "map<string,any>", "description": "Returns the named values produced by the callable Function."},
+      {"id": "result", "displayName": "Result", "name": "result", "direction": "output", "dataType": "result<map<string,any>>", "description": "Reports successful Function output or a stable dispatch and execution failure."}
+    ]
+  },
+  {
+    "id": "function_argument",
+    "displayName": "Add Function Argument",
+    "description": "Add one named value to a dynamic Function call. Chain this pure node to build a complete argument map for a callable graph with multiple inputs.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.argument"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "argument", "input", "map"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "argument"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "arguments", "target": "arguments"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "output", "source": "arguments", "target": "output_arguments"}
+      ]
+    },
+    "inputs": [
+      {"id": "arguments", "displayName": "Arguments", "name": "arguments", "direction": "input", "dataType": "map<string,any>", "optional": true, "description": "Existing named arguments to copy before adding this value. Omitted or null input starts an empty argument map."},
+      {"id": "name", "displayName": "Name", "name": "name", "direction": "input", "dataType": "string", "description": "Name of the declared Function input that receives the value."},
+      {"id": "value", "displayName": "Value", "name": "value", "direction": "input", "dataType": "any", "description": "Value to associate with the named Function input."}
+    ],
+    "outputs": [
+      {"id": "output_arguments", "displayName": "Arguments", "name": "arguments", "direction": "output", "dataType": "map<string,any>", "description": "Returns a fresh argument map containing the previous entries and this named value."}
+    ]
+  },
+  {
+    "id": "function_result_value",
+    "displayName": "Get Function Result",
+    "description": "Read one named output from a dynamically selected Function result. A declared parameter ID is preferred when the Function uses typed parameter identities.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.result_value"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "result", "output", "lookup"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "result"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "results", "target": "results"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "output", "source": "value", "target": "value"}
+      ]
+    },
+    "inputs": [
+      {"id": "results", "displayName": "Results", "name": "results", "direction": "input", "dataType": "map<string,any>", "description": "Named values returned by the Function call."},
+      {"id": "name", "displayName": "Name", "name": "name", "direction": "input", "dataType": "string", "description": "Name of the Function output to read when the output uses a legacy name identity."},
+      {"id": "parameter_id", "displayName": "Parameter ID", "name": "parameterId", "direction": "input", "dataType": "string", "optional": true, "description": "Canonical Function parameter UUID. When supplied, it takes precedence over Name."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "direction": "output", "dataType": "any", "description": "Returns the selected Function output value, or null when no matching output is available."}
+    ]
+  },
+  {
+    "id": "return",
+    "displayName": "Return",
+    "description": "Return one value from the current callable Function. The node is available to migrated graphs and fails explicitly when used outside a Function call.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "hidden": true,
+    "hiddenReason": "function-runtime",
+    "tags": ["function", "return", "runtime"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "return_value"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "value", "target": "value"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the return operation when execution reaches this node."},
+      {"id": "value", "displayName": "Value", "name": "value", "direction": "input", "dataType": "any", "optional": true, "description": "Value returned to the caller. Omitted input returns null."}
+    ],
+    "outputs": []
+  },
+  {
+    "id": "function_start",
+    "displayName": "Function Start",
+    "description": "Expose declared Function input values to the internal callable graph boundary. This runtime node is generated into a Function graph and is hidden from the node palette.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.start", "function.function_start"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "hidden": true,
+    "hiddenReason": "function-runtime",
+    "tags": ["function", "runtime", "input"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_start",
+      "functionBoundary": {"role": "inputs", "flowPin": "flow"}
+    },
+    "inputs": [],
+    "outputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "output", "dataType": "execution", "description": "Starts execution inside the Function."}
+    ]
+  },
+  {
+    "id": "function_end",
+    "displayName": "Function End",
+    "description": "Collect declared Function output values at the internal callable graph boundary. This runtime node is generated into a Function graph and is hidden from the node palette.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.end", "function.function_end"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "hidden": true,
+    "hiddenReason": "function-runtime",
+    "tags": ["function", "runtime", "output"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {
+      "operation": "function_end",
+      "functionBoundary": {"role": "outputs", "flowPin": "flow"}
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Completes execution inside the Function."}
+    ],
+    "outputs": []
+  },
+  {
+    "id": "function_input",
+    "displayName": "Function Input",
+    "description": "Read one declared input from the active callable Function frame. Typed parameter IDs are preferred when the Function signature declares them.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.function_input"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["function", "input", "parameter", "runtime"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "function_input"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "output", "source": "value", "target": "value"}
+      ]
+    },
+    "inputs": [
+      {"id": "name", "displayName": "Name", "name": "name", "direction": "input", "dataType": "string", "description": "Name of the declared Function input to read when the signature uses a legacy name identity."},
+      {"id": "parameter_id", "displayName": "Parameter ID", "name": "parameterId", "direction": "input", "dataType": "string", "optional": true, "description": "Canonical Function parameter UUID. When supplied, it takes precedence over Name."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "direction": "output", "dataType": "any", "description": "Returns the value currently bound to the selected Function input."}
+    ]
+  },
+  {
+    "id": "function_output",
+    "displayName": "Function Output",
+    "description": "Return one named or typed value from the active callable Function frame. When no callable frame is active, execution continues through Flow so the invalid placement remains observable.",
+    "domain": "core",
+    "family": "function",
+    "lifecycle": "active",
+    "handlerCapability": "function",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["function.function_output"],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["function", "output", "return", "runtime"],
+    "handler": "FunctionHandler",
+    "handlerConfig": {"operation": "function_output"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "value", "target": "value"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "direction": "input", "dataType": "execution", "description": "Starts the Function output operation when execution reaches this node."},
+      {"id": "name", "displayName": "Name", "name": "name", "direction": "input", "dataType": "string", "description": "Name of the declared Function output when the signature uses a legacy name identity."},
+      {"id": "parameter_id", "displayName": "Parameter ID", "name": "parameterId", "direction": "input", "dataType": "string", "optional": true, "description": "Canonical Function parameter UUID. When supplied, it takes precedence over Name."},
+      {"id": "value", "displayName": "Value", "name": "value", "direction": "input", "dataType": "any", "description": "Value to return through the selected Function output."}
+    ],
+    "outputs": []
+  }
+]

@@ -98,7 +98,7 @@ class WorldGenDatapackCompilerTest {
     void placesCustomOresInUndergroundOresStage() throws IOException {
         WorldGenProject project = project("26.2", false);
         project.getFeatureGraph().setNodes(new LinkedHashMap<>(Map.of(
-            "ore", new WorldGenNode("ore_vein", 0, 0, Map.of("block", "minecraft:diamond_ore"))
+            "ore", new WorldGenNode("worldgen:ore_vein", 0, 0, Map.of("block", "minecraft:diamond_ore"))
         )));
         WorldGenDatapackBuild build = compile(project);
         JsonArray features = json(build.getFolder().resolve("data").resolve("resync_worldgen").resolve("worldgen").resolve("biome").resolve("plains.json"))
@@ -112,10 +112,10 @@ class WorldGenDatapackCompilerTest {
     void compilesConnectedFeaturePlacementControls() throws IOException {
         WorldGenProject project = project("26.2", false);
         LinkedHashMap<String, WorldGenNode> nodes = new LinkedHashMap<>();
-        nodes.put("ore", new WorldGenNode("ore_vein", 0, 0, Map.of("block", "minecraft:diamond_ore", "size", 5)));
-        nodes.put("scatter", new WorldGenNode("scatter", 0, 0, Map.of(
+        nodes.put("ore", new WorldGenNode("worldgen:ore_vein", 0, 0, Map.of("block", "minecraft:diamond_ore", "size", 5)));
+        nodes.put("scatter", new WorldGenNode("worldgen:scatter", 0, 0, Map.of(
             "count", 2, "chance", 0.5f, "min_y", -32, "max_y", 48, "biome", "minecraft:plains", "generation_step", "underground_ores")));
-        nodes.put("output", new WorldGenNode("output_features", 0, 0, Map.of()));
+        nodes.put("output", new WorldGenNode("worldgen:output_features", 0, 0, Map.of()));
         project.getFeatureGraph().setNodes(nodes);
         project.getFeatureGraph().setConnections(List.of(
             new WorldGenConnection("ore", "feature", "scatter", "feature"),
@@ -202,6 +202,20 @@ class WorldGenDatapackCompilerTest {
     }
 
     @Test
+    void compilesWithAnExactCatalogRecipe() throws IOException {
+        WorldGenProject project = project("26.2", false);
+        WorldGenBuildRecipe recipe = WorldGenBuildRecipe.capture(project);
+
+        assertEquals(40, recipe.catalogSha1().length());
+        WorldGenDatapackBuild build = new WorldGenDatapackCompiler(null).compile(project, output, recipe);
+
+        assertEquals(recipe.revision(), build.getRevision());
+        assertEquals(recipe.minecraftVersion(), build.getMinecraftVersion());
+        assertThrows(IllegalArgumentException.class, () -> new WorldGenDatapackCompiler(null)
+            .compile(project, output, new WorldGenBuildRecipe(recipe.revision() + 1, recipe.minecraftVersion(), recipe.catalogSha1())));
+    }
+
+    @Test
     void writesLegacyWorldgenSchemaFor1211() throws IOException {
         WorldGenDatapackBuild build = compile(project("1.21.1", false));
         Path data = build.getFolder().resolve("data").resolve("resync_worldgen");
@@ -252,11 +266,11 @@ class WorldGenDatapackCompilerTest {
         project.setId("test");
         project.getSettings().setTargetVersion(target);
         project.getTerrainGraph().setNodes(new LinkedHashMap<>(Map.of(
-            "height", new WorldGenNode("output_height", 0, 0, Map.of("height", 64f))
+            "height", new WorldGenNode("worldgen:output_height", 0, 0, Map.of("height", 64f))
         )));
         if (feature) {
             project.getFeatureGraph().setNodes(new LinkedHashMap<>(Map.of(
-                "tree", new WorldGenNode("tree_feature", 0, 0, Map.of("tree", "BIRCH"))
+                "tree", new WorldGenNode("worldgen:tree_feature", 0, 0, Map.of("tree", "BIRCH"))
             )));
         }
         return project;

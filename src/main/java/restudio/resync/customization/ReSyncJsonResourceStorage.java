@@ -2,29 +2,62 @@ package restudio.resync.customization;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.bukkit.plugin.java.JavaPlugin;
+import restudio.resync.Log;
+import restudio.resync.flow.automation.ScheduleDefinition;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
+import restudio.resync.flow.protocol.ProtocolRejectionCode;
+import restudio.resync.flow.protocol.ResourcePresentationIntent;
+import restudio.resync.flow.resource.ResourcePayloadCodecs;
+import restudio.resync.migration.AtomicFiles;
+import restudio.resync.migration.MigrationPaths;
+import restudio.resync.migration.MigrationReportsPersistenceParticipant;
+import restudio.resync.migration.RecipeMigrationReportContract;
+import restudio.resync.modules.flow.FlowResourceMutationStamp;
+import restudio.resync.resources.JsonAssetInventory;
 import restudio.resync.resources.JsonAssetStore;
 import restudio.resync.resources.ReSyncManagedResource;
 import restudio.resync.resources.ReSyncResourceCatalog;
 import restudio.resync.resources.RecipeSchemaNormalizer;
+import restudio.resync.server.AggregateResourceCreateStorage;
+import restudio.resync.storage.AssetProjectMetadata;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.AssetTransactionCoordinator.AssetDelta;
+import restudio.resync.storage.AssetTransactionCoordinator.AssetKey;
+import restudio.resync.storage.AssetTransactionCoordinator.ExpectedState;
+import restudio.resync.storage.AssetTransactionCoordinator.Live;
+import restudio.resync.storage.AssetTransactionCoordinator.Missing;
+import restudio.resync.storage.AssetTransactionCoordinator.ProjectDelta;
+import restudio.resync.storage.AssetTransactionCoordinator.Snapshot;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.ProjectMetadataLineage;
 import restudio.resync.storage.StorageSafety;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Base64;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ReSyncJsonResourceStorage {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -32,90 +65,643 @@ public class ReSyncJsonResourceStorage {
     private final Map<String, CachedIconData> iconDataCache = new ConcurrentHashMap<>();
     private final List<ResourceListener> listeners = new CopyOnWriteArrayList<>();
     private final List<ResourceMutationInterceptor> interceptors = new CopyOnWriteArrayList<>();
-    private final JavaPlugin plugin;
+    private volatile LegacyRuntimeActivationGate legacyRuntimeGate;
+    private volatile Path activeScopeRoot;
+    private volatile Path assetsRoot;
+    private volatile AssetTransactionCoordinator coordinator;
+    private volatile AssetTransactionCoordinator.ListenerRegistration coordinatorListener;
+    private final AssetPersistenceGate assetsGate;
+    private final AssetInventoryFactory assetInventoryFactory;
+    private volatile PersistenceState persistenceState = PersistenceState.OPEN;
+    private final ReentrantReadWriteLock persistenceFence = new ReentrantReadWriteLock(true);
+    private RecipeMigrationReportContract.Report pendingRecipeMigrationReport;
+    private MigrationReportsPersistenceParticipant migrationReportsAuthority;
+
+    private enum PersistenceState {
+        OPEN,
+        QUIESCED,
+        CLOSED
+    }
+
+    @FunctionalInterface
+    interface AssetInventoryFactory {
+        JsonAssetInventory scan(Path root) throws IOException;
+    }
 
     private record CachedIconData(long modified, long size, String data, String hash) {
     }
 
-    public ReSyncJsonResourceStorage(JavaPlugin plugin) {
-        this.plugin = plugin;
-        File dataFolder = plugin.getDataFolder();
-        for (String type : resourceTypes()) {
-            ReSyncManagedResource resource = ReSyncResourceCatalog.byType(type);
-            stores.put(type, new JsonAssetStore<>(
-                dataFolder.toPath().resolve("assets"),
-                dataFolder.toPath().resolve(legacyFolder(type)),
-                type,
-                resource.defaultFolder(),
-                json -> gson.fromJson(json, JsonObject.class),
-                gson::toJson,
-                this::id,
-                value -> folder(value, resource.defaultFolder())
-            ));
+    public record ResourceSnapshotValue(String id, JsonObject value, JsonAssetStore.AssetStamp stamp) {
+        public ResourceSnapshotValue {
+            id = Objects.requireNonNull(id, "Resource snapshot value ID is required");
+            value = Objects.requireNonNull(value, "Resource snapshot value is required").deepCopy();
+            stamp = Objects.requireNonNull(stamp, "Resource snapshot value stamp is required");
+        }
+
+        @Override
+        public JsonObject value() {
+            return value.deepCopy();
         }
     }
 
+    public record ResourceSnapshot(String type, Path root, long rootSequence, String revision, List<ResourceSnapshotValue> values) {
+        public ResourceSnapshot {
+            type = Objects.requireNonNull(type, "Resource snapshot type is required");
+            root = Objects.requireNonNull(root, "Resource snapshot root is required").toAbsolutePath().normalize();
+            revision = Objects.requireNonNull(revision, "Resource snapshot revision is required");
+            values = List.copyOf(Objects.requireNonNull(values, "Resource snapshot values are required"));
+        }
+    }
+
+    public ReSyncJsonResourceStorage(JavaPlugin plugin, LegacyRuntimeActivationGate legacyRuntimeGate,
+                                     AssetPersistenceGate assetsGate, AssetTransactionCoordinator coordinator) {
+        this(plugin, legacyRuntimeGate, assetsGate, coordinator, JsonAssetInventory::scan);
+    }
+
+    ReSyncJsonResourceStorage(JavaPlugin plugin, LegacyRuntimeActivationGate legacyRuntimeGate,
+                              AssetPersistenceGate assetsGate, AssetTransactionCoordinator coordinator,
+                              AssetInventoryFactory assetInventoryFactory) {
+        Objects.requireNonNull(plugin, "plugin");
+        this.legacyRuntimeGate = Objects.requireNonNull(legacyRuntimeGate, "legacyRuntimeGate");
+        this.assetsGate = Objects.requireNonNull(assetsGate, "assetsGate");
+        this.assetInventoryFactory = Objects.requireNonNull(assetInventoryFactory, "assetInventoryFactory");
+        AssetTransactionCoordinator sharedCoordinator = Objects.requireNonNull(coordinator, "coordinator");
+        Path root = sharedCoordinator.canonicalRoot();
+        Path scope = Objects.requireNonNull(root.getParent(), "coordinator root parent").toAbsolutePath().normalize();
+        if (!assetsGate.scopeRoot().toAbsolutePath().normalize().equals(scope)) {
+            throw new IllegalArgumentException("Shared asset persistence gate scope does not match coordinator root");
+        }
+        initializeStores(scope, sharedCoordinator);
+    }
+
+    private void initializeStores(Path scopeRoot, AssetTransactionCoordinator candidateCoordinator) {
+        Map<String, JsonAssetStore<JsonObject>> candidateStores = Map.of();
+        AssetTransactionCoordinator.ListenerRegistration candidateListener = null;
+        try {
+            candidateCoordinator.healthCheck();
+            Path candidateAssetsRoot = candidateCoordinator.canonicalRoot();
+            candidateStores = createStores(scopeRoot, candidateAssetsRoot, candidateCoordinator, legacyRuntimeGate);
+            JsonAssetInventory inventory = assetInventoryFactory.scan(candidateAssetsRoot);
+            for (JsonAssetStore<JsonObject> store : candidateStores.values()) {
+                store.healthCheckLocal(inventory);
+            }
+            candidateListener = registerCoordinatorListener(candidateCoordinator);
+            synchronized (stores) {
+                stores.clear();
+                stores.putAll(candidateStores);
+            }
+            activeScopeRoot = scopeRoot.toAbsolutePath().normalize();
+            assetsRoot = candidateAssetsRoot.toAbsolutePath().normalize();
+            coordinator = candidateCoordinator;
+            coordinatorListener = candidateListener;
+        } catch (IOException | RuntimeException failure) {
+            if (candidateListener != null) {
+                candidateListener.close();
+            }
+            try {
+                closeStores(candidateStores.values(), failure);
+            } catch (IOException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw new IllegalStateException("Failed to initialize JSON resource persistence", failure);
+        }
+    }
+
+    private Map<String, JsonAssetStore<JsonObject>> createStores(Path scopeRoot, Path candidateAssetsRoot,
+                                                                  AssetTransactionCoordinator candidateCoordinator,
+                                                                  LegacyRuntimeActivationGate candidateLegacyRuntimeGate) {
+        Map<String, JsonAssetStore<JsonObject>> candidateStores = new LinkedHashMap<>();
+        try {
+            for (String type : resourceTypesStatic()) {
+                ReSyncManagedResource resource = ReSyncResourceCatalog.byType(type);
+                candidateStores.put(type, new JsonAssetStore<>(
+                    candidateAssetsRoot,
+                    scopeRoot.resolve(legacyFolder(type)),
+                    type,
+                    resource.defaultFolder(),
+                    json -> parse(type, json),
+                    gson::toJson,
+                    this::id,
+                    value -> folder(value, resource.defaultFolder()),
+                    candidateLegacyRuntimeGate,
+                    candidateCoordinator,
+                    this::persistenceMutationOpen,
+                    this::acquireStoreMutation,
+                    payloadMerger(type),
+                    ProjectMetadataLineage.writer(candidateAssetsRoot, gson)
+                ));
+            }
+            return candidateStores;
+        } catch (RuntimeException failure) {
+            try {
+                closeStores(candidateStores.values(), failure);
+            } catch (IOException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
+        }
+    }
+
+    public Path getAssetsPath() {
+        return assetsRoot;
+    }
+
+    public synchronized void validateActiveCoordinator(AssetTransactionCoordinator expected) throws IOException {
+        AssetTransactionCoordinator required = Objects.requireNonNull(expected, "expectedCoordinator");
+        AssetTransactionCoordinator current = requireCoordinator();
+        if (current != required) {
+            throw new IOException("JSON resource persistence coordinator identity does not match the shared coordinator");
+        }
+        Path root = requireDirectory(assetsRoot, "JSON resource asset root");
+        if (!root.equals(required.canonicalRoot())) {
+            throw new IOException("JSON resource persistence coordinator root does not match the active asset root");
+        }
+    }
+
+    public Path getScopePath() {
+        return activeScopeRoot;
+    }
+
+    public Path getMigrationReportsPath() {
+        return activeScopeRoot.resolve(".migrations").toAbsolutePath().normalize();
+    }
+
+    public synchronized void flushPersistence() throws IOException {
+        requireAssetsRoot();
+        requireCoordinator().flush();
+    }
+
+    public synchronized void quiescePersistence() {
+        if (persistenceState == PersistenceState.CLOSED) {
+            return;
+        }
+        assetsGate.quiesce();
+        persistenceFence.writeLock().lock();
+        try {
+            persistenceState = PersistenceState.QUIESCED;
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public synchronized void resumePersistence() throws IOException {
+        resumePersistenceWhileQuiesced();
+        assetsGate.resume();
+    }
+
+    public synchronized void resumePersistenceWhileQuiesced() throws IOException {
+        resumePersistenceWhileQuiesced(false);
+    }
+
+    public synchronized void resumePersistenceAfterHealthCheck() throws IOException {
+        resumePersistenceWhileQuiesced(true);
+    }
+
+    private void resumePersistenceWhileQuiesced(boolean healthVerified) throws IOException {
+        requireAssetsRoot();
+        if (!healthVerified) {
+            healthCheckPersistence();
+        }
+        persistenceFence.writeLock().lock();
+        try {
+            persistenceState = PersistenceState.OPEN;
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    public synchronized void rebindPersistence(Path candidateScopeRoot, AssetTransactionCoordinator candidateCoordinator) throws IOException {
+        if (persistenceState != PersistenceState.QUIESCED) {
+            throw new IOException("JSON resource persistence must be quiesced before rebind");
+        }
+        Path scope = requireDirectory(candidateScopeRoot, "activeRoot");
+        Path candidateAssetsRoot = requireDirectory(scope.resolve("assets"), "JSON resource rebind root");
+        AssetTransactionCoordinator sharedCoordinator = Objects.requireNonNull(candidateCoordinator, "candidateCoordinator");
+        if (!sharedCoordinator.canonicalRoot().equals(candidateAssetsRoot)) {
+            throw new IOException("JSON resource coordinator root does not match rebind asset root");
+        }
+        sharedCoordinator.healthCheck();
+        LegacyRuntimeActivationGate candidateLegacyRuntimeGate = legacyRuntimeGate.isCompatibilityMode()
+            ? LegacyRuntimeActivationGate.compatibility(scope) : LegacyRuntimeActivationGate.runtime(scope);
+        Map<String, JsonAssetStore<JsonObject>> candidateStores = Map.of();
+        AssetTransactionCoordinator.ListenerRegistration candidateListener = null;
+        try {
+            candidateStores = createStores(scope, candidateAssetsRoot, sharedCoordinator, candidateLegacyRuntimeGate);
+            JsonAssetInventory inventory = assetInventoryFactory.scan(candidateAssetsRoot);
+            for (JsonAssetStore<JsonObject> store : candidateStores.values()) {
+                store.healthCheckLocal(inventory);
+            }
+            candidateListener = registerCoordinatorListener(sharedCoordinator);
+            assetsGate.rebind(scope);
+        } catch (IOException | RuntimeException failure) {
+            if (candidateListener != null) {
+                candidateListener.close();
+            }
+            closeStores(candidateStores.values(), failure);
+            throw failure;
+        }
+        AssetTransactionCoordinator.ListenerRegistration admittedListener = candidateListener;
+        Map<String, JsonAssetStore<JsonObject>> previous;
+        AssetTransactionCoordinator.ListenerRegistration previousListener = coordinatorListener;
+        synchronized (stores) {
+            previous = Map.copyOf(stores);
+            stores.clear();
+            stores.putAll(candidateStores);
+        }
+        activeScopeRoot = scope;
+        assetsRoot = candidateAssetsRoot;
+        coordinator = sharedCoordinator;
+        legacyRuntimeGate = candidateLegacyRuntimeGate;
+        coordinatorListener = admittedListener;
+        pendingRecipeMigrationReport = null;
+        iconDataCache.clear();
+        closeStores(previous.values(), null);
+        if (previousListener != null) {
+            previousListener.close();
+        }
+    }
+
+    public synchronized void healthCheckPersistence() throws IOException {
+        requireAssetsRoot();
+        requireCoordinator().healthCheck();
+        healthCheckPersistenceLocal();
+    }
+
+    public synchronized void healthCheckPersistenceLocal() throws IOException {
+        requireAssetsRoot();
+        healthCheckPersistenceLocal(assetInventoryFactory.scan(assetsRoot));
+    }
+
+    public synchronized void healthCheckPersistenceLocal(JsonAssetInventory inventory) throws IOException {
+        requireAssetsRoot();
+        Map<String, JsonAssetStore<JsonObject>> current;
+        synchronized (stores) {
+            current = Map.copyOf(stores);
+        }
+        JsonAssetInventory requiredInventory = Objects.requireNonNull(inventory, "inventory");
+        for (JsonAssetStore<JsonObject> store : current.values()) {
+            store.healthCheckLocal(requiredInventory);
+        }
+    }
+
+    public synchronized void closePersistence() throws IOException {
+        if (persistenceState == PersistenceState.CLOSED) {
+            return;
+        }
+        persistenceFence.writeLock().lock();
+        try {
+            Map<String, JsonAssetStore<JsonObject>> current;
+            synchronized (stores) {
+                current = Map.copyOf(stores);
+            }
+            closeStores(current.values(), null);
+            AssetTransactionCoordinator.ListenerRegistration listener = coordinatorListener;
+            if (listener != null) {
+                listener.close();
+                coordinatorListener = null;
+            }
+            synchronized (stores) {
+                stores.clear();
+            }
+            iconDataCache.clear();
+            persistenceState = PersistenceState.CLOSED;
+        } finally {
+            persistenceFence.writeLock().unlock();
+        }
+    }
+
+    private boolean persistenceMutationOpen() {
+        return persistenceState == PersistenceState.OPEN && assetsGate.isOpen();
+    }
+
+    private AssetPersistenceGate.MutationLease acquirePersistenceMutation() {
+        AssetPersistenceGate.MutationLease sharedLease = assetsGate.acquire();
+        persistenceFence.readLock().lock();
+        if (persistenceState != PersistenceState.OPEN) {
+            persistenceFence.readLock().unlock();
+            sharedLease.close();
+            throw new IllegalStateException("JSON resource persistence is QUIESCED; mutation rejected");
+        }
+        return () -> {
+            persistenceFence.readLock().unlock();
+            sharedLease.close();
+        };
+    }
+
+    private JsonAssetStore.MutationLease acquireStoreMutation() {
+        AssetPersistenceGate.MutationLease lease = acquirePersistenceMutation();
+        return lease::close;
+    }
+
+    private JsonAssetStore.PayloadMerger<JsonObject> payloadMerger(String type) {
+        Set<String> ownedFields = ownedFieldPaths(type);
+        return (value, existing, serialized) -> {
+            return JsonAssetStore.mergePayload(existing, serialized, ownedFields);
+        };
+    }
+
+    private Set<String> ownedFieldPaths(String type) {
+        return switch (type) {
+            case ReSyncResourceCatalog.CHAT -> Set.of(
+                "id", "folder", "displayName", "channel", "channel.prefix", "channel.range", "channel.speakPermission",
+                "channel.readPermission", "channel.allowMiniMessage", "channel.miniMessagePermission", "format", "format.template",
+                "rule", "rule.contains", "rule.action", "rule.replacement", "rule.channel", "rule.flowId", "privateMessages",
+                "privateMessages.sender", "privateMessages.receiver", "privateMessages.spy", "privateMessages.privateMessageFlow",
+                "mention", "mention.template", "mention.mentionFlow", "ignore", "ignore.players", "enabled");
+            case ReSyncResourceCatalog.MOTD_PROFILE -> Set.of(
+                "id", "folder", "line1", "line2", "priority", "playerCountMode", "onlinePlayers", "maxPlayers", "icon",
+                "iconData", "iconHash", "enabled");
+            case ReSyncResourceCatalog.MESSAGE_RULE -> Set.of(
+                "id", "folder", "source", "sources", "contains", "replacement", "action", "priority", "enabled", "permission",
+                "players", "flowPredicate", "flowId");
+            case ReSyncResourceCatalog.TEXT_TEMPLATE -> Set.of(
+                "id", "folder", "kind", "text", "mode", "frameMillis", "width", "visibleCharacters", "frames", "values",
+                "entries", "colors", "color", "secondaryColor");
+            case ReSyncResourceCatalog.RECIPE_DEFINITION -> Set.of(
+                "id", "folder", "type", "output", "output.material", "output.amount", "shape", "ingredients", "experience",
+                "cookingTime", "craftedFlow", "cookedFlow", "deniedFlow", "conditions", "conditions.permission", "conditions.world",
+                "enabled");
+            case ReSyncResourceCatalog.ADVANCEMENT_TREE -> Set.of("id", "folder", "displayName", "enabled", "nodes");
+            case ReSyncResourceCatalog.DIALOG -> Set.of(
+                "id", "folder", "displayName", "enabled", "type", "title", "external_title", "pause", "can_close_with_escape",
+                "after_action", "columns", "body", "inputs", "actions");
+            case ReSyncResourceCatalog.TRADE_PROFILE -> Set.of(
+                "id", "folder", "displayName", "enabled", "profession", "villagerType", "level", "maxUses", "restockTicks",
+                "lootTable", "offers", "hooks", "hooks.openAction", "hooks.completeAction", "hooks.deniedAction");
+            case ReSyncResourceCatalog.NPC_DEFINITION -> Set.of(
+                "id", "folder", "displayName", "enabled", "entityType", "skin", "skin.username", "ai", "gravity", "invulnerable",
+                "followPlayer", "followRange", "dialog", "tradeProfile", "lootTable", "equipment", "equipment.mainHand",
+                "equipment.offHand", "equipment.helmet", "equipment.chestplate", "equipment.leggings", "equipment.boots", "hooks",
+                "hooks.spawnAction", "hooks.interactAction", "hooks.rightClickAction", "hooks.leftClickAction", "hooks.damageAction",
+                "hooks.deathAction", "hooks.despawnAction");
+            case ReSyncResourceCatalog.LOOT_TABLE -> Set.of(
+                "id", "folder", "displayName", "enabled", "trigger", "trigger.event", "trigger.target", "trigger.entity", "trigger.tool",
+                "trigger.overrideDrops", "pools", "hooks", "hooks.beforeRollFlow", "hooks.afterRollFlow", "hooks.deniedRollFlow");
+            case ReSyncResourceCatalog.VARIABLE_DEFINITION -> Set.of(
+                "id", "folder", "name", "displayName", "description", "valueType", "type", "scope", "persistent", "defaultValue");
+            case ReSyncResourceCatalog.TIMER_DEFINITION -> Set.of(
+                "id", "folder", "name", "displayName", "description", "scope", "persistent", "defaultDuration", "defaultUnit",
+                "tickInterval");
+            case ReSyncResourceCatalog.SCHEDULE_DEFINITION -> Set.of(
+                "id", "folder", "name", "displayName", "description", "targetType", "targetId", "timingMode", "duration", "unit",
+                "initialDelay", "dateTime", "timeZone", "cron", "scope", "persistent", "overlapPolicy", "existingTaskPolicy",
+                "failurePolicy", "offlinePolicy", "missedRunPolicy", "timing", "timing.mode", "timing.duration", "timing.unit",
+                "timing.initialDelay", "timing.dateTime", "timing.timeZone", "timing.cron", "timing.pattern", "target", "target.type",
+                "target.id");
+            default -> Set.of("id", "folder");
+        };
+    }
+
+    private AssetTransactionCoordinator requireCoordinator() throws IOException {
+        AssetTransactionCoordinator current = coordinator;
+        if (current == null || persistenceState == PersistenceState.CLOSED) {
+            throw new IOException("JSON resource persistence is closed");
+        }
+        return current;
+    }
+
+    private AssetTransactionCoordinator.ListenerRegistration registerCoordinatorListener(
+        AssetTransactionCoordinator candidateCoordinator) {
+        return candidateCoordinator.addListener(result -> {
+            if (result.states().keySet().stream().anyMatch(key -> "blob".equals(key.type()))) {
+                iconDataCache.clear();
+            }
+        });
+    }
+
+    private void closeStores(Iterable<JsonAssetStore<JsonObject>> candidates, Throwable priorFailure) throws IOException {
+        IOException failure = null;
+        for (JsonAssetStore<JsonObject> store : candidates) {
+            try {
+                store.close();
+            } catch (RuntimeException closeFailure) {
+                if (priorFailure != null) {
+                    priorFailure.addSuppressed(closeFailure);
+                } else if (failure == null) {
+                    failure = new IOException("Failed to close JSON resource persistence binding", closeFailure);
+                } else {
+                    failure.addSuppressed(closeFailure);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private void requireAssetsRoot() throws IOException {
+        requireDirectory(assetsRoot, "JSON resource asset root");
+    }
+
+    private Path requireDirectory(Path path, String name) throws IOException {
+        Path normalized = Objects.requireNonNull(path, name).toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(normalized) || !Files.isDirectory(normalized)) {
+            throw new IOException(name + " must be an existing non-symbolic-link directory: " + normalized);
+        }
+        return normalized;
+    }
+
     public JsonObject get(String type, String id) {
-        JsonAssetStore<JsonObject> store = stores.get(type);
-        JsonObject value = store != null ? store.get(id) : null;
+        JsonObject value = logicalPayload(requireStore(type).get(id));
         normalizeAssetId(value, id);
         if (value != null && ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
-            return motdProfileForClient(value);
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                return motdProfileForClient(value);
+            }
         }
         return value;
     }
 
     public List<String> listIds(String type) {
-        JsonAssetStore<JsonObject> store = stores.get(type);
-        return store != null ? store.listIds() : List.of();
+        try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+            return requireStore(type).listIds();
+        }
+    }
+
+    public ResourceSnapshot readSnapshot(String type) {
+        JsonAssetStore.ReadSnapshot<JsonObject> snapshot = requireStore(type).readSnapshot();
+        List<ResourceSnapshotValue> values = snapshot.values().stream().map(value -> {
+            JsonObject payload = logicalPayload(value.value());
+            normalizeAssetId(payload, value.id());
+            return new ResourceSnapshotValue(value.id(), payload, value.stamp());
+        }).toList();
+        return new ResourceSnapshot(type, snapshot.root(), snapshot.rootSequence(), snapshot.revision(), values);
+    }
+
+    public boolean isCurrent(ResourceSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "Resource snapshot is required");
+        requireStore(snapshot.type());
+        try {
+            AssetTransactionCoordinator currentCoordinator = requireCoordinator();
+            if (!currentCoordinator.canonicalRoot().equals(snapshot.root())) {
+                return false;
+            }
+            return currentCoordinator.read(current -> {
+                long liveCount = current.states().entrySet().stream()
+                    .filter(entry -> entry.getKey().type().equals(snapshot.type()) && entry.getValue() instanceof Live)
+                    .count();
+                if (liveCount != snapshot.values().size()) {
+                    return false;
+                }
+                for (ResourceSnapshotValue value : snapshot.values()) {
+                    AssetKey key = new AssetKey(snapshot.type(), value.id());
+                    ExpectedState state = current.state(key).orElse(null);
+                    if (!(state instanceof Live) || state.revision() != value.stamp().revision()
+                        || !current.mutationValue(key).filter(value.stamp().mutationValue()::equals).isPresent()) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        } catch (IOException exception) {
+            throw new IllegalStateException("JSON resource snapshot authority is unavailable", exception);
+        }
     }
 
     public void save(String type, JsonObject value) {
-        JsonAssetStore<JsonObject> store = stores.get(type);
-        if (store == null) {
-            throw new IllegalArgumentException("Unknown resource type: " + type);
-        }
-        normalizeAssetId(value, id(value));
-        if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
-            RecipeSchemaNormalizer.normalize(value);
-        }
-        if (ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
-            prepareMotdIcon(value);
-        }
+        saveMutation(type, value, UUID.randomUUID(), -1L, false);
+    }
+
+    public void save(String type, JsonObject value, UUID mutationId, long expectedRevision) {
+        requireMutationRequest(mutationId, expectedRevision);
+        saveMutation(type, value, mutationId, expectedRevision, true);
+    }
+
+    public void save(String type, JsonObject value, long expectedRevision, UUID mutationId) {
+        save(type, value, mutationId, expectedRevision);
+    }
+
+    public JsonAssetStore.AggregateCreateResult create(String type, JsonObject value, UUID mutationId,
+                                                       long expectedRevision,
+                                                       ResourcePresentationIntent presentation,
+                                                       String expectedPayloadHash) {
+        requireMutationRequest(mutationId, expectedRevision);
+        Objects.requireNonNull(presentation, "presentation");
+        Objects.requireNonNull(expectedPayloadHash, "expectedPayloadHash");
+        JsonAssetStore<JsonObject> store = requireStore(type);
+        JsonObject working = value == null ? null : value.deepCopy();
+        String safeId = id(working);
+        JsonAssetStore.AggregateCreateResult result;
         try {
-            for (ResourceMutationInterceptor interceptor : interceptors) {
-                interceptor.beforeSave(type, value);
+            byte[] motdIcon;
+            try {
+                normalizeAssetId(working, safeId);
+                validate(type, working);
+                if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                    RecipeSchemaNormalizer.normalize(working);
+                }
+                motdIcon = ReSyncResourceCatalog.MOTD_PROFILE.equals(type) ? prepareMotdIcon(working) : null;
+                if (safeId == null || safeId.isBlank()) {
+                    throw new IllegalArgumentException("Invalid JSON resource id");
+                }
+            } catch (IllegalArgumentException failure) {
+                throw rejectAggregateCreate(failure);
             }
-            store.save(value);
+            JsonAssetStore.AssetStamp before;
+            long beforeGeneration;
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                before = store.readStamp(safeId);
+                beforeGeneration = store.cacheGeneration();
+            }
+            Map<Path, byte[]> binaryWrites;
+            try {
+                for (ResourceMutationInterceptor interceptor : interceptors) {
+                    interceptor.beforeSave(type, working);
+                }
+                if (!safeId.equals(id(working))) {
+                    throw new IllegalArgumentException("JSON resource identity changed during create: " + safeId);
+                }
+                Map<String, Object> canonicalPayload = gson.fromJson(gson.toJson(working), Map.class);
+                if (!expectedPayloadHash.equals(ResourcePayloadCodecs.json().hashPayload(canonicalPayload).canonicalText())) {
+                    throw rejectAggregateCreate("RESOURCE_PAYLOAD_INVALID",
+                        new IllegalArgumentException("JSON resource changed during aggregate create validation: " + safeId));
+                }
+                Path iconPath = motdIcon == null ? null : resolveIconPath(text(working, "icon"));
+                if (motdIcon != null && iconPath == null) {
+                    throw new IllegalArgumentException("MOTD icon target must be inside coordinated asset storage");
+                }
+                binaryWrites = motdIcon == null ? Map.of() : Map.of(iconPath, motdIcon);
+            } catch (IllegalArgumentException failure) {
+                throw rejectAggregateCreate(failure);
+            }
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                JsonAssetStore.AssetStamp afterCallbacks = store.readStamp(safeId);
+                if (!Objects.equals(before, afterCallbacks) || beforeGeneration != store.cacheGeneration()) {
+                    throw new IllegalStateException("JSON resource changed during create callbacks: " + safeId);
+                }
+                try {
+                    result = store.create(working, binaryWrites, mutationId, expectedRevision, presentation);
+                } catch (JsonAssetStore.PreCommitConflictException failure) {
+                    throw AggregateResourceCreateStorage.rejectBeforeCommit("RESOURCE_PATH_CONFLICT",
+                        failure.getMessage() + ". Choose another folder or name.", failure);
+                }
+            }
         } catch (RuntimeException failure) {
-            notifySaveFailure(type, value, failure);
+            notifySaveFailure(type, working, failure);
             throw failure;
         }
-        notifyListeners(type, id(value), value, false);
+        return result;
+    }
+
+    private AggregateResourceCreateStorage.PreCommitRejection rejectAggregateCreate(RuntimeException failure) {
+        return rejectAggregateCreate(ProtocolRejectionCode.RESOURCE_OPERATION_FAILED.legacyValue(), failure);
+    }
+
+    private AggregateResourceCreateStorage.PreCommitRejection rejectAggregateCreate(String errorCode,
+                                                                                      RuntimeException failure) {
+        return AggregateResourceCreateStorage.rejectBeforeCommit(errorCode, failure.getMessage(), failure);
     }
 
     public void delete(String type, String id) {
-        JsonAssetStore<JsonObject> store = stores.get(type);
-        if (store == null) {
-            throw new IllegalArgumentException("Unknown resource type: " + type);
-        }
-        try {
-            for (ResourceMutationInterceptor interceptor : interceptors) {
-                interceptor.beforeDelete(type, id);
+        deleteMutation(type, id, UUID.randomUUID(), -1L, false);
+    }
+
+    public void delete(String type, String id, UUID mutationId, long expectedRevision) {
+        requireMutationRequest(mutationId, expectedRevision);
+        deleteMutation(type, id, mutationId, expectedRevision, true);
+    }
+
+    public void delete(String type, String id, long expectedRevision, UUID mutationId) {
+        delete(type, id, mutationId, expectedRevision);
+    }
+
+    public boolean supportsAuthoritativeMutationIdentity() {
+        return true;
+    }
+
+    public FlowResourceMutationStamp readMutationStamp(String type, String id) {
+        JsonAssetStore<JsonObject> store = requireStore(type);
+        try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+            JsonAssetStore.AssetStamp stamp = store.readStamp(id);
+            if (stamp == null) {
+                return null;
             }
-            store.delete(id);
-        } catch (RuntimeException failure) {
-            notifyDeleteFailure(type, id, failure);
-            throw failure;
+            UUID runtimeMutationId = stamp.runtimeMutationId().orElseThrow(() -> new IllegalStateException(
+                "Adopted JSON resource lineage cannot be exposed as a runtime mutation UUID: " + stamp.mutationValue()));
+            return new FlowResourceMutationStamp(stamp.type(), stamp.id(), stamp.revision(), runtimeMutationId,
+                stamp.payloadHash(), stamp.deleted());
         }
-        notifyListeners(type, id, null, true);
+    }
+
+    public boolean matchesCommittedPayloadRecovery(String type, JsonObject previous, JsonObject requested,
+                                                   JsonObject actual) {
+        if (previous == null || requested == null) {
+            return false;
+        }
+        if (!ReSyncResourceCatalog.MOTD_PROFILE.equals(type)) {
+            return JsonAssetStore.matchesLegacyMergedPayload(previous, requested, actual, ownedFieldPaths(type));
+        }
+        JsonObject normalized = requested.deepCopy();
+        try {
+            prepareMotdIcon(normalized);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        return JsonAssetStore.matchesLegacyMergedPayload(previous, normalized, actual, ownedFieldPaths(type));
     }
 
     public JsonObject reload(String type, String id) {
-        JsonAssetStore<JsonObject> store = stores.get(type);
-        if (store == null) {
-            throw new IllegalArgumentException("Unknown resource type: " + type);
-        }
+        JsonAssetStore<JsonObject> store = requireStore(type);
         JsonObject value;
         try {
             value = store.reload(id, candidate -> {
@@ -123,16 +709,20 @@ public class ReSyncJsonResourceStorage {
                 for (ResourceMutationInterceptor interceptor : interceptors) {
                     interceptor.beforeSave(type, candidate);
                 }
+                if (candidate != null && !Objects.equals(id(candidate), id)) {
+                    throw new IllegalArgumentException("JSON resource identity changed during reload: " + id);
+                }
             });
         } catch (RuntimeException failure) {
             notifySaveFailure(type, null, failure);
             throw failure;
         }
         normalizeAssetId(value, id);
-        if (value != null) {
-            notifyListeners(type, id, value, false);
+        if (value == null) {
+            return null;
         }
-        return value;
+        notifyListeners(type, id, value.deepCopy(), false);
+        return logicalPayload(store.get(id));
     }
 
     public void addListener(ResourceListener listener) {
@@ -155,37 +745,197 @@ public class ReSyncJsonResourceStorage {
         interceptors.remove(interceptor);
     }
 
-    public void migrateLegacyAssets() {
-        for (JsonAssetStore<JsonObject> store : stores.values()) {
-            store.migrateLegacyAssets();
+    public synchronized void migrateLegacyAssets() {
+        throw new IllegalStateException("Legacy JSON resource migration requires verified asset coordinator adoption");
+    }
+
+    public synchronized void bindMigrationReportsAuthority(MigrationReportsPersistenceParticipant authority) {
+        Objects.requireNonNull(authority, "authority");
+        if (!activeScopeRoot.equals(authority.rebindScope())) {
+            throw new IllegalArgumentException("Migration reports authority scope does not match JSON resource storage scope");
         }
-        Path reportFile = plugin.getDataFolder().toPath().resolve(".migrations").resolve("recipe-schema-v1.json");
-        if (Files.exists(reportFile)) {
+        if (migrationReportsAuthority != null && migrationReportsAuthority != authority) {
+            throw new IllegalStateException("Migration reports authority is already bound");
+        }
+        migrationReportsAuthority = authority;
+    }
+
+    public synchronized void flushMigrationReports(MigrationReportsPersistenceParticipant authority, Path reportsRoot) throws IOException {
+        if (persistenceState == PersistenceState.CLOSED) {
+            throw new IOException("JSON resource persistence is closed");
+        }
+        Path root = requireMigrationReportsRoot(reportsRoot);
+        if (migrationReportsAuthority != authority || authority == null || !authority.isAdmitted()
+            || !authority.root().equals(root)) {
+            throw new IOException("Migration reports can only be flushed by the admitted participant authority");
+        }
+        Path reportFile = recipeMigrationReportFile(root);
+        if (pendingRecipeMigrationReport == null) {
+            if (Files.exists(reportFile)) {
+                validateRecipeMigrationReport(reportFile);
+            }
             return;
         }
-        JsonAssetStore<JsonObject> recipes = stores.get(ReSyncResourceCatalog.RECIPE_DEFINITION);
-        int inspected = 0;
-        int normalized = 0;
-        if (recipes != null) {
-            for (String recipeId : recipes.listIds()) {
-                inspected++;
-                JsonObject recipe = recipes.get(recipeId);
-                if (RecipeSchemaNormalizer.normalize(recipe)) {
-                    recipes.save(recipe);
-                    normalized++;
-                }
+        RecipeMigrationReportContract.Report pending = pendingRecipeMigrationReport;
+        byte[] expected = pending.canonicalJson().getBytes(StandardCharsets.UTF_8);
+        try {
+            AtomicFiles.writeNew(reportFile, expected);
+        } catch (FileAlreadyExistsException collision) {
+            RecipeMigrationReportContract.Report existing = readRecipeMigrationReport(reportFile);
+            byte[] actual = Files.readAllBytes(reportFile);
+            if (!pending.equals(existing) || !Arrays.equals(expected, actual)) {
+                IOException failure = new IOException("Recipe migration report already exists with different content");
+                failure.addSuppressed(collision);
+                throw failure;
             }
         }
-        JsonObject report = new JsonObject();
-        report.addProperty("version", 1);
-        report.addProperty("inspected", inspected);
-        report.addProperty("normalized", normalized);
-        report.addProperty("unchanged", inspected - normalized);
-        try {
-            StorageSafety.writeUtf8Atomic(reportFile, gson.toJson(report));
-        } catch (IOException exception) {
-            throw new IllegalStateException("Failed to save recipe migration report", exception);
+        validateRecipeMigrationReport(reportFile);
+        pendingRecipeMigrationReport = null;
+    }
+
+    public synchronized boolean hasPendingMigrationReports() {
+        return pendingRecipeMigrationReport != null;
+    }
+
+    public boolean allowsLegacyMigration() {
+        return false;
+    }
+
+    private JsonAssetStore<JsonObject> requireStore(String type) {
+        if (persistenceState == PersistenceState.CLOSED) {
+            throw new IllegalStateException("JSON resource persistence is closed");
         }
+        JsonAssetStore<JsonObject> store;
+        synchronized (stores) {
+            store = stores.get(type);
+        }
+        if (store == null) {
+            throw new IllegalArgumentException("Unknown resource type: " + type);
+        }
+        return store;
+    }
+
+    private void saveMutation(String type, JsonObject value, UUID mutationId, long expectedRevision,
+                              boolean authoritative) {
+        JsonAssetStore<JsonObject> store = requireStore(type);
+        JsonObject working = value == null ? null : value.deepCopy();
+        String safeId = id(working);
+        try {
+            normalizeAssetId(working, safeId);
+            validate(type, working);
+            if (ReSyncResourceCatalog.RECIPE_DEFINITION.equals(type)) {
+                RecipeSchemaNormalizer.normalize(working);
+            }
+            byte[] motdIcon = ReSyncResourceCatalog.MOTD_PROFILE.equals(type) ? prepareMotdIcon(working) : null;
+            if (safeId == null || safeId.isBlank()) {
+                throw new IllegalArgumentException("Invalid JSON resource id");
+            }
+            JsonAssetStore.AssetStamp before;
+            long beforeGeneration;
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                before = store.readStamp(safeId);
+                beforeGeneration = store.cacheGeneration();
+            }
+            for (ResourceMutationInterceptor interceptor : interceptors) {
+                interceptor.beforeSave(type, working);
+            }
+            if (!safeId.equals(id(working))) {
+                throw new IllegalArgumentException("JSON resource identity changed during save: " + safeId);
+            }
+            Path iconPath = motdIcon == null ? null : resolveIconPath(text(working, "icon"));
+            if (motdIcon != null && iconPath == null) {
+                throw new IllegalArgumentException("MOTD icon target must be inside coordinated asset storage");
+            }
+            Map<Path, byte[]> binaryWrites = motdIcon == null ? Map.of() : Map.of(iconPath, motdIcon);
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                JsonAssetStore.AssetStamp afterCallbacks = store.readStamp(safeId);
+                if (!Objects.equals(before, afterCallbacks) || beforeGeneration != store.cacheGeneration()) {
+                    throw new IllegalStateException("JSON resource changed during save callbacks: " + safeId);
+                }
+                if (authoritative) {
+                    store.save(working, binaryWrites, mutationId, expectedRevision);
+                } else {
+                    store.save(working, binaryWrites);
+                }
+            }
+        } catch (RuntimeException failure) {
+            notifySaveFailure(type, working, failure);
+            throw failure;
+        }
+        notifyListeners(type, safeId, working.deepCopy(), false);
+    }
+
+    private void deleteMutation(String type, String id, UUID mutationId, long expectedRevision,
+                                boolean authoritative) {
+        JsonAssetStore<JsonObject> store = requireStore(type);
+        JsonAssetStore.AssetStamp before;
+        long beforeGeneration;
+        try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+            before = store.readStamp(id);
+            beforeGeneration = store.cacheGeneration();
+        } catch (RuntimeException failure) {
+            notifyDeleteFailure(type, id, failure);
+            throw failure;
+        }
+        try {
+            for (ResourceMutationInterceptor interceptor : interceptors) {
+                interceptor.beforeDelete(type, id);
+            }
+            try (AssetPersistenceGate.MutationLease ignored = acquirePersistenceMutation()) {
+                JsonAssetStore.AssetStamp afterCallbacks = store.readStamp(id);
+                if (!Objects.equals(before, afterCallbacks) || beforeGeneration != store.cacheGeneration()) {
+                    throw new IllegalStateException("JSON resource changed during delete callbacks: " + id);
+                }
+                if (authoritative) {
+                    store.delete(id, mutationId, expectedRevision);
+                } else {
+                    store.delete(id);
+                }
+            }
+        } catch (RuntimeException failure) {
+            notifyDeleteFailure(type, id, failure);
+            throw failure;
+        }
+        notifyListeners(type, id, null, true);
+    }
+
+    private void requireMutationRequest(UUID mutationId, long expectedRevision) {
+        Objects.requireNonNull(mutationId, "mutationId");
+        if (expectedRevision < 0L) {
+            throw new IllegalArgumentException("Expected resource revision cannot be negative");
+        }
+    }
+
+    private Path requireMigrationReportsRoot(Path reportsRoot) throws IOException {
+        Path expected = MigrationPaths.requirePath(activeScopeRoot.resolve(".migrations"), "migration reports root");
+        Path candidate = MigrationPaths.requirePath(reportsRoot, "migration reports root");
+        if (!expected.equals(candidate)) {
+            throw new IOException("Migration reports root must be dataRoot/.migrations");
+        }
+        if (Files.exists(candidate)) {
+            MigrationPaths.requireDirectory(candidate, "migration reports root");
+        }
+        return candidate;
+    }
+
+    private Path recipeMigrationReportFile(Path reportsRoot) {
+        Path root = MigrationPaths.requirePath(reportsRoot, "migration reports root");
+        return root.resolve(RecipeMigrationReportContract.FILE_NAME).toAbsolutePath().normalize();
+    }
+
+    private RecipeMigrationReportContract.Report readRecipeMigrationReport(Path reportFile) {
+        try {
+            return RecipeMigrationReportContract.read(reportFile);
+        } catch (IOException | RuntimeException exception) {
+            if (exception instanceof IllegalStateException state) {
+                throw state;
+            }
+            throw new IllegalStateException("Recipe migration report could not be read", exception);
+        }
+    }
+
+    private void validateRecipeMigrationReport(Path reportFile) {
+        readRecipeMigrationReport(reportFile);
     }
 
     public List<String> resourceTypes() {
@@ -235,9 +985,30 @@ public class ReSyncJsonResourceStorage {
     }
 
     private void notifyListeners(String type, String id, JsonObject value, boolean deleted) {
+        JsonObject logical = logicalPayload(value);
         for (ResourceListener listener : listeners) {
-            listener.resourceChanged(type, id, value, deleted);
+            try {
+                listener.resourceChanged(type, id, logical == null ? null : logical.deepCopy(), deleted);
+            } catch (Throwable failure) {
+                Log.error("JSON resource post-commit listener failed for " + type + "/" + id, failure);
+            }
         }
+    }
+
+    private JsonObject parse(String type, String json) {
+        JsonObject value = gson.fromJson(json, JsonObject.class);
+        validate(type, value);
+        return value;
+    }
+
+    private void validate(String type, JsonObject value) {
+        if (ReSyncResourceCatalog.SCHEDULE_DEFINITION.equals(type)) {
+            ScheduleDefinition.from(value, id(value));
+        }
+    }
+
+    private JsonObject logicalPayload(JsonObject value) {
+        return value == null ? null : JsonAssetStore.logicalPayload(value);
     }
 
     private void notifySaveFailure(String type, JsonObject value, RuntimeException failure) {
@@ -284,14 +1055,19 @@ public class ReSyncJsonResourceStorage {
     }
 
     private CachedIconData cachedIconData(Path icon) throws IOException {
-        String key = icon.toAbsolutePath().normalize().toString();
-        long modified = Files.getLastModifiedTime(icon).toMillis();
-        long size = Files.size(icon);
+        Path canonicalRoot = assetsRoot.toRealPath();
+        Path canonicalIcon = icon.toRealPath();
+        if (canonicalIcon.equals(canonicalRoot) || !canonicalIcon.startsWith(canonicalRoot)) {
+            throw new IOException("MOTD icon is outside coordinated asset storage");
+        }
+        String key = canonicalIcon.toString();
+        long modified = Files.getLastModifiedTime(canonicalIcon).toMillis();
+        long size = Files.size(canonicalIcon);
         CachedIconData cached = iconDataCache.get(key);
         if (cached != null && cached.modified() == modified && cached.size() == size) {
             return cached;
         }
-        byte[] bytes = Files.readAllBytes(icon);
+        byte[] bytes = Files.readAllBytes(canonicalIcon);
         BufferedImage image = validPngIcon(bytes);
         if (image == null) {
             iconDataCache.remove(key);
@@ -302,10 +1078,10 @@ public class ReSyncJsonResourceStorage {
         return fresh;
     }
 
-    private void prepareMotdIcon(JsonObject value) {
+    private byte[] prepareMotdIcon(JsonObject value) {
         String iconData = text(value, "iconData");
         if (iconData.isBlank()) {
-            return;
+            return null;
         }
         byte[] bytes;
         try {
@@ -317,20 +1093,16 @@ public class ReSyncJsonResourceStorage {
         if (image == null) {
             throw new IllegalArgumentException("MOTD icon must be 64x64 PNG");
         }
+        String actualHash = sha256(bytes);
         String hash = text(value, "iconHash");
-        if (hash.isBlank()) {
-            hash = sha256(bytes);
-            value.addProperty("iconHash", hash);
+        if (!hash.isBlank() && (!hash.matches("[0-9a-f]{64}") || !hash.equals(actualHash))) {
+            throw new IllegalArgumentException("MOTD icon hash does not match its PNG data");
         }
-        String relative = "motd-icons/" + hash + ".png";
-        Path path = resolveIconPath(relative);
-        try {
-            Files.createDirectories(path.getParent());
-            Files.write(path, bytes);
-            value.addProperty("icon", relative);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to store MOTD icon");
-        }
+        hash = actualHash;
+        value.addProperty("iconHash", hash);
+        String relative = "assets/motd-icons/" + hash + ".png";
+        value.addProperty("icon", relative);
+        return bytes;
     }
 
     private BufferedImage validPngIcon(byte[] bytes) {
@@ -365,10 +1137,12 @@ public class ReSyncJsonResourceStorage {
             return null;
         }
         Path path = Path.of(icon);
-        if (!path.isAbsolute()) {
-            path = plugin.getDataFolder().toPath().resolve(icon);
+        if (path.isAbsolute()) {
+            return null;
         }
-        return path.normalize();
+        Path resolved = activeScopeRoot.resolve(path).toAbsolutePath().normalize();
+        Path root = assetsRoot.toAbsolutePath().normalize();
+        return resolved.equals(root) || !resolved.startsWith(root) ? null : resolved;
     }
 
     private String stripImageDataPrefix(String data) {

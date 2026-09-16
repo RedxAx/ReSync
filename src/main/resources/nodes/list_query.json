@@ -1,0 +1,320 @@
+[
+  {
+    "id": "list_index_of",
+    "displayName": "Index Of",
+    "description": "Find the first value equal to a target in a list. Missing or null list input uses an empty list, missing or null value input matches null entries, and no match returns -1.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "query", "index"],
+    "legacyIds": ["list.index_of"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "index_of"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to find by equality. Missing or null input matches null entries."}
+    ],
+    "outputs": [
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "Returns the first zero-based index of a value equal to the target, or -1 when no match exists."}
+    ]
+  },
+  {
+    "id": "list_count",
+    "displayName": "Count",
+    "description": "Count values equal to a target in a list. Missing or null list input uses an empty list, missing or null value input matches null entries, and equality is checked for every item.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "query", "count"],
+    "legacyIds": ["list.count"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "count"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "type:t", "description": "Value to count by equality. Missing or null input matches null entries."}
+    ],
+    "outputs": [
+      {"id": "count", "displayName": "Count", "name": "count", "pinType": "DATA", "dataType": "number", "description": "Returns the number of list values equal to the target, including null matches when the target is null."}
+    ]
+  },
+  {
+    "id": "list_first",
+    "displayName": "First",
+    "description": "Read the first value in a list. Missing or null list input uses an empty list, and an empty list returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "query", "first"],
+    "legacyIds": ["list.first"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "first"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List whose first value should be read. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "item", "displayName": "Item", "name": "item", "pinType": "DATA", "dataType": "type:t", "description": "Returns the first value, or null when the list is missing, null, or empty."}
+    ]
+  },
+  {
+    "id": "list_last",
+    "displayName": "Last",
+    "description": "Read the last value in a list. Missing or null list input uses an empty list, and an empty list returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "query", "last"],
+    "legacyIds": ["list.last"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "last"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "description": "List whose last value should be read. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "item", "displayName": "Item", "name": "item", "pinType": "DATA", "dataType": "type:t", "description": "Returns the last value, or null when the list is missing, null, or empty."}
+    ]
+  },
+  {
+    "id": "list_find_first",
+    "displayName": "Find First",
+    "description": "Return the first value that matches a property predicate. Missing or null list input uses an empty list, the property may be blank to inspect each value, and no match returns null.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "query", "predicate", "search"],
+    "legacyIds": ["list.find_first"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "find_first"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property to inspect. Missing or blank input compares each list value directly."},
+      {"id": "operator", "displayName": "Operator", "name": "operator", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "contains", "contains_ignore_case", "starts_with", "ends_with", "is_null", "is_not_null", "is_empty", "is_not_empty"], "defaultValue": "equals", "description": "Predicate used to compare each value."},
+      {"id": "compare_value", "displayName": "Compare Value", "name": "compare_value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value used by operators that compare against a target. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "found_element", "displayName": "Found Element", "name": "found_element", "pinType": "DATA", "dataType": "type:t", "description": "Returns the first matching value, or null when no value matches."}
+    ]
+  },
+  {
+    "id": "list_find_all",
+    "displayName": "Find All",
+    "description": "Find every index containing a target value. Missing or null list input uses an empty list, missing or null target matches null values, and indices remain in ascending order.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "query", "search", "index"],
+    "legacyIds": ["list.find_all"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "find_all"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "target", "displayName": "Target", "name": "target", "pinType": "DATA", "dataType": "type:t", "description": "Value to find. Missing or null input matches null values."}
+    ],
+    "outputs": [
+      {"id": "indices", "displayName": "Indices", "name": "indices", "pinType": "DATA", "dataType": "list<number>", "constraints": {"min": 0, "max": 65536}, "description": "Returns every zero-based matching index in ascending order."}
+    ]
+  },
+  {
+    "id": "list_find_index",
+    "displayName": "Find Index",
+    "description": "Find the first index whose value matches a condition. Missing or null list input uses an empty list, a blank condition selects the first non-null value, and no match returns -1.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "query", "search", "index"],
+    "legacyIds": ["list.find_index"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "find_index"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "condition", "displayName": "Condition", "name": "condition", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Condition such as type:string, not_null, instanceof Type, a text fragment, or a numeric greater-than or less-than expression. Blank selects the first non-null value."}
+    ],
+    "outputs": [
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "Returns the first matching zero-based index, or -1 when no value matches."}
+    ]
+  },
+  {
+    "id": "list_contains_any",
+    "displayName": "Contains Any",
+    "description": "Check whether a list contains at least one value from another list. Missing or null inputs use empty lists, equality includes null values, and an empty item list returns true.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "contains", "query", "boolean"],
+    "legacyIds": ["list.contains_any"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "contains_any"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "items", "displayName": "Items", "name": "items", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Values to search for. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "contains", "displayName": "Contains", "name": "contains", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when at least one item occurs in the list."}
+    ]
+  },
+  {
+    "id": "list_contains_all",
+    "displayName": "Contains All",
+    "description": "Check whether a list contains every value from another list. Missing or null inputs use empty lists, equality includes null values, and an empty item list returns true.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "contains", "query", "boolean"],
+    "legacyIds": ["list.contains_all"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "contains_all"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "items", "displayName": "Items", "name": "items", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Values that must all be present. Missing or null input uses an empty list."}
+    ],
+    "outputs": [
+      {"id": "contains", "displayName": "Contains", "name": "contains", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when every item occurs in the list."}
+    ]
+  },
+  {
+    "id": "list_any",
+    "displayName": "List Any",
+    "description": "Return whether at least one value matches a property predicate. Missing or null list input uses an empty list, and a blank property compares each value directly.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "predicate", "boolean"],
+    "legacyIds": ["list.any"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "any"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property to inspect. Missing or blank input compares each list value directly."},
+      {"id": "operator", "displayName": "Operator", "name": "operator", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "contains", "contains_ignore_case", "starts_with", "ends_with", "is_null", "is_not_null", "is_empty", "is_not_empty"], "defaultValue": "equals", "description": "Predicate used to compare each value."},
+      {"id": "compare_value", "displayName": "Compare Value", "name": "compare_value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value used by operators that compare against a target. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "matches", "displayName": "Matches", "name": "matches", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when at least one value matches the predicate."}
+    ]
+  },
+  {
+    "id": "list_all",
+    "displayName": "List All",
+    "description": "Return whether every value matches a property predicate. Missing or null list input uses an empty list, and a blank property compares each value directly.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "predicate", "boolean"],
+    "legacyIds": ["list.all"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "all"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property to inspect. Missing or blank input compares each list value directly."},
+      {"id": "operator", "displayName": "Operator", "name": "operator", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "contains", "contains_ignore_case", "starts_with", "ends_with", "is_null", "is_not_null", "is_empty", "is_not_empty"], "defaultValue": "equals", "description": "Predicate used to compare each value."},
+      {"id": "compare_value", "displayName": "Compare Value", "name": "compare_value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value used by operators that compare against a target. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "matches", "displayName": "Matches", "name": "matches", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when every value matches the predicate."}
+    ]
+  },
+  {
+    "id": "list_none",
+    "displayName": "List None",
+    "description": "Return whether no values match a property predicate. Missing or null list input uses an empty list, and a blank property compares each value directly.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "predicate", "boolean"],
+    "legacyIds": ["list.none"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "none"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to inspect. Missing or null input uses an empty list."},
+      {"id": "property_name", "displayName": "Property", "name": "property_name", "pinType": "DATA", "dataType": "string", "optional": true, "defaultValue": "", "description": "Property to inspect. Missing or blank input compares each list value directly."},
+      {"id": "operator", "displayName": "Operator", "name": "operator", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "contains", "contains_ignore_case", "starts_with", "ends_with", "is_null", "is_not_null", "is_empty", "is_not_empty"], "defaultValue": "equals", "description": "Predicate used to compare each value."},
+      {"id": "compare_value", "displayName": "Compare Value", "name": "compare_value", "pinType": "DATA", "dataType": "any", "optional": true, "description": "Value used by operators that compare against a target. Missing or null input uses null."}
+    ],
+    "outputs": [
+      {"id": "matches", "displayName": "Matches", "name": "matches", "pinType": "DATA", "dataType": "boolean", "description": "Returns true when no value matches the predicate."}
+    ]
+  }
+]

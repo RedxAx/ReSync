@@ -11,6 +11,10 @@ import restudio.flow.data.FlowNode;
 import restudio.resync.ReSync;
 import restudio.resync.flow.handler.FlowHandlerException;
 import restudio.resync.flow.registry.NodeDefinition;
+import restudio.resync.flow.identity.CorrelationId;
+import restudio.resync.flow.runtime.CompiledRuntimeContext;
+import restudio.resync.flow.runtime.RuntimePrincipal;
+import restudio.resync.flow.runtime.RuntimeExecutionContext;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,6 +43,12 @@ public class FlowContext {
     private final Map<String, CompletableFuture<Void>> beforeContinuationOperations = new ConcurrentHashMap<>();
     private final List<String> triggeredOutputs = new CopyOnWriteArrayList<>();
     private final Consumer<String> deferredOutputConsumer;
+    private final RuntimePrincipal runtimePrincipal;
+    private final CorrelationId invocationId;
+    private final String invocationKey;
+    private final CompiledRuntimeContext compiledRuntimeContext;
+    private final long requestedDeadlineMillis;
+    private final FlowNode currentNode;
     private Function<String, CompletableFuture<Void>> deferredOutputDispatcher;
     private final AtomicLong operationCounter = new AtomicLong(0);
     private final AtomicBoolean deferredOutputTriggered = new AtomicBoolean();
@@ -54,11 +64,42 @@ public class FlowContext {
     }
 
     public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer, FlowExecutor executor) {
+        this(runtime, player, event, deferredOutputConsumer, executor, null, null, null,
+            RuntimeExecutionContext.NO_DEADLINE);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer,
+                       FlowExecutor executor, RuntimePrincipal runtimePrincipal, CorrelationId invocationId,
+                       CompiledRuntimeContext compiledRuntimeContext, long requestedDeadlineMillis) {
+        this(runtime, player, event, deferredOutputConsumer, executor, runtimePrincipal, invocationId, null,
+            compiledRuntimeContext, requestedDeadlineMillis);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer,
+                       FlowExecutor executor, RuntimePrincipal runtimePrincipal, CorrelationId invocationId,
+                       String invocationKey, CompiledRuntimeContext compiledRuntimeContext, long requestedDeadlineMillis) {
+        this(runtime, player, event, deferredOutputConsumer, executor, runtimePrincipal, invocationId, invocationKey,
+            compiledRuntimeContext, requestedDeadlineMillis, null);
+    }
+
+    public FlowContext(FlowRuntime runtime, Player player, Event event, Consumer<String> deferredOutputConsumer,
+                       FlowExecutor executor, RuntimePrincipal runtimePrincipal, CorrelationId invocationId,
+                       String invocationKey, CompiledRuntimeContext compiledRuntimeContext, long requestedDeadlineMillis,
+                       FlowNode currentNode) {
         this.runtime = runtime;
         this.player = player;
         this.event = event;
         this.deferredOutputConsumer = deferredOutputConsumer;
         this.executor = executor;
+        this.runtimePrincipal = runtimePrincipal;
+        this.invocationId = invocationId;
+        this.invocationKey = invocationKey;
+        this.compiledRuntimeContext = compiledRuntimeContext;
+        this.currentNode = currentNode;
+        if (requestedDeadlineMillis < 0) {
+            throw new IllegalArgumentException("Requested Deadline Cannot Be Negative");
+        }
+        this.requestedDeadlineMillis = requestedDeadlineMillis;
     }
 
     public Player getPlayer() {
@@ -71,15 +112,19 @@ public class FlowContext {
     }
 
     public Event getEvent() {
+        if (compiledRuntimeContext != null) {
+            LiveEventScope scope = executor == null ? null : executor.liveEventScope(compiledRuntimeContext, invocationId);
+            return scope == null ? null : scope.event(compiledRuntimeContext, invocationId);
+        }
         return event;
     }
 
     public boolean isEventMutationOpen() {
-        return event != null && runtime != null && runtime.isEventMutationOpen();
+        return getEvent() != null && (compiledRuntimeContext != null || runtime != null && runtime.isEventMutationOpen());
     }
 
     public boolean setEventCancelled(boolean cancelled) {
-        if (!isEventMutationOpen() || !(event instanceof Cancellable cancellable)) {
+        if (!isEventMutationOpen() || !(getEvent() instanceof Cancellable cancellable)) {
             return false;
         }
         cancellable.setCancelled(cancelled);
@@ -137,11 +182,7 @@ public class FlowContext {
     }
 
     public <T> List<T> getRepeatableInputValues(FlowNode node, String basePinName, Class<T> type) {
-        NodeDefinition definition = runtime.getDefinition(node);
-        NodeDefinition.PinDefinition base = definition != null ? definition.getInputs().stream()
-            .filter(pin -> basePinName.equals(pin.getName()))
-            .findFirst()
-            .orElse(null) : null;
+        NodeDefinition.PinDefinition base = runtime.resolveInputPin(node, basePinName);
         NodeDefinition.RepeatablePin repeatable = base != null ? base.getRepeatable() : null;
         if (repeatable == null) {
             T value = getInputValue(node, basePinName, type, null);
@@ -168,14 +209,14 @@ public class FlowContext {
         if (node.getInputValues() != null && node.getInputValues().get("__removed_optional_inputs") instanceof Iterable<?> names) {
             for (Object name : names) {
                 if (name != null) {
-                    removed.add(name.toString());
+                    removed.add(runtime.normalizeInputPin(node, name.toString()));
                 }
             }
         }
         List<T> values = new ArrayList<>();
         for (int index = 1; index <= count; index++) {
             String pinName = index == 1 ? basePinName : basePinName + "_" + index;
-            if (removed.contains(pinName)) {
+            if (removed.contains(runtime.normalizeInputPin(node, pinName))) {
                 continue;
             }
             T value = getInputValue(node, pinName, type, null);
@@ -211,23 +252,24 @@ public class FlowContext {
             return;
         }
 
+        String normalizedPin = runtime != null ? runtime.normalizeOutputPin(currentNode, pinName) : pinName;
         boolean hasDeferredOutputTarget = deferredOutputConsumer != null || deferredOutputDispatcher != null;
         if (synchronousCapture || !hasDeferredOutputTarget) {
-            runtime.triggerOutput(pinName);
+            runtime.triggerOutput(currentNode, normalizedPin);
         }
 
         if (synchronousCapture) {
-            triggeredOutputs.add(pinName);
+            triggeredOutputs.add(normalizedPin);
             return;
         }
 
         if (deferredOutputConsumer != null) {
             deferredOutputTriggered.set(true);
-            deferredOutputConsumer.accept(pinName);
+            deferredOutputConsumer.accept(normalizedPin);
         }
         if (deferredOutputDispatcher != null) {
             deferredOutputTriggered.set(true);
-            CompletableFuture<Void> continuation = deferredOutputDispatcher.apply(pinName);
+            CompletableFuture<Void> continuation = deferredOutputDispatcher.apply(normalizedPin);
             trackAsyncOperation(nextOperationId("continuation"), continuation);
         }
     }
@@ -313,6 +355,50 @@ public class FlowContext {
 
     public FlowExecutor getExecutor() {
         return executor;
+    }
+
+    public String eventType() {
+        Event live = getEvent();
+        if (live != null) {
+            return live.getClass().getSimpleName();
+        }
+        if (compiledRuntimeContext == null || compiledRuntimeContext.event() == null) {
+            return "";
+        }
+        String type = compiledRuntimeContext.event().type();
+        return type.substring(Math.max(type.lastIndexOf('.'), type.lastIndexOf('$')) + 1);
+    }
+
+    public boolean isEventCancelled() {
+        Event live = getEvent();
+        if (live != null) {
+            return live instanceof Cancellable cancellable && cancellable.isCancelled();
+        }
+        if (compiledRuntimeContext == null || compiledRuntimeContext.event() == null) {
+            return false;
+        }
+        var cancelled = compiledRuntimeContext.event().fields().get("cancelled");
+        return cancelled != null && Boolean.TRUE.equals(cancelled.value());
+    }
+
+    public RuntimePrincipal getRuntimePrincipal() {
+        return runtimePrincipal;
+    }
+
+    public CorrelationId getInvocationId() {
+        return invocationId;
+    }
+
+    public String getInvocationKey() {
+        return invocationKey;
+    }
+
+    public CompiledRuntimeContext getCompiledRuntimeContext() {
+        return compiledRuntimeContext;
+    }
+
+    public long getRequestedDeadlineMillis() {
+        return requestedDeadlineMillis;
     }
 
     public CompletableFuture<Void> runAsync(Runnable runnable) {
@@ -468,7 +554,8 @@ public class FlowContext {
     }
 
     public FlowContext createSubContext(Map<String, Object> variables) {
-        FlowContext child = new FlowContext(runtime, player, event, deferredOutputConsumer, executor);
+        FlowContext child = new FlowContext(runtime, player, event, deferredOutputConsumer, executor, runtimePrincipal,
+            invocationId, invocationKey, compiledRuntimeContext, requestedDeadlineMillis, currentNode);
         child.deferredOutputDispatcher = deferredOutputDispatcher;
         if (variables != null) {
             child.getLocalVariables().putAll(variables);
@@ -477,11 +564,19 @@ public class FlowContext {
     }
 
     public FlowGraph extractSubGraph(FlowNode node, String pinName) {
-        String nodeId = runtime.findNodeId(node);
-        if (nodeId == null || runtime.getGraph() == null) {
+        if (runtime == null || node == null || pinName == null || pinName.isBlank()) {
             return null;
         }
-        return runtime.getGraph().extractSubGraph(nodeId, pinName);
+        FlowGraph graph = runtime.getGraph();
+        if (graph == null) {
+            return null;
+        }
+        String nodeId = runtime.findNodeId(node);
+        String normalizedPin = runtime.normalizeOutputPin(node, pinName);
+        if (nodeId == null || normalizedPin == null || normalizedPin.isBlank()) {
+            return null;
+        }
+        return graph.extractSubGraph(nodeId, normalizedPin);
     }
 
     public Boolean executeSubFlowBoolean(FlowGraph subGraph, FlowNode node) {

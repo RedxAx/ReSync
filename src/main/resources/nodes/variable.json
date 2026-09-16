@@ -1,0 +1,929 @@
+[
+  {
+    "id": "variable.access",
+    "displayName": "Scoped Variable Access",
+    "description": "Read, write, remove, list, or test a runtime variable in the selected scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "retiring",
+    "replacementFor": "automation.variable",
+    "hidden": true,
+    "hiddenReason": "migration-only",
+    "deprecated": true,
+    "handlerCapability": "automation.variable.variable-access.variable-access",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "FAMILY",
+    "tags": ["variable", "scope", "state"],
+    "examples": ["Select a scope and action, provide a name when needed, then continue through Flow."],
+    "legacyIds": ["variable_access", "variable.variable_access"],
+    "aliases": ["Variable", "Read Variable", "Write Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_access"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "mode", "target": "mode"},
+        {"direction": "input", "source": "scope", "target": "scope"},
+        {"direction": "input", "source": "persist", "target": "persist"},
+        {"direction": "input", "source": "name", "target": "name"},
+        {"direction": "input", "source": "value", "target": "value"},
+        {"direction": "input", "source": "amount", "target": "amount"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"},
+        {"direction": "output", "source": "value", "target": "output_value"},
+        {"direction": "output", "source": "exists", "target": "exists"},
+        {"direction": "output", "source": "variables", "target": "variables"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the variable operation."},
+      {"id": "mode", "displayName": "Mode", "name": "mode", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["get", "set", "delete", "list", "increment", "decrement", "multiply", "divide", "exists"], "defaultValue": "get", "description": "Chooses whether to read, write, remove, list, test, or update the variable."},
+      {"id": "scope", "displayName": "Scope", "name": "scope", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["local", "global", "player"], "defaultValue": "local", "description": "Chooses the local graph, server, or player variable scope."},
+      {"id": "persist", "displayName": "Persist", "name": "persist", "pinType": "DATA", "dataType": "boolean", "defaultValue": false, "description": "Stores the value in durable variable storage when enabled."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "visibleWhen": {"mode": "get,set,delete,increment,decrement,multiply,divide,exists"}, "description": "Names the variable to read, write, remove, update, or test."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "visibleWhen": {"mode": "set"}, "description": "Value to store when Mode is set."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "visibleWhen": {"mode": "increment,decrement,multiply,divide"}, "description": "Numeric amount used by increment, decrement, multiply, and divide."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "dataType": "player", "optional": true, "visibleWhen": {"scope": "player"}, "description": "Player whose scoped variable is accessed; the current player is used when omitted."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable operation completes."},
+      {"id": "output_value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "visibleWhen": {"mode": "get,set,increment,decrement,multiply,divide"}, "description": "Returns the value read or produced by the operation."},
+      {"id": "exists", "displayName": "Exists", "name": "exists", "pinType": "DATA", "dataType": "boolean", "visibleWhen": {"mode": "exists"}, "description": "Reports whether the selected variable exists."},
+      {"id": "variables", "displayName": "Variables", "name": "variables", "pinType": "DATA", "dataType": "list<any>", "visibleWhen": {"mode": "list"}, "description": "Returns variable names visible in the selected scope."}
+    ]
+  },
+  {
+    "id": "variable.set.global",
+    "displayName": "Set Global Variable",
+    "description": "Store a value in the server-wide variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "set"],
+    "examples": ["Connect Flow, provide a name and value, then continue after the server variable is stored."],
+    "legacyIds": ["variable_set_global", "variable.variable_set_global"],
+    "aliases": ["Global Set", "Set Server Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_set_global"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts storing the global variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the server variable."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Value to store; null removes the variable."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the global variable is stored."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "input", "source": "value", "target": "value"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.set.local",
+    "displayName": "Set Local Variable",
+    "description": "Store a value in the current graph's local variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "set"],
+    "examples": ["Connect Flow, provide a name and value, then continue after the graph variable is stored."],
+    "legacyIds": ["variable_set_local", "variable.variable_set_local"],
+    "aliases": ["Local Set"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_set_local"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts storing the local variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the graph variable."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Value to store; null removes the variable."}
+    ],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the local variable is stored."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "input", "source": "value", "target": "value"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.set.player",
+    "displayName": "Set Player Variable",
+    "description": "Store a value for one player in the player variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "player", "set"],
+    "examples": ["Connect Flow, select a Player, provide a name and value, then continue."],
+    "legacyIds": ["variable_set_player"],
+    "aliases": ["Player Set"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_set_player"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts storing the player variable."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "dataType": "player", "description": "Player who owns the variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the player variable."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Value to store; null removes the variable."}
+    ],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the player variable is stored."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "player", "target": "player"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "input", "source": "value", "target": "value"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.get.global",
+    "displayName": "Get Global Variable",
+    "description": "Read a value from the server-wide variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "get"],
+    "examples": ["Connect Flow and provide a name to read the server variable."],
+    "legacyIds": ["variable_get_global", "variable.variable_get_global"],
+    "aliases": ["Global Get", "Get Server Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_get_global"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading the global variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the server variable."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is read."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the stored value, or null when it is absent."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "value", "target": "value"}
+    ]}
+  },
+  {
+    "id": "variable.get.local",
+    "displayName": "Get Local Variable",
+    "description": "Read a value from the current graph's local variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "get"],
+    "examples": ["Connect Flow and provide a name to read the graph variable."],
+    "legacyIds": ["variable_get_local", "variable.variable_get_local"],
+    "aliases": ["Local Get"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_get_local"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading the local variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the graph variable."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is read."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the stored value, or null when it is absent."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "value", "target": "value"}
+    ]}
+  },
+  {
+    "id": "variable.get.player",
+    "displayName": "Get Player Variable",
+    "description": "Read a value from one player's variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "player", "get"],
+    "examples": ["Connect Flow, select a Player, and provide a name to read the player variable."],
+    "legacyIds": ["variable_get_player"],
+    "aliases": ["Player Get"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_get_player"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading the player variable."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "dataType": "player", "description": "Player who owns the variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the player variable."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is read."},
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the stored value, or null when it is absent."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "player", "target": "player"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "value", "target": "value"}
+    ]}
+  },
+  {
+    "id": "variable.exists",
+    "displayName": "Variable Exists",
+    "description": "Check whether a named variable exists in a selected scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "scope", "exists"],
+    "examples": ["Connect Flow, choose a scope, provide a name, and branch from Exists."],
+    "legacyIds": ["variable_exists", "variable.variable_exists"],
+    "aliases": ["Has Variable", "Check Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_exists"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the existence check."},
+      {"id": "scope", "displayName": "Scope", "name": "scope", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["local", "global", "player"], "defaultValue": "local", "description": "Scope in which the variable is checked."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the variable to check."},
+      {"id": "player", "displayName": "Player", "name": "player", "pinType": "DATA", "dataType": "player", "optional": true, "visibleWhen": {"scope": "player"}, "description": "Player who owns the variable when Scope is player."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the existence check."},
+      {"id": "exists", "displayName": "Exists", "name": "exists", "pinType": "DATA", "dataType": "boolean", "description": "True when the named variable exists."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "scope", "target": "scope"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "input", "source": "player", "target": "player"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "exists", "target": "exists"}
+    ]}
+  },
+  {
+    "id": "variable.list.all",
+    "displayName": "List Variables",
+    "description": "List variable names visible from the current graph, server, and player scopes.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "scope", "list"],
+    "examples": ["Connect Flow and use Variables to inspect the names visible to the running graph."],
+    "legacyIds": ["variable_list_all", "variable.variable_list_all"],
+    "aliases": ["List All Variables", "List Variable Names"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_list_all"},
+    "inputs": [{"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts listing visible variables."}],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable names are collected."},
+      {"id": "variables", "displayName": "Variables", "name": "variables", "pinType": "DATA", "dataType": "list<any>", "description": "Names from global, local, and player scopes."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "variables", "target": "variables"}
+    ]}
+  },
+  {
+    "id": "variable.delete.global",
+    "displayName": "Delete Global Variable",
+    "description": "Remove one value from the server-wide variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "delete"],
+    "examples": ["Connect Flow and provide a name to remove a server variable."],
+    "legacyIds": ["variable_delete_global", "variable.variable_delete_global"],
+    "aliases": ["Global Delete", "Delete Server Variable"],
+    "auditPolicy": "state_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_delete_global"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts deleting the global variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the server variable to remove."}
+    ],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the global variable is removed."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.delete.local",
+    "displayName": "Delete Local Variable",
+    "description": "Remove one value from the current graph's local variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "delete"],
+    "examples": ["Connect Flow and provide a name to remove a graph variable."],
+    "legacyIds": ["variable_delete_local", "variable.variable_delete_local"],
+    "aliases": ["Local Delete"],
+    "auditPolicy": "state_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_delete_local"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts deleting the local variable."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the graph variable to remove."}
+    ],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the local variable is removed."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.exists.global",
+    "displayName": "Global Variable Exists",
+    "description": "Check whether a named server-wide variable exists.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "exists"],
+    "examples": ["Connect Flow and provide a name to test a server variable."],
+    "legacyIds": ["variable_exists_global", "variable.variable_exists_global"],
+    "aliases": ["Has Global Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_exists_global"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the global variable check."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the server variable to check."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the global variable check."},
+      {"id": "exists", "displayName": "Exists", "name": "exists", "pinType": "DATA", "dataType": "boolean", "description": "True when the server variable exists."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "exists", "target": "exists"}
+    ]}
+  },
+  {
+    "id": "variable.exists.local",
+    "displayName": "Local Variable Exists",
+    "description": "Check whether a named graph-local variable exists.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "exists"],
+    "examples": ["Connect Flow and provide a name to test a graph variable."],
+    "legacyIds": ["variable_exists_local", "variable.variable_exists_local"],
+    "aliases": ["Has Local Variable"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_exists_local"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts the local variable check."},
+      {"id": "name", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Name of the graph variable to check."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the local variable check."},
+      {"id": "exists", "displayName": "Exists", "name": "exists", "pinType": "DATA", "dataType": "boolean", "description": "True when the graph variable exists."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "input", "source": "name", "target": "name"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "exists", "target": "exists"}
+    ]}
+  },
+  {
+    "id": "variable.list.global",
+    "displayName": "List Global Variables",
+    "description": "List names stored in the server-wide variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "list"],
+    "examples": ["Connect Flow to collect the server variable names."],
+    "legacyIds": ["variable_list_global", "variable.variable_list_global"],
+    "aliases": ["List Server Variables"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_list_global"},
+    "inputs": [{"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts listing global variables."}],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after global variable names are collected."},
+      {"id": "variables", "displayName": "Variables", "name": "variables", "pinType": "DATA", "dataType": "list<any>", "description": "Names stored in the server-wide scope."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "variables", "target": "variables"}
+    ]}
+  },
+  {
+    "id": "variable.list.local",
+    "displayName": "List Local Variables",
+    "description": "List names stored in the current graph's local variable scope.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "list"],
+    "examples": ["Connect Flow to collect the current graph's local variable names."],
+    "legacyIds": ["variable_list_local", "variable.variable_list_local"],
+    "aliases": ["List Graph Variables"],
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_list_local"},
+    "inputs": [{"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts listing local variables."}],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after local variable names are collected."},
+      {"id": "variables", "displayName": "Variables", "name": "variables", "pinType": "DATA", "dataType": "list<any>", "description": "Names stored in the current graph's local scope."}
+    ],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "output", "source": "flow", "target": "output_flow"}, {"direction": "output", "source": "variables", "target": "variables"}
+    ]}
+  },
+  {
+    "id": "variable.clear.global",
+    "displayName": "Clear Global Variables",
+    "description": "Remove every server-wide variable from the current runtime.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "global", "clear"],
+    "examples": ["Connect Flow to clear the server-wide variables."],
+    "legacyIds": ["variable_clear_global", "variable.variable_clear_global"],
+    "aliases": ["Clear Server Variables"],
+    "auditPolicy": "state_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_clear_global"},
+    "inputs": [{"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts clearing global variables."}],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after global variables are cleared."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "variable.clear.local",
+    "displayName": "Clear Local Variables",
+    "description": "Remove every local variable from the current graph.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "local", "clear"],
+    "examples": ["Connect Flow to clear the current graph's local variables."],
+    "legacyIds": ["variable_clear_local", "variable.variable_clear_local"],
+    "aliases": ["Clear Local State"],
+    "auditPolicy": "state_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "VariableScopeHandler",
+    "handlerConfig": {"operation": "variable_clear_local"},
+    "inputs": [{"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts clearing local variables."}],
+    "outputs": [{"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after local variables are cleared."}],
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"}, {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]}
+  },
+  {
+    "id": "get_variable",
+    "displayName": "Get Variable",
+    "description": "Reads a Flow variable and returns its current value.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["get.variable"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "get"],
+    "examples": ["Connect Flow, provide a variable name, and use Value in the next node."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "get"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "output", "source": "flow", "target": "output_flow"},
+      {"direction": "output", "source": "value", "target": "output_value"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to read."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is read."},
+      {"id": "output_value", "direction": "output", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the stored value, or null when the variable is absent."}
+    ]
+  },
+  {
+    "id": "set_variable",
+    "displayName": "Set Variable",
+    "description": "Stores a value in a Flow variable.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["set.variable"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "set"],
+    "examples": ["Connect Flow, provide a variable name and value, then continue after it is stored."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "set"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "value", "target": "value"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts storing the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to store."},
+      {"id": "value", "direction": "input", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Provides the value to store."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is stored."}
+    ]
+  },
+  {
+    "id": "get_server_var",
+    "displayName": "Get Server Variable",
+    "description": "Reads a server-scoped variable and returns its current value.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable.get.get-server-var",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["get.server.var"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "server", "get"],
+    "examples": ["Connect Flow, provide a server variable name, and use Value in the next node."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "get"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "output", "source": "flow", "target": "output_flow"},
+      {"direction": "output", "source": "value", "target": "output_value"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts reading the server variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the server variable to read."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the server variable is read."},
+      {"id": "output_value", "direction": "output", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Returns the stored server value, or null when it is absent."}
+    ]
+  },
+  {
+    "id": "variable_has",
+    "displayName": "Has Variable",
+    "description": "Checks whether a Flow variable currently has a value.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.has"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "exists"],
+    "examples": ["Connect Flow, provide a variable name, and branch from Has."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "has"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "output", "source": "flow", "target": "output_flow"},
+      {"direction": "output", "source": "has", "target": "has"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts checking the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to check."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable check."},
+      {"id": "has", "direction": "output", "displayName": "Has", "name": "has", "pinType": "DATA", "dataType": "boolean", "description": "Reports whether the variable has a non-null value."}
+    ]
+  },
+  {
+    "id": "variable_delete",
+    "displayName": "Delete Variable",
+    "description": "Removes a Flow variable by storing a null value.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.delete"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "delete"],
+    "examples": ["Connect Flow and provide the name of the variable to remove."],
+    "auditPolicy": "state_mutation",
+    "confirmationPolicy": "explicit_flow_intent",
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "delete"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts deleting the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to remove."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is removed."}
+    ]
+  },
+  {
+    "id": "variable_increment",
+    "displayName": "Increment Variable",
+    "description": "Adds a numeric delta to a Flow variable.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.increment"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "number", "increment"],
+    "examples": ["Connect Flow, provide a variable name and delta, then continue after the value is increased."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "increment"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "delta", "target": "delta"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts incrementing the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to change."},
+      {"id": "delta", "direction": "input", "displayName": "Delta", "name": "delta", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Numeric amount to add; defaults to 1."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is increased."}
+    ]
+  },
+  {
+    "id": "variable_decrement",
+    "displayName": "Decrement Variable",
+    "description": "Subtracts a numeric delta from a Flow variable.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.decrement"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "number", "decrement"],
+    "examples": ["Connect Flow, provide a variable name and delta, then continue after the value is decreased."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "decrement"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "delta", "target": "delta"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts decrementing the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to change."},
+      {"id": "delta", "direction": "input", "displayName": "Delta", "name": "delta", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Numeric amount to subtract; defaults to 1."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is decreased."}
+    ]
+  },
+  {
+    "id": "variable_multiply",
+    "displayName": "Multiply Variable",
+    "description": "Multiplies a Flow variable by a numeric factor.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.multiply"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "number", "multiply"],
+    "examples": ["Connect Flow, provide a variable name and factor, then continue after the value is multiplied."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "multiply"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "factor", "target": "factor"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts multiplying the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to change."},
+      {"id": "factor", "direction": "input", "displayName": "Factor", "name": "factor", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Numeric factor to multiply by; defaults to 1."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is multiplied."}
+    ]
+  },
+  {
+    "id": "variable_divide",
+    "displayName": "Divide Variable",
+    "description": "Divides a Flow variable by a non-zero numeric divisor.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.divide"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "number", "divide"],
+    "examples": ["Connect Flow, provide a variable name and non-zero divisor, then continue after the value is divided."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "divide"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "divisor", "target": "divisor"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts dividing the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to change."},
+      {"id": "divisor", "direction": "input", "displayName": "Divisor", "name": "divisor", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Non-zero numeric divisor; defaults to 1."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the variable is divided."}
+    ]
+  },
+  {
+    "id": "variable_append",
+    "displayName": "Append Variable",
+    "description": "Appends a value to a variable list or string.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.append"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "append"],
+    "examples": ["Connect Flow, provide a variable name and value, then continue after the value is appended."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "append"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "name", "target": "name"},
+      {"direction": "input", "source": "value", "target": "value"},
+      {"direction": "output", "source": "flow", "target": "output_flow"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts appending to the Flow variable."},
+      {"id": "name", "direction": "input", "displayName": "Name", "name": "name", "pinType": "DATA", "dataType": "string", "description": "Names the Flow variable to change."},
+      {"id": "value", "direction": "input", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "any", "description": "Provides the value to append."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after the value is appended."}
+    ]
+  },
+  {
+    "id": "variable_list_keys",
+    "displayName": "List Variable Keys",
+    "description": "Lists local and global variable keys that match a prefix.",
+    "domain": "automation",
+    "family": "variable",
+    "lifecycle": "active",
+    "handlerCapability": "automation.variable",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["variable.list_keys"],
+    "category": "VARIABLE",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["variable", "list", "keys"],
+    "examples": ["Connect Flow, provide an optional prefix, and inspect the returned Keys."],
+    "handler": "VariableHandler",
+    "handlerConfig": {"operation": "list_keys"},
+    "migrationMapping": {"sourceSchemaVersion": 1, "targetSchemaVersion": 2, "complete": true, "pins": [
+      {"direction": "input", "source": "flow", "target": "flow"},
+      {"direction": "input", "source": "prefix", "target": "prefix"},
+      {"direction": "output", "source": "flow", "target": "output_flow"},
+      {"direction": "output", "source": "keys", "target": "keys"}
+    ]},
+    "inputs": [
+      {"id": "flow", "direction": "input", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts collecting matching variable keys."},
+      {"id": "prefix", "direction": "input", "displayName": "Prefix", "name": "prefix", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Limits results to keys beginning with this prefix."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "direction": "output", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Continues after matching variable keys are collected."},
+      {"id": "keys", "direction": "output", "displayName": "Keys", "name": "keys", "pinType": "DATA", "dataType": "list<string>", "description": "Returns matching local and global variable keys."}
+    ]
+  }
+]

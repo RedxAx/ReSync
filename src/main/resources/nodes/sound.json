@@ -1,0 +1,549 @@
+[
+  {
+    "id": "sound.play",
+    "displayName": "Play Sound",
+    "description": "Play a sound at a world location with a selected volume and pitch.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "play", "location"],
+    "examples": ["Connect Flow, choose a sound and location, then continue after playback."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "location", "target": "location"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts playback when execution reaches this node."},
+      {"id": "location", "displayName": "Location", "name": "location", "dataType": "location", "direction": "input", "description": "Selects the world location where the sound is played."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to play."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the sound has been played."}
+    ]
+  },
+  {
+    "id": "sound.stop",
+    "displayName": "Stop Sound",
+    "description": "Stop one selected sound for a player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "stop", "player"],
+    "examples": ["Connect Flow, select a Player and Sound, then continue after stopping it."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_stop"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound", "target": "sound"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts stopping the selected sound."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player whose sound should stop."},
+      {"id": "sound", "displayName": "Sound", "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "direction": "input", "description": "Selects the sound to stop."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the selected sound has stopped."}
+    ]
+  },
+  {
+    "id": "sound.sound_play_ambient",
+    "displayName": "Play Ambient Sound",
+    "description": "Play a sound at a world location through the ambient sound category.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "ambient", "location"],
+    "examples": ["Connect Flow, choose a location and sound, then play it as ambient audio."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_ambient"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "location", "target": "location"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts ambient playback."},
+      {"id": "location", "displayName": "Location", "name": "location", "dataType": "location", "direction": "input", "description": "Selects the world location where the sound is played."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to play."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after ambient playback."}
+    ]
+  },
+  {
+    "id": "sound.fade",
+    "displayName": "Fade Sound",
+    "description": "Fade a sound from one volume to another for a player over a bounded duration.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "fade", "player"],
+    "examples": ["Connect Flow, select a player and sound, then set the start, end, and duration values."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "fade"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound", "target": "sound"},
+        {"direction": "input", "source": "from_volume", "target": "from_volume"},
+        {"direction": "input", "source": "to_volume", "target": "to_volume"},
+        {"direction": "input", "source": "duration_ticks", "target": "duration_ticks"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the sound fade."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player whose sound should fade."},
+      {"id": "sound", "displayName": "Sound", "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "direction": "input", "description": "Selects the sound to fade."},
+      {"id": "from_volume", "displayName": "From Volume", "name": "from_volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets the volume at the beginning of the fade."},
+      {"id": "to_volume", "displayName": "To Volume", "name": "to_volume", "dataType": "number", "defaultValue": 0.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets the volume at the end of the fade."},
+      {"id": "duration_ticks", "displayName": "Duration Ticks", "name": "duration_ticks", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 1, "max": 200}, "direction": "input", "description": "Sets the fade duration in server ticks from 1 through 200."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the fade has been scheduled."}
+    ]
+  },
+  {
+    "id": "sound.play.for.player",
+    "displayName": "Play Sound For Player",
+    "description": "Play a selected sound for one player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "play", "player"],
+    "examples": ["Connect Flow, choose a Player and Sound, then continue after private playback."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_for_player"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts playback for the player."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player who hears the sound."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to play."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after playback for the player."}
+    ]
+  },
+  {
+    "id": "sound.play.for.all",
+    "displayName": "Play Sound For All",
+    "description": "Play a selected sound for every online player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "play", "players"],
+    "examples": ["Connect Flow, choose a Sound, then broadcast it to all online players."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_for_all"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts playback for every online player."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to broadcast."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the broadcast has been sent."}
+    ]
+  },
+  {
+    "id": "sound.stop.for.player",
+    "displayName": "Stop Sound For Player",
+    "description": "Stop one selected sound for a player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "stop", "player"],
+    "examples": ["Connect Flow, select a Player and Sound, then continue after stopping that sound."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_stop_for_player"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound", "target": "sound"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts stopping the sound for the player."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player whose sound should stop."},
+      {"id": "sound", "displayName": "Sound", "name": "sound", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "direction": "input", "description": "Selects the sound to stop."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the sound has stopped."}
+    ]
+  },
+  {
+    "id": "sound.stop.all",
+    "displayName": "Stop All Sounds",
+    "description": "Stop every currently playing sound for a player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "stop", "all"],
+    "examples": ["Connect Flow and a Player to stop every sound currently playing for that player."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_stop_all"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts stopping all sounds."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player whose sounds should stop."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after all sounds have stopped."}
+    ]
+  },
+  {
+    "id": "sound.play.category",
+    "displayName": "Play Sound In Category",
+    "description": "Play a sound for a player through a selected sound category.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "play", "category"],
+    "examples": ["Connect Flow, choose a Player, Sound, and Category, then continue after playback."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_category"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "category", "target": "category"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts category playback."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player who hears the sound."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to play."},
+      {"id": "category", "displayName": "Category", "name": "category", "dataType": "string", "widget": "DROPDOWN", "options": ["MASTER", "MUSIC", "RECORDS", "WEATHER", "BLOCKS", "HOSTILE", "NEUTRAL", "PLAYERS", "AMBIENT", "VOICE", "UI"], "defaultValue": "MASTER", "direction": "input", "description": "Selects the Minecraft sound category."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after category playback."}
+    ]
+  },
+  {
+    "id": "sound.stop.category",
+    "displayName": "Stop Sound Category",
+    "description": "Stop all sounds in a selected category for a player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "stop", "category"],
+    "examples": ["Connect Flow, select a Player and Category, then stop all sounds in that category."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_stop_category"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "category", "target": "category"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts stopping sounds in the category."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player whose category sounds should stop."},
+      {"id": "category", "displayName": "Category", "name": "category", "dataType": "string", "widget": "DROPDOWN", "options": ["MASTER", "MUSIC", "RECORDS", "WEATHER", "BLOCKS", "HOSTILE", "NEUTRAL", "PLAYERS", "AMBIENT", "VOICE", "UI"], "defaultValue": "MASTER", "direction": "input", "description": "Selects the Minecraft sound category."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the category sounds have stopped."}
+    ]
+  },
+  {
+    "id": "sound.loop.for.player",
+    "displayName": "Loop Sound For Player",
+    "description": "Schedule a bounded number of sound plays for a player at a fixed interval.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "loop", "player"],
+    "examples": ["Connect Flow, choose a Player and Sound, then set the interval and repeat count."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_loop_for_player"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "input", "source": "interval_ticks", "target": "interval_ticks"},
+        {"direction": "input", "source": "repeat_count", "target": "repeat_count"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the sound loop schedule."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player who hears each repeat."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to repeat."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."},
+      {"id": "interval_ticks", "displayName": "Interval Ticks", "name": "interval_ticks", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 1, "max": 72000}, "direction": "input", "description": "Sets the delay between repeats in server ticks."},
+      {"id": "repeat_count", "displayName": "Repeat Count", "name": "repeat_count", "dataType": "integer", "defaultValue": 10, "constraints": {"min": 1, "max": 256}, "direction": "input", "description": "Sets how many times the sound is played."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the repeat schedule has been created."}
+    ]
+  },
+  {
+    "id": "sound.play.sequence",
+    "displayName": "Play Sound Sequence",
+    "description": "Schedule a bounded ordered sequence of sounds for a player.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "sequence", "player"],
+    "examples": ["Connect Flow, choose a Player and ordered Sound list, then set the interval between entries."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_sequence"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "player", "target": "player"},
+        {"direction": "input", "source": "sounds", "target": "sounds"},
+        {"direction": "input", "source": "interval_ticks", "target": "interval_ticks"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts the sound sequence schedule."},
+      {"id": "player", "displayName": "Player", "name": "player", "dataType": "player", "direction": "input", "description": "Selects the player who hears the sequence."},
+      {"id": "sounds", "displayName": "Sounds", "name": "sounds", "dataType": "list<sound>", "direction": "input", "description": "Provides the ordered sounds to play, with at most 100 entries."},
+      {"id": "interval_ticks", "displayName": "Interval Ticks", "name": "interval_ticks", "dataType": "integer", "defaultValue": 20, "constraints": {"min": 1, "max": 72000}, "direction": "input", "description": "Sets the delay between sequence entries in server ticks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after the sequence has been scheduled."}
+    ]
+  },
+  {
+    "id": "sound.play.with.distance",
+    "displayName": "Play Sound With Distance",
+    "description": "Play a sound at a location for players within a maximum distance.",
+    "domain": "sound",
+    "family": "sound",
+    "lifecycle": "active",
+    "handlerCapability": "sound.playback",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "VISUAL",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["sound", "distance", "location"],
+    "examples": ["Connect Flow, choose a location and sound, then set the maximum listener distance."],
+    "authorizationPolicy": "trusted_server_flow",
+    "handler": "SoundHandler",
+    "handlerConfig": {"operation": "sound_play_with_distance"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "flow", "target": "flow"},
+        {"direction": "input", "source": "location", "target": "location"},
+        {"direction": "input", "source": "sound_type", "target": "sound_type"},
+        {"direction": "input", "source": "volume", "target": "volume"},
+        {"direction": "input", "source": "pitch", "target": "pitch"},
+        {"direction": "input", "source": "max_distance", "target": "max_distance"},
+        {"direction": "output", "source": "flow", "target": "output_flow"}
+      ]
+    },
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "input", "description": "Starts distance-limited playback."},
+      {"id": "location", "displayName": "Location", "name": "location", "dataType": "location", "direction": "input", "description": "Selects the world location where the sound originates."},
+      {"id": "sound_type", "displayName": "Sound", "name": "sound_type", "dataType": "sound", "widget": "SEARCHABLE_LIST", "optionsSource": "server:minecraft:sound", "defaultValue": "BLOCK_AMETHYST_BLOCK_CHIME", "direction": "input", "description": "Selects the sound to play."},
+      {"id": "volume", "displayName": "Volume", "name": "volume", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 16}, "direction": "input", "description": "Sets playback volume from 0 through 16."},
+      {"id": "pitch", "displayName": "Pitch", "name": "pitch", "dataType": "number", "defaultValue": 1.0, "constraints": {"min": 0, "max": 2}, "direction": "input", "description": "Sets playback pitch from 0 through 2."},
+      {"id": "max_distance", "displayName": "Max Distance", "name": "max_distance", "dataType": "number", "defaultValue": 16.0, "constraints": {"min": 0, "max": 1024}, "direction": "input", "description": "Sets the maximum listener distance from 0 through 1024 blocks."}
+    ],
+    "outputs": [
+      {"id": "output_flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "direction": "output", "description": "Continues after distance-limited playback."}
+    ]
+  }
+]

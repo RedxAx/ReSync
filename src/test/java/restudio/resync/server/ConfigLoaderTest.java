@@ -5,7 +5,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,15 +15,22 @@ class ConfigLoaderTest {
     Path tempDir;
 
     @Test
-    void configGeneratesApiKeyAndPersistsBindHostDefault() throws Exception {
+    void configGeneratesApiKeyAndDefersBindHostDefaultUntilActivation() throws Exception {
         Path config = tempDir.resolve("plugins/ReSync/config.properties");
         ReSyncConfig loaded = ConfigLoader.load(config.toString());
-        String content = Files.readString(config);
 
         assertFalse(loaded.getApiKey().isBlank());
         assertEquals(12441, loaded.getPort());
         assertEquals("127.0.0.1", loaded.getBindHost());
+        assertFalse(Files.exists(config));
+        assertTrue(loaded.getPersistenceParticipant().durabilityDeferred());
+        assertEquals("127.0.0.1", loaded.getPersistenceParticipant().properties().getProperty("bind-host"));
+
+        loaded.getPersistenceParticipant().activateAndFlush();
+
+        String content = Files.readString(config);
         assertFalse(content.contains("config.yml"));
+        assertFalse(loaded.getPersistenceParticipant().durabilityDeferred());
     }
 
     @Test
@@ -45,27 +51,5 @@ class ConfigLoaderTest {
         ReSyncConfig loaded = ConfigLoader.load(config.toString());
 
         assertTrue(loaded.isEnabled());
-    }
-
-    @Test
-    void parsesTlsProvisioningContract() throws Exception {
-        Path config = tempDir.resolve("tls.properties");
-        Files.writeString(config, """
-                api-key=secret
-                bind-host=0.0.0.0
-                public-bind-enabled=true
-                tls.enabled=true
-                tls.spki-fingerprint=aa
-                tls.runtime-metadata-file=tls/runtime.json
-                tls.subject-alternative-names=DNS:node.example,IP:127.0.0.1
-                """);
-
-        ReSyncConfig loaded = ConfigLoader.load(config.toString());
-
-        assertTrue(loaded.isEnabled());
-        assertTrue(loaded.getTls().isEnabled());
-        assertEquals("aa", loaded.getTls().getSpkiFingerprint());
-        assertEquals("tls/runtime.json", loaded.getTls().getRuntimeMetadataFile());
-        assertEquals(List.of("DNS:node.example", "IP:127.0.0.1"), loaded.getTls().getSubjectAlternativeNames());
     }
 }

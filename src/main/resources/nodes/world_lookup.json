@@ -1,0 +1,77 @@
+[
+  {
+    "id": "get_location",
+    "displayName": "Get Location",
+    "description": "Create a location in the current world from X, Y, and Z coordinates.",
+    "domain": "world",
+    "family": "world_lookup",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["get.location"],
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["world", "lookup", "location"],
+    "handler": "WorldActionHandler",
+    "handlerConfig": {"operation": "get_location"},
+    "inputs": [
+      {"id": "x", "displayName": "X", "name": "x", "pinType": "DATA", "dataType": "number", "description": "Sets the horizontal X coordinate."},
+      {"id": "y", "displayName": "Y", "name": "y", "pinType": "DATA", "dataType": "number", "description": "Sets the vertical Y coordinate."},
+      {"id": "z", "displayName": "Z", "name": "z", "pinType": "DATA", "dataType": "number", "description": "Sets the horizontal Z coordinate."}
+    ],
+    "outputs": [
+      {"id": "location", "displayName": "Location", "name": "location", "pinType": "DATA", "dataType": "location", "description": "Returns a location in the current world at the supplied coordinates."}
+    ]
+  },
+  {
+    "id": "world_get_by_name",
+    "displayName": "World Get By Name",
+    "description": "Find a loaded world by its name.",
+    "domain": "world",
+    "family": "world_lookup",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["world.world_get_by_name"],
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["world", "lookup", "name"],
+    "handler": "WorldActionHandler",
+    "handlerConfig": {"operation": "world_get_by_name"},
+    "inputs": [
+      {"id": "world_name", "displayName": "World Name", "name": "world_name", "pinType": "DATA", "dataType": "string", "description": "Names the loaded world to find."}
+    ],
+    "outputs": [
+      {"id": "world", "displayName": "World", "name": "world", "pinType": "DATA", "dataType": "world", "description": "Returns the loaded world with that name, or fails when the world is not loaded."}
+    ]
+  },
+  {
+    "id": "world_get_all",
+    "displayName": "World Get All",
+    "description": "Return every currently loaded world.",
+    "domain": "world",
+    "family": "world_lookup",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["world.world_get_all"],
+    "category": "WORLD",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["world", "lookup", "list"],
+    "handler": "WorldActionHandler",
+    "handlerConfig": {"operation": "world_get_all"},
+    "outputs": [
+      {"id": "worlds_list", "displayName": "Worlds", "name": "worlds_list", "pinType": "DATA", "dataType": "list<world>", "description": "Returns every currently loaded world."}
+    ],
+    "inputs": []
+  }
+]

@@ -9,6 +9,11 @@ public class FlowOptionSourceMetadata {
     private boolean searchable;
     private String displayName;
     private String valueType;
+    private String resourceTypeOwner;
+    private String resourceTypeId;
+    private boolean typed;
+    private boolean available = true;
+    private String unavailableReason;
     private List<String> contextKeys;
 
     public FlowOptionSourceMetadata() {
@@ -103,6 +108,46 @@ public class FlowOptionSourceMetadata {
 
     public void setValueType(String valueType) {
         this.valueType = valueType;
+    }
+
+    public String getResourceTypeOwner() {
+        return resourceTypeOwner != null ? resourceTypeOwner : "";
+    }
+
+    public void setResourceTypeOwner(String resourceTypeOwner) {
+        this.resourceTypeOwner = resourceTypeOwner;
+    }
+
+    public String getResourceTypeId() {
+        return resourceTypeId != null ? resourceTypeId : "";
+    }
+
+    public void setResourceTypeId(String resourceTypeId) {
+        this.resourceTypeId = resourceTypeId;
+    }
+
+    public boolean isTyped() {
+        return typed;
+    }
+
+    public void setTyped(boolean typed) {
+        this.typed = typed;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
+    }
+
+    public String getUnavailableReason() {
+        return unavailableReason != null ? unavailableReason : "";
+    }
+
+    public void setUnavailableReason(String unavailableReason) {
+        this.unavailableReason = unavailableReason;
     }
 
     public List<String> getContextKeys() {

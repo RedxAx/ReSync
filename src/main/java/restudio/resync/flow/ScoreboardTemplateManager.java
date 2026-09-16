@@ -33,6 +33,7 @@ public final class ScoreboardTemplateManager {
     private static final Map<UUID, PacketScoreboardState> PACKET_SCOREBOARDS = new ConcurrentHashMap<>();
     private static volatile EditTargetStateSender editTargetStateSender;
     private static volatile PlayerSessionLinkService sessionLinkService;
+    private static volatile ScoreboardRuntimeCapability runtimeCapability = ScoreboardRuntimeCapability.unavailable();
 
     private ScoreboardTemplateManager() {
     }
@@ -45,6 +46,14 @@ public final class ScoreboardTemplateManager {
     public static void clearEditStateBridge() {
         editTargetStateSender = null;
         sessionLinkService = null;
+    }
+
+    public static void configureRuntimeCapability(ScoreboardRuntimeCapability capability) {
+        runtimeCapability = capability != null ? capability : ScoreboardRuntimeCapability.unavailable();
+    }
+
+    public static void clearRuntimeCapability() {
+        runtimeCapability = ScoreboardRuntimeCapability.unavailable();
     }
 
     public static String getDefaultScoreboardId() {
@@ -71,7 +80,7 @@ public final class ScoreboardTemplateManager {
         if (storage == null || id == null || id.isBlank()) {
             return false;
         }
-        ScoreboardDefinition definition = storage.getScoreboard(id);
+        ScoreboardDefinition definition = getRuntimeScoreboard(id);
         if (definition == null) {
             return false;
         }
@@ -90,21 +99,17 @@ public final class ScoreboardTemplateManager {
     }
 
     public static boolean showTemplate(Player player, String scoreboardId, boolean usePapi) {
-        FlowStorage storage = getFlowStorage();
-        if (storage == null || scoreboardId == null || scoreboardId.isBlank()) {
+        if (scoreboardId == null || scoreboardId.isBlank()) {
             return false;
         }
-        return showTemplate(player, storage.getScoreboard(scoreboardId), usePapi);
+        return showTemplate(player, getRuntimeScoreboard(scoreboardId), usePapi);
     }
 
     public static boolean showTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
         if (player == null || definition == null || !definition.isEnabled()) {
             return false;
         }
-        applyTemplate(player, definition, usePapi);
-        ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(definition.getId(), usePapi));
-        publishState(player, definition.getId());
-        return true;
+        return activateTemplate(player, definition, usePapi);
     }
 
     public static void refreshActiveTemplates(FlowStorage storage) {
@@ -114,7 +119,7 @@ public final class ScoreboardTemplateManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             ActiveScoreboardState state = ACTIVE_SCOREBOARDS.get(player.getUniqueId());
             if (state != null) {
-                ScoreboardDefinition definition = storage.getScoreboard(state.scoreboardId());
+                ScoreboardDefinition definition = getRuntimeScoreboard(state.scoreboardId());
                 if (definition != null && definition.isEnabled()) {
                     applyTemplate(player, definition, state.usePapi());
                 } else {
@@ -125,13 +130,11 @@ public final class ScoreboardTemplateManager {
         String defaultId = storage.getDefaultScoreboardId();
         if (defaultId != null && !defaultId.isBlank()) {
             boolean usePapi = storage.isDefaultScoreboardUsePapi();
-            ScoreboardDefinition definition = storage.getScoreboard(defaultId);
+            ScoreboardDefinition definition = getRuntimeScoreboard(defaultId);
             if (definition != null && definition.isEnabled()) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!ACTIVE_SCOREBOARDS.containsKey(player.getUniqueId())) {
-                        applyTemplate(player, definition, usePapi);
-                        ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(defaultId, usePapi));
-                        publishState(player, defaultId);
+                        activateTemplate(player, definition, usePapi);
                     }
                 }
             }
@@ -142,7 +145,7 @@ public final class ScoreboardTemplateManager {
         if (storage == null || scoreboardId == null || scoreboardId.isBlank()) {
             return;
         }
-        ScoreboardDefinition definition = storage.getScoreboard(scoreboardId);
+        ScoreboardDefinition definition = getRuntimeScoreboard(scoreboardId);
         if (definition == null) {
             return;
         }
@@ -164,9 +167,7 @@ public final class ScoreboardTemplateManager {
             boolean usePapi = storage.isDefaultScoreboardUsePapi();
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (!ACTIVE_SCOREBOARDS.containsKey(player.getUniqueId())) {
-                    applyTemplate(player, definition, usePapi);
-                    ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(scoreboardId, usePapi));
-                    publishState(player, scoreboardId);
+                    activateTemplate(player, definition, usePapi);
                 }
             }
         }
@@ -210,11 +211,9 @@ public final class ScoreboardTemplateManager {
         if (id == null || id.isBlank()) {
             return;
         }
-        ScoreboardDefinition definition = storage.getScoreboard(id);
-        if (definition != null) {
-            applyTemplate(player, definition, storage.isDefaultScoreboardUsePapi());
-            ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(id, storage.isDefaultScoreboardUsePapi()));
-            publishState(player, id);
+        ScoreboardDefinition definition = getRuntimeScoreboard(id);
+        if (definition != null && definition.isEnabled()) {
+            activateTemplate(player, definition, storage.isDefaultScoreboardUsePapi());
         }
     }
 
@@ -236,10 +235,18 @@ public final class ScoreboardTemplateManager {
 
     private static void applyTemplateToAll(ScoreboardDefinition definition, boolean usePapi) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            applyTemplate(player, definition, usePapi);
-            ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(definition.getId(), usePapi));
-            publishState(player, definition.getId());
+            activateTemplate(player, definition, usePapi);
         }
+    }
+
+    private static boolean activateTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
+        if (player == null || definition == null || !definition.isEnabled()
+            || !applyTemplate(player, definition, usePapi)) {
+            return false;
+        }
+        ACTIVE_SCOREBOARDS.put(player.getUniqueId(), new ActiveScoreboardState(definition.getId(), usePapi));
+        publishState(player, definition.getId());
+        return true;
     }
 
     static boolean hasAnimatedTemplates(FlowStorage storage) {
@@ -247,17 +254,17 @@ public final class ScoreboardTemplateManager {
             return false;
         }
         for (ActiveScoreboardState state : ACTIVE_SCOREBOARDS.values()) {
-            if (state != null && hasAnimation(storage.getScoreboard(state.scoreboardId()))) {
+            if (state != null && hasAnimation(getRuntimeScoreboard(state.scoreboardId()))) {
                 return true;
             }
         }
         String defaultId = storage.getDefaultScoreboardId();
-        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getScoreboard(defaultId));
+        return defaultId != null && !defaultId.isBlank() && hasAnimation(getRuntimeScoreboard(defaultId));
     }
 
-    private static void applyTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
+    private static boolean applyTemplate(Player player, ScoreboardDefinition definition, boolean usePapi) {
         if (!packetsAvailable()) {
-            return;
+            return false;
         }
         UUID playerId = player.getUniqueId();
         PacketScoreboardState board = PACKET_SCOREBOARDS.get(playerId);
@@ -291,6 +298,7 @@ public final class ScoreboardTemplateManager {
             send(player, new WrapperPlayServerResetScore(LINE_ENTRIES[index], board.objectiveId()));
         }
         PACKET_SCOREBOARDS.put(playerId, new PacketScoreboardState(board.objectiveId(), lineCount));
+        return true;
     }
 
     private static WrapperPlayServerTeams teamPacket(PacketScoreboardState board, int index, WrapperPlayServerTeams.TeamMode mode, Component line, String entry) {
@@ -345,6 +353,14 @@ public final class ScoreboardTemplateManager {
 
     private static FlowStorage getFlowStorage() {
         return FlowRuntimeAccess.getStorage();
+    }
+
+    public static ScoreboardDefinition getRuntimeScoreboard(String id) {
+        return runtimeCapability.get(id);
+    }
+
+    public static List<String> listRuntimeScoreboardIds() {
+        return runtimeCapability.listIds();
     }
 
     private static String findActiveScoreboardId(Player player) {

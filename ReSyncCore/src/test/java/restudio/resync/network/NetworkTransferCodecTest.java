@@ -10,6 +10,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NetworkTransferCodecTest {
     @Test
@@ -36,6 +37,28 @@ class NetworkTransferCodecTest {
         PlayerStateSnapshot assembled = NetworkTransferCodec.assemble(decoded.reversed());
         assertEquals(snapshot, assembled);
         assertArrayEquals(payload, assembled.payload());
+    }
+
+    @Test
+    void preservesPinnedSnapshotsAcrossChunkCodec() {
+        byte[] payload = new byte[]{1, 2, 3};
+        PlayerStateSnapshot snapshot = new PlayerStateSnapshot("pinned", "network", UUID.randomUUID(), 2, "survival", payload, NetworkPayloads.sha256(payload), 1, 5, "lobby", 1000, true);
+        List<NetworkSnapshotChunk> decoded = NetworkTransferCodec.split("transfer", snapshot).stream()
+            .map(NetworkTransferCodec::encodeChunk)
+            .map(NetworkTransferCodec::decodeChunk)
+            .toList();
+
+        assertTrue(decoded.stream().allMatch(NetworkSnapshotChunk::pinned));
+        assertEquals(snapshot, NetworkTransferCodec.assemble(decoded));
+    }
+
+    @Test
+    void decodesLegacyChunksWithoutPinnedField() {
+        byte[] payload = new byte[]{1, 2, 3};
+        PlayerStateSnapshot snapshot = new PlayerStateSnapshot("legacy", "network", UUID.randomUUID(), 2, "survival", payload, NetworkPayloads.sha256(payload), 1, 5, "lobby", 1000, false);
+        NetworkSnapshotChunk chunk = NetworkTransferCodec.split("transfer", snapshot).getFirst();
+
+        assertEquals(false, NetworkTransferCodec.decodeChunk(NetworkTransferCodec.encodeChunk(chunk)).pinned());
     }
 
     @Test

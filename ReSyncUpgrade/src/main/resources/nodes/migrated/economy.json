@@ -1,0 +1,317 @@
+[
+  {
+    "id": "eco.get.balance",
+    "displayName": "Get Balance",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_balance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.set.balance",
+    "displayName": "Set Balance",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_set_balance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.add.balance",
+    "displayName": "Add Balance",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_add_balance"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.transfer",
+    "displayName": "Transfer Balance",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_transfer"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.remove.balance",
+    "displayName": "Eco Subtract Balance",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_subtract_balance"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "new_balance",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "id": "eco.has.balance",
+    "displayName": "Eco Has Enough",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_has_enough"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      },
+      {
+        "name": "amount",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "has",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "economy.eco_get_top",
+    "displayName": "Eco Get Top",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_top"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "limit",
+        "dataType": "number"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "top",
+        "dataType": "list<any>"
+      }
+    ]
+  },
+  {
+    "id": "eco.format",
+    "displayName": "Eco Format",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "format"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.deposit",
+    "displayName": "Eco Deposit",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "deposit"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.withdraw",
+    "displayName": "Eco Withdraw",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "withdraw"
+    },
+    "inputs": [],
+    "outputs": [],
+    "hidden": true
+  },
+  {
+    "id": "eco.get.currency",
+    "displayName": "Get Currency",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_get_currency"
+    },
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      },
+      {
+        "name": "singular",
+        "dataType": "string"
+      },
+      {
+        "name": "plural",
+        "dataType": "string"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ]
+  },
+  {
+    "id": "eco.has.bank",
+    "displayName": "Has Bank Account",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_has_bank"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "has_bank",
+        "dataType": "boolean"
+      }
+    ]
+  },
+  {
+    "id": "eco.create.bank",
+    "displayName": "Create Bank Account",
+    "category": "ECONOMY",
+    "handler": "EconomyHandler",
+    "handlerConfig": {
+      "operation": "eco_create_bank"
+    },
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "player",
+        "dataType": "player"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean"
+      },
+      {
+        "name": "error",
+        "dataType": "string"
+      }
+    ]
+  }
+]
+

@@ -1,0 +1,4553 @@
+[
+  {
+    "id": "gui_open",
+    "displayName": "Open GUI",
+    "description": "Open a saved GUI for the current player.",
+    "domain": "runtime",
+    "family": "gui",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-apply.gui-open",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "gui.open"
+    ],
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "gui",
+      "apply"
+    ],
+    "examples": [
+      "Select the managed GUI, then handle Flow or Failed."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_apply",
+      "resource_type": "gui",
+      "resource_pin": "gui",
+      "value_pin": "opened"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "gui",
+          "target": "gui"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "opened",
+          "target": "opened"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "gui",
+        "displayName": "GUI",
+        "name": "gui",
+        "pinType": "DATA",
+        "dataType": "gui_id",
+        "description": "Selects the managed GUI.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "opened",
+        "displayName": "Opened",
+        "name": "opened",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the GUI opened."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<boolean>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "tab_apply",
+    "displayName": "Apply Tab List",
+    "description": "Apply a saved tab list to the current player.",
+    "domain": "runtime",
+    "family": "tab",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-apply.tab-apply",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "tab.apply"
+    ],
+    "category": "TAB_LIST",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "tab",
+      "apply"
+    ],
+    "examples": [
+      "Select the managed Tab List, then handle Flow or Failed."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_apply",
+      "resource_type": "tab",
+      "resource_pin": "tab",
+      "value_pin": "applied"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "tab",
+          "target": "tab"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "applied",
+          "target": "applied"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "tab",
+        "displayName": "Tab",
+        "name": "tab",
+        "pinType": "DATA",
+        "dataType": "tab_id",
+        "description": "Selects the managed Tab List.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:tab"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "applied",
+        "displayName": "Applied",
+        "name": "applied",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the Tab List was applied."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<boolean>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "gui_get",
+    "displayName": "Get GUI",
+    "description": "Get a saved GUI as a typed value.",
+    "domain": "runtime",
+    "family": "gui",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.gui-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "gui.get"
+    ],
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "gui",
+      "get"
+    ],
+    "examples": [
+      "Select the managed GUI, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "gui",
+      "resource_pin": "gui",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "gui",
+          "target": "gui"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "gui",
+        "displayName": "GUI",
+        "name": "gui",
+        "pinType": "DATA",
+        "dataType": "gui_id",
+        "description": "Selects the managed GUI.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "gui_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<gui_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "scoreboard_get_template",
+    "displayName": "Get Scoreboard",
+    "description": "Get a saved scoreboard as a typed value.",
+    "domain": "runtime",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.scoreboard-get-template",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "scoreboard.get.template"
+    ],
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "scoreboard",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Scoreboard, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "scoreboard",
+      "resource_pin": "scoreboard",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "scoreboard",
+          "target": "scoreboard"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "scoreboard",
+        "displayName": "Scoreboard",
+        "name": "scoreboard",
+        "pinType": "DATA",
+        "dataType": "scoreboard_id",
+        "description": "Selects the managed Scoreboard.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:scoreboard"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "scoreboard_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<scoreboard_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "tab_get",
+    "displayName": "Get Tab List",
+    "description": "Get a saved tab list as a typed value.",
+    "domain": "runtime",
+    "family": "tab",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.tab-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "tab.get"
+    ],
+    "category": "TAB_LIST",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "tab",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Tab List, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "tab",
+      "resource_pin": "tab",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "tab",
+          "target": "tab"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "tab",
+        "displayName": "Tab",
+        "name": "tab",
+        "pinType": "DATA",
+        "dataType": "tab_id",
+        "description": "Selects the managed Tab List.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:tab"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "tab_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<tab_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "custom_content_get",
+    "displayName": "Get Custom Content",
+    "description": "Get saved custom content as a typed value.",
+    "domain": "runtime",
+    "family": "custom_content",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.custom-content-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "custom_content.get"
+    ],
+    "category": "CUSTOM_CONTENT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "custom_content",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Custom Content, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "custom_content",
+      "resource_pin": "content",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "content",
+          "target": "content"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "content",
+        "displayName": "Content",
+        "name": "content",
+        "pinType": "DATA",
+        "dataType": "custom_content_id",
+        "description": "Selects the managed Custom Content.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:custom_content"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "custom_content_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<custom_content_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "chat_get_profile",
+    "displayName": "Get Chat Profile",
+    "description": "Get a saved chat profile as a typed value.",
+    "domain": "runtime",
+    "family": "chat",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.chat-get-profile",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "chat.get.profile"
+    ],
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "chat",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Chat Profile, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "chat",
+      "resource_pin": "profile",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "profile",
+          "target": "profile"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "profile",
+        "displayName": "Profile",
+        "name": "profile",
+        "pinType": "DATA",
+        "dataType": "chat_id",
+        "description": "Selects the managed Chat Profile.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:chat"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "chat_profile",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<chat_profile>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "motd_get_profile",
+    "displayName": "Get MOTD Profile",
+    "description": "Get a saved MOTD profile as a typed value.",
+    "domain": "runtime",
+    "family": "motd_profile",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.motd-get-profile",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "motd.get.profile"
+    ],
+    "category": "NETWORK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "motd_profile",
+      "get"
+    ],
+    "examples": [
+      "Select the managed MOTD Profile, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "motd_profile",
+      "resource_pin": "profile",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "profile",
+          "target": "profile"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "profile",
+        "displayName": "Profile",
+        "name": "profile",
+        "pinType": "DATA",
+        "dataType": "motd_profile_id",
+        "description": "Selects the managed MOTD Profile.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:motd_profile"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "motd_profile",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<motd_profile>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "message_rule_get",
+    "displayName": "Get Message Rule",
+    "description": "Get a saved message rule as a typed value.",
+    "domain": "runtime",
+    "family": "message_rule",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.message-rule-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "message_rule.get"
+    ],
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "message_rule",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Message Rule, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "message_rule",
+      "resource_pin": "rule",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "rule",
+          "target": "rule"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "rule",
+        "displayName": "Rule",
+        "name": "rule",
+        "pinType": "DATA",
+        "dataType": "message_rule_id",
+        "description": "Selects the managed Message Rule.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:message_rule"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "message_rule",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<message_rule>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "text_get_template",
+    "displayName": "Get Text Template",
+    "description": "Get a saved text template as a typed value.",
+    "domain": "runtime",
+    "family": "text_template",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.text-get-template",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "text.get.template"
+    ],
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "text_template",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Text Template, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "text_template",
+      "resource_pin": "template",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "template",
+          "target": "template"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "template",
+        "displayName": "Template",
+        "name": "template",
+        "pinType": "DATA",
+        "dataType": "text_template_id",
+        "description": "Selects the managed Text Template.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:text_template"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "text_template",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<text_template>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "dialog_get",
+    "displayName": "Get Dialog",
+    "description": "Get a saved dialog as a typed value.",
+    "domain": "runtime",
+    "family": "dialog",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.dialog-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "dialog.get"
+    ],
+    "category": "DIALOG",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "dialog",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Dialog, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "dialog",
+      "resource_pin": "dialog",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "dialog",
+          "target": "dialog"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "dialog",
+        "displayName": "Dialog",
+        "name": "dialog",
+        "pinType": "DATA",
+        "dataType": "dialog_id",
+        "description": "Selects the managed Dialog.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:dialog"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "dialog_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<dialog_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "trade_get_profile",
+    "displayName": "Get Trade Profile",
+    "description": "Get a saved trade profile as a typed value.",
+    "domain": "runtime",
+    "family": "trade_profile",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.trade-get-profile",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "trade.get.profile"
+    ],
+    "category": "TRADE",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "trade_profile",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Trade Profile, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "trade_profile",
+      "resource_pin": "profile",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "profile",
+          "target": "profile"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "profile",
+        "displayName": "Profile",
+        "name": "profile",
+        "pinType": "DATA",
+        "dataType": "trade_profile_id",
+        "description": "Selects the managed Trade Profile.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:trade_profile"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "trade_profile",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<trade_profile>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "npc_get",
+    "displayName": "Get NPC",
+    "description": "Get a saved NPC as a typed value.",
+    "domain": "runtime",
+    "family": "npc_definition",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.npc-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "npc.get"
+    ],
+    "category": "NPC",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "npc_definition",
+      "get"
+    ],
+    "examples": [
+      "Select the managed NPC Definition, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "npc_definition",
+      "resource_pin": "npc",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "npc",
+          "target": "npc"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "npc",
+        "displayName": "NPC",
+        "name": "npc",
+        "pinType": "DATA",
+        "dataType": "npc_id",
+        "description": "Selects the managed NPC Definition.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:npc_definition"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "npc_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<npc_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "loot_get_table",
+    "displayName": "Get Loot Table",
+    "description": "Get a saved loot table as a typed value.",
+    "domain": "runtime",
+    "family": "loot_table",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.loot-get-table",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "loot.get.table"
+    ],
+    "category": "LOOT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "loot_table",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Loot Table, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "loot_table",
+      "resource_pin": "loot_table",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "loot_table",
+          "target": "loot_table"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "loot_table",
+        "displayName": "Loot Table",
+        "name": "loot_table",
+        "pinType": "DATA",
+        "dataType": "loot_table_id",
+        "description": "Selects the managed Loot Table.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:loot_table"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "loot_table_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<loot_table_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "advancement_get_tree",
+    "displayName": "Get Advancement Tree",
+    "description": "Get a saved advancement tree as a typed value.",
+    "domain": "runtime",
+    "family": "advancement_tree",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.advancement-get-tree",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "advancement.get.tree"
+    ],
+    "category": "ADVANCEMENT",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "advancement_tree",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Advancement Tree, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "advancement_tree",
+      "resource_pin": "tree",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "tree",
+          "target": "tree"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "tree",
+        "displayName": "Tree",
+        "name": "tree",
+        "pinType": "DATA",
+        "dataType": "advancement_tree_id",
+        "description": "Selects the managed Advancement Tree.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:advancement_tree"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "advancement_tree_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<advancement_tree_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "recipe_get",
+    "displayName": "Get Recipe",
+    "description": "Get a saved recipe as a typed value.",
+    "domain": "runtime",
+    "family": "recipe_definition",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.recipe-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "recipe.get"
+    ],
+    "category": "RECIPE",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "recipe_definition",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Recipe, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "recipe_definition",
+      "resource_pin": "recipe",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "recipe",
+          "target": "recipe"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "recipe",
+        "displayName": "Recipe",
+        "name": "recipe",
+        "pinType": "DATA",
+        "dataType": "recipe_id",
+        "description": "Selects the managed Recipe.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:recipe_definition"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "recipe_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<recipe_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "flow_get",
+    "displayName": "Get Flow",
+    "description": "Get a saved Flow as a typed value.",
+    "domain": "runtime",
+    "family": "graph",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.flow-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "flow.get"
+    ],
+    "category": "FLOW",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "flow",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Flow, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "flow",
+      "resource_pin": "flow_id",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Flow ID",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "dataType": "flow_id",
+        "description": "Selects the managed Flow.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "flow_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<flow_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "function_get",
+    "displayName": "Get Function",
+    "description": "Get a saved function and its signature as a typed value.",
+    "domain": "runtime",
+    "family": "graph",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.function-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "function.get"
+    ],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "function",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Function, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "function",
+      "resource_pin": "function",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "function",
+          "target": "function"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "function",
+        "displayName": "Function",
+        "name": "function",
+        "pinType": "DATA",
+        "dataType": "function",
+        "description": "Selects the managed Function.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:function"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "function_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<function_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "command_get",
+    "displayName": "Get Command",
+    "description": "Get a saved command as a typed value.",
+    "domain": "runtime",
+    "family": "graph",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.command-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "command.get"
+    ],
+    "category": "COMMAND",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "command",
+      "get"
+    ],
+    "examples": [
+      "Select the managed Command, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "command",
+      "resource_pin": "command",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "command",
+          "target": "command"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "command",
+        "displayName": "Command",
+        "name": "command",
+        "pinType": "DATA",
+        "dataType": "command_id",
+        "description": "Selects the managed Command.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:command"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "command_definition",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<command_definition>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "worldgen_get",
+    "displayName": "Get Worldgen Project",
+    "description": "Get a saved world generation project as a typed value.",
+    "domain": "runtime",
+    "family": "worldgen",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-get.worldgen-get",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "worldgen.get"
+    ],
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "resource",
+      "worldgen",
+      "get"
+    ],
+    "examples": [
+      "Select the managed WorldGen, then use Value or Result."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_get",
+      "resource_type": "worldgen",
+      "resource_pin": "project",
+      "value_pin": "value"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "project",
+          "target": "project"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "project",
+        "displayName": "Project",
+        "name": "project",
+        "pinType": "DATA",
+        "dataType": "worldgen_project",
+        "description": "Selects the managed WorldGen.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:worldgen"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "worldgen_project",
+        "description": "Returns the loaded resource value."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<worldgen_project>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "custom_content_details",
+    "displayName": "Read Custom Content",
+    "description": "Expose a loaded custom content definition for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.custom-content-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "custom_content.details"
+    ],
+    "category": "CUSTOM_CONTENT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "custom_content_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "custom_content_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "chat_profile_details",
+    "displayName": "Read Chat Profile",
+    "description": "Expose a loaded chat profile for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.chat-profile-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "chat.profile.details"
+    ],
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "chat_profile",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "chat_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "message_rule_details",
+    "displayName": "Read Message Rule",
+    "description": "Expose a loaded message rule for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.message-rule-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "message_rule.details"
+    ],
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "message_rule",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "message_rule_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "text_template_details",
+    "displayName": "Read Text Template",
+    "description": "Expose a loaded text template for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.text-template-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "text.template.details"
+    ],
+    "category": "TEXT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "text_template",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "text_template_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "dialog_details",
+    "displayName": "Read Dialog",
+    "description": "Expose a loaded dialog for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.dialog-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "dialog.details"
+    ],
+    "category": "DIALOG",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "dialog_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "dialog_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "trade_profile_details",
+    "displayName": "Read Trade Profile",
+    "description": "Expose a loaded trade profile for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.trade-profile-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "trade.profile.details"
+    ],
+    "category": "TRADE",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "trade_profile",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "trade_profile_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "npc_details",
+    "displayName": "Read NPC",
+    "description": "Expose a loaded NPC definition for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.npc-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "npc.details"
+    ],
+    "category": "NPC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "npc_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "npc_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "loot_table_details",
+    "displayName": "Read Loot Table",
+    "description": "Expose a loaded loot table for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.loot-table-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "loot.table.details"
+    ],
+    "category": "LOOT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "loot_table_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "loot_table_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "advancement_tree_details",
+    "displayName": "Read Advancement Tree",
+    "description": "Expose a loaded advancement tree for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "advancement.tree.details"
+    ],
+    "category": "ADVANCEMENT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "advancement_tree_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "advancement_tree_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "recipe_details",
+    "displayName": "Read Recipe",
+    "description": "Expose a loaded recipe for use in the Flow.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.resource-details.recipe-details",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "recipe.details"
+    ],
+    "category": "RECIPE",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "resource_details"
+    },
+    "inputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "recipe_definition",
+        "description": "Provides the loaded resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "recipe_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "details",
+        "displayName": "Details",
+        "name": "details",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the resource fields as a map."
+      }
+    ]
+  },
+  {
+    "id": "flow_run",
+    "displayName": "Run Flow",
+    "description": "Run a saved Flow, then continue when it finishes.",
+    "domain": "runtime",
+    "family": "graph",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.run-graph-id.flow-run",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "flow.run"
+    ],
+    "category": "FLOW",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "flow",
+      "run-graph-id"
+    ],
+    "examples": [
+      "Select the saved graph, then continue when it finishes."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "run_graph_id",
+      "resource_type": "flow",
+      "resource_pin": "selected_flow"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "selected_flow",
+          "target": "selected_flow"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "selected_flow",
+        "displayName": "Selected Flow",
+        "name": "selected_flow",
+        "pinType": "DATA",
+        "dataType": "flow_id",
+        "description": "Selects the managed Flow.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<flow_id>",
+        "description": "Returns the typed resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "command_run",
+    "displayName": "Run Command",
+    "description": "Run a saved command, then continue when it finishes.",
+    "domain": "runtime",
+    "family": "graph",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "command.run"
+    ],
+    "category": "COMMAND",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "command",
+      "run-graph-id"
+    ],
+    "examples": [
+      "Select the saved graph, then continue when it finishes."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "run_graph_id",
+      "resource_type": "command",
+      "resource_pin": "command"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "command",
+          "target": "command"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "command",
+        "displayName": "Command",
+        "name": "command",
+        "pinType": "DATA",
+        "dataType": "command_id",
+        "description": "Selects the managed Command.",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:command"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<command_id>",
+        "description": "Returns the typed resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "flow_run_value",
+    "displayName": "Run Loaded Flow",
+    "description": "Run the Flow value produced by Get Flow, then continue when it finishes.",
+    "domain": "runtime",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value.run-graph.flow-run-value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "flow.run.value"
+    ],
+    "category": "FLOW",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "run-graph"
+    ],
+    "examples": [
+      "Connect a loaded graph value, then continue when it finishes."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "run_graph"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "flow_definition",
+        "description": "Provides the resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<flow_id>",
+        "description": "Returns the typed resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "command_run_value",
+    "displayName": "Run Loaded Command",
+    "description": "Run the command value produced by Get Command, then continue when it finishes.",
+    "domain": "runtime",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "command.run.value"
+    ],
+    "category": "COMMAND",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "run-graph"
+    ],
+    "examples": [
+      "Connect a loaded graph value, then continue when it finishes."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "run_graph"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "command_definition",
+        "description": "Provides the resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<command_id>",
+        "description": "Returns the typed resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "function_call_value",
+    "displayName": "Call Loaded Function",
+    "description": "Call the function value produced by Get Function. Connect a single input directly or use Add Function Argument for multiple inputs.",
+    "domain": "runtime",
+    "family": "resource",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "function.call.value"
+    ],
+    "category": "FUNCTION",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "call-function"
+    ],
+    "examples": [
+      "Connect a loaded Function and its arguments, then use the results."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "call_function"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "input",
+          "source": "arguments",
+          "target": "arguments"
+        },
+        {
+          "direction": "output",
+          "source": "results",
+          "target": "results"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "function_definition",
+        "description": "Provides the resource value."
+      },
+      {
+        "id": "arguments",
+        "displayName": "Arguments",
+        "name": "arguments",
+        "pinType": "DATA",
+        "dataType": "any",
+        "description": "Provides an optional arguments.",
+        "optional": true
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "results",
+        "displayName": "Results",
+        "name": "results",
+        "pinType": "DATA",
+        "dataType": "map<string,any>",
+        "description": "Returns the values produced by the Function."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<map<string,any>>",
+        "description": "Returns the typed resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "gui_open_value",
+    "displayName": "Open Loaded GUI",
+    "description": "Open the GUI value produced by Get GUI for the current player.",
+    "domain": "runtime",
+    "family": "gui",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "gui.open.value"
+    ],
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "gui",
+      "apply-value"
+    ],
+    "examples": [
+      "Use Open Loaded GUI with its typed resource value."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_apply_value",
+      "resource_type": "gui",
+      "value_pin": "opened"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "opened",
+          "target": "opened"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "gui_definition",
+        "description": "Provides the resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "opened",
+        "displayName": "Opened",
+        "name": "opened",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the GUI opened."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<boolean>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "scoreboard_show_value",
+    "displayName": "Show Loaded Scoreboard",
+    "description": "Show the scoreboard value produced by Get Scoreboard for the current player.",
+    "domain": "runtime",
+    "family": "scoreboard",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-apply-value.scoreboard-show-value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "scoreboard.show.value"
+    ],
+    "category": "SCOREBOARD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "scoreboard",
+      "apply-value"
+    ],
+    "examples": [
+      "Use Show Loaded Scoreboard with its typed resource value."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_apply_value",
+      "resource_type": "scoreboard",
+      "value_pin": "shown"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "shown",
+          "target": "shown"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "scoreboard_definition",
+        "description": "Provides the resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "shown",
+        "displayName": "Shown",
+        "name": "shown",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the Scoreboard was shown."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<boolean>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "tab_apply_value",
+    "displayName": "Apply Loaded Tab List",
+    "description": "Apply the tab list value produced by Get Tab List to the current player.",
+    "domain": "runtime",
+    "family": "tab",
+    "lifecycle": "active",
+    "handlerCapability": "resync.runtime.resource.resource-apply-value.tab-apply-value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "tab.apply.value"
+    ],
+    "category": "TAB_LIST",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "resource",
+      "tab",
+      "apply-value"
+    ],
+    "examples": [
+      "Use Apply Loaded Tab List with its typed resource value."
+    ],
+    "handler": "ReSyncRuntimeResourceHandler",
+    "handlerConfig": {
+      "operation": "resource_apply_value",
+      "resource_type": "tab",
+      "value_pin": "applied"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "failed",
+          "target": "failed"
+        },
+        {
+          "direction": "output",
+          "source": "applied",
+          "target": "applied"
+        },
+        {
+          "direction": "output",
+          "source": "result",
+          "target": "result"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Starts the resource operation."
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "tab_definition",
+        "description": "Provides the resource value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation succeeds."
+      },
+      {
+        "id": "failed",
+        "displayName": "Failed",
+        "name": "failed",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Continues when the resource operation fails."
+      },
+      {
+        "id": "applied",
+        "displayName": "Applied",
+        "name": "applied",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the Tab List was applied."
+      },
+      {
+        "id": "result",
+        "displayName": "Result",
+        "name": "result",
+        "pinType": "DATA",
+        "dataType": "result<boolean>",
+        "description": "Returns the typed resource operation result."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Reports whether the resource operation succeeded."
+      },
+      {
+        "id": "error_code",
+        "displayName": "Error Code",
+        "name": "error_code",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the stable failure code."
+      },
+      {
+        "id": "message",
+        "displayName": "Message",
+        "name": "message",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Explains the resource operation result."
+      }
+    ]
+  },
+  {
+    "id": "motd_profile_details",
+    "displayName": "Read MOTD Profile",
+    "description": "Read the lines, priority, and player counts from a loaded MOTD profile.",
+    "domain": "runtime",
+    "family": "resource_details",
+    "lifecycle": "active",
+    "handlerCapability": "resync.resource.value",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "motd.profile.details"
+    ],
+    "category": "CHAT",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": [
+      "resource",
+      "motd-details"
+    ],
+    "examples": [
+      "Connect the loaded value to inspect its fields."
+    ],
+    "handler": "ResourceValueHandler",
+    "handlerConfig": {
+      "operation": "motd_details"
+    },
+    "inputs": [
+      {
+        "id": "profile",
+        "displayName": "Profile",
+        "name": "profile",
+        "pinType": "DATA",
+        "dataType": "motd_profile",
+        "description": "Provides the loaded MOTD Profile."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "id",
+        "displayName": "ID",
+        "name": "id",
+        "pinType": "DATA",
+        "dataType": "motd_profile_id",
+        "description": "Returns the stable resource ID."
+      },
+      {
+        "id": "line_1",
+        "displayName": "Line 1",
+        "name": "line_1",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the first MOTD line."
+      },
+      {
+        "id": "line_2",
+        "displayName": "Line 2",
+        "name": "line_2",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Returns the second MOTD line."
+      },
+      {
+        "id": "priority",
+        "displayName": "Priority",
+        "name": "priority",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the MOTD priority."
+      },
+      {
+        "id": "online_players",
+        "displayName": "Online Players",
+        "name": "online_players",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the current online player count."
+      },
+      {
+        "id": "max_players",
+        "displayName": "Max Players",
+        "name": "max_players",
+        "pinType": "DATA",
+        "dataType": "number",
+        "description": "Returns the configured maximum player count."
+      }
+    ]
+  }
+]

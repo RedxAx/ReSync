@@ -3,6 +3,7 @@ package restudio.resync.runtime.data;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.flow.data.FlowTypeRef;
+import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.RuntimeDataAdapter;
 import restudio.resync.api.RuntimeDataCapability;
 import restudio.resync.api.RuntimeDataQuery;
@@ -21,10 +22,28 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
     public static final String ID = "resync:custom_items";
     private final CustomContentStorage storage;
     private final CustomContentService service;
+    private final RuntimeDataCategoryCatalog<CustomContentStorage.CategoryProjection> categoryCatalog;
 
     public CustomContentItemDataAdapter(CustomContentStorage storage, CustomContentService service) {
         this.storage = storage;
         this.service = service;
+        this.categoryCatalog = new RuntimeDataCategoryCatalog<>(this) {
+            @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.IO;
+            }
+
+            @Override
+            protected Snapshot<CustomContentStorage.CategoryProjection> captureSnapshot() {
+                CustomContentStorage.CategoryProjection projection = storage.readRuntimeDataCategoryProjection();
+                return snapshot(projection.revision(), records(projection.definitions()), projection);
+            }
+
+            @Override
+            protected boolean current(CustomContentStorage.CategoryProjection projection) {
+                return storage.isRuntimeDataCategoryProjectionCurrent(projection);
+            }
+        };
     }
 
     @Override
@@ -59,8 +78,13 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
     }
 
     @Override
+    public OptionCatalogProvider categoryCatalog() {
+        return categoryCatalog;
+    }
+
+    @Override
     public List<RuntimeDataRecord> records(RuntimeDataQuery query) {
-        return storage.getAll().stream().filter(this::isItemContent).map(this::record).toList();
+        return records(storage.getAll());
     }
 
     @Override
@@ -89,12 +113,22 @@ public final class CustomContentItemDataAdapter implements RuntimeDataAdapter<It
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("contentType", type);
         attributes.put("provider", provider);
-        attributes.put("material", definition.getMaterial());
-        attributes.put("flowId", definition.getFlowId());
-        attributes.put("externalId", definition.getExternalId());
-        attributes.put("customModelData", definition.getCustomModelData());
+        put(attributes, "material", definition.getMaterial());
+        put(attributes, "flowId", definition.getFlowId());
+        put(attributes, "externalId", definition.getExternalId());
+        put(attributes, "customModelData", definition.getCustomModelData());
         return new RuntimeDataRecord(domain(), id(), definition.getId(), definition.getDisplayName(), "ReSync " + RuntimeDataLabels.label(type),
             categories, tags, attributes);
+    }
+
+    private static void put(Map<String, Object> attributes, String key, Object value) {
+        if (value != null) {
+            attributes.put(key, value);
+        }
+    }
+
+    private List<RuntimeDataRecord> records(List<CustomContentDefinition> definitions) {
+        return definitions.stream().filter(this::isItemContent).map(this::record).toList();
     }
 
     private boolean isItemContent(CustomContentDefinition definition) {

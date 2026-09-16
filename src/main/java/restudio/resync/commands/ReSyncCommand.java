@@ -13,17 +13,19 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.CustomContentDefinition;
-import restudio.flow.data.ScoreboardDefinition;
 import restudio.flow.data.TabDefinition;
 import restudio.resync.ReSync;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.customcontent.CustomContentService;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.customcontent.CustomContentStorage;
 import restudio.resync.dialog.DialogService;
 import restudio.resync.flow.FlowStorage;
 import restudio.resync.flow.TabListService;
 import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.diagnostics.ProgrammabilityAcceptanceSnapshot;
+import restudio.resync.migration.AuthorityUseGrant;
+import restudio.resync.migration.ProductionAuthorityBundle;
 import restudio.resync.modules.FlowRuntimeModule;
 import restudio.resync.modules.FlowModule;
 import restudio.resync.runtime.LootTableService;
@@ -31,6 +33,7 @@ import restudio.resync.runtime.NpcService;
 import restudio.resync.runtime.TradeProfileService;
 import restudio.resync.selection.InteractiveSelectionManager;
 import restudio.resync.server.ReSyncServer;
+import restudio.resync.server.TemporaryLifecycleDiagnostics;
 import restudio.resync.world.WorldGameRuleDescriptor;
 import restudio.resync.world.WorldGeneratorDescriptor;
 import restudio.resync.world.WorldInventoryGroup;
@@ -43,6 +46,10 @@ import restudio.resync.world.WorldRegistryEntry;
 import restudio.resync.world.WorldSignPortal;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,6 +66,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class ReSyncCommand implements TabExecutor {
+    private static final String AUTHORITY_ANCHOR_RELATIVE_PATH = "authority/authority-trust-anchor.json";
     private final ReSync plugin;
     private final Map<String, CommandBranch> commandTree = new LinkedHashMap<>();
 
@@ -70,7 +78,14 @@ public class ReSyncCommand implements TabExecutor {
         }, args -> args.length == 2
                 ? filter(commandTree.keySet().stream().filter(group -> !"help".equals(group)).toList(), args[1])
                 : List.of());
-        register("status", "Runtime Status", (sender, args) -> handleStatus(sender), args -> List.of());
+        register("status", "Runtime Status", this::handleStatus,
+            args -> args.length == 2 ? filter(List.of("reset"), args[1]) : List.of());
+        register("authority", "Authority Bundle", this::handleAuthority, args -> {
+            if (args.length == 2) {
+                return filter(List.of("export", "export-anchor", "grant"), args[1]);
+            }
+            return List.of();
+        });
         register("network", "Network Control", this::handleNetwork, args -> args.length == 2 ? filter(List.of("reload"), args[1]) : List.of());
         register("scoreboard", "Scoreboards", this::handleScoreboard, this::tabCompleteScoreboard);
         register("tab", "Player Lists", this::handleTab, this::tabCompleteTab);
@@ -86,7 +101,17 @@ public class ReSyncCommand implements TabExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("resync.command")) {
+        boolean authorityExport = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
+            && "export".equalsIgnoreCase(args[1]);
+        boolean authorityAnchor = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
+            && ("anchor".equalsIgnoreCase(args[1]) || "export-anchor".equalsIgnoreCase(args[1]));
+        boolean authorityGrant = args.length >= 2 && "authority".equalsIgnoreCase(args[0])
+            && "grant".equalsIgnoreCase(args[1]);
+        boolean allowed = authorityExport ? hasAuthorityExportPermission(sender)
+            : authorityAnchor ? hasAuthorityAnchorPermission(sender)
+            : authorityGrant ? hasAuthorityGrantPermission(sender)
+            : sender.hasPermission("resync.command");
+        if (!allowed) {
             sendError(sender, "No permission");
             return true;
         }
@@ -122,21 +147,35 @@ public class ReSyncCommand implements TabExecutor {
             return true;
         }
         try {
-            plugin.reloadNetworkState();
-            sendSuccess(sender, "Network Sync Reloaded");
+            plugin.reloadNetworkState().whenComplete((unused, failure) -> {
+                if (failure == null) {
+                    sendSuccess(sender, "Network Sync Reloaded");
+                } else {
+                    Throwable cause = failure;
+                    while (cause.getCause() != null && cause.getCause() != cause) {
+                        cause = cause.getCause();
+                    }
+                    sendError(sender, "Network Sync Reload Failed", cause.getMessage() == null
+                        ? cause.getClass().getSimpleName() : cause.getMessage());
+                }
+            });
         } catch (Exception exception) {
             sendError(sender, "Network Sync Reload Failed", exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage());
         }
         return true;
     }
 
-    private boolean handleStatus(CommandSender sender) {
+    private boolean handleStatus(CommandSender sender, String[] args) {
         ReSyncServer server = plugin.getReSyncServer();
         if (server == null) {
             sendError(sender, "Server Not Initialized");
             return true;
         }
-        Map<String, Object> status = server.readinessSnapshot();
+        if (args.length == 2 && "reset".equalsIgnoreCase(args[1])) {
+            TemporaryLifecycleDiagnostics.resetExecutionTimings();
+            sendInfo(sender, "Timing Samples Reset");
+        }
+        Map<String, Object> status = server.statusSnapshot();
         sendInfo(sender, "ReSync Status");
         sendInfo(sender, "API", Boolean.TRUE.equals(status.get("apiEnabled")) ? "Enabled" : "Disabled");
         sendInfo(sender, "Bind", String.valueOf(status.get("bindHost")));
@@ -145,7 +184,141 @@ public class ReSyncCommand implements TabExecutor {
         sendInfo(sender, "Open Connections", String.valueOf(status.get("openConnections")));
         sendInfo(sender, "Queue", status.get("queueMaxGlobalRequests") + " global / " + status.get("queueMaxRequestsPerClient") + " per client");
         sendInfo(sender, "Memory", status.get("sessionMemoryBytes") + "/" + status.get("sessionMemoryLimitBytes"));
+        TemporaryLifecycleDiagnostics.HotPathSnapshot hotPath = TemporaryLifecycleDiagnostics.hotPathSnapshot();
+        sendInfo(sender, "Resident Plans", hotPath.residentPlanHits() + " hits · " + hotPath.residentPlanMisses()
+            + " misses · " + hotPath.residentPlanReplacements() + " replacements · "
+            + hotPath.residentPlanInvalidations() + " invalidations");
+        sendInfo(sender, "Execution Phases", String.format(Locale.ROOT,
+            "%.1f µs cancellation · %.1f µs deferred · %d deferred batches · %d filesystem validations",
+            hotPath.averageSynchronousCancellationPrefixMicros(), hotPath.averageDeferredExecutionMicros(),
+            hotPath.deferredBatches(), hotPath.filesystemValidationAttempts()));
+        FlowRuntimeModule flowRuntime = flowRuntimeModule();
+        if (flowRuntime != null) {
+            FlowRuntimeModule.CompiledRuntimeDiagnostics compiled = flowRuntime.compiledRuntimeDiagnostics();
+            sendInfo(sender, "Execution Templates", compiled.templatePreparations() + " prepared · "
+                + compiled.residentPlans() + " resident · " + compiled.activeInvocations() + " active invocations · "
+                + compiled.activePlanLeases() + " active leases");
+        }
+        for (TemporaryLifecycleDiagnostics.ExecutionPhase phase : TemporaryLifecycleDiagnostics.ExecutionPhase.values()) {
+            TemporaryLifecycleDiagnostics.Timing timing = TemporaryLifecycleDiagnostics.executionTiming(phase);
+            sendInfo(sender, phase.label(), String.format(Locale.ROOT,
+                "%d samples (%d retained) · p95 %.3f ms · p99 %.3f ms · max %.3f ms",
+                timing.observed(), timing.retained(), timing.p95Nanos() / 1_000_000.0,
+                timing.p99Nanos() / 1_000_000.0, timing.maximumNanos() / 1_000_000.0));
+        }
         return true;
+    }
+
+    private boolean handleAuthority(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendUsageLine(sender, "/resync authority export");
+            sendUsageLine(sender, "/resync authority export-anchor");
+            sendUsageLine(sender, "/resync authority grant <migrationId> <sourcePath> <invocationHash> <planPreimageOrFile> <grantId>");
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        return switch (action) {
+            case "export" -> handleAuthorityBundleExport(sender, args);
+            case "anchor", "export-anchor" -> handleAuthorityAnchorExport(sender, args);
+            case "grant" -> handleAuthorityGrant(sender, args);
+            default -> {
+                sendUsageLine(sender, "/resync authority <export|export-anchor|grant> ...");
+                yield true;
+            }
+        };
+    }
+
+    private boolean handleAuthorityBundleExport(CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sendUsageLine(sender, "/resync authority export");
+            return true;
+        }
+        if (!hasAuthorityExportPermission(sender)) {
+            sendError(sender, "No permission");
+            return true;
+        }
+        ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server Not Initialized");
+            return true;
+        }
+        try {
+            ProductionAuthorityBundle bundle = server.exportProductionAuthorityBundle();
+            sendSuccess(sender, "Authority Bundle Exported", ProductionAuthorityBundle.AUTHORITY_DIRECTORY + "/"
+                + ProductionAuthorityBundle.AUTHORITY_FILE + " " + bundle.bundleHash());
+        } catch (IOException | RuntimeException exception) {
+            String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+            sendError(sender, "Authority Bundle Unavailable", detail);
+        }
+        return true;
+    }
+
+    private boolean handleAuthorityAnchorExport(CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sendUsageLine(sender, "/resync authority export-anchor");
+            return true;
+        }
+        if (!hasAuthorityAnchorPermission(sender)) {
+            sendError(sender, "No permission");
+            return true;
+        }
+        ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server Not Initialized");
+            return true;
+        }
+        try {
+            server.exportProductionAuthorityTrustAnchor(AUTHORITY_ANCHOR_RELATIVE_PATH);
+            sendSuccess(sender, "Authority Trust Anchor Exported", AUTHORITY_ANCHOR_RELATIVE_PATH);
+        } catch (IOException | RuntimeException exception) {
+            String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+            sendError(sender, "Authority Trust Anchor Unavailable", detail);
+        }
+        return true;
+    }
+
+    private boolean handleAuthorityGrant(CommandSender sender, String[] args) {
+        if (args.length != 7) {
+            sendUsageLine(sender, "/resync authority grant <migrationId> <sourcePath> <invocationHash> <planPreimageOrFile> <grantId>");
+            return true;
+        }
+        if (!hasAuthorityGrantPermission(sender)) {
+            sendError(sender, "No permission");
+            return true;
+        }
+        ReSyncServer server = plugin.getReSyncServer();
+        if (server == null) {
+            sendError(sender, "Server Not Initialized");
+            return true;
+        }
+        try {
+            Path source = Path.of(args[3]);
+            Path preimage = Path.of(args[5]);
+            AuthorityUseGrant grant;
+            if (Files.exists(preimage, LinkOption.NOFOLLOW_LINKS)) {
+                grant = server.issueProductionAuthorityUseGrantFromPlanPreimage(source, args[2], args[4], preimage, args[6]);
+            } else {
+                grant = server.issueProductionAuthorityUseGrant(source, args[2], args[4], args[5], args[6]);
+            }
+            Path target = server.productionAuthorityUseGrantPath(grant.grantId());
+            sendSuccess(sender, "Authority Use Grant Issued", target + " " + grant.grantHash());
+        } catch (IOException | RuntimeException exception) {
+            String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+            sendError(sender, "Authority Use Grant Unavailable", detail);
+        }
+        return true;
+    }
+
+    private boolean hasAuthorityExportPermission(CommandSender sender) {
+        return sender.hasPermission("resync.authority.export");
+    }
+
+    private boolean hasAuthorityAnchorPermission(CommandSender sender) {
+        return sender.hasPermission("resync.authority.anchor");
+    }
+
+    private boolean hasAuthorityGrantPermission(CommandSender sender) {
+        return sender.hasPermission("resync.authority.grant");
     }
 
     private boolean handleQuickEdit(CommandSender sender) {
@@ -228,7 +401,8 @@ public class ReSyncCommand implements TabExecutor {
             sendError(sender, "Item Create Failed", itemId);
             return true;
         }
-        target.getInventory().addItem(item);
+        PaperPlayerDataMutationAdmission.shared().mutatePlayer("command-item-give:" + target.getUniqueId(), target,
+            () -> target.getInventory().addItem(item));
         sendSuccess(sender, "Item Given", itemId + " -> " + target.getName() + " x" + amount);
         return true;
     }
@@ -582,19 +756,8 @@ public class ReSyncCommand implements TabExecutor {
         type = resourceTypeAlias(type);
         String id = requiredArg(sender, args, 3, usage);
         if (id == null) return true;
-        FlowModule flowModule = flowModule();
-        if (flowModule == null || !flowModule.supportsResourceActivation(type)) {
-            sendError(sender, "Resource Type Unavailable", type);
-            return true;
-        }
-        try {
-            flowModule.setResourceEnabled(type, id, enabled);
-        } catch (RuntimeException exception) {
-            sendError(sender, enabled ? "Resource Enable Failed" : "Resource Disable Failed",
-                "Resource not found".equals(exception.getMessage()) ? id : "Review this resource and try again");
-            return true;
-        }
-        sendSuccess(sender, enabled ? "Resource Enabled" : "Resource Disabled", id);
+        sendError(sender, enabled ? "Resource Enable Unavailable" : "Resource Disable Unavailable",
+            FlowModule.LEGACY_RESOURCE_MUTATION_UNAVAILABLE);
         return true;
     }
 
@@ -757,7 +920,9 @@ public class ReSyncCommand implements TabExecutor {
         }
         DialogService service = plugin.getReSyncServer().getModuleContext().getService(DialogService.class);
         if (service == null) {
-            service = new DialogService(plugin, storage, getStorage(), plugin.getReSyncServer().getFlowExecutor());
+            FlowStorage flowStorage = getStorage();
+            service = new DialogService(plugin, storage, flowStorage, plugin.getReSyncServer().getFlowExecutor(), null, null,
+                flowStorage != null ? flowStorage.legacyRuntimeGate() : null);
         }
         if (!service.supported()) {
             sendError(sender, "Dialog API Unavailable", "Paper 1.21.7+ is required");
@@ -863,39 +1028,15 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private void createResource(ReSyncJsonResourceStorage storage, String type, JsonObject resource) {
-        FlowModule flowModule = flowModule();
-        if (flowModule != null && flowModule.resourceTypes().contains(type)) {
-            flowModule.createResource(type, resource);
-            return;
-        }
-        if (storage == null) {
-            throw new IllegalArgumentException("Resource storage unavailable");
-        }
-        storage.save(type, resource);
+        throw new IllegalArgumentException(FlowModule.LEGACY_RESOURCE_MUTATION_UNAVAILABLE);
     }
 
     private void updateResource(ReSyncJsonResourceStorage storage, String type, JsonObject resource) {
-        FlowModule flowModule = flowModule();
-        if (flowModule != null && flowModule.resourceTypes().contains(type)) {
-            flowModule.updateResource(type, resource);
-            return;
-        }
-        if (storage == null) {
-            throw new IllegalArgumentException("Resource storage unavailable");
-        }
-        storage.save(type, resource);
+        throw new IllegalArgumentException(FlowModule.LEGACY_RESOURCE_MUTATION_UNAVAILABLE);
     }
 
     private void deleteResource(ReSyncJsonResourceStorage storage, String type, String id) {
-        FlowModule flowModule = flowModule();
-        if (flowModule != null && flowModule.resourceTypes().contains(type)) {
-            flowModule.deleteResource(type, id);
-            return;
-        }
-        if (storage == null) {
-            throw new IllegalArgumentException("Resource storage unavailable");
-        }
-        storage.delete(type, id);
+        throw new IllegalArgumentException(FlowModule.LEGACY_RESOURCE_MUTATION_UNAVAILABLE);
     }
 
     private List<String> resourceFieldOptions(String type) {
@@ -1403,6 +1544,9 @@ public class ReSyncCommand implements TabExecutor {
             sendInfo(sender, "Inventory Completion", Boolean.TRUE.equals(diagnostics.get("inventoryComplete")) ? "Ready" : "Incomplete");
             sendInfo(sender, "Node Dispositions", diagnosticMap(diagnostics.get("nodeDispositions")));
             sendInfo(sender, "Resource Dispositions", diagnosticMap(diagnostics.get("resourceDispositions")));
+            if (diagnostics.get("catalogPublication") instanceof Map<?, ?> publication) {
+                sendInfo(sender, "Catalog Dispatch", diagnosticMap(publication));
+            }
             return true;
         }
         if (!"reload".equals(sub)) {
@@ -1485,11 +1629,7 @@ public class ReSyncCommand implements TabExecutor {
             return filter(List.of("show", "hide", "list", "default"), args[1]);
         }
         if (args.length == 3 && "default".equalsIgnoreCase(args[1])) {
-            FlowStorage storage = getStorage();
-            if (storage == null) {
-                return List.of();
-            }
-            List<String> options = new ArrayList<>(storage.listScoreboardIds());
+            List<String> options = new ArrayList<>(runtimeScoreboardIds());
             options.add("none");
             return filter(options, args[2]);
         }
@@ -1500,11 +1640,7 @@ public class ReSyncCommand implements TabExecutor {
             return filter(onlinePlayers(), args[2]);
         }
         if (args.length == 4 && "show".equalsIgnoreCase(args[1])) {
-            FlowStorage storage = getStorage();
-            if (storage == null) {
-                return List.of();
-            }
-            return filter(storage.listScoreboardIds(), args[3]);
+            return filter(runtimeScoreboardIds(), args[3]);
         }
         if (args.length == 5 && "show".equalsIgnoreCase(args[1])) {
             return filter(booleanOptions(), args[4]);
@@ -1702,18 +1838,24 @@ public class ReSyncCommand implements TabExecutor {
     }
 
     private boolean handleScoreboard(CommandSender sender, String[] args) {
+        try {
+            return handleScoreboardOperation(sender, args);
+        } catch (RuntimeException failure) {
+            String detail = failure.getMessage();
+            sendError(sender, "Scoreboard Operation Failed",
+                detail == null || detail.isBlank() ? failure.getClass().getSimpleName() : detail);
+            return true;
+        }
+    }
+
+    private boolean handleScoreboardOperation(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sendUsage(sender);
             return true;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
         if ("list".equals(action)) {
-            FlowStorage storage = getStorage();
-            if (storage == null) {
-                sendError(sender, "Flow Storage Unavailable");
-                return true;
-            }
-            List<String> ids = storage.listScoreboardIds();
+            List<String> ids = ScoreboardTemplateManager.listRuntimeScoreboardIds();
             if (ids.isEmpty()) {
                 sendInfo(sender, "No Scoreboards Found");
             } else {
@@ -1768,25 +1910,27 @@ public class ReSyncCommand implements TabExecutor {
             sendUsage(sender);
             return true;
         }
-        FlowStorage storage = getStorage();
-        if (storage == null) {
-            sendError(sender, "Flow Storage Unavailable");
-            return true;
-        }
         String scoreboardId = args[3];
-        ScoreboardDefinition definition = storage.getScoreboard(scoreboardId);
-        if (definition == null) {
+        if (ScoreboardTemplateManager.getRuntimeScoreboard(scoreboardId) == null) {
             sendError(sender, "Scoreboard Not Found", scoreboardId);
             return true;
         }
         boolean usePapi = args.length < 5 || Boolean.parseBoolean(args[4]);
-        boolean applied = ScoreboardTemplateManager.showTemplate(target, definition, usePapi);
+        boolean applied = ScoreboardTemplateManager.showTemplate(target, scoreboardId, usePapi);
         if (applied) {
             sendSuccess(sender, "Scoreboard Applied", scoreboardId + " -> " + target.getName());
         } else {
             sendError(sender, "Scoreboard Apply Failed", scoreboardId);
         }
         return true;
+    }
+
+    private List<String> runtimeScoreboardIds() {
+        try {
+            return ScoreboardTemplateManager.listRuntimeScoreboardIds();
+        } catch (RuntimeException failure) {
+            return List.of();
+        }
     }
 
     private boolean handleTab(CommandSender sender, String[] args) {
@@ -3701,6 +3845,7 @@ public class ReSyncCommand implements TabExecutor {
         }
         List<String> actions = switch (normalized) {
             case "network" -> List.of("reload");
+            case "authority" -> List.of("export", "export-anchor", "grant");
             case "scoreboard" -> List.of("list", "show", "hide", "default");
             case "tab" -> List.of("list", "apply", "clear", "default", "interval");
             case "world" -> List.of("list", "info", "create", "load", "unload", "clone", "delete", "profile", "group", "sign", "tp");

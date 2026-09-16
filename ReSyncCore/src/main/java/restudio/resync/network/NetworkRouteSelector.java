@@ -1,9 +1,9 @@
 package restudio.resync.network;
 
+import restudio.resync.contract.canonical.CanonicalDigests;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -32,17 +32,12 @@ public final class NetworkRouteSelector {
 
     private static double weightedScore(UUID playerId, String groupId, NetworkRoutingCandidate candidate, Map<String, Integer> weights) {
         int weight = weights.getOrDefault(candidate.nodeId(), 1);
-        byte[] digest;
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            messageDigest.update(playerId.toString().getBytes(StandardCharsets.UTF_8));
-            messageDigest.update((byte) 0);
-            messageDigest.update(groupId.getBytes(StandardCharsets.UTF_8));
-            messageDigest.update((byte) 0);
-            digest = messageDigest.digest(candidate.nodeId().getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 Is Not Available", exception);
-        }
+        byte[] digest = CanonicalDigests.sha256(
+            playerId.toString().getBytes(StandardCharsets.UTF_8),
+            new byte[]{0},
+            groupId.getBytes(StandardCharsets.UTF_8),
+            new byte[]{0},
+            candidate.nodeId().getBytes(StandardCharsets.UTF_8));
         long bits = ByteBuffer.wrap(digest).getLong() >>> 11;
         double uniform = (bits + 1.0) / ((1L << 53) + 1.0);
         return -Math.log(uniform) / weight;

@@ -1,0 +1,2697 @@
+[
+  {
+    "id": "block_properties",
+    "displayName": "Block Properties",
+    "description": "Read typed properties from a target block.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.properties"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "query"
+    ],
+    "examples": [
+      "Use block properties to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "operation": "get"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "type",
+          "target": "type"
+        },
+        {
+          "direction": "output",
+          "source": "data",
+          "target": "data"
+        },
+        {
+          "direction": "output",
+          "source": "light_level",
+          "target": "light_level"
+        },
+        {
+          "direction": "output",
+          "source": "biome",
+          "target": "biome"
+        },
+        {
+          "direction": "output",
+          "source": "temperature",
+          "target": "temperature"
+        },
+        {
+          "direction": "output",
+          "source": "humidity",
+          "target": "humidity"
+        },
+        {
+          "direction": "output",
+          "source": "is_solid",
+          "target": "is_solid"
+        },
+        {
+          "direction": "output",
+          "source": "is_liquid",
+          "target": "is_liquid"
+        },
+        {
+          "direction": "output",
+          "source": "is_air",
+          "target": "is_air"
+        },
+        {
+          "direction": "output",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "output",
+          "source": "world",
+          "target": "world"
+        },
+        {
+          "direction": "output",
+          "source": "x",
+          "target": "x"
+        },
+        {
+          "direction": "output",
+          "source": "y",
+          "target": "y"
+        },
+        {
+          "direction": "output",
+          "source": "z",
+          "target": "z"
+        },
+        {
+          "direction": "output",
+          "source": "break_naturally",
+          "target": "break_naturally"
+        },
+        {
+          "direction": "output",
+          "source": "state",
+          "target": "state"
+        },
+        {
+          "direction": "output",
+          "source": "container_items",
+          "target": "container_items"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Property name used for this operation.",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "type",
+          "data",
+          "light_level",
+          "biome",
+          "temperature",
+          "humidity",
+          "is_solid",
+          "is_liquid",
+          "is_air",
+          "break_naturally",
+          "location",
+          "world",
+          "x",
+          "y",
+          "z",
+          "state",
+          "container_items"
+        ],
+        "defaultValue": "type"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the has value produced by this operation.",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "id": "type",
+        "displayName": "Type",
+        "name": "type",
+        "pinType": "DATA",
+        "dataType": "material",
+        "direction": "output",
+        "description": "Returns the type value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "type"
+        }
+      },
+      {
+        "id": "data",
+        "displayName": "Data",
+        "name": "data",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the data value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "data"
+        }
+      },
+      {
+        "id": "light_level",
+        "displayName": "Light Level",
+        "name": "light_level",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the light level value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "light_level"
+        }
+      },
+      {
+        "id": "biome",
+        "displayName": "Biome",
+        "name": "biome",
+        "pinType": "DATA",
+        "dataType": "biome",
+        "direction": "output",
+        "description": "Returns the biome value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "biome"
+        }
+      },
+      {
+        "id": "temperature",
+        "displayName": "Temperature",
+        "name": "temperature",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the temperature value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "temperature"
+        }
+      },
+      {
+        "id": "humidity",
+        "displayName": "Humidity",
+        "name": "humidity",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the humidity value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "humidity"
+        }
+      },
+      {
+        "id": "is_solid",
+        "displayName": "Is Solid",
+        "name": "is_solid",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the is solid value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_solid"
+        }
+      },
+      {
+        "id": "is_liquid",
+        "displayName": "Is Liquid",
+        "name": "is_liquid",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the is liquid value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_liquid"
+        }
+      },
+      {
+        "id": "is_air",
+        "displayName": "Is Air",
+        "name": "is_air",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the is air value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_air"
+        }
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "output",
+        "description": "Returns the location value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "location"
+        }
+      },
+      {
+        "id": "world",
+        "displayName": "World",
+        "name": "world",
+        "pinType": "DATA",
+        "dataType": "world",
+        "direction": "output",
+        "description": "Returns the world value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "world"
+        }
+      },
+      {
+        "id": "x",
+        "displayName": "X",
+        "name": "x",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the x value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "x"
+        }
+      },
+      {
+        "id": "y",
+        "displayName": "Y",
+        "name": "y",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the y value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "y"
+        }
+      },
+      {
+        "id": "z",
+        "displayName": "Z",
+        "name": "z",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the z value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "z"
+        }
+      },
+      {
+        "id": "break_naturally",
+        "displayName": "Break Naturally",
+        "name": "break_naturally",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Returns the break naturally value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "break_naturally"
+        }
+      },
+      {
+        "id": "state",
+        "displayName": "State",
+        "name": "state",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Returns the state value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "state"
+        }
+      },
+      {
+        "id": "container_items",
+        "displayName": "Container Items",
+        "name": "container_items",
+        "pinType": "DATA",
+        "dataType": "list<itemstack>",
+        "direction": "output",
+        "description": "Returns the container items value produced by this operation.",
+        "visibleWhen": {
+          "action": "get",
+          "property": "container_items"
+        }
+      }
+    ]
+  },
+  {
+    "id": "block_actions",
+    "displayName": "Block Actions",
+    "description": "Run supported block property actions against a target block.",
+    "domain": "block",
+    "family": "block_action",
+    "lifecycle": "active",
+    "handlerCapability": "block.family",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.actions"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Connect Flow to run block actions when a block property must change."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "block",
+    "handlerConfig": {
+      "operation": "set"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "property",
+          "target": "property"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "input",
+        "description": "Starts this operation when the execution route is reached."
+      },
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "id": "property",
+        "displayName": "Property",
+        "name": "property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Property name used for this operation.",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "type",
+          "data",
+          "light_level",
+          "biome",
+          "temperature",
+          "humidity",
+          "is_solid",
+          "is_liquid",
+          "is_air",
+          "break_naturally",
+          "location",
+          "world",
+          "x",
+          "y",
+          "z",
+          "state",
+          "container_items"
+        ],
+        "defaultValue": "type"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "any",
+        "direction": "input",
+        "description": "Value to apply to the selected property.",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Continues execution after this operation completes."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Returns the success value produced by this operation.",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ]
+  },
+  {
+    "id": "block_type",
+    "displayName": "Block Type",
+    "description": "Read or update the block type through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.set.block-type",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.type"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Connect Flow to read or update a block's type."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "type",
+      "operation": "set"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "output_value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Value to apply to the selected property.",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_data",
+    "displayName": "Block Data",
+    "description": "Read the block data property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-data",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.data"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block data to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "data",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_light_level",
+    "displayName": "Block Light Level",
+    "description": "Read the block light level property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-light-level",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.light_level"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block light level to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "light_level",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_biome",
+    "displayName": "Block Biome",
+    "description": "Read or update the block biome through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.set.block-biome",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.biome"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Connect Flow to read or update a block's biome."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "biome",
+      "operation": "set"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "input",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "output_value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Value to apply to the selected property.",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_temperature",
+    "displayName": "Block Temperature",
+    "description": "Read the block temperature property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-temperature",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.temperature"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block temperature to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "temperature",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_humidity",
+    "displayName": "Block Humidity",
+    "description": "Read the block humidity property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-humidity",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.humidity"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block humidity to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "humidity",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_property_is_solid",
+    "displayName": "Block Is Solid",
+    "description": "Read the block is solid property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-property-is-solid",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.is_solid"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block is solid to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_solid",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_is_liquid",
+    "displayName": "Block Is Liquid",
+    "description": "Read the block is liquid property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-is-liquid",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.is_liquid"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block is liquid to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_liquid",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_is_air",
+    "displayName": "Block Is Air",
+    "description": "Read the block is air property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-is-air",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.is_air"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block is air to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "is_air",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_property_break_naturally",
+    "displayName": "Block Break Naturally",
+    "description": "Run the block break naturally action through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.break_naturally"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Connect Flow to run block break naturally for a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_mutation",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "break_naturally",
+      "operation": "do"
+    },
+    "destructive": true,
+    "confirmationPolicy": "explicit_flow_intent",
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "do"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_location",
+    "displayName": "Block Location",
+    "description": "Read the block location property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-location",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.location"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block location to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "location",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "location",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_world",
+    "displayName": "Block World",
+    "description": "Read the block world property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-world",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.world"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block world to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "world",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "world",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_x",
+    "displayName": "Block X",
+    "description": "Read the block x property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-x",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.x"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block x to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "x",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_y",
+    "displayName": "Block Y",
+    "description": "Read the block y property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-y",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.y"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block y to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "y",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  },
+  {
+    "id": "block_z",
+    "displayName": "Block Z",
+    "description": "Read the block z property through the canonical block family.",
+    "domain": "block",
+    "family": "block_properties",
+    "lifecycle": "active",
+    "handlerCapability": "block.family.get.block-z",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": [
+      "block.z"
+    ],
+    "category": "BLOCK",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "block",
+      "property",
+      "action"
+    ],
+    "examples": [
+      "Use block z to read or inspect a target block."
+    ],
+    "authorizationPolicy": "trusted_server_flow",
+    "auditPolicy": "block_read",
+    "handler": "block",
+    "handlerConfig": {
+      "property": "z",
+      "operation": "get"
+    },
+    "hidden": true,
+    "hiddenReason": "Compatibility descriptor retained behind the canonical block family.",
+    "canonicalId": "block_properties",
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "target",
+          "target": "target"
+        },
+        {
+          "direction": "input",
+          "source": "action",
+          "target": "action"
+        },
+        {
+          "direction": "output",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "direction": "output",
+          "source": "success",
+          "target": "success"
+        },
+        {
+          "direction": "output",
+          "source": "has",
+          "target": "has"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "target",
+        "displayName": "Target",
+        "name": "target",
+        "pinType": "DATA",
+        "dataType": "block",
+        "direction": "input",
+        "description": "Block selected for this operation."
+      },
+      {
+        "id": "action",
+        "displayName": "Action",
+        "name": "action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "direction": "input",
+        "description": "Action to apply to the selected target.",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "value",
+        "displayName": "Value",
+        "name": "value",
+        "pinType": "DATA",
+        "dataType": "number",
+        "direction": "output",
+        "description": "Value read from the selected property."
+      },
+      {
+        "id": "success",
+        "displayName": "Success",
+        "name": "success",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "Operation success"
+      },
+      {
+        "id": "has",
+        "displayName": "Has",
+        "name": "has",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "direction": "output",
+        "description": "True when the requested value is available."
+      },
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "direction": "output",
+        "description": "Flow continuing after the operation."
+      }
+    ]
+  }
+]

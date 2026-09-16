@@ -1,0 +1,163 @@
+[
+  {
+    "id": "core.result.success",
+    "displayName": "Successful Result",
+    "description": "Create a successful result containing a typed value.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.success"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "success", "value"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "success"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Typed value to include in the successful result."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<type:t>", "description": "Result containing the supplied typed value."}
+    ]
+  },
+  {
+    "id": "core.result.failure",
+    "displayName": "Failed Result",
+    "description": "Create a failed result with a clear error code, message, and optional details.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.failure"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "failure", "error"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "failure"},
+    "inputs": [
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "defaultValue": "FAILED", "description": "Code identifying why the operation failed."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "defaultValue": "Operation Failed", "description": "Message explaining why the operation failed."},
+      {"id": "details", "displayName": "Details", "name": "details", "dataType": "map<string,any>", "optional": true, "description": "Additional details describing the failure."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<any>", "description": "Failed result containing the error information."}
+    ]
+  },
+  {
+    "id": "core.result.is_success",
+    "displayName": "Result Succeeded",
+    "description": "Check whether a result completed successfully.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.is_success"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "success", "check"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "is_success"},
+    "inputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<type:t>", "description": "Result whose successful state should be checked."}
+    ],
+    "outputs": [
+      {"id": "success", "displayName": "Success", "name": "success", "dataType": "boolean", "description": "Whether the result completed successfully."}
+    ]
+  },
+  {
+    "id": "core.result.value",
+    "displayName": "Result Value",
+    "description": "Read the typed value from a successful result.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.value"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "value", "unwrap"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "value"},
+    "inputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<type:t>", "description": "Result whose successful value should be read."}
+    ],
+    "outputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Typed value when the result is successful."},
+      {"id": "available", "displayName": "Available", "name": "available", "dataType": "boolean", "description": "Whether a successful value is available."}
+    ]
+  },
+  {
+    "id": "core.result.error",
+    "displayName": "Result Error",
+    "description": "Read the error information from a failed result.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.error"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["result", "error", "message", "details"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "error"},
+    "inputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<any>", "description": "Failed result whose error information should be read."}
+    ],
+    "outputs": [
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Error code from the failed result."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Message from the failed result."},
+      {"id": "details", "displayName": "Details", "name": "details", "dataType": "map<string,any>", "description": "Additional details from the failed result."}
+    ]
+  },
+  {
+    "id": "core.result.match",
+    "displayName": "Match Result",
+    "description": "Continue through Success or Failure and expose the typed value or error information.",
+    "domain": "core",
+    "family": "result",
+    "lifecycle": "active",
+    "handlerCapability": "result",
+    "selectorIntent": "typed-result",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "legacyIds": ["result.match"],
+    "category": "LOGIC",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": ["result", "match", "branch", "success", "failure"],
+    "handler": "ResultHandler",
+    "handlerConfig": {"operation": "match"},
+    "inputs": [
+      {"id": "flow", "displayName": "Flow", "name": "flow", "pinType": "FLOW", "dataType": "execution", "description": "Starts result matching when execution reaches this node."},
+      {"id": "result", "displayName": "Result", "name": "result", "dataType": "result<type:t>", "description": "Result to route through its success or failure branch."}
+    ],
+    "outputs": [
+      {"id": "success", "displayName": "Success", "name": "success", "pinType": "FLOW", "dataType": "execution", "description": "Continues execution when the result is successful."},
+      {"id": "failure", "displayName": "Failure", "name": "failure", "pinType": "FLOW", "dataType": "execution", "description": "Continues execution when the result has failed."},
+      {"id": "value", "displayName": "Value", "name": "value", "dataType": "type:t", "description": "Typed value exposed for a successful result."},
+      {"id": "error_code", "displayName": "Error Code", "name": "error_code", "dataType": "string", "description": "Error code exposed for a failed result."},
+      {"id": "message", "displayName": "Message", "name": "message", "dataType": "string", "description": "Message exposed for a failed result."},
+      {"id": "details", "displayName": "Details", "name": "details", "dataType": "map<string,any>", "description": "Failure details exposed for a failed result."}
+    ]
+  }
+]

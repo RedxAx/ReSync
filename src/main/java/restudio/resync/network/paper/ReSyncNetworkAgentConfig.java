@@ -4,9 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -15,6 +14,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.IntStream;
+import restudio.resync.migration.MigrationPaths;
 
 public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, ResourcePolicy resources, List<PathPolicy> pathSyncs, String networkId, String nodeId, String displayName, String hubUrl, String enrollmentToken, String credential, int capacity, int maximumFrameBytes, int maximumPayloadBytes, long heartbeatIntervalTicks, long reconnectDelayTicks, Tls tls, Path credentialFile) {
     public ReSyncNetworkAgentConfig {
@@ -59,21 +59,40 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
 
     public static ReSyncNetworkAgentConfig load(Path dataDirectory) throws IOException {
         Path root = dataDirectory.toAbsolutePath().normalize();
-        Path propertiesFile = root.resolve("resync.properties");
+        return load(root, root);
+    }
+
+    public static ReSyncNetworkAgentConfig load(Path operatorDataDirectory, Path activeDataDirectory) throws IOException {
+        Path operatorRoot = operatorDataDirectory.toAbsolutePath().normalize();
+        Path activeRoot = activeDataDirectory.toAbsolutePath().normalize();
+        Path propertiesFile = operatorRoot.resolve("resync.properties");
         Properties properties = new Properties();
         if (Files.exists(propertiesFile)) {
             try (InputStream input = Files.newInputStream(propertiesFile)) {
                 properties.load(input);
             }
         }
-        Path credentialFile = root.resolve(properties.getProperty("network.credential-file", "network/node.credential")).normalize();
-        if (!credentialFile.startsWith(root)) {
-            throw new IllegalArgumentException("ReSync Network Credential File Must Stay Inside The Plugin Directory");
+        Path credentialFile = activeRoot.resolve(properties.getProperty("network.credential-file", "network/node.credential")).normalize();
+        Path networkRoot = activeRoot.resolve("network").normalize();
+        if (!credentialFile.getParent().equals(networkRoot)) {
+            throw new IllegalArgumentException("ReSync Network Credential File Must Stay Inside The Network Persistence Root");
         }
-        String credential = Files.exists(credentialFile) ? Files.readString(credentialFile).trim() : "";
+        try {
+            MigrationPaths.requirePath(credentialFile, "credentialFile");
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("ReSync Network Credential File Is Invalid", exception);
+        }
+        String credential = "";
+        if (Files.exists(credentialFile, LinkOption.NOFOLLOW_LINKS)) {
+            if (Files.isSymbolicLink(credentialFile)
+                || !Files.isRegularFile(credentialFile, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("ReSync Network Credential File Is Invalid");
+            }
+            credential = Files.readString(credentialFile).trim();
+        }
         String trustStoreValue = properties.getProperty("network.tls.trust-store", "").trim();
-        Path trustStore = trustStoreValue.isBlank() ? null : root.resolve(trustStoreValue).normalize();
-        if (trustStore != null && !trustStore.startsWith(root)) {
+        Path trustStore = trustStoreValue.isBlank() ? null : operatorRoot.resolve(trustStoreValue).normalize();
+        if (trustStore != null && !trustStore.startsWith(operatorRoot)) {
             throw new IllegalArgumentException("ReSync Network Trust Store Must Stay Inside The Plugin Directory");
         }
         String passwordEnvironment = properties.getProperty("network.tls.trust-store-password-env", "RESYNC_NETWORK_TRUSTSTORE_PASSWORD").trim();
@@ -104,32 +123,6 @@ public record ReSyncNetworkAgentConfig(boolean enabled, ChatPolicy chat, Resourc
 
     public boolean pathsEnabled() {
         return pathSyncs.stream().anyMatch(PathPolicy::enabled);
-    }
-
-    public void saveCredential(String value) throws IOException {
-        String credential = normalize(value);
-        if (credential.isBlank()) {
-            throw new IllegalArgumentException("ReSync Network Credential Is Required");
-        }
-        Path parent = credentialFile.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Path temporary = credentialFile.resolveSibling(credentialFile.getFileName() + ".tmp");
-        Files.writeString(temporary, credential);
-        try {
-            Files.setPosixFilePermissions(temporary, Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
-        } catch (UnsupportedOperationException ignored) {
-        }
-        try {
-            Files.move(temporary, credentialFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException exception) {
-            Files.move(temporary, credentialFile, StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    public void clearCredential() throws IOException {
-        Files.deleteIfExists(credentialFile);
     }
 
     public record Tls(boolean enabled, Path trustStore, String trustStorePassword) {

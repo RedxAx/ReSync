@@ -38,6 +38,7 @@ import restudio.resync.customcontent.CustomContentService;
 import restudio.resync.customization.ReSyncJsonResourceStorage;
 import restudio.resync.flow.util.TextFormatter;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class LootTableService implements Listener {
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
     private static final GsonComponentSerializer COMPONENT_SERIALIZER = GsonComponentSerializer.gson();
     private final ReSyncJsonResourceStorage storage;
     private final CustomContentService customContentService;
@@ -292,9 +294,8 @@ public class LootTableService implements Listener {
         }
         List<ItemStack> items = generate(id, context);
         if (player != null) {
-            for (ItemStack item : items) {
-                player.getInventory().addItem(item);
-            }
+            playerDataAdmission.mutatePlayer("loot-table-give:" + player.getUniqueId(), player,
+                () -> items.forEach(item -> player.getInventory().addItem(item)));
         }
         return items;
     }

@@ -19,6 +19,10 @@ public class AsyncStorageExecutor {
     private final List<CompletableFuture<Void>> pending = Collections.synchronizedList(new ArrayList<>());
 
     public void submit(Runnable task) {
+        submitTracked(task);
+    }
+
+    public CompletableFuture<Void> submitTracked(Runnable task) {
         CompletableFuture<Void> future = CompletableFuture.runAsync(task, executor)
             .exceptionally(error -> {
                 Log.warn("Async storage write failed: " + error.getMessage());
@@ -26,6 +30,7 @@ public class AsyncStorageExecutor {
             });
         pending.add(future);
         future.whenComplete((ignored, error) -> pending.remove(future));
+        return future;
     }
 
     public void flush() {

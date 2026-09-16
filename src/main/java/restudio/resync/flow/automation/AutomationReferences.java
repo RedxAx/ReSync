@@ -1,6 +1,7 @@
 package restudio.resync.flow.automation;
 
 import restudio.flow.data.FlowResourceReference;
+import restudio.resync.flow.identity.ServerResourceLocator;
 
 import java.util.Map;
 
@@ -10,6 +11,7 @@ public final class AutomationReferences {
 
     public static String id(Object value) {
         return switch (value) {
+            case ServerResourceLocator locator -> locator.id();
             case FlowResourceReference reference -> reference.id();
             case Map<?, ?> map when map.get("id") != null -> map.get("id").toString();
             case Map<?, ?> map when map.get("resourceId") != null -> map.get("resourceId").toString();

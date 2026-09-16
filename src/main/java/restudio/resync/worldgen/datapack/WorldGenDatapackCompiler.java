@@ -35,12 +35,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+
 public class WorldGenDatapackCompiler {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final Plugin plugin;
+    private final boolean legacyCompatibility;
 
     public WorldGenDatapackCompiler(Plugin plugin) {
+        this(plugin, false);
+    }
+
+    public WorldGenDatapackCompiler(Plugin plugin, boolean legacyCompatibility) {
         this.plugin = plugin;
+        this.legacyCompatibility = legacyCompatibility;
     }
 
     public WorldGenDatapackBuild compile(WorldGenProject project, Path outputRoot, long revision) {
@@ -51,11 +58,12 @@ public class WorldGenDatapackCompiler {
         WorldGenProjectSettings settings = project.getSettings() == null ? new WorldGenProjectSettings() : project.getSettings();
         WorldGenGenerationMode generationMode = WorldGenGenerationMode.resolve(settings.getGenerationMode());
         if (generationMode == WorldGenGenerationMode.VANILLA) {
-            VanillaWorldGenValidator.validate(project);
+            VanillaWorldGenValidator.validate(project, legacyCompatibility);
         } else {
-            PipelineCompiler.compileProject(project);
+            PipelineCompiler.compileProject(project, legacyCompatibility);
         }
-        BiomePolicyCompiler.Result biomePolicy = BiomePolicyCompiler.compile(project);
+        project = PipelineCompiler.normalizeForRuntime(project, legacyCompatibility);
+        BiomePolicyCompiler.Result biomePolicy = BiomePolicyCompiler.compile(project, true);
         String configuredVersion = settings.getTargetVersion();
         WorldGenTargetVersion target = WorldGenTargetVersion.AUTOMATIC.equalsIgnoreCase(configuredVersion)
             ? WorldGenTargetVersion.resolve(configuredVersion, Bukkit.getMinecraftVersion())
@@ -110,6 +118,16 @@ public class WorldGenDatapackCompiler {
         } catch (IOException exception) {
             throw new IllegalStateException("Datapack Compile Failed: " + exception.getMessage(), exception);
         }
+    }
+
+    public WorldGenDatapackBuild compile(WorldGenProject project, Path outputRoot, WorldGenBuildRecipe recipe) {
+        if (project == null || recipe == null) {
+            throw new IllegalArgumentException("WorldGen Build Recipe Requires A Project");
+        }
+        if (!recipe.matches(project)) {
+            throw new IllegalArgumentException("WorldGen Build Recipe Does Not Match The Authoritative Project");
+        }
+        return compile(project, outputRoot, recipe.revision());
     }
 
     public Path generatedRoot() {
@@ -208,6 +226,7 @@ public class WorldGenDatapackCompiler {
                                          WorldGenTargetVersion target, WorldGenVanillaCatalog catalog, WorldGenGenerationMode generationMode,
                                          String dimensionKey) {
         Map<String, Object> manifest = new LinkedHashMap<>();
+        manifest.put("owner", WorldGenInstalledDatapackCapability.OWNER);
         manifest.put("projectId", project.getId());
         manifest.put("namespace", namespace);
         manifest.put("packName", packName);

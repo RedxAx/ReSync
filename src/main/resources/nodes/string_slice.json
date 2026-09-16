@@ -1,0 +1,107 @@
+[
+  {
+    "id": "string_substring",
+    "displayName": "Substring",
+    "description": "Extract a bounded section of text. Missing or null text uses empty text, start defaults to zero, length may be omitted to keep the remaining text, and values outside 0 through 65536 or a negative length fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "slice", "substring"],
+    "legacyIds": ["string.substring"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "substring"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to slice. Missing or null input is treated as empty text; values longer than 65536 characters fail before output."},
+      {"id": "start", "displayName": "Start", "name": "start", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "constraints": {"min": 0, "max": 65536}, "description": "Zero-based character position where the slice starts. Missing or null input uses zero; values outside 0 through 65536 fail before output."},
+      {"id": "length", "displayName": "Length", "name": "length", "pinType": "DATA", "dataType": "number", "optional": true, "constraints": {"min": 0, "max": 65536}, "description": "Maximum number of characters to return. Omit this input to keep the remaining text; values outside 0 through 65536, including negative values, fail before output."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "string", "description": "Returns the selected text, limited by the value length and optional length input."}
+    ]
+  },
+  {
+    "id": "string_split",
+    "displayName": "Split",
+    "description": "Split text using a literal delimiter. Missing or null text uses empty text, a missing or null delimiter uses a comma, and text or delimiter values outside 65536 characters fail before output.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["string", "slice", "split"],
+    "legacyIds": ["string.split"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "split"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "constraints": {"min": 0, "max": 65536}, "description": "Text to split. Missing or null input is treated as empty text; values longer than 65536 characters fail before output."},
+      {"id": "delimiter", "displayName": "Delimiter", "name": "delimiter", "pinType": "DATA", "dataType": "string", "defaultValue": ",", "constraints": {"min": 0, "max": 65536}, "description": "Literal text that separates parts. Missing or null input uses a comma; values longer than 65536 characters fail before output."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "list<string>", "description": "Returns the parts in order after splitting with the literal delimiter, including empty parts."}
+    ]
+  },
+  {
+    "id": "string_index_of",
+    "displayName": "String Index Of",
+    "description": "Find the first index of a substring in text. Missing or null inputs use empty text, and -1 means the substring was not found.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "slice", "index"],
+    "legacyIds": ["string.index_of"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "index_of"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to search. Missing or null input uses empty text."},
+      {"id": "substring", "displayName": "Substring", "name": "substring", "pinType": "DATA", "dataType": "string", "description": "Text to find. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "The zero-based index of the first substring occurrence, or -1 when it is absent."}
+    ]
+  },
+  {
+    "id": "string_last_index_of",
+    "displayName": "String Last Index Of",
+    "description": "Find the last index of a substring in text. Missing or null inputs use empty text, and -1 means the substring was not found.",
+    "domain": "core",
+    "family": "string",
+    "lifecycle": "active",
+    "handlerCapability": "generic-string",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["string", "slice", "index"],
+    "legacyIds": ["string.last_index_of"],
+    "handler": "GenericStringHandler",
+    "handlerConfig": {"operation": "last_index_of"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "string", "description": "Text to search. Missing or null input uses empty text."},
+      {"id": "substring", "displayName": "Substring", "name": "substring", "pinType": "DATA", "dataType": "string", "description": "Text to find. Missing or null input uses empty text."}
+    ],
+    "outputs": [
+      {"id": "index", "displayName": "Index", "name": "index", "pinType": "DATA", "dataType": "number", "description": "The zero-based index of the last substring occurrence, or -1 when it is absent."}
+    ]
+  }
+]

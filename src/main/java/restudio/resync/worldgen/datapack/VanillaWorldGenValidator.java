@@ -3,6 +3,7 @@ package restudio.resync.worldgen.datapack;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
 
 import java.util.Map;
 import java.util.Set;
@@ -16,18 +17,22 @@ public final class VanillaWorldGenValidator {
     }
 
     public static void validate(WorldGenProject project) {
+        validate(project, false);
+    }
+
+    public static void validate(WorldGenProject project, boolean legacyCompatibility) {
         if (project == null) {
             throw new IllegalArgumentException("WorldGen Project Missing");
         }
         requireEmpty(project.getTerrainGraph(), "Terrain", "Choose A Vanilla Terrain Preset In World Settings");
         requireEmpty(project.getSurfaceGraph(), "Surface", "Vanilla Surface Rules Come From The Selected Terrain Preset");
         requireEmpty(project.getCaveGraph(), "Caves", "Vanilla Caves Come From The Selected Terrain Preset");
-        validateNodes(project.getFeatureGraph(), FEATURE_NODES, "Features");
-        validateNodes(project.getStructureGraph(), STRUCTURE_NODES, "Structures");
-        validateNodes(project.getSpawnGraph(), SPAWN_NODES, "Spawns");
-        validateFeatureRules(project.getFeatureGraph());
-        validateStructureRules(project.getStructureGraph());
-        validateSpawnRules(project.getSpawnGraph());
+        validateNodes(project.getFeatureGraph(), FEATURE_NODES, "Features", legacyCompatibility);
+        validateNodes(project.getStructureGraph(), STRUCTURE_NODES, "Structures", legacyCompatibility);
+        validateNodes(project.getSpawnGraph(), SPAWN_NODES, "Spawns", legacyCompatibility);
+        validateFeatureRules(project.getFeatureGraph(), legacyCompatibility);
+        validateStructureRules(project.getStructureGraph(), legacyCompatibility);
+        validateSpawnRules(project.getSpawnGraph(), legacyCompatibility);
     }
 
     private static void requireEmpty(WorldGenGraph graph, String stage, String action) {
@@ -36,23 +41,24 @@ public final class VanillaWorldGenValidator {
         }
     }
 
-    private static void validateNodes(WorldGenGraph graph, Set<String> supported, String stage) {
+    private static void validateNodes(WorldGenGraph graph, Set<String> supported, String stage, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
         for (WorldGenNode node : graph.getNodes().values()) {
-            if (node != null && !supported.contains(node.getType())) {
-                throw new IllegalArgumentException(node.getType() + " Isn't Available In Vanilla " + stage);
+            String type = node == null ? "" : WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility);
+            if (node != null && !supported.contains(type)) {
+                throw new IllegalArgumentException(type + " Isn't Available In Vanilla " + stage);
             }
         }
     }
 
-    private static void validateFeatureRules(WorldGenGraph graph) {
+    private static void validateFeatureRules(WorldGenGraph graph, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
         for (WorldGenNode node : graph.getNodes().values()) {
-            if (node == null || !"scatter".equals(node.getType())) {
+            if (node == null || !"scatter".equals(WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility))) {
                 continue;
             }
             double count = number(node.getInputValues(), "count", 8);
@@ -70,12 +76,12 @@ public final class VanillaWorldGenValidator {
         }
     }
 
-    private static void validateStructureRules(WorldGenGraph graph) {
+    private static void validateStructureRules(WorldGenGraph graph, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
         for (WorldGenNode node : graph.getNodes().values()) {
-            if (node == null || !"structure_placement".equals(node.getType())) {
+            if (node == null || !"structure_placement".equals(WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility))) {
                 continue;
             }
             String anchor = text(node.getInputValues(), "anchor", "surface");
@@ -86,12 +92,12 @@ public final class VanillaWorldGenValidator {
         }
     }
 
-    private static void validateSpawnRules(WorldGenGraph graph) {
+    private static void validateSpawnRules(WorldGenGraph graph, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes() == null) {
             return;
         }
         for (WorldGenNode node : graph.getNodes().values()) {
-            if (node == null || !"spawn_rule".equals(node.getType())) {
+            if (node == null || !"spawn_rule".equals(WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility))) {
                 continue;
             }
             Map<String, Object> values = node.getInputValues();

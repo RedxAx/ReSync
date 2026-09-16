@@ -1,0 +1,584 @@
+[
+  {
+    "id": "structure_save",
+    "displayName": "Structure Save",
+    "description": "Save a clipboard as a named structure in the server library.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "structure",
+      "structure_save"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure Save."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_save"
+    },
+    "legacyIds": [
+      "structure.save"
+    ],
+    "aliases": [
+      "structure.save"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "input",
+          "source": "structure_id",
+          "target": "structure_id"
+        },
+        {
+          "direction": "input",
+          "source": "display_name",
+          "target": "display_name"
+        },
+        {
+          "direction": "input",
+          "source": "tags",
+          "target": "tags"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Structure Save."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the clipboard id used by Structure Save.",
+        "defaultValue": "default"
+      },
+      {
+        "id": "structure_id",
+        "displayName": "Structure Id",
+        "name": "structure_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the structure id used by Structure Save."
+      },
+      {
+        "id": "display_name",
+        "displayName": "Display Name",
+      "name": "display_name",
+      "pinType": "DATA",
+      "dataType": "string",
+      "description": "Provides the display name used by Structure Save."
+      },
+      {
+        "id": "tags",
+        "displayName": "Tags",
+        "name": "tags",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the tags used by Structure Save.",
+        "defaultValue": ""
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Structure Save."
+      }
+    ]
+  },
+  {
+    "id": "structure_load",
+    "displayName": "Structure Load",
+    "description": "Load a named structure into a clipboard.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "structure",
+      "structure_load"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure Load."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_load"
+    },
+    "legacyIds": [
+      "structure.load"
+    ],
+    "aliases": [
+      "structure.load"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "structure_id",
+          "target": "structure_id"
+        },
+        {
+          "direction": "input",
+          "source": "clipboard_id",
+          "target": "clipboard_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Structure Load."
+      },
+      {
+        "id": "structure_id",
+        "displayName": "Structure Id",
+        "name": "structure_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the structure id used by Structure Load."
+      },
+      {
+        "id": "clipboard_id",
+        "displayName": "Clipboard Id",
+        "name": "clipboard_id",
+        "pinType": "DATA",
+      "dataType": "string",
+      "description": "Provides the clipboard id used by Structure Load.",
+      "defaultValue": "loaded"
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Structure Load."
+      }
+    ]
+  },
+  {
+    "id": "structure_paste",
+    "displayName": "Structure Paste",
+    "description": "Paste a named structure at a world location.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "structure",
+      "structure_paste"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure Paste."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_paste"
+    },
+    "legacyIds": [
+      "structure.paste"
+    ],
+    "aliases": [
+      "structure.paste"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "structure_id",
+          "target": "structure_id"
+        },
+        {
+          "direction": "input",
+          "source": "location",
+          "target": "location"
+        },
+        {
+          "direction": "input",
+          "source": "ignore_air",
+          "target": "ignore_air"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Structure Paste."
+      },
+      {
+        "id": "structure_id",
+        "displayName": "Structure Id",
+        "name": "structure_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the structure id used by Structure Paste."
+      },
+      {
+        "id": "location",
+        "displayName": "Location",
+        "name": "location",
+        "pinType": "DATA",
+        "dataType": "location",
+        "description": "Provides the location used by Structure Paste."
+      },
+      {
+        "id": "ignore_air",
+        "displayName": "Ignore Air",
+        "name": "ignore_air",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Provides the ignore air used by Structure Paste.",
+        "defaultValue": true
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Structure Paste."
+      }
+    ]
+  },
+  {
+    "id": "structure_list",
+    "displayName": "Structure List",
+    "description": "List named structures available in the server library.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "structure",
+      "structure_list"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure List."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_list"
+    },
+    "legacyIds": [
+      "structure.list"
+    ],
+    "aliases": [
+      "structure.list"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "structures",
+          "target": "structures"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Structure List."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Structure List."
+      },
+      {
+        "id": "structures",
+        "displayName": "Structures",
+        "name": "structures",
+        "pinType": "DATA",
+        "dataType": "list<string>",
+        "description": "Returns the structures produced by Structure List."
+      }
+    ]
+  },
+  {
+    "id": "structure_exists",
+    "displayName": "Structure Exists",
+    "description": "Check whether a named structure exists in the server library.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "tags": [
+      "world",
+      "structure",
+      "structure_exists"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure Exists."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_exists"
+    },
+    "legacyIds": [
+      "structure.exists"
+    ],
+    "aliases": [
+      "structure.exists"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "structure_id",
+          "target": "structure_id"
+        },
+        {
+          "direction": "output",
+          "source": "exists",
+          "target": "exists"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "structure_id",
+        "displayName": "Structure Id",
+        "name": "structure_id",
+        "pinType": "DATA",
+        "dataType": "string",
+        "description": "Provides the structure id used by Structure Exists."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "exists",
+        "displayName": "Exists",
+        "name": "exists",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the exists produced by Structure Exists."
+      }
+    ]
+  },
+  {
+    "id": "structure_delete",
+    "displayName": "Structure Delete",
+    "description": "Delete the selected Structure from this server's library.",
+    "domain": "world",
+    "family": "structure",
+    "lifecycle": "active",
+    "handlerCapability": "world-action",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 3,
+    "kind": "ACTION",
+    "tags": [
+      "world",
+      "structure",
+      "structure_delete"
+    ],
+    "examples": [
+      "Connect Flow and provide the inputs required by Structure Delete."
+    ],
+    "handler": "RegionHandler",
+    "handlerConfig": {
+      "operation": "structure_delete"
+    },
+    "legacyIds": [
+      "structure.delete"
+    ],
+    "aliases": [
+      "structure.delete"
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 3,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "structure_id",
+          "target": "structure_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        },
+        {
+          "direction": "output",
+          "source": "deleted",
+          "target": "deleted"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Provides the flow used by Structure Delete."
+      },
+      {
+        "id": "structure_id",
+        "displayName": "Structure",
+        "name": "structure_id",
+        "pinType": "DATA",
+        "dataType": "resource_reference<restudio.resync:structure>",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:structure",
+        "description": "Selects the ReSync Structure on this server to delete."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution",
+        "description": "Returns the flow produced by Structure Delete."
+      },
+      {
+        "id": "deleted",
+        "displayName": "Deleted",
+        "name": "deleted",
+        "pinType": "DATA",
+        "dataType": "boolean",
+        "description": "Returns the deleted produced by Structure Delete."
+      }
+    ]
+  }
+]

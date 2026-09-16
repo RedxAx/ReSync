@@ -1,0 +1,88 @@
+[
+  {
+    "id": "list_sort",
+    "displayName": "List Sort",
+    "description": "Stable sort; detached shallow result. Ascending: nulls last; descending: nulls first. Finite numeric values use exact comparison; other values use natural comparable ordering. Unsupported mixed/object values fail. Cap 0..65536. sort_order accepts exactly ascending or descending.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["list", "sort", "ordering"],
+    "legacyIds": ["list.sort"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "sort"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy; values are not deep-copied. Inputs over 65536 items fail before output."},
+      {"id": "sort_order", "displayName": "Sort Order", "name": "sort_order", "pinType": "DATA", "dataType": "string", "widget": "DROPDOWN", "options": ["ascending", "descending"], "defaultValue": "ascending", "description": "Order accepts exactly ascending or descending; ascending places null values last and descending places null values first."}
+    ],
+    "outputs": [
+      {"id": "sorted_list", "displayName": "Sorted List", "name": "sorted_list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable sorted detached shallow copy. Finite numeric values use exact comparison and other homogeneous values use natural comparable ordering; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_sort_descending",
+    "displayName": "Sort Descending",
+    "description": "Stable descending sort; detached shallow result. Descending: nulls first. Finite numeric values use exact comparison; other values use natural comparable ordering. Unsupported mixed/object values fail. Cap 0..65536.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "sort", "ordering"],
+    "legacyIds": ["list.sort_descending"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "sort_descending"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "list", "target": "list"},
+        {"direction": "output", "source": "list", "target": "output_list"}
+      ]
+    },
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort descending. The result is a detached shallow copy; values are not deep-copied. Inputs over 65536 items fail before output."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Stable descending sorted detached shallow copy with null values first. Finite numeric values use exact comparison and other values use natural comparable ordering; results over 65536 items fail before output."}
+    ]
+  },
+  {
+    "id": "list_sort_by_property",
+    "displayName": "Sort By Property",
+    "description": "Stable-sort a shallow copy of a list by a property in ascending order. Missing or null list input uses an empty list, the property is required, null property values sort last, and unsupported property values fail.",
+    "domain": "core",
+    "family": "list",
+    "lifecycle": "active",
+    "handlerCapability": "generic-list",
+    "selectorIntent": "typed-list",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["list", "sort", "ordering", "property"],
+    "legacyIds": ["list.sort_by_property"],
+    "handler": "GenericListHandler",
+    "handlerConfig": {"operation": "sort_by_property"},
+    "inputs": [
+      {"id": "list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "List to sort. The result is a detached shallow copy; missing or null input uses an empty list, and inputs over 65536 items fail before output."},
+      {"id": "property", "displayName": "Property", "name": "property", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "Property used for comparison. A non-blank property is required."}
+    ],
+    "outputs": [
+      {"id": "output_list", "displayName": "List", "name": "list", "pinType": "DATA", "dataType": "list<type:t>", "constraints": {"min": 0, "max": 65536}, "description": "Returns a stable ascending shallow copy sorted by the selected property, with null property values last."}
+    ]
+  }
+]

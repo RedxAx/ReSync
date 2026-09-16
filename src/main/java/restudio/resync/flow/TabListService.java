@@ -10,7 +10,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 import restudio.flow.data.TabDefinition;
-import restudio.resync.flow.ScoreboardTemplateManager;
 import restudio.resync.flow.util.ReSyncPlaceholderUtil;
 import restudio.resync.flow.util.TextFormatter;
 
@@ -75,7 +74,7 @@ public final class TabListService {
     }
 
     public static void applyTemplateToAll(TabDefinition definition, boolean usePapi) {
-        if (definition == null) {
+        if (definition == null || !definition.isEnabled()) {
             return;
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -112,18 +111,12 @@ public final class TabListService {
     }
 
     public static void refreshActiveTabs(FlowStorage storage, String tabId) {
-        if (storage == null || tabId == null || tabId.isBlank()) {
+        if (storage == null || tabId == null || tabId.isBlank() || Bukkit.getServer() == null) {
             return;
         }
-        TabDefinition definition = storage.getTab(tabId);
-        if (definition == null) {
-            return;
-        }
-        if (!definition.isEnabled()) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                ActiveTabState state = ACTIVE_TABS.get(player.getUniqueId());
-                if (state != null && tabId.equalsIgnoreCase(state.tabId())) clearForPlayer(player);
-            }
+        TabDefinition definition = storage.getRuntimeTab(tabId);
+        if (definition == null || !definition.isEnabled()) {
+            clearActiveTabReferences(tabId, true);
             return;
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -174,7 +167,7 @@ public final class TabListService {
         if (storage == null || tabId == null || tabId.isBlank()) {
             return false;
         }
-        TabDefinition definition = storage.getTab(tabId);
+        TabDefinition definition = storage.getRuntimeTab(tabId);
         if (definition == null) {
             return false;
         }
@@ -214,13 +207,16 @@ public final class TabListService {
         if (tabId == null || tabId.isBlank()) {
             return;
         }
-        TabDefinition definition = storage.getTab(tabId);
+        TabDefinition definition = storage.getRuntimeTab(tabId);
         if (definition != null) {
             applyTemplate(player, definition, storage.isDefaultTabUsePapi());
         }
     }
 
     private static void refreshActive() {
+        if (Bukkit.getOnlinePlayers().isEmpty()) {
+            return;
+        }
         FlowStorage storage = getFlowStorage();
         if (storage == null) {
             return;
@@ -230,9 +226,11 @@ public final class TabListService {
         if (regularRefresh || hasAnimatedTabs(storage)) {
             String defaultTabId = storage.getDefaultTabId();
             if (defaultTabId != null && !defaultTabId.isBlank()) {
-                TabDefinition defaultDefinition = storage.getTab(defaultTabId);
-                if (defaultDefinition != null) {
+                TabDefinition defaultDefinition = storage.getRuntimeTab(defaultTabId);
+                if (defaultDefinition != null && defaultDefinition.isEnabled()) {
                     applyTemplateToAll(defaultDefinition, storage.isDefaultTabUsePapi());
+                } else {
+                    clearActiveTabReferences(defaultTabId, true);
                 }
             } else if (!ACTIVE_TABS.isEmpty()) {
                 for (Player player : Bukkit.getOnlinePlayers()) {
@@ -240,10 +238,12 @@ public final class TabListService {
                     if (state == null) {
                         continue;
                     }
-                    TabDefinition definition = storage.getTab(state.tabId());
-                    if (definition != null) {
+                    TabDefinition definition = storage.getRuntimeTab(state.tabId());
+                    if (definition != null && definition.isEnabled()) {
                         applyViewerHeaderFooter(player, definition, state.usePapi());
                         applyEntryFormat(player, definition.getEntryFormat(), state.usePapi());
+                    } else {
+                        clearForPlayer(player);
                     }
                 }
             }
@@ -255,16 +255,17 @@ public final class TabListService {
 
     private static boolean hasAnimatedTabs(FlowStorage storage) {
         for (ActiveTabState state : ACTIVE_TABS.values()) {
-            if (state != null && hasAnimation(storage.getTab(state.tabId()))) {
+            if (state != null && hasAnimation(storage.getRuntimeTab(state.tabId()))) {
                 return true;
             }
         }
         String defaultId = storage.getDefaultTabId();
-        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getTab(defaultId));
+        return defaultId != null && !defaultId.isBlank() && hasAnimation(storage.getRuntimeTab(defaultId));
     }
 
     private static boolean hasAnimation(TabDefinition definition) {
-        return definition != null && (hasAnimation(definition.getHeader()) || hasAnimation(definition.getFooter()) || hasAnimation(definition.getEntryFormat()));
+        return definition != null && definition.isEnabled()
+            && (hasAnimation(definition.getHeader()) || hasAnimation(definition.getFooter()) || hasAnimation(definition.getEntryFormat()));
     }
 
     private static boolean hasAnimation(String value) {

@@ -22,6 +22,15 @@ public class ConversionHandler implements NodeHandler {
     private final ConcurrentHashMap<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public ConversionHandler() {
+        operations.put("literal_string", (ctx, node) ->
+            ctx.setOutput(node, "string", ctx.getInputValue(node, "value", String.class, "")));
+
+        operations.put("literal_number", (ctx, node) ->
+            ctx.setOutput(node, "number", ctx.getInputValue(node, "value", Number.class, 0.0)));
+
+        operations.put("literal_boolean", (ctx, node) ->
+            ctx.setOutput(node, "boolean", ctx.getInputValue(node, "value", Boolean.class, false)));
+
         operations.put("to_string", (ctx, node) -> {
             Object value = ctx.getInputValue(node, "value", Object.class, null);
             String string = value != null ? value.toString() : "";

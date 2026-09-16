@@ -36,6 +36,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import restudio.resync.ReSync;
 import restudio.flow.data.CustomContentDefinition;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -550,12 +551,14 @@ public class CustomContentListener implements Listener {
         if (player == null || item == null || item.getAmount() <= 0) {
             return;
         }
-        int nextAmount = item.getAmount() - 1;
-        if (hand == EquipmentSlot.OFF_HAND) {
-            player.getInventory().setItemInOffHand(nextAmount > 0 ? copyWithAmount(item, nextAmount) : null);
-            return;
-        }
-        player.getInventory().setItemInMainHand(nextAmount > 0 ? copyWithAmount(item, nextAmount) : null);
+        PaperPlayerDataMutationAdmission.shared().mutatePlayer("custom-content-projectile-consume:" + player.getUniqueId(), player, () -> {
+            int nextAmount = item.getAmount() - 1;
+            if (hand == EquipmentSlot.OFF_HAND) {
+                player.getInventory().setItemInOffHand(nextAmount > 0 ? copyWithAmount(item, nextAmount) : null);
+                return;
+            }
+            player.getInventory().setItemInMainHand(nextAmount > 0 ? copyWithAmount(item, nextAmount) : null);
+        });
     }
 
     private ItemStack copyWithAmount(ItemStack item, int amount) {

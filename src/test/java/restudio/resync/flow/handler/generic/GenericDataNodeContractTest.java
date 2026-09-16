@@ -1,6 +1,7 @@
 package restudio.resync.flow.handler.generic;
 
 import org.junit.jupiter.api.Test;
+import restudio.resync.upgrade.UpgradeNodeDefinitionSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,7 +14,7 @@ class GenericDataNodeContractTest {
     void entityDataSupportsAttributesExplosivesAndSpawnData() throws Exception {
         String handler = Files.readString(Path.of("src/main/java/restudio/resync/flow/handler/generic/EntityDataAccess.java"));
         String operations = Files.readString(Path.of("src/main/java/restudio/resync/flow/handler/generic/EntityActionHandler.java"));
-        String nodes = Files.readString(Path.of("src/main/resources/nodes/migrated/entity.json"));
+        String nodes = UpgradeNodeDefinitionSource.read("entity.json");
         String catalogs = Files.readString(Path.of("src/main/java/restudio/resync/modules/flow/BuiltinOptionCatalogService.java"));
 
         assertTrue(handler.contains("property.startsWith(\"attribute:\")"));
@@ -40,7 +41,7 @@ class GenericDataNodeContractTest {
     @Test
     void itemComponentsExposeTypedFlowValuesAndAttributeBuilders() throws Exception {
         String handler = Files.readString(Path.of("src/main/java/restudio/resync/flow/handler/generic/InventoryActionHandler.java"));
-        String nodes = Files.readString(Path.of("src/main/resources/nodes/migrated/itemstack.json"));
+        String nodes = UpgradeNodeDefinitionSource.read("itemstack.json");
 
         assertTrue(handler.contains("operations.put(\"item_get_components\""));
         assertTrue(handler.contains("operations.put(\"item_get_component\""));

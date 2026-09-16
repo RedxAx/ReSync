@@ -6,6 +6,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import restudio.resync.flow.CoreGraphStorageBoundary;
+import restudio.resync.flow.catalog.CatalogVersion;
+import restudio.resync.flow.graph.GraphDocument;
+import restudio.resync.flow.graph.OpaqueData;
+import restudio.resync.flow.identity.CatalogBinding;
+import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.ContractRef;
+import restudio.resync.flow.identity.OwnerId;
+import restudio.resync.flow.identity.ResourceTypeId;
+import restudio.resync.flow.identity.ServerId;
+import restudio.resync.flow.identity.ServerResourceLocator;
 import restudio.resync.resources.AssetFileFormat;
 
 import java.io.IOException;
@@ -13,7 +24,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,7 +79,6 @@ class StorageDurabilityTest {
     @Test
     void preparedTransactionsAreRecoveredBeforeNewerCommits() throws Exception {
         Path assets = tempDir.resolve("assets");
-        AssetTransactionManager transactions = new AssetTransactionManager(assets, new Gson());
         Path target = assets.resolve("Blueprints").resolve("Flows").resolve("ordered.json");
         Path transaction = assets.resolve(".transactions").resolve("prepared");
         Files.createDirectories(transaction);
@@ -87,6 +100,7 @@ class StorageDurabilityTest {
         journal.add("entries", entries);
         Files.writeString(transaction.resolve("journal.json"), journal.toString());
 
+        AssetTransactionManager transactions = new AssetTransactionManager(assets, new Gson());
         transactions.commit(Map.of(target, "{\"value\":2}"), "newer");
 
         assertEquals("{\"value\":2}", Files.readString(target));
@@ -94,16 +108,23 @@ class StorageDurabilityTest {
     }
 
     @Test
-    void committedMutationIdsAreIdempotent() throws Exception {
+    void committedMutationIdsRequireExactReplay() throws Exception {
         Path assets = tempDir.resolve("assets");
         AssetTransactionManager transactions = new AssetTransactionManager(assets, new Gson());
         Path target = assets.resolve("Blueprints").resolve("Flows").resolve("idempotent.json");
+        Path other = assets.resolve("Blueprints").resolve("Flows").resolve("other.json");
+        String mutationId = UUID.fromString("55555555-5555-4555-8555-555555555555").toString();
 
-        String first = transactions.commit(Map.of(target, "{\"value\":1}"), "same-mutation");
-        String duplicate = transactions.commit(Map.of(target, "{\"value\":2}"), "same-mutation");
+        String first = transactions.commit(Map.of(target, "{\"value\":1}"), mutationId);
+        String duplicate = transactions.commit(Map.of(target, "{\"value\":1}"), mutationId);
 
         assertEquals(first, duplicate);
+        assertThrows(IOException.class,
+            () -> transactions.commit(Map.of(target, "{\"value\":2}"), mutationId));
+        assertThrows(IOException.class,
+            () -> transactions.commit(Map.of(other, "{\"value\":1}"), mutationId));
         assertEquals("{\"value\":1}", Files.readString(target));
+        assertFalse(Files.exists(other));
     }
 
     @Test
@@ -166,9 +187,38 @@ class StorageDurabilityTest {
         Path assets = tempDir.resolve("assets");
         Files.createDirectories(assets.resolve(".migrations"));
         Files.createDirectories(assets.resolve(".tombstones"));
+        Files.createDirectories(assets.resolve(".asset-coordinator/bindings"));
+        Files.createDirectories(assets.resolve(".mutation-intents/command"));
         Files.writeString(assets.resolve(".migrations/command-bindings-v1.json"), "{\"migration\":\"command-bindings-v1\"}");
         Files.writeString(assets.resolve(".tombstones/deleted.json"), "{\"id\":\"deleted\"}");
+        Files.writeString(assets.resolve(".asset-coordinator/bindings/transaction.json"), "{\"id\":\"transaction\"}");
+        Files.writeString(assets.resolve(".mutation-intents/command/main.json"), "{\"id\":\"main\"}");
         Files.writeString(assets.resolve("project.json"), "{\"resources\":[]}");
+
+        AssetIntegrityService.HealthReport report = new AssetIntegrityService(assets).scan(0);
+
+        assertEquals(AssetIntegrityService.Status.HEALTHY, report.status());
+        assertTrue(report.issues().isEmpty());
+    }
+
+    @Test
+    void integrityScanUsesCoreGraphIntegrityForCanonicalCommandAssets() throws Exception {
+        Path assets = tempDir.resolve("assets");
+        Path command = assets.resolve("Blueprints/Commands/main.json");
+        Files.createDirectories(command.getParent());
+        ServerResourceLocator resource = new ServerResourceLocator(
+            new ServerId(UUID.fromString("11111111-1111-4111-8111-111111111111")),
+            ContractRef.of(new OwnerId("restudio.resync"), new ResourceTypeId("command")), "main");
+        GraphDocument graph = new GraphDocument(new CatalogVersion(1, 0), resource, 1,
+            new CatalogBinding(1, new ContentHash("0".repeat(64)), new ContentHash("1".repeat(64))), Set.of(),
+            List.of(), List.of(), List.of(), List.of(), OpaqueData.empty());
+        CoreGraphStorageBoundary boundary = new CoreGraphStorageBoundary();
+        Files.write(command, boundary.encode(graph,
+            new CoreGraphStorageBoundary.AssetMetadata("command", 1,
+                "22222222-2222-4222-8222-222222222222")));
+        Files.writeString(assets.resolve("project.json"), """
+            {"resources":[{"type":"command","id":"main","path":"Blueprints/Commands"}]}
+            """);
 
         AssetIntegrityService.HealthReport report = new AssetIntegrityService(assets).scan(0);
 

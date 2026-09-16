@@ -9,6 +9,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import org.bukkit.inventory.ItemStack;
 import restudio.resync.Log;
 import restudio.resync.customcontent.CustomContentService;
@@ -18,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
@@ -26,11 +28,18 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
 
     private final CustomContentService customContent;
     private final boolean supported;
+    private final PaperPlayerDataMutationAdmission playerDataAdmission;
     private Set<NamespacedKey> loadedKeys = Set.of();
     private Map<NamespacedKey, JsonObject> loadedDefinitions = Map.of();
 
     public PaperAdvancementRuntimeBridge(CustomContentService customContent) {
+        this(customContent, PaperPlayerDataMutationAdmission.shared());
+    }
+
+    public PaperAdvancementRuntimeBridge(CustomContentService customContent,
+                                         PaperPlayerDataMutationAdmission playerDataAdmission) {
         this.customContent = customContent;
+        this.playerDataAdmission = Objects.requireNonNull(playerDataAdmission, "playerDataAdmission");
         this.supported = PaperUnsafe.loadAdvancementSupported();
     }
 
@@ -70,17 +79,19 @@ public class PaperAdvancementRuntimeBridge implements AdvancementRuntimeBridge {
         if (player == null) {
             return;
         }
-        for (NamespacedKey key : loadedKeys) {
-            Advancement advancement = Bukkit.getAdvancement(key);
-            JsonObject definition = loadedDefinitions.get(key);
-            if (advancement == null || !isRoot(definition)) {
-                continue;
+        playerDataAdmission.mutatePlayer("advancement-runtime-sync:" + player.getUniqueId(), player, () -> {
+            for (NamespacedKey key : loadedKeys) {
+                Advancement advancement = Bukkit.getAdvancement(key);
+                JsonObject definition = loadedDefinitions.get(key);
+                if (advancement == null || !isRoot(definition)) {
+                    continue;
+                }
+                AdvancementProgress progress = player.getAdvancementProgress(advancement);
+                if (!progress.getAwardedCriteria().contains(ROOT_CRITERION)) {
+                    progress.awardCriteria(ROOT_CRITERION);
+                }
             }
-            AdvancementProgress progress = player.getAdvancementProgress(advancement);
-            if (!progress.getAwardedCriteria().contains(ROOT_CRITERION)) {
-                progress.awardCriteria(ROOT_CRITERION);
-            }
-        }
+        });
     }
 
     private void applyAdvancements(Map<NamespacedKey, String> definitions) {

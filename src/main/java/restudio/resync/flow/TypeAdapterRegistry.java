@@ -31,6 +31,7 @@ import restudio.flow.data.FlowPermission;
 import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.FlowWorldRef;
 import restudio.resync.flow.util.TextFormatter;
+import restudio.resync.api.ExtensionRegistryActivation;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -41,6 +42,7 @@ import java.util.function.Function;
 public class TypeAdapterRegistry {
     private final Map<ClassPair, Function<Object, Object>> adapters = new HashMap<>();
     private final Map<Class<?>, Function<String, ?>> stringParsers = new HashMap<>();
+    private volatile ExtensionRegistryActivation activation;
 
     public static final class ClassPair {
         private final Class<?> source;
@@ -75,6 +77,16 @@ public class TypeAdapterRegistry {
 
     public TypeAdapterRegistry() {
         registerDefaultAdapters();
+    }
+
+    public void bindActivation(ExtensionRegistryActivation activation) {
+        this.activation = activation;
+    }
+
+    private TypeAdapterRegistry(boolean defaults) {
+        if (defaults) {
+            registerDefaultAdapters();
+        }
     }
 
     private void registerDefaultAdapters() {
@@ -217,22 +229,65 @@ public class TypeAdapterRegistry {
     }
 
     public <S, T> void register(Class<S> source, Class<T> target, Function<S, T> adapter) {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(TypeAdapterRegistry.class, next -> {
+                next.registerLocal(source, target, adapter);
+                return null;
+            });
+            return;
+        }
+        registerLocal(source, target, adapter);
+    }
+
+    private <S, T> void registerLocal(Class<S> source, Class<T> target, Function<S, T> adapter) {
         Function<Object, Object> wrapper = obj -> adapter.apply((S) obj);
         adapters.put(new ClassPair(source, target), wrapper);
     }
 
     public void unregister(Class<?> source, Class<?> target) {
         if (source != null && target != null) {
-            adapters.remove(new ClassPair(source, target));
+            ExtensionRegistryActivation current = activation;
+            if (current != null) {
+                current.update(TypeAdapterRegistry.class, next -> {
+                    next.unregisterLocal(source, target);
+                    return null;
+                });
+                return;
+            }
+            unregisterLocal(source, target);
         }
     }
 
+    private void unregisterLocal(Class<?> source, Class<?> target) {
+        adapters.remove(new ClassPair(source, target));
+    }
+
     public <T> void registerStringParser(Class<T> target, Function<String, T> parser) {
+        if (target == null || parser == null) {
+            throw new IllegalArgumentException("String parser target and parser are required");
+        }
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(TypeAdapterRegistry.class, next -> {
+                next.registerStringParserLocal(target, parser);
+                return null;
+            });
+            return;
+        }
+        registerStringParserLocal(target, parser);
+    }
+
+    private <T> void registerStringParserLocal(Class<T> target, Function<String, T> parser) {
         stringParsers.put(target, parser);
     }
 
     @SuppressWarnings("unchecked")
     public <S, T> T adapt(Object source, Class<T> target) {
+        TypeAdapterRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.adapt(source, target);
+        }
         if (source == null) return null;
         Class<?> boxedTarget = boxed(target);
         if (boxedTarget.isInstance(source)) return (T) source;
@@ -275,6 +330,10 @@ public class TypeAdapterRegistry {
     }
 
     public boolean canConvert(Class<?> source, Class<?> target) {
+        TypeAdapterRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.canConvert(source, target);
+        }
         Class<?> boxedSource = boxed(source);
         Class<?> boxedTarget = boxed(target);
         if (boxedTarget.isAssignableFrom(boxedSource)) return true;
@@ -312,10 +371,56 @@ public class TypeAdapterRegistry {
     }
 
     public Map<ClassPair, Function<Object, Object>> getAdapters() {
+        TypeAdapterRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.getAdapters();
+        }
         return Map.copyOf(adapters);
     }
 
     public Map<Class<?>, Function<String, ?>> getStringParsers() {
+        TypeAdapterRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.getStringParsers();
+        }
         return Map.copyOf(stringParsers);
+    }
+
+    public synchronized TypeAdapterRegistry copy() {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            return current.snapshot().typeAdapters();
+        }
+        TypeAdapterRegistry copy = new TypeAdapterRegistry(false);
+        copy.adapters.putAll(adapters);
+        copy.stringParsers.putAll(stringParsers);
+        return copy;
+    }
+
+    public synchronized void replaceFrom(TypeAdapterRegistry staged) {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(TypeAdapterRegistry.class, next -> {
+                next.replaceFromLocal(staged);
+                return null;
+            });
+            return;
+        }
+        replaceFromLocal(staged);
+    }
+
+    private synchronized void replaceFromLocal(TypeAdapterRegistry staged) {
+        if (staged == null) {
+            throw new IllegalArgumentException("A staged type adapter registry is required");
+        }
+        adapters.clear();
+        adapters.putAll(staged.adapters);
+        stringParsers.clear();
+        stringParsers.putAll(staged.stringParsers);
+    }
+
+    private TypeAdapterRegistry activeRegistry() {
+        ExtensionRegistryActivation current = activation;
+        return current != null ? current.snapshot().typeAdapters() : this;
     }
 }

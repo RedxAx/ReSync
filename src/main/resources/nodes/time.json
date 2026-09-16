@@ -1,0 +1,252 @@
+[
+  {
+    "id": "time_format",
+    "displayName": "Format Time",
+    "description": "Format an epoch-millisecond instant with a strict Java date-time pattern, IANA time zone, and BCP 47 locale. Invalid patterns, zones, locales, or formatter values publish valid=false and diagnostic error text.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "format", "date"],
+    "legacyIds": ["time.format", "misc.time_format"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_format"},
+    "inputs": [
+      {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Epoch-millisecond instant to format."},
+      {"id": "format", "displayName": "Format", "name": "format", "pinType": "DATA", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern. Invalid or incomplete patterns fail with valid=false and error text."},
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used to render the instant. UTC is used by default; an invalid zone is reported through valid and error."},
+      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the formatter. Blank uses neutral locale rules; an invalid locale is reported through valid and error."}
+    ],
+    "outputs": [
+      {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Formatted time text, or empty text when formatting fails."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the pattern, zone, locale, and value were accepted."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when formatting succeeds."}
+    ]
+  },
+  {
+    "id": "time_parse",
+    "displayName": "Parse Time",
+    "description": "Parse text into an epoch-millisecond instant with a strict Java date-time pattern, IANA time zone, and BCP 47 locale. Invalid patterns, zones, locales, incomplete dates, and invalid calendar values publish valid=false and diagnostic error text.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 3,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "parse", "date"],
+    "legacyIds": ["time.parse", "misc.time_parse"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_parse"},
+    "inputs": [
+      {"id": "string", "displayName": "String", "name": "string", "pinType": "DATA", "dataType": "string", "description": "Complete date and time text to parse. Blank text fails with valid=false and error text."},
+      {"id": "format", "displayName": "Format", "name": "format", "pinType": "DATA", "dataType": "string", "defaultValue": "uuuu-MM-dd HH:mm:ss", "description": "Strict Java date-time pattern containing a complete date and time. Invalid or incomplete patterns fail with valid=false and error text."},
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID for local date-time text. UTC is used by default; an invalid zone is reported through valid and error."},
+      {"id": "locale", "displayName": "Locale", "name": "locale", "pinType": "DATA", "dataType": "string", "defaultValue": "", "description": "BCP 47 language tag used by the parser. Blank uses neutral locale rules; an invalid locale is reported through valid and error."}
+    ],
+    "outputs": [
+      {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Parsed epoch-millisecond instant, or zero when parsing fails."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the complete text, strict pattern, zone, locale, and calendar value were accepted."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when parsing succeeds."}
+    ]
+  },
+  {
+    "id": "time_add",
+    "displayName": "Add Time",
+    "description": "Add a whole finite amount to an epoch-millisecond instant. Milliseconds, ticks, seconds, minutes, hours, days, and weeks use fixed units; months and years use calendar arithmetic in the IANA zone. Unsupported units or overflow publish valid=false with diagnostic error text.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 4,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "add", "duration"],
+    "legacyIds": ["time.add", "misc.time_add"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_add"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 3,
+      "targetSchemaVersion": 4,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "time", "target": "time"},
+        {"direction": "input", "source": "amount", "target": "amount"},
+        {"direction": "input", "source": "unit", "target": "unit"},
+        {"direction": "input", "source": "time_zone", "target": "time_zone"},
+        {"direction": "output", "source": "time", "target": "output_time"},
+        {"direction": "output", "source": "valid", "target": "valid"},
+        {"direction": "output", "source": "error", "target": "error"}
+      ]
+    },
+    "inputs": [
+      {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Epoch-millisecond instant to change."},
+      {"id": "amount", "displayName": "Amount", "name": "amount", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Whole finite amount to add. Fractional, non-finite, or overflowing values fail before a new instant is published."},
+      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "seconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks", "months", "years"], "description": "Unit for the amount. Fixed units are milliseconds, ticks, seconds, minutes, hours, and days or weeks; months and years use calendar arithmetic."},
+      {"id": "time_zone", "displayName": "Time Zone", "name": "time_zone", "pinType": "DATA", "dataType": "string", "defaultValue": "UTC", "description": "IANA time-zone ID used for calendar months and years. UTC is used by default; invalid zones and overflow are reported through valid and error."}
+    ],
+    "outputs": [
+      {"id": "output_time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Instant after adding the amount, or the original instant when the operation fails."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the amount, unit, zone, and resulting instant were accepted."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when the addition succeeds."}
+    ]
+  },
+  {
+    "id": "time_diff",
+    "displayName": "Time Difference",
+    "description": "Compare two epoch-millisecond instants and publish absolute and signed differences. Signed is time2 minus time1; unit_diff truncates in a supported fixed unit. Months and years are unsupported; invalid units or overflow publish valid=false with diagnostic error text.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 4,
+    "kind": "PURE",
+    "clockDomain": "wall_time",
+    "tags": ["time", "difference", "duration"],
+    "legacyIds": ["time.diff", "misc.time_diff"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_diff"},
+    "inputs": [
+      {"id": "time1", "displayName": "Time 1", "name": "time1", "pinType": "DATA", "dataType": "instant", "description": "First epoch-millisecond instant. The signed result subtracts this value from time2."},
+      {"id": "time2", "displayName": "Time 2", "name": "time2", "pinType": "DATA", "dataType": "instant", "description": "Second epoch-millisecond instant. The signed result is time2 minus time1."},
+      {"id": "unit", "displayName": "Unit", "name": "unit", "pinType": "DATA", "dataType": "string", "defaultValue": "milliseconds", "options": ["milliseconds", "ticks", "seconds", "minutes", "hours", "days", "weeks"], "description": "Unit for unit_diff. Milliseconds, ticks, seconds, minutes, hours, days, and weeks are supported; calendar units such as months and years are unsupported."}
+    ],
+    "outputs": [
+      {"id": "diff", "displayName": "Difference", "name": "diff", "pinType": "DATA", "dataType": "duration", "description": "Absolute non-negative millisecond difference between time1 and time2."},
+      {"id": "signed_diff", "displayName": "Signed Difference", "name": "signed_diff", "pinType": "DATA", "dataType": "duration", "description": "Signed millisecond difference calculated as time2 minus time1."},
+      {"id": "unit_diff", "displayName": "Unit Difference", "name": "unit_diff", "pinType": "DATA", "dataType": "number", "description": "Signed difference truncated toward zero in the selected supported unit."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when both instants and the selected unit produced a representable result."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when the comparison succeeds."}
+    ]
+  },
+  {
+    "id": "time_to_ticks",
+    "displayName": "Seconds To Ticks",
+    "description": "Convert finite seconds that resolve to a whole in-range tick count at 20 ticks per second. Non-integral tick products, non-finite values, or out-of-range results publish valid=false and diagnostic error text. This pure conversion does not read or claim a server tick clock.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "clockDomain": "monotonic_elapsed",
+    "tags": ["time", "ticks", "convert"],
+    "legacyIds": ["time.time_to_ticks"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_to_ticks"},
+    "inputs": [
+      {"id": "seconds", "displayName": "Seconds", "name": "seconds", "pinType": "DATA", "dataType": "number", "description": "Finite seconds that resolve to a whole in-range tick count after multiplication by 20. Non-integral products, non-finite values, or out-of-range results fail before output."}
+    ],
+    "outputs": [
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "pinType": "DATA", "dataType": "number", "description": "Whole nominal ticks equal to seconds multiplied by 20."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when seconds were finite, whole, and converted without overflow."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when conversion succeeds."}
+    ]
+  },
+  {
+    "id": "time_current",
+    "displayName": "Current Time",
+    "description": "Read the current server wall-clock instant from the runtime clock.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "clockDomain": "wall_time",
+    "tags": ["time", "current", "clock"],
+    "aliases": ["Now", "Current Instant"],
+    "legacyIds": ["time.time_current"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_current"},
+    "inputs": [],
+    "outputs": [
+      {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "instant", "description": "Current epoch-millisecond instant."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the runtime clock returned a current instant."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when the current instant was read."}
+    ]
+  },
+  {
+    "id": "time_get_current_ticks",
+    "displayName": "Current Server Ticks",
+    "description": "Read the server's current monotonic tick counter.",
+    "domain": "core",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "clockDomain": "server_ticks",
+    "tags": ["time", "ticks", "server"],
+    "aliases": ["Current Ticks", "Server Tick Counter"],
+    "legacyIds": ["get.current.ticks", "get_current_ticks"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_get_current_ticks"},
+    "inputs": [],
+    "outputs": [
+      {"id": "ticks", "displayName": "Ticks", "name": "ticks", "pinType": "DATA", "dataType": "number", "description": "Current server tick counter."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the server tick counter was read."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when the tick counter was read."}
+    ]
+  },
+  {
+    "id": "time_get_current_time",
+    "displayName": "Current World Time",
+    "description": "Read the selected world's current day-time tick value. A world is required; failures publish valid=false and diagnostic error text.",
+    "domain": "world",
+    "family": "time",
+    "lifecycle": "active",
+    "handlerCapability": "time",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "WORLD",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "clockDomain": "world_day_time",
+    "tags": ["world", "time", "ticks"],
+    "aliases": ["World Time", "Current Day Time"],
+    "legacyIds": ["get.current.time", "get_current_time"],
+    "handler": "TimeHandler",
+    "handlerConfig": {"operation": "time_get_current_time"},
+    "inputs": [
+      {"id": "world", "displayName": "World", "name": "world", "pinType": "DATA", "dataType": "world", "description": "World whose current day-time ticks should be read."}
+    ],
+    "outputs": [
+      {"id": "time", "displayName": "Time", "name": "time", "pinType": "DATA", "dataType": "number", "description": "Selected world's current day-time ticks."},
+      {"id": "valid", "displayName": "Valid", "name": "valid", "pinType": "DATA", "dataType": "boolean", "description": "True when the selected world supplied a day-time value."},
+      {"id": "error", "displayName": "Error", "name": "error", "pinType": "DATA", "dataType": "string", "description": "Diagnostic error text, or empty text when the world time was read."}
+    ]
+  }
+]

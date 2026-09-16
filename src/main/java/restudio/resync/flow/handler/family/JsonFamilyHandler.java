@@ -2,6 +2,7 @@ package restudio.resync.flow.handler.family;
 
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
@@ -13,19 +14,26 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.Repairable;
+import org.bukkit.util.Vector;
 import restudio.flow.data.FlowNode;
+import restudio.flow.data.FlowTypeRef;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowMutations;
+import restudio.resync.flow.ItemStackPropertySelector;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 import restudio.resync.flow.handler.property.PropertyRegistry;
+import restudio.resync.flow.registry.NodeDefinition;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
+import java.util.UUID;
 
 public class JsonFamilyHandler implements NodeHandler {
     private static final Set<String> OPERATIONS = Set.of("get", "set", "has", "do", "execute");
@@ -48,7 +56,14 @@ public class JsonFamilyHandler implements NodeHandler {
 
     @Override
     public void execute(FlowContext ctx, FlowNode node) {
-        String property = node.getHandlerConfig() != null ? node.getHandlerConfig().getString("property") : null;
+        String property = null;
+        if (ctx.getRuntime().hasExplicitInput(node, "property")) {
+            property = ctx.getInputValue(node, "property", String.class, null);
+        }
+        if (property == null || property.isBlank()) {
+            property = ItemStackPropertySelector.text(node.getHandlerConfig() != null
+                ? node.getHandlerConfig().getString("property") : null);
+        }
         String configuredAction = node.getHandlerConfig() != null ? node.getHandlerConfig().getString("action", "get") : "get";
         String action = ctx.getInputValue(node, "action", String.class, configuredAction);
         if (property == null || property.isBlank()) {
@@ -74,8 +89,10 @@ public class JsonFamilyHandler implements NodeHandler {
             case "do", "execute" -> ctx.setOutput(node, "success", executeAction(ctx, target, property));
             case "get" -> {
                 Object value = readValue(target, property);
-                ctx.setOutput(node, "value", value);
-                ctx.setOutput(node, property, value);
+                Object genericValue = outputValue(ctx, node, "value", value);
+                Object propertyValue = outputValue(ctx, node, property, value);
+                ctx.setOutput(node, "value", genericValue);
+                ctx.setOutput(node, property, propertyValue);
             }
             default -> throw new IllegalArgumentException("Unknown property action: " + normalizedAction);
         }
@@ -93,9 +110,29 @@ public class JsonFamilyHandler implements NodeHandler {
         return propertyRegistry != null && propertyRegistry.hasProperty(familyId, property);
     }
 
+    private Object outputValue(FlowContext ctx, FlowNode node, String output, Object value) {
+        NodeDefinition.PinDefinition pin = ctx.getRuntime().resolveOutputPin(node, output);
+        if (pin == null) {
+            return value;
+        }
+        if (value instanceof UUID uuid && FlowTypeRef.simple("string").equals(pin.getTypeRef())) {
+            return uuid.toString();
+        }
+        if (value instanceof Vector && FlowTypeRef.simple("location").equals(pin.getTypeRef())) {
+            throw new IllegalStateException("Property " + familyId + "." + output + " produces a vector, not a location; its descriptor requires migration");
+        }
+        return value;
+    }
+
     private Object resolveTarget(FlowContext ctx, FlowNode node) {
         return switch (familyId) {
-            case "player" -> ctx.getInputValue(node, "target", Player.class, null);
+            case "player" -> {
+                Object raw = ctx.getRuntime().resolveInput(node, "target");
+                if (raw == null && !ctx.getRuntime().hasInputConnection(node, "target")) {
+                    yield ctx.getPlayer();
+                }
+                yield ctx.getRuntime().resolveInput(node, "target", Player.class);
+            }
             case "entity" -> ctx.getInputValue(node, "target", Entity.class, null);
             case "world" -> ctx.getInputValue(node, "target", World.class, null);
             case "block" -> ctx.getInputValue(node, "target", Block.class, null);
@@ -111,9 +148,12 @@ public class JsonFamilyHandler implements NodeHandler {
             return explicit;
         }
         String suffix = toMethodSuffix(property);
-        for (String methodName : new String[] {"get" + suffix, "is" + suffix, property}) {
+        for (String methodName : new String[] {"get" + suffix, "is" + suffix}) {
             try {
                 Method method = target.getClass().getMethod(methodName);
+                if (method.getReturnType() == Void.TYPE) {
+                    continue;
+                }
                 return method.invoke(target);
             } catch (NoSuchMethodException exception) {
                 continue;
@@ -141,7 +181,7 @@ public class JsonFamilyHandler implements NodeHandler {
             return MissingValue.INSTANCE;
         }
         return switch (property) {
-            case "uuid" -> player.getUniqueId().toString();
+            case "uuid" -> player.getUniqueId();
             case "gamemode" -> player.getGameMode().name();
             case "world" -> player.getWorld();
             case "inventory" -> player.getInventory();
@@ -155,7 +195,7 @@ public class JsonFamilyHandler implements NodeHandler {
             case "on_ground" -> player.isOnGround();
             case "sleeping" -> player.isSleeping();
             case "bed_spawn_location" -> player.getBedSpawnLocation();
-            case "last_damage" -> player.getLastDamageCause();
+            case "last_damage" -> player.getLastDamage();
             case "killer" -> player.getKiller();
             case "ping" -> player.getPing();
             case "player_list_name" -> player.getPlayerListName();
@@ -180,15 +220,15 @@ public class JsonFamilyHandler implements NodeHandler {
         }
         return switch (property) {
             case "type" -> entity.getType().name();
-            case "uuid" -> entity.getUniqueId().toString();
+            case "uuid" -> entity.getUniqueId();
             case "world" -> entity.getWorld();
             case "exists" -> entity.isValid() && !entity.isDead();
             case "is_alive" -> entity.isValid() && !entity.isDead();
             case "is_valid" -> entity.isValid();
             case "is_dead" -> entity.isDead() || !entity.isValid();
-            case "health" -> entity instanceof LivingEntity living ? living.getHealth() : 0.0;
+            case "health" -> requireLiving(entity, property).getHealth();
             case "max_health" -> maxHealth(entity);
-            case "absorption" -> entity instanceof LivingEntity living ? living.getAbsorptionAmount() : 0.0;
+            case "absorption" -> requireLiving(entity, property).getAbsorptionAmount();
             case "type_info" -> entity.getType().name();
             default -> MissingValue.INSTANCE;
         };
@@ -263,21 +303,37 @@ public class JsonFamilyHandler implements NodeHandler {
             case "lore" -> meta != null && meta.hasLore() ? meta.getLore() : List.of();
             case "durability" -> meta instanceof Damageable damageable ? damageable.getDamage() : 0;
             case "max_durability" -> item.getType().getMaxDurability();
-            case "enchantments" -> item.getEnchantments();
+            case "enchantments" -> enchantments(item);
             case "custom_model_data" -> meta != null && meta.hasCustomModelData() ? meta.getCustomModelData() : 0;
             case "unbreakable" -> meta != null && meta.isUnbreakable();
-            case "item_flags" -> meta != null ? meta.getItemFlags() : Set.of();
+            case "item_flags" -> meta == null ? List.of() : meta.getItemFlags().stream()
+                .map(Enum::name).sorted().toList();
+            case "repair_cost" -> meta instanceof Repairable repairable && repairable.hasRepairCost()
+                ? repairable.getRepairCost() : 0;
+            case "localized_name" -> meta != null && meta.hasLocalizedName() ? meta.getLocalizedName() : "";
             default -> MissingValue.INSTANCE;
         };
     }
 
     private double maxHealth(Entity entity) {
-        if (!(entity instanceof LivingEntity living)) {
-            return 0.0;
+        AttributeInstance attribute = requireLiving(entity, "max_health").getAttribute(Attribute.MAX_HEALTH);
+        if (attribute == null) {
+            throw new IllegalStateException("Property entity.max_health requires a maximum health attribute");
         }
-        return living.getAttribute(Attribute.MAX_HEALTH) != null
-            ? living.getAttribute(Attribute.MAX_HEALTH).getValue()
-            : 0.0;
+        return attribute.getValue();
+    }
+
+    private LivingEntity requireLiving(Entity entity, String property) {
+        if (entity instanceof LivingEntity living) {
+            return living;
+        }
+        throw new IllegalArgumentException("Property entity." + property + " requires a living entity");
+    }
+
+    private Map<String, Integer> enchantments(ItemStack item) {
+        Map<String, Integer> values = new LinkedHashMap<>();
+        item.getEnchantments().forEach((enchantment, level) -> values.put(enchantment.getKey().toString(), level));
+        return values;
     }
 
     private Object readContainerItems(Block block) {
@@ -393,6 +449,9 @@ public class JsonFamilyHandler implements NodeHandler {
     }
 
     private String toMethodSuffix(String property) {
+        if ("max_air".equals(property)) {
+            return "MaximumAir";
+        }
         StringBuilder builder = new StringBuilder();
         for (String part : property.split("_")) {
             if (!part.isEmpty()) {

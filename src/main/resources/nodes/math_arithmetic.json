@@ -1,0 +1,483 @@
+[
+  {
+    "id": "math_add",
+    "displayName": "Add",
+    "description": "Adds two finite numbers. Non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "add"],
+    "legacyIds": ["math.add"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "add"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "First finite number to add."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Second finite number to add."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the sum of A and B."}
+    ]
+  },
+  {
+    "id": "math_subtract",
+    "displayName": "Subtract",
+    "description": "Subtracts the second finite number from the first. Non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "subtract"],
+    "legacyIds": ["math.subtract"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "subtract"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to subtract from."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to subtract."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns A minus B."}
+    ]
+  },
+  {
+    "id": "math_multiply",
+    "displayName": "Multiply",
+    "description": "Multiplies two finite numbers. Non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "multiply"],
+    "legacyIds": ["math.multiply"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "multiply"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "First finite number to multiply."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Second finite number to multiply."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the product of A and B."}
+    ]
+  },
+  {
+    "id": "math_negate",
+    "displayName": "Negate",
+    "description": "Reverses the sign of a finite number. Non-finite input fails before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "negate"],
+    "legacyIds": ["math.negate"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "negate"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number whose sign should be reversed."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the input with its sign reversed."}
+    ]
+  },
+  {
+    "id": "math_hypotenuse",
+    "displayName": "Hypotenuse",
+    "description": "Calculates the hypotenuse of two finite side lengths. Non-finite inputs fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "geometry", "hypotenuse"],
+    "legacyIds": ["math.hypotenuse"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "hypotenuse"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "First finite side length."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Second finite side length."}
+    ],
+    "outputs": [
+      {"id": "hypotenuse", "displayName": "Hypotenuse", "name": "hypotenuse", "pinType": "DATA", "dataType": "number", "description": "Returns the length of the hypotenuse."}
+    ]
+  },
+  {
+    "id": "math_sin",
+    "displayName": "Sin",
+    "description": "Returns the sine of an angle measured in degrees, using radians for the calculation. Non-finite angles fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "sine", "degrees", "radians"],
+    "legacyIds": ["math.sin"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "sin"},
+    "inputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite angle measured in degrees."}
+    ],
+    "outputs": [
+      {"id": "sin", "displayName": "Sin", "name": "sin", "pinType": "DATA", "dataType": "number", "description": "Returns the sine of the angle."}
+    ]
+  },
+  {
+    "id": "math_cos",
+    "displayName": "Cos",
+    "description": "Returns the cosine of an angle measured in degrees, using radians for the calculation. Non-finite angles fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "cosine", "degrees", "radians"],
+    "legacyIds": ["math.cos"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "cos"},
+    "inputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite angle measured in degrees."}
+    ],
+    "outputs": [
+      {"id": "cos", "displayName": "Cos", "name": "cos", "pinType": "DATA", "dataType": "number", "description": "Returns the cosine of the angle."}
+    ]
+  },
+  {
+    "id": "math_tan",
+    "displayName": "Tan",
+    "description": "Returns the tangent of an angle measured in degrees, using radians for the calculation. Non-finite angles fail before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "tangent", "degrees", "radians"],
+    "legacyIds": ["math.tan"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "tan"},
+    "inputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite angle measured in degrees."}
+    ],
+    "outputs": [
+      {"id": "tan", "displayName": "Tan", "name": "tan", "pinType": "DATA", "dataType": "number", "description": "Returns the tangent of the angle."}
+    ]
+  },
+  {
+    "id": "math_atan",
+    "displayName": "Arc Tan",
+    "description": "Returns the arctangent of a finite number as an angle in degrees, using radians for the calculation. Non-finite input fails before a result is published.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "trigonometry", "arctangent", "degrees", "radians"],
+    "legacyIds": ["math.atan"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "atan"},
+    "inputs": [
+      {"id": "value", "displayName": "Value", "name": "value", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number whose arctangent should be returned."}
+    ],
+    "outputs": [
+      {"id": "angle_degrees", "displayName": "Angle Degrees", "name": "angle_degrees", "pinType": "DATA", "dataType": "number", "description": "Returns the arctangent angle measured in degrees."}
+    ]
+  },
+  {
+    "id": "math_random",
+    "displayName": "Random",
+    "description": "Generates a random number from min through max. The lower bound is inclusive, the upper bound is exclusive, and the defaults are 0 and 1.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "number", "random"],
+    "legacyIds": ["math.random"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "random"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "min", "target": "min"},
+        {"direction": "input", "source": "max", "target": "max"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "min", "displayName": "Min", "name": "min", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Inclusive lower bound for the generated number."},
+      {"id": "max", "displayName": "Max", "name": "max", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Exclusive upper bound for the generated number."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns a random number between the configured bounds."}
+    ]
+  },
+  {
+    "id": "math_vector_add",
+    "displayName": "Vector Add",
+    "description": "Adds the x, y, and z components of two vectors and returns the resulting vector.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "arithmetic", "add"],
+    "legacyIds": ["math.vector_add"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_add"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector to add."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector to add."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise sum of the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_subtract",
+    "displayName": "Vector Subtract",
+    "description": "Subtracts the components of the second vector from the first vector.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "arithmetic", "subtract"],
+    "legacyIds": ["math.vector_subtract"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_subtract"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "Vector from which to subtract."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Vector to subtract from the first vector."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise difference of the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_multiply",
+    "displayName": "Vector Multiply",
+    "description": "Multiplies every component of a vector by a scalar number.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "arithmetic", "multiply"],
+    "legacyIds": ["math.vector_multiply"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_multiply"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "scalar", "target": "scalar"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose components should be scaled."},
+      {"id": "scalar", "displayName": "Scalar", "name": "scalar", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number applied to each vector component."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector after scalar multiplication."}
+    ]
+  },
+  {
+    "id": "math_vector_multiply_components",
+    "displayName": "Vector Multiply Components",
+    "description": "Multiplies matching x, y, and z components from two vectors.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "arithmetic", "components", "multiply"],
+    "legacyIds": ["math.vector_multiply_components"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_multiply_components"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector whose components should be multiplied."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector whose components should be multiplied."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise product of the two vectors."}
+    ]
+  },
+  {
+    "id": "math_vector_cross",
+    "displayName": "Vector Cross",
+    "description": "Calculates the three-dimensional cross product of two vectors.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "cross", "product"],
+    "legacyIds": ["math.vector_cross"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_cross"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector in the cross product."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector in the cross product."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector perpendicular to both inputs."}
+    ]
+  },
+  {
+    "id": "math_vector_dot",
+    "displayName": "Vector Dot",
+    "description": "Calculates the dot product of two vectors.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "dot", "product"],
+    "legacyIds": ["math.vector_dot"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_dot"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result", "target": "result"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "First vector in the dot product."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Second vector in the dot product."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the scalar dot product of the two vectors."}
+    ]
+  }
+]

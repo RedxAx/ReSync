@@ -21,14 +21,14 @@ class WorkspaceRevisionTest {
     }
 
     @Test
-    void boundsRememberedOperationResults() {
+    void retainsAcceptedOperationsAndRejectsIdReuseWithAnotherPayload() {
         WorkspaceRevision<String> revision = new WorkspaceRevision<>(0L, 2);
-        revision.advance("first", sequence -> "first");
-        revision.advance("second", sequence -> "second");
-        revision.advance("third", sequence -> "third");
+        revision.advance("first", "hash-one", sequence -> "first");
+        revision.advance("second", "hash-two", sequence -> "second");
+        revision.advance("third", "hash-three", sequence -> "third");
 
-        assertEquals(2, revision.operations().size());
-        assertEquals(WorkspaceRevision.Status.CONFLICT, revision.assess(0L, "first").status());
-        assertEquals(WorkspaceRevision.Status.DUPLICATE, revision.assess(1L, "second").status());
+        assertEquals(3, revision.operations().size());
+        assertEquals(WorkspaceRevision.Status.DUPLICATE, revision.assess(0L, "first", "hash-one").status());
+        assertEquals(WorkspaceRevision.Status.MISMATCH, revision.assess(0L, "first", "different").status());
     }
 }

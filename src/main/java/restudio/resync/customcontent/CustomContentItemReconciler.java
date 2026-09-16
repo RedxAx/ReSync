@@ -24,12 +24,14 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import restudio.flow.data.CustomContentDefinition;
 import restudio.resync.ReSync;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 import restudio.resync.world.WorldManagementManager;
 import restudio.resync.world.WorldManagementService;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
@@ -37,12 +39,19 @@ import java.util.function.UnaryOperator;
 class CustomContentItemReconciler {
     private final CustomContentStorage storage;
     private final CustomContentService service;
+    private final PaperPlayerDataMutationAdmission playerDataAdmission;
     private final CustomContentOfflinePlayerDataReconciler offlinePlayerDataReconciler;
 
     CustomContentItemReconciler(CustomContentStorage storage, CustomContentService service) {
+        this(storage, service, PaperPlayerDataMutationAdmission.shared());
+    }
+
+    CustomContentItemReconciler(CustomContentStorage storage, CustomContentService service,
+                                PaperPlayerDataMutationAdmission playerDataAdmission) {
         this.storage = storage;
         this.service = service;
-        this.offlinePlayerDataReconciler = new CustomContentOfflinePlayerDataReconciler(this);
+        this.playerDataAdmission = Objects.requireNonNull(playerDataAdmission, "playerDataAdmission");
+        this.offlinePlayerDataReconciler = new CustomContentOfflinePlayerDataReconciler(this, playerDataAdmission);
     }
 
     void reconcileContent(String contentId) {
@@ -113,18 +122,20 @@ class CustomContentItemReconciler {
     }
 
     private void reconcilePlayerNow(Player player, String contentId, boolean clearDeleted) {
-        PlayerInventory inventory = player.getInventory();
-        reconcileInventoryNow(inventory, contentId, clearDeleted);
-        reconcileInventoryNow(player.getEnderChest(), contentId, clearDeleted);
-        ItemStack cursor = player.getItemOnCursor();
-        ItemStack updatedCursor = transformItem(cursor, contentId, clearDeleted);
-        if (updatedCursor != cursor) {
-            player.setItemOnCursor(updatedCursor);
-        }
-        if (player.getOpenInventory() != null) {
-            reconcileInventoryNow(player.getOpenInventory().getTopInventory(), contentId, clearDeleted);
-        }
-        player.updateInventory();
+        playerDataAdmission.mutatePlayer("custom-content-player-reconcile:" + player.getUniqueId(), player, () -> {
+            PlayerInventory inventory = player.getInventory();
+            reconcileInventoryNow(inventory, contentId, clearDeleted);
+            reconcileInventoryNow(player.getEnderChest(), contentId, clearDeleted);
+            ItemStack cursor = player.getItemOnCursor();
+            ItemStack updatedCursor = transformItem(cursor, contentId, clearDeleted);
+            if (updatedCursor != cursor) {
+                player.setItemOnCursor(updatedCursor);
+            }
+            if (player.getOpenInventory() != null) {
+                reconcileInventoryNow(player.getOpenInventory().getTopInventory(), contentId, clearDeleted);
+            }
+            player.updateInventory();
+        });
     }
 
     private void reconcileEntity(Entity entity, String contentId, boolean clearDeleted) {
@@ -155,7 +166,7 @@ class CustomContentItemReconciler {
             default -> {
             }
         }
-        if (entity instanceof InventoryHolder holder) {
+        if (!(entity instanceof Player) && entity instanceof InventoryHolder holder) {
             reconcileInventoryNow(holder.getInventory(), contentId, clearDeleted);
         }
     }

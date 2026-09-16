@@ -57,6 +57,7 @@ import restudio.resync.flow.automation.AutomationTaskService;
 import restudio.resync.flow.automation.TimerDefinition;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.network.paper.PaperPlayerDataMutationAdmission;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -79,6 +80,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private final Map<UUID, ItemStack> disarmedItems = new ConcurrentHashMap<>();
     private final Map<String, CooldownEntry> cooldowns = new ConcurrentHashMap<>();
     private final AutomationTaskService automationTasks;
+    private final PaperPlayerDataMutationAdmission playerDataAdmission = PaperPlayerDataMutationAdmission.shared();
 
     public AbilityEffectHandler() {
         this(null);
@@ -213,7 +215,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             int amplifier = integer(ctx, node, "amplifier", 0);
             PotionEffectType type = requirePotionEffect(effectName);
             requireEffectValues(duration, amplifier);
-            target.addPotionEffect(new PotionEffect(type, duration, amplifier));
+            mutateEntity(target, "flow-ability-potion", () -> target.addPotionEffect(new PotionEffect(type, duration, amplifier)));
             ctx.triggerOutput("flow");
         });
         operations.put("launch_projectile", (ctx, node) -> {
@@ -294,7 +296,9 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             double percent = number(ctx, node, "percent", 100.0);
             if (!Double.isFinite(percent) || percent < 0) throw new IllegalArgumentException("Reflected damage percent must be a finite non-negative number");
             if (!(ctx.getEvent() instanceof EntityDamageByEntityEvent damageEvent) || !(damageEvent.getDamager() instanceof LivingEntity damager)) throw new IllegalArgumentException("Reflect Damage requires an entity damage event with a living damager");
-            damage(damager, damageEvent.getDamage() * percent / 100.0, damageEvent.getEntity());
+            double amount = damageEvent.getDamage() * percent / 100.0;
+            Entity source = damageEvent.getEntity();
+            FlowMutations.afterDamageEvent(ctx, damager, () -> damage(damager, amount, source));
             ctx.triggerOutput("flow");
         });
         operations.put("launch_target", (ctx, node) -> {
@@ -358,12 +362,12 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         operations.put("push_entities", (ctx, node) -> moveArea(ctx, node, 1));
         operations.put("ignite_target", (ctx, node) -> {
             Entity target = requireTarget(ctx, node);
-            target.setFireTicks(requireDuration(integer(ctx, node, "ticks", 100)));
+            mutateEntity(target, "flow-ability-ignite", () -> target.setFireTicks(requireDuration(integer(ctx, node, "ticks", 100))));
             ctx.triggerOutput("flow");
         });
         operations.put("freeze_target", (ctx, node) -> {
             Entity target = requireTarget(ctx, node);
-            target.setFreezeTicks(requireDuration(integer(ctx, node, "ticks", 100)));
+            mutateEntity(target, "flow-ability-freeze", () -> target.setFreezeTicks(requireDuration(integer(ctx, node, "ticks", 100))));
             ctx.triggerOutput("flow");
         });
         operations.put("set_velocity", (ctx, node) -> {
@@ -462,13 +466,13 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 target.setYaw(player.getLocation().getYaw());
                 target.setPitch(player.getLocation().getPitch());
             }
-            player.teleport(target);
+            mutateEntity(player, "flow-ability-teleport-caster", () -> player.teleport(target));
             ctx.triggerOutput("flow");
         });
         operations.put("teleport_target", (ctx, node) -> {
             Entity target = requireTarget(ctx, node);
             Location location = requireLocation(ctx, node);
-            target.teleport(location);
+            mutateEntity(target, "flow-ability-teleport-target", () -> target.teleport(location));
             ctx.triggerOutput("flow");
         });
         operations.put("beam", (ctx, node) -> {
@@ -751,7 +755,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ItemStack item = requireItem(ctx, node);
             String key = string(ctx, node, "key", "charge");
             double value = number(ctx, node, "value", 0.0);
-            setCharge(item, key, value);
+            mutateItem(ctx, "flow-ability-set-charge", () -> setCharge(item, key, value));
             ctx.setOutput(node, "item", item);
             ctx.setOutput(node, "value", value);
             ctx.triggerOutput("flow");
@@ -760,7 +764,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             ItemStack item = requireItem(ctx, node);
             String key = string(ctx, node, "key", "charge");
             double value = getCharge(item, key) + number(ctx, node, "amount", 1.0);
-            setCharge(item, key, value);
+            mutateItem(ctx, "flow-ability-add-charge", () -> setCharge(item, key, value));
             ctx.setOutput(node, "item", item);
             ctx.setOutput(node, "value", value);
             ctx.triggerOutput("flow");
@@ -773,7 +777,8 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             boolean success = value >= amount;
             if (success) {
                 value -= amount;
-                setCharge(item, key, value);
+                double consumedValue = value;
+                mutateItem(ctx, "flow-ability-consume-charge", () -> setCharge(item, key, consumedValue));
             }
             ctx.setOutput(node, "item", item);
             ctx.setOutput(node, "value", value);
@@ -845,7 +850,8 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             Player player = requirePlayer(ctx, node, "player");
             ItemStack heldItem = requireItem(ctx, node);
             String mode = string(ctx, node, "mode", "potion");
-            boolean success = applyHoldingEffect(ctx, node, player, heldItem, mode);
+            boolean success = playerDataAdmission.mutatePlayer("flow-ability-holding-effect", player,
+                () -> applyHoldingEffect(ctx, node, player, heldItem, mode));
             ctx.setOutput(node, "item", heldItem);
             ctx.setOutput(node, "success", success);
             if (!success) {
@@ -914,31 +920,35 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private void disarm(FlowContext context, Player player, int duration) {
-        PlayerInventory inventory = player.getInventory();
-        ItemStack item = inventory.getItemInMainHand();
-        if (item == null || item.getType().isAir()) throw new IllegalArgumentException("Target player is not holding an item");
-        if (disarmedItems.putIfAbsent(player.getUniqueId(), item.clone()) != null) throw new IllegalStateException("Target player is already disarmed");
-        inventory.setItemInMainHand(new ItemStack(Material.AIR));
-        try {
-            context.runLater(() -> restoreDisarmed(player), duration);
-        } catch (RuntimeException exception) {
-            restoreDisarmed(player);
-            throw exception;
-        }
+        playerDataAdmission.mutatePlayer("flow-ability-disarm", player, () -> {
+            PlayerInventory inventory = player.getInventory();
+            ItemStack item = inventory.getItemInMainHand();
+            if (item == null || item.getType().isAir()) throw new IllegalArgumentException("Target player is not holding an item");
+            if (disarmedItems.putIfAbsent(player.getUniqueId(), item.clone()) != null) throw new IllegalStateException("Target player is already disarmed");
+            inventory.setItemInMainHand(new ItemStack(Material.AIR));
+            try {
+                context.runLater(() -> restoreDisarmed(player), duration);
+            } catch (RuntimeException exception) {
+                restoreDisarmed(player);
+                throw exception;
+            }
+        });
     }
 
     private void restoreDisarmed(Player player) {
         if (player == null) return;
         ItemStack stored = disarmedItems.get(player.getUniqueId());
         if (stored == null) return;
-        PlayerInventory inventory = player.getInventory();
-        ItemStack current = inventory.getItemInMainHand();
-        if (current == null || current.getType().isAir()) {
-            inventory.setItemInMainHand(stored);
-        } else {
-            inventory.addItem(stored).values().forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-        }
-        disarmedItems.remove(player.getUniqueId(), stored);
+        playerDataAdmission.mutatePlayer("flow-ability-restore-disarm", player, () -> {
+            PlayerInventory inventory = player.getInventory();
+            ItemStack current = inventory.getItemInMainHand();
+            if (current == null || current.getType().isAir()) {
+                inventory.setItemInMainHand(stored);
+            } else {
+                inventory.addItem(stored).values().forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+            }
+            disarmedItems.remove(player.getUniqueId(), stored);
+        });
     }
 
     private boolean cooldownReady(FlowContext ctx, FlowNode node, String fallbackKey) {
@@ -1204,11 +1214,11 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
                 }
             }
             case "ignite" -> {
-                entity.setFireTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)));
+                mutateEntity(entity, "flow-ability-ignite", () -> entity.setFireTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100))));
                 return true;
             }
             case "freeze" -> {
-                entity.setFreezeTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100)));
+                mutateEntity(entity, "flow-ability-freeze", () -> entity.setFreezeTicks(integer(ctx, node, "duration_ticks", integer(ctx, node, "ticks", 100))));
                 return true;
             }
             case "stun" -> {
@@ -1411,7 +1421,7 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         int duration = Math.min(200, Math.max(1, integer(ctx, node, "duration_ticks", 20)));
         double arrivalRadius = Math.max(0.05, number(ctx, node, "arrival_radius", 0.35));
         LeapResult result = leapPath(target, start, requestedLocation, duration);
-        target.setVelocity(new Vector(0.0, 0.0, 0.0));
+        mutateEntity(target, "flow-ability-leap-start", () -> target.setVelocity(new Vector(0.0, 0.0, 0.0)));
         for (int tick = 1; tick <= result.points().size(); tick++) {
             int scheduledTick = tick;
             Location point = result.points().get(tick - 1);
@@ -1424,8 +1434,10 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
             Location current = target.getLocation();
             Location destination = result.destination();
             if (current.getWorld() != null && current.getWorld().equals(destination.getWorld()) && current.distanceSquared(destination) <= arrivalRadius * arrivalRadius) {
-                target.setVelocity(new Vector(0.0, 0.0, 0.0));
-                target.setFallDistance(0.0f);
+                mutateEntity(target, "flow-ability-leap-arrival", () -> {
+                    target.setVelocity(new Vector(0.0, 0.0, 0.0));
+                    target.setFallDistance(0.0f);
+                });
             }
         }, duration + 1);
         return result;
@@ -1483,20 +1495,22 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private void moveAlongLeapPath(Entity target, Location point) {
-        if (!target.isValid() || !hasEntitySpace(target, point)) {
-            return;
-        }
-        Location current = target.getLocation();
-        if (target instanceof Player) {
-            target.setVelocity(point.toVector().subtract(current.toVector()));
-        } else {
-            Location targetLocation = point.clone();
-            targetLocation.setYaw(current.getYaw());
-            targetLocation.setPitch(current.getPitch());
-            target.teleport(targetLocation);
-            target.setVelocity(new Vector(0.0, 0.0, 0.0));
-        }
-        target.setFallDistance(0.0f);
+        mutateEntity(target, "flow-ability-leap-step", () -> {
+            if (!target.isValid() || !hasEntitySpace(target, point)) {
+                return;
+            }
+            Location current = target.getLocation();
+            if (target instanceof Player) {
+                target.setVelocity(point.toVector().subtract(current.toVector()));
+            } else {
+                Location targetLocation = point.clone();
+                targetLocation.setYaw(current.getYaw());
+                targetLocation.setPitch(current.getPitch());
+                target.teleport(targetLocation);
+                target.setVelocity(new Vector(0.0, 0.0, 0.0));
+            }
+            target.setFallDistance(0.0f);
+        });
     }
 
     private Location nearestLeapDestination(Entity target, Location destination) {
@@ -1771,13 +1785,13 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     }
 
     private void damage(LivingEntity target, double amount, Entity source) {
-        CustomContentListener.runSuppressingDamageAbilities(() -> {
+        mutateEntity(target, "flow-ability-damage", () -> CustomContentListener.runSuppressingDamageAbilities(() -> {
             if (source != null) {
                 target.damage(amount, source);
             } else {
                 target.damage(amount);
             }
-        });
+        }));
     }
 
     private boolean bool(FlowContext ctx, FlowNode node, String pin, boolean fallback) {
@@ -1852,7 +1866,8 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
     private void addEffect(LivingEntity living, String name, int duration, int amplifier) {
         PotionEffectType type = requirePotionEffect(name);
         requireEffectValues(duration, amplifier);
-        living.addPotionEffect(new PotionEffect(type, duration, amplifier, false, false, false));
+        mutateEntity(living, "flow-ability-potion", () ->
+            living.addPotionEffect(new PotionEffect(type, duration, amplifier, false, false, false)));
     }
 
     private PotionEffectType requirePotionEffect(String name) {
@@ -2095,6 +2110,23 @@ public class AbilityEffectHandler implements NodeHandler, Listener {
         String id = "legacy.cooldown." + name.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]+", "_");
         TimerDefinition definition = new TimerDefinition(id, name, "", scope, false, 0D, TimerDefinition.TimeUnit.TICKS, 0D);
         return new LegacyCooldown(definition, owner, new AutomationInstanceKey(id, scope, owner.id()));
+    }
+
+    private void mutateEntity(Entity entity, String operation, Runnable mutation) {
+        if (entity instanceof Player player) {
+            playerDataAdmission.mutatePlayer(operation + ":" + player.getUniqueId(), player, mutation);
+            return;
+        }
+        mutation.run();
+    }
+
+    private void mutateItem(FlowContext context, String operation, Runnable mutation) {
+        Player player = context.getPlayer();
+        if (player == null) {
+            mutation.run();
+            return;
+        }
+        playerDataAdmission.mutatePlayer(operation + ":" + player.getUniqueId(), player, mutation);
     }
 
     private record CooldownEntry(long startedAt, long readyAt) {

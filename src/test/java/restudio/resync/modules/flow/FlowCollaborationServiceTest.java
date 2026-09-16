@@ -86,6 +86,37 @@ class FlowCollaborationServiceTest {
     }
 
     @Test
+    void linksDirectAndMinecraftBridgeSessionsForTheSameClient() {
+        Set<Session> sessions = ConcurrentHashMap.newKeySet();
+        Session direct = session("direct", "remotely-device", "collaboration_presence");
+        Session bridge = session("bridge", "bridge:15e748bd-d368-4bf8-a846-0936d51f405f:remotely-device", "collaboration_presence");
+        Session other = session("other", "bridge:32740ba5-aa56-4c20-bd1f-d56e011dd93b:remotely-device", "collaboration_presence");
+        CollaborationIdentity owner = new CollaborationIdentity("user", "Alex", "", "restudio");
+        direct.setCollaborationIdentity(owner);
+        bridge.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "minecraft"));
+        other.setCollaborationIdentity(new CollaborationIdentity("user", "Alex", "", "restudio"));
+        sessions.addAll(List.of(direct, bridge, other));
+        RecordingSender sender = new RecordingSender(sessions);
+        FlowCollaborationService service = new FlowCollaborationService(sessions, sender);
+
+        service.subscribe(direct);
+        service.subscribe(bridge);
+        service.subscribe(other);
+
+        JsonObject directSnapshot = JsonParser.parseString(sender.presenceByRecipient.get("direct")).getAsJsonObject();
+        assertEquals(Set.of("direct", "bridge"), directSnapshot.getAsJsonArray("selfSessionIds").asList().stream()
+            .map(value -> value.getAsString()).collect(Collectors.toSet()));
+        assertEquals(Set.of("other"), directSnapshot.getAsJsonArray("collaborators").asList().stream()
+            .map(value -> value.getAsJsonObject().get("sessionId").getAsString()).collect(Collectors.toSet()));
+
+        JsonObject bridgeSnapshot = JsonParser.parseString(sender.presenceByRecipient.get("bridge")).getAsJsonObject();
+        assertEquals(Set.of("direct", "bridge"), bridgeSnapshot.getAsJsonArray("selfSessionIds").asList().stream()
+            .map(value -> value.getAsString()).collect(Collectors.toSet()));
+        assertEquals(Set.of("other"), bridgeSnapshot.getAsJsonArray("collaborators").asList().stream()
+            .map(value -> value.getAsJsonObject().get("sessionId").getAsString()).collect(Collectors.toSet()));
+    }
+
+    @Test
     void publishesTheExplicitCommitAuthorAcrossThreads() {
         Set<Session> sessions = ConcurrentHashMap.newKeySet();
         Session session = session("direct", "resource_events");
@@ -106,9 +137,13 @@ class FlowCollaborationServiceTest {
     }
 
     private Session session(String id, String capability) {
+        return session(id, id, capability);
+    }
+
+    private Session session(String id, String clientId, String capability) {
         ConnectionInfo connection = new ConnectionInfo(null, id.hashCode());
         connection.setClientCapabilities(Set.of(capability));
-        return new Session(id, id, connection);
+        return new Session(id, clientId, connection);
     }
 
     private static final class RecordingSender extends FlowPacketSender {

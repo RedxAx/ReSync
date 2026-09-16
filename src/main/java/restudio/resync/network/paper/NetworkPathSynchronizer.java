@@ -12,6 +12,7 @@ import restudio.resync.network.NetworkResourceMutation;
 import restudio.resync.network.NetworkResourceQuery;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.PathPolicy;
 import restudio.resync.network.paper.ReSyncNetworkAgentConfig.ResourceConflictPolicy;
+import restudio.resync.migration.MigrationPaths;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +31,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
@@ -48,27 +51,53 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     private final ReSyncNetworkAgent agent;
     private final PathPolicy policy;
     private final String resourceType;
+    private volatile Path dataDirectory;
+    private final Path operatorDataDirectory;
     private final Path serverDirectory;
     private final List<PathRoot> roots;
     private final Set<Path> protectedPaths;
     private final int maximumPayloadBytes;
     private final NetworkResourceManifestStore manifest;
+    private final NetworkPersistenceDrainController persistenceDrain;
+    private final NetworkPersistenceDrainController.Registration manifestRegistration;
+    private final NetworkPersistenceDrainController.Registration producerRegistration;
     private final Map<String, CompletableFuture<Void>> work = new ConcurrentHashMap<>();
     private final Map<String, PendingMutation> pending = new ConcurrentHashMap<>();
     private final RemoteChangeTracker remoteChanges = new RemoteChangeTracker();
     private final AtomicBoolean synchronizing = new AtomicBoolean();
     private final AtomicBoolean scanning = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean persistenceQuiesced = new AtomicBoolean();
     private volatile boolean ready;
+    private volatile String startupFailure;
     private volatile int synchronizationFailures;
     private volatile long nextSynchronizationAttemptAt;
     private BukkitTask scanTask;
     private BukkitTask commandTask;
+    private NetworkPersistenceDrainController.Lease commandLease;
+    private long commandGeneration;
 
     public NetworkPathSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, ReSyncNetworkAgentConfig config, PathPolicy policy, Path serverDirectory, Path dataDirectory) {
+        this(plugin, agent, config, policy, serverDirectory, dataDirectory, dataDirectory,
+            agent == null ? null : agent.persistenceDrain());
+    }
+
+    public NetworkPathSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, ReSyncNetworkAgentConfig config, PathPolicy policy, Path serverDirectory, Path dataDirectory, NetworkPersistenceDrainController persistenceDrain) {
+        this(plugin, agent, config, policy, serverDirectory, dataDirectory, dataDirectory, persistenceDrain);
+    }
+
+    public NetworkPathSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, ReSyncNetworkAgentConfig config, PathPolicy policy, Path serverDirectory, Path dataDirectory, Path operatorDataDirectory) {
+        this(plugin, agent, config, policy, serverDirectory, dataDirectory, operatorDataDirectory,
+            agent == null ? null : agent.persistenceDrain());
+    }
+
+    public NetworkPathSynchronizer(ReSync plugin, ReSyncNetworkAgent agent, ReSyncNetworkAgentConfig config, PathPolicy policy, Path serverDirectory, Path dataDirectory, Path operatorDataDirectory, NetworkPersistenceDrainController persistenceDrain) {
         this.plugin = plugin;
         this.agent = agent;
         Path normalizedDataDirectory = dataDirectory.toAbsolutePath().normalize();
+        Path normalizedOperatorDataDirectory = operatorDataDirectory.toAbsolutePath().normalize();
+        this.dataDirectory = normalizedDataDirectory;
+        this.operatorDataDirectory = normalizedOperatorDataDirectory;
         if (policy == null) {
             throw new IllegalArgumentException("Path Sync Policy Is Required");
         }
@@ -77,10 +106,15 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
         this.serverDirectory = serverDirectory.toAbsolutePath().normalize();
         this.roots = roots(this.policy.entries());
         this.maximumPayloadBytes = Math.min(config == null ? 0 : config.maximumPayloadBytes(), NetworkResourceCodec.MAXIMUM_RESOURCE_BYTES);
+        this.persistenceDrain = persistenceDrain;
         Set<Path> protectedPaths = new LinkedHashSet<>();
+        protectedPaths.add(normalizedDataDirectory);
         protectedPaths.add(normalizedDataDirectory.resolve("network"));
         protectedPaths.add(normalizedDataDirectory.resolve("resync.properties"));
         protectedPaths.add(normalizedDataDirectory.resolve("config.properties"));
+        protectedPaths.add(normalizedOperatorDataDirectory.resolve("network"));
+        protectedPaths.add(normalizedOperatorDataDirectory.resolve("resync.properties"));
+        protectedPaths.add(normalizedOperatorDataDirectory.resolve("nodes"));
         if (config != null && config.credentialFile() != null) {
             protectedPaths.add(config.credentialFile().toAbsolutePath().normalize());
         }
@@ -89,36 +123,143 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
         }
         this.protectedPaths = Set.copyOf(protectedPaths);
         this.manifest = new NetworkResourceManifestStore(dataDirectory, "path-manifest-" + policy.id() + ".json");
+        NetworkPersistenceDrainController.Registration registeredManifest = null;
+        NetworkPersistenceDrainController.Registration registeredProducer = null;
+        if (persistenceDrain != null) {
+            try {
+                registeredManifest = persistenceDrain.register(manifest.persistenceComponent("path-manifest:" + policy.id()));
+                registeredProducer = persistenceDrain.registerProducer(new NetworkPersistenceDrainController.Producer() {
+                    @Override
+                    public String owner() {
+                        return "path-synchronizer:" + NetworkPathSynchronizer.this.policy.id();
+                    }
+
+                    @Override
+                    public void closeAdmission() {
+                        closeAdmissionForDrain();
+                    }
+
+                    @Override
+                    public CompletionStage<NetworkPersistenceDrainController.AbortResult> abortPending() {
+                        ready = false;
+                        return CompletableFuture.completedFuture(NetworkPersistenceDrainController.AbortResult.completed());
+                    }
+
+                    @Override
+                    public void resumeAdmission() {
+                        resumeAdmissionAfterDrain();
+                    }
+                });
+            } catch (RuntimeException exception) {
+                if (registeredProducer != null) {
+                    registeredProducer.close();
+                }
+                if (registeredManifest != null) {
+                    registeredManifest.close();
+                }
+                throw exception;
+            }
+        }
+        manifestRegistration = registeredManifest;
+        producerRegistration = registeredProducer;
     }
 
     public void start() {
+        requirePrimaryThread();
         if (!policy.enabled()) {
             return;
         }
-        agent.addListener(this);
-        scanTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::scan, SCAN_INTERVAL_TICKS, SCAN_INTERVAL_TICKS);
-        if (agent.connected()) {
-            synchronize();
+        try {
+            manifest.healthCheck();
+        } catch (IOException | RuntimeException exception) {
+            startupFailure = rootMessage(exception);
+            prepareForShutdown();
+            Log.warn("ReSync path synchronization persistence is unavailable: " + startupFailure);
+            return;
+        }
+        try {
+            agent.addListener(this);
+            scanTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::scan, SCAN_INTERVAL_TICKS, SCAN_INTERVAL_TICKS);
+            if (agent.connected()) {
+                synchronize();
+            }
+        } catch (RuntimeException exception) {
+            shutdown();
+            throw exception;
         }
     }
 
     public synchronized void shutdown() {
-        if (!closed.compareAndSet(false, true)) {
+        requirePrimaryThread();
+        prepareForShutdown();
+        finalizeShutdown();
+    }
+
+    public synchronized void prepareForShutdown() {
+        requirePrimaryThread();
+        if (closed.get()) {
+            closeAdmissionForDrain();
+            prepareBukkitAdmission();
             return;
         }
-        ready = false;
-        agent.removeListener(this);
-        if (scanTask != null) {
-            scanTask.cancel();
-            scanTask = null;
+        closeAdmissionForDrain();
+        prepareBukkitAdmission();
+        closed.set(true);
+    }
+
+    public synchronized void finalizeShutdown() {
+        if (producerRegistration != null) {
+            producerRegistration.close();
         }
-        if (commandTask != null) {
-            commandTask.cancel();
-            commandTask = null;
+        if (manifestRegistration != null) {
+            manifestRegistration.close();
         }
-        work.clear();
-        pending.clear();
-        remoteChanges.clear();
+    }
+
+    public void flushPersistence() throws IOException {
+        manifest.flush();
+    }
+
+    public void quiescePersistence() throws IOException {
+        closeAdmissionForDrain();
+        if (!persistenceQuiesced.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            manifest.quiesce();
+        } catch (IOException | RuntimeException exception) {
+            persistenceQuiesced.set(false);
+            throw exception;
+        }
+    }
+
+    public void resumePersistence() throws IOException {
+        if (!persistenceQuiesced.get()) {
+            return;
+        }
+        manifest.resume();
+        persistenceQuiesced.set(false);
+        resumeAdmissionAfterDrain();
+    }
+
+    public void rebindPersistence(Path networkRoot) throws IOException {
+        if (!persistenceQuiesced.get()) {
+            throw new IOException("ReSync path synchronization persistence must be quiesced before rebind");
+        }
+        Path candidateNetworkRoot = MigrationPaths.requireDirectory(networkRoot, "networkRoot");
+        Path candidateDataDirectory = candidateNetworkRoot.getParent();
+        if (candidateDataDirectory == null) {
+            throw new IOException("ReSync path synchronization data root is unavailable");
+        }
+        manifest.rebind(candidateNetworkRoot);
+        dataDirectory = candidateDataDirectory;
+    }
+
+    public void healthCheckPersistence() throws IOException {
+        if (startupFailure != null) {
+            throw new IOException("ReSync path synchronization startup failed: " + startupFailure);
+        }
+        manifest.healthCheck();
     }
 
     @Override
@@ -130,7 +271,7 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
 
     @Override
     public void onResourceChanged(NetworkResource resource) {
-        if (closed.get() || !resourceType.equals(resource.type()) || resource.originNodeId().equals(agent.nodeId()) || root(resource.resourceId()).isEmpty()) {
+        if (closed.get() || persistenceQuiesced.get() || !resourceType.equals(resource.type()) || resource.originNodeId().equals(agent.nodeId()) || root(resource.resourceId()).isEmpty()) {
             return;
         }
         NetworkResourceManifestStore.Entry known = manifest.get(resource.type(), resource.resourceId());
@@ -143,15 +284,23 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private void synchronize() {
-        if (closed.get() || !agent.connected() || System.currentTimeMillis() < nextSynchronizationAttemptAt || !synchronizing.compareAndSet(false, true)) {
+        if (closed.get() || persistenceQuiesced.get() || !agent.connected() || System.currentTimeMillis() < nextSynchronizationAttemptAt || !synchronizing.compareAndSet(false, true)) {
             return;
         }
         ready = false;
+        NetworkPersistenceDrainController.Lease lease = admit("path-synchronization");
+        if (persistenceDrain != null && lease == null) {
+            synchronizing.set(false);
+            return;
+        }
         fetchRemote(NetworkResourceQuery.firstPage(), new ArrayList<>())
             .thenCombine(CompletableFuture.supplyAsync(this::snapshotLocal), Reconciliation::new)
             .thenCompose(reconciliation -> reconcile(reconciliation.remote(), reconciliation.local()))
             .whenComplete((unused, throwable) -> {
                 synchronizing.set(false);
+                if (lease != null) {
+                    lease.close();
+                }
                 if (throwable != null) {
                     scheduleSynchronizationRetry();
                     Log.warn("ReSync path synchronization failed: " + rootMessage(throwable));
@@ -313,7 +462,7 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private void scan() {
-        if (closed.get() || !agent.connected()) {
+        if (closed.get() || persistenceQuiesced.get() || !agent.connected()) {
             return;
         }
         if (!ready) {
@@ -321,6 +470,11 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             return;
         }
         if (!scanning.compareAndSet(false, true)) {
+            return;
+        }
+        NetworkPersistenceDrainController.Lease lease = admit("path-scan");
+        if (persistenceDrain != null && lease == null) {
+            scanning.set(false);
             return;
         }
         try {
@@ -339,6 +493,9 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             });
         } finally {
             scanning.set(false);
+            if (lease != null) {
+                lease.close();
+            }
         }
     }
 
@@ -363,6 +520,9 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private CompletableFuture<Void> publish(PendingMutation mutation, long expectedRevision, int conflictAttempts) {
+        if (persistenceQuiesced.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("ReSync path synchronization persistence is quiesced"));
+        }
         if (!agent.connected()) {
             pending.put(key(mutation.resourceId()), mutation);
             return CompletableFuture.completedFuture(null);
@@ -392,6 +552,9 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private CompletableFuture<Void> apply(NetworkResource resource) {
+        if (persistenceQuiesced.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("ReSync path synchronization persistence is quiesced"));
+        }
         return CompletableFuture.runAsync(() -> {
             PathRoot root = root(resource.resourceId()).orElseThrow(() -> new IllegalArgumentException("Shared file is outside the selected paths"));
             Path target = safeTarget(resource.resourceId());
@@ -443,26 +606,56 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
         if (closed.get() || policy.commands().isEmpty()) {
             return;
         }
+        long nextGeneration = ++commandGeneration;
         if (commandTask != null) {
             commandTask.cancel();
-        }
-        commandTask = Bukkit.getScheduler().runTaskLater(plugin, this::runCommands, COMMAND_SETTLE_TICKS);
-    }
-
-    private void runCommands() {
-        synchronized (this) {
             commandTask = null;
         }
-        if (closed.get()) {
+        if (commandLease != null) {
+            commandLease.close();
+            commandLease = null;
+        }
+        commandLease = admit("path-command:" + policy.id());
+        if (persistenceDrain != null && commandLease == null) {
             return;
         }
-        for (String command : policy.commands()) {
-            try {
-                if (!Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command)) {
-                    Log.warn("Path Sync command was not accepted for " + policy.name() + ": " + command);
+        try {
+            commandTask = Bukkit.getScheduler().runTaskLater(plugin, () -> runCommands(nextGeneration), COMMAND_SETTLE_TICKS);
+        } catch (RuntimeException exception) {
+            if (commandLease != null) {
+                commandLease.close();
+                commandLease = null;
+            }
+            throw exception;
+        }
+    }
+
+    private void runCommands(long expectedGeneration) {
+        NetworkPersistenceDrainController.Lease lease;
+        synchronized (this) {
+            if (expectedGeneration != commandGeneration) {
+                return;
+            }
+            commandTask = null;
+            lease = commandLease;
+            commandLease = null;
+        }
+        try {
+            if (closed.get()) {
+                return;
+            }
+            for (String command : policy.commands()) {
+                try {
+                    if (!Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command)) {
+                        Log.warn("Path Sync command was not accepted for " + policy.name() + ": " + command);
+                    }
+                } catch (RuntimeException exception) {
+                    Log.warn("Path Sync command failed for " + policy.name() + ": " + rootMessage(exception));
                 }
-            } catch (RuntimeException exception) {
-                Log.warn("Path Sync command failed for " + policy.name() + ": " + rootMessage(exception));
+            }
+        } finally {
+            if (lease != null) {
+                lease.close();
             }
         }
     }
@@ -540,6 +733,10 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
     }
 
     private void enqueue(String key, Supplier<CompletableFuture<Void>> operation) {
+        NetworkPersistenceDrainController.Lease lease = admit("path-operation:" + key);
+        if (persistenceDrain != null && lease == null) {
+            return;
+        }
         work.compute(key, (ignored, previous) -> {
             CompletableFuture<Void> base = previous == null ? CompletableFuture.completedFuture(null) : previous.handle((unused, throwable) -> null);
             CompletableFuture<Void> next = base.thenCompose(unused -> {
@@ -554,12 +751,75 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
             });
             next.whenComplete((unused, throwable) -> {
                 work.remove(key, next);
+                if (lease != null) {
+                    lease.close();
+                }
                 if (throwable != null) {
                     Log.warn("ReSync path operation failed: " + rootMessage(throwable));
                 }
             });
             return next;
         });
+    }
+
+    private NetworkPersistenceDrainController.Lease admit(String operation) {
+        if (persistenceDrain == null) {
+            return null;
+        }
+        try {
+            return persistenceDrain.tryAcquire(operation, Duration.ZERO).orElse(null);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
+
+    private synchronized void closeAdmissionForDrain() {
+        ready = false;
+        persistenceQuiesced.set(true);
+        commandGeneration++;
+        if (agent != null && Bukkit.getServer() == null) {
+            agent.removeListener(this);
+        }
+    }
+
+    private synchronized void prepareBukkitAdmission() {
+        if (agent != null) {
+            agent.removeListener(this);
+        }
+        if (scanTask != null) {
+            scanTask.cancel();
+            scanTask = null;
+        }
+        if (commandTask != null) {
+            commandTask.cancel();
+            commandTask = null;
+        }
+        if (commandLease != null) {
+            commandLease.close();
+            commandLease = null;
+        }
+    }
+
+    private synchronized void resumeAdmissionAfterDrain() {
+        if (closed.get()) {
+            return;
+        }
+        persistenceQuiesced.set(false);
+        if (agent == null) {
+            return;
+        }
+        agent.addListener(this);
+        scanTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::scan, SCAN_INTERVAL_TICKS, SCAN_INTERVAL_TICKS);
+        if (agent.connected()) {
+            synchronize();
+        }
+    }
+
+    private static void requirePrimaryThread() {
+        if (Bukkit.getServer() != null && !Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Network path synchronizer lifecycle must run on the Bukkit main thread");
+        }
     }
 
     private PendingMutation mutation(LocalFile local, NetworkResourceMetadata remote) {
@@ -591,7 +851,14 @@ public final class NetworkPathSynchronizer implements ReSyncNetworkAgent.Listene
 
     private boolean protectedPath(Path path) {
         Path normalized = path.toAbsolutePath().normalize();
-        return protectedPaths.stream().anyMatch(protectedPath -> normalized.equals(protectedPath) || normalized.startsWith(protectedPath));
+        return isReSyncDataPath(normalized, dataDirectory)
+            || protectedPaths.stream().anyMatch(protectedPath -> normalized.equals(protectedPath) || normalized.startsWith(protectedPath));
+    }
+
+    static boolean isReSyncDataPath(Path candidate, Path dataDirectory) {
+        Path normalizedCandidate = candidate.toAbsolutePath().normalize();
+        Path normalizedDataDirectory = dataDirectory.toAbsolutePath().normalize();
+        return normalizedCandidate.equals(normalizedDataDirectory) || normalizedCandidate.startsWith(normalizedDataDirectory);
     }
 
     private record PathRoot(String id, Path path) {

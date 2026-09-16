@@ -2,12 +2,19 @@ package restudio.resync.modules.flow;
 
 import com.google.gson.Gson;
 import restudio.resync.core.Session;
+import restudio.resync.flow.identity.ServerResourceLocator;
+import restudio.resync.flow.protocol.ResourcePresentationIntent;
 import restudio.resync.resources.ReSyncManagedResource;
+import restudio.resync.server.AggregateResourceCreateStorage;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 public interface FlowResourceAdapter<T> {
+    String AUTHORITATIVE_MUTATION_IDENTITY_UNAVAILABLE =
+        "Authoritative resource mutation identity durability is unavailable";
+
     ReSyncManagedResource descriptor();
 
     T get(String id);
@@ -30,6 +37,53 @@ public interface FlowResourceAdapter<T> {
 
     void delete(String id);
 
+    default boolean supportsAuthoritativeMutationIdentity() {
+        return false;
+    }
+
+    default void save(T value, UUID mutationId, long expectedRevision) {
+        throw authoritativeMutationIdentityUnavailable();
+    }
+
+    default void delete(String id, UUID mutationId, long expectedRevision) {
+        throw authoritativeMutationIdentityUnavailable();
+    }
+
+    default boolean supportsAggregateCreate() {
+        return false;
+    }
+
+    default AggregateResourceCreateStorage.Result createAggregate(ServerResourceLocator resource, T value,
+                                                                   FlowResourceMutationContext context,
+                                                                   ResourcePresentationIntent presentation) {
+        throw new UnsupportedOperationException("Aggregate resource create is unavailable");
+    }
+
+    default FlowResourceMutationStamp readMutationStamp(String id) {
+        throw authoritativeMutationIdentityUnavailable();
+    }
+
+    default void completePostCommitRecovery(String id, UUID mutationId, long revision, boolean deleted) {
+    }
+
+    default boolean matchesCommittedPayloadRecovery(T previous, T requested, T actual) {
+        return false;
+    }
+
+    default FlowResourceMutationStamp recoverProjectMetadataLineage(UUID sourceMutationId, String sourceType,
+                                                                     String sourceId, long sourceRevision,
+                                                                     String sourceHash, long previousMetadataRevision,
+                                                                     UUID previousMetadataMutationId,
+                                                                     String previousMetadataHash) {
+        throw new UnsupportedOperationException("Project metadata lineage recovery is unavailable");
+    }
+
+    default FlowResourceMutationStamp recoverUnreceiptedProjectMetadataLineage(long previousMetadataRevision,
+                                                                                UUID previousMetadataMutationId,
+                                                                                String previousMetadataHash) {
+        return null;
+    }
+
     default void validate(T value) {
     }
 
@@ -39,6 +93,9 @@ public interface FlowResourceAdapter<T> {
 
     default String unsupportedOperationReason(String operation) {
         return switch (operation != null ? operation : "") {
+            case "rename" -> "This resource domain does not expose a durable presentation rename transaction";
+            case "move" -> "This resource domain does not expose a durable presentation move transaction";
+            case "subscribe" -> "This resource domain does not expose a session-bound durable resource subscription";
             case "duplicate" -> "This resource domain does not support duplication";
             case "reload" -> "This resource domain does not expose an explicit reload operation";
             case "apply" -> "This resource domain does not expose a generic apply operation";
@@ -163,6 +220,10 @@ public interface FlowResourceAdapter<T> {
     }
 
     default void afterDelete(String id) {
+    }
+
+    private static IllegalStateException authoritativeMutationIdentityUnavailable() {
+        return new IllegalStateException(AUTHORITATIVE_MUTATION_IDENTITY_UNAVAILABLE);
     }
 
     private String compactDisplayName() {

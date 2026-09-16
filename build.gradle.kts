@@ -40,8 +40,12 @@ dependencies {
     }
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     implementation("com.github.retrooper:packetevents-spigot:2.12.1")
+    implementation("net.java.dev.jna:jna:5.17.0")
+    runtimeOnly("org.xerial:sqlite-jdbc:3.53.2.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
+    testImplementation(project(":ReSyncUpgrade"))
+    testImplementation(project(":ReSyncUpgradeSqlite"))
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.99.0")
     testImplementation("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
     testImplementation("com.google.code.gson:gson:2.10.1")
@@ -50,6 +54,7 @@ dependencies {
 }
 
 val targetJavaVersion = 21
+val upgradeNodeDefinitions = layout.projectDirectory.dir("ReSyncUpgrade/src/main/resources/nodes/migrated")
 val generatedContractsDir = layout.buildDirectory.dir("generated/sources/resyncContracts/java")
 val protocolContractFile = layout.projectDirectory.file("../Remotely/contracts/resync-protocol.json")
 
@@ -247,6 +252,12 @@ tasks {
         archiveClassifier.set("")
         mergeServiceFiles()
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+        exclude("nodes/migrated/**")
+        exclude("restudio/resync/upgrade/adapter/**")
+        exclude("restudio/resync/upgrade/command/**")
+        exclude("restudio/resync/upgrade/flow/**")
+        exclude("restudio/resync/upgrade/sqlite/**")
+        exclude("restudio/resync/flow/migration/flow-graph-schema-v2.json")
         relocate("io.javalin", "restudio.resync.libs.javalin")
         relocate("org.eclipse.jetty", "restudio.resync.libs.jetty")
         relocate("kotlin", "restudio.resync.libs.kotlin")
@@ -275,6 +286,7 @@ tasks {
 
     test {
         useJUnitPlatform()
+        systemProperty("resync.upgrade.node-definitions", upgradeNodeDefinitions.asFile.absolutePath)
     }
 
     val validateNodeDefinitions by registering(JavaExec::class) {
@@ -283,6 +295,7 @@ tasks {
         classpath = sourceSets["main"].runtimeClasspath + sourceSets["main"].compileClasspath
         mainClass.set("restudio.resync.flow.validation.NodeDefinitionBuildValidator")
         args(projectDir.absolutePath)
+        systemProperty("resync.upgrade.node-definitions", upgradeNodeDefinitions.asFile.absolutePath)
         workingDir = projectDir
     }
 
@@ -305,9 +318,25 @@ val verifyUniversalJar by tasks.registering {
             "org/sqlite/JDBC.class",
             "META-INF/services/java.sql.Driver"
         )
+        val forbiddenEntryNames = setOf(
+            "restudio/resync/flow/migration/flow-graph-schema-v2.json",
+            "META-INF/services/restudio.resync.upgrade.adapter.OfflineUpgradeAdapterProvider",
+            "META-INF/services/restudio.resync.upgrade.flow.ManagedFlowFileMigrationProvider"
+        )
+        val forbiddenEntryPrefixes = setOf(
+            "nodes/migrated/",
+            "restudio/resync/upgrade/adapter/",
+            "restudio/resync/upgrade/command/",
+            "restudio/resync/upgrade/flow/",
+            "restudio/resync/upgrade/sqlite/"
+        )
         ZipFile(universalJar.get().asFile).use { archive ->
             val missingEntries = requiredEntries.filter { archive.getEntry(it) == null }
             check(missingEntries.isEmpty()) { "Universal ReSync jar is missing ${missingEntries.joinToString()}" }
+            val forbiddenEntries = archive.entries().asSequence().map { it.name }.filter { entry ->
+                entry in forbiddenEntryNames || forbiddenEntryPrefixes.any(entry::startsWith)
+            }.toList()
+            check(forbiddenEntries.isEmpty()) { "Universal ReSync jar contains retired entries ${forbiddenEntries.joinToString()}" }
         }
     }
 }

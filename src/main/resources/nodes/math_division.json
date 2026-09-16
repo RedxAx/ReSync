@@ -1,0 +1,126 @@
+[
+  {
+    "id": "math_divide",
+    "displayName": "Divide",
+    "description": "Divides one finite number by another. Non-finite inputs fail before a result is published. A zero divisor returns 0.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "divide"],
+    "legacyIds": ["math.divide"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "divide"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number to divide."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Finite divisor. A zero divisor returns 0."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns A divided by B."}
+    ]
+  },
+  {
+    "id": "math_modulo",
+    "displayName": "Modulo",
+    "description": "Returns the remainder of one finite number divided by another. Non-finite inputs fail before a result is published. A zero divisor returns 0.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 1,
+    "kind": "PURE",
+    "tags": ["math", "number", "arithmetic", "modulo"],
+    "legacyIds": ["math.modulo"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "modulo"},
+    "inputs": [
+      {"id": "a", "displayName": "A", "name": "a", "pinType": "DATA", "dataType": "number", "defaultValue": 0, "description": "Finite number whose remainder should be calculated."},
+      {"id": "b", "displayName": "B", "name": "b", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Finite divisor. A zero divisor returns 0."}
+    ],
+    "outputs": [
+      {"id": "result", "displayName": "Result", "name": "result", "pinType": "DATA", "dataType": "number", "description": "Returns the remainder of A divided by B."}
+    ]
+  },
+  {
+    "id": "math_vector_divide",
+    "displayName": "Vector Divide",
+    "description": "Divides every component of a vector by a scalar number. A zero scalar returns a zero vector.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "division"],
+    "legacyIds": ["math.vector_divide"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_divide"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector", "target": "vector"},
+        {"direction": "input", "source": "scalar", "target": "scalar"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector", "displayName": "Vector", "name": "vector", "pinType": "DATA", "dataType": "vector", "description": "Vector whose components should be divided."},
+      {"id": "scalar", "displayName": "Scalar", "name": "scalar", "pinType": "DATA", "dataType": "number", "defaultValue": 1, "description": "Number used to divide each vector component. A zero value returns a zero vector."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the vector after scalar division."}
+    ]
+  },
+  {
+    "id": "math_vector_divide_components",
+    "displayName": "Vector Divide Components",
+    "description": "Divides matching x, y, and z components from two vectors. A zero divisor component produces 0 for that component.",
+    "domain": "core",
+    "family": "math",
+    "lifecycle": "active",
+    "handlerCapability": "generic-math",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "DATA",
+    "schemaVersion": 2,
+    "kind": "PURE",
+    "tags": ["math", "vector", "components", "division"],
+    "legacyIds": ["math.vector_divide_components"],
+    "handler": "GenericMathHandler",
+    "handlerConfig": {"operation": "vector_divide_components"},
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {"direction": "input", "source": "vector1", "target": "vector1"},
+        {"direction": "input", "source": "vector2", "target": "vector2"},
+        {"direction": "output", "source": "result_vector", "target": "result_vector"}
+      ]
+    },
+    "inputs": [
+      {"id": "vector1", "displayName": "Vector 1", "name": "vector1", "pinType": "DATA", "dataType": "vector", "description": "Dividend vector."},
+      {"id": "vector2", "displayName": "Vector 2", "name": "vector2", "pinType": "DATA", "dataType": "vector", "description": "Divisor vector. Zero components produce 0 in the matching result component."}
+    ],
+    "outputs": [
+      {"id": "result_vector", "displayName": "Result Vector", "name": "result_vector", "pinType": "DATA", "dataType": "vector", "description": "Returns the component-wise quotient of the two vectors."}
+    ]
+  }
+]

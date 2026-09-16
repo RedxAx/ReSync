@@ -3,6 +3,7 @@ package restudio.resync.runtime.data;
 import org.bukkit.inventory.ItemStack;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.api.OptionCatalogItem;
+import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.RuntimeDataAdapter;
 import restudio.resync.api.RuntimeDataQuery;
 import restudio.resync.api.RuntimeDataRecord;
@@ -18,9 +19,22 @@ import java.util.Set;
 public final class ExternalItemDataAdapter implements RuntimeDataAdapter<ItemStack> {
     public static final String ID = "resync:provider_items";
     private final CustomContentService service;
+    private final RuntimeDataCategoryCatalog<Void> categoryCatalog;
 
     public ExternalItemDataAdapter(CustomContentService service) {
         this.service = service;
+        this.categoryCatalog = new RuntimeDataCategoryCatalog<>(this) {
+            @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.SERVER_MAIN;
+            }
+
+            @Override
+            protected Snapshot<Void> captureSnapshot() {
+                List<RuntimeDataRecord> capturedRecords = records(RuntimeDataQuery.all());
+                return snapshot(ID + ":" + capturedRecords.size() + ":" + capturedRecords.hashCode(), capturedRecords, null);
+            }
+        };
     }
 
     @Override
@@ -44,9 +58,13 @@ public final class ExternalItemDataAdapter implements RuntimeDataAdapter<ItemSta
     }
 
     @Override
+    public OptionCatalogProvider categoryCatalog() {
+        return categoryCatalog;
+    }
+
+    @Override
     public List<RuntimeDataRecord> records(RuntimeDataQuery query) {
-        return service.recipeItemCatalog().stream().filter(item -> item.value().startsWith("provider:"))
-            .map(this::record).toList();
+        return service.providerRecipeItemCatalog().stream().map(this::record).toList();
     }
 
     @Override

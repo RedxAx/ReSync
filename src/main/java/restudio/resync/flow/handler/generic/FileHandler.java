@@ -2,104 +2,99 @@ package restudio.resync.flow.handler.generic;
 
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowOperationResult;
-import restudio.resync.ReSync;
 import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
-import java.util.stream.Stream;
 
 public class FileHandler implements NodeHandler {
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
-    private final Path root;
+    private final ManagedFlowFileCapability capability;
 
-    public FileHandler() {
-        this(ReSync.getInstance().getDataFolder().toPath());
+    public FileHandler(ManagedFlowFileCapability capability) {
+        this.capability = Objects.requireNonNull(capability, "capability");
+        registerOperations();
     }
 
-    FileHandler(Path root) {
-        this.root = root.toAbsolutePath().normalize();
+    private void registerOperations() {
         operations.put("file_write", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path target = resolveSafePath(ctx.getInputValue(node, "path", String.class, ""));
-            createParent(target);
-            Files.writeString(target, ctx.getInputValue(node, "content", String.class, ""), StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            String target = capability.write(ctx.getInputValue(node, "path", String.class, ""),
+                ctx.getInputValue(node, "content", String.class, ""));
             return outcome(true, Map.of(), target);
         }, Map.of()));
         operations.put("file_append", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path target = resolveSafePath(ctx.getInputValue(node, "path", String.class, ""));
-            createParent(target);
-            Files.writeString(target, ctx.getInputValue(node, "content", String.class, ""), StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            String target = capability.append(ctx.getInputValue(node, "path", String.class, ""),
+                ctx.getInputValue(node, "content", String.class, ""));
             return outcome(true, Map.of(), target);
         }, Map.of()));
         operations.put("file_read", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path target = requireFile(ctx.getInputValue(node, "path", String.class, ""));
-            String content = Files.readString(target, StandardCharsets.UTF_8);
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String target = capability.normalize(path);
+            String content = capability.read(path);
             return outcome(content, Map.of("content", content), target);
         }, Map.of("content", "")));
         operations.put("file_read_lines", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path target = requireFile(ctx.getInputValue(node, "path", String.class, ""));
-            List<String> lines = List.copyOf(Files.readAllLines(target, StandardCharsets.UTF_8));
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String target = capability.normalize(path);
+            List<String> lines = capability.readLines(path);
             return outcome(lines, Map.of("lines", lines), target);
         }, Map.of("lines", List.of())));
         operations.put("file_delete", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path target = resolveSafePath(ctx.getInputValue(node, "path", String.class, ""));
-            boolean exists = Files.exists(target);
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String target = capability.normalize(path);
+            boolean exists = capability.exists(path);
             boolean preview = ctx.getInputValue(node, "preview", Boolean.class, false);
             if (!exists) {
-                throw new FileOperationException("FILE_NOT_FOUND", "File does not exist");
+                throw new ManagedFlowFileCapability.AccessException("FILE_NOT_FOUND", "File does not exist");
             }
-            boolean deleted = !preview && Files.deleteIfExists(target);
+            boolean deleted = !preview && capability.delete(path);
             return new FileOutcome<>(deleted, Map.of("preview", preview, "would_delete", exists, "deleted", deleted),
-                Map.of("path", relativePath(target), "preview", preview));
+                Map.of("path", target, "preview", preview));
         }, Map.of("preview", false, "would_delete", false, "deleted", false)));
         operations.put("file_exists", (ctx, node) -> executeSync(ctx, node, () -> {
-            Path target = resolveSafePath(ctx.getInputValue(node, "path", String.class, ""));
-            boolean exists = Files.exists(target);
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String target = capability.normalize(path);
+            boolean exists = capability.exists(path);
             return outcome(exists, Map.of("exists", exists), target);
         }, Map.of("exists", false)));
         operations.put("file_copy", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path source = requireFile(ctx.getInputValue(node, "source_path", String.class, ""));
-            Path destination = resolveSafePath(ctx.getInputValue(node, "dest_path", String.class, ""));
-            createParent(destination);
-            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-            return new FileOutcome<>(true, Map.of(), Map.of("source", relativePath(source), "destination", relativePath(destination)));
+            String sourcePath = ctx.getInputValue(node, "source_path", String.class, "");
+            String destinationPath = ctx.getInputValue(node, "dest_path", String.class, "");
+            String source = capability.normalize(sourcePath);
+            String destination = capability.copy(sourcePath, destinationPath);
+            return new FileOutcome<>(true, Map.of(), Map.of("source", source, "destination", destination));
         }, Map.of()));
         operations.put("file_move", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path source = requireFile(ctx.getInputValue(node, "source_path", String.class, ""));
-            Path destination = resolveSafePath(ctx.getInputValue(node, "dest_path", String.class, ""));
-            createParent(destination);
-            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
-            return new FileOutcome<>(true, Map.of(), Map.of("source", relativePath(source), "destination", relativePath(destination)));
+            String sourcePath = ctx.getInputValue(node, "source_path", String.class, "");
+            String destinationPath = ctx.getInputValue(node, "dest_path", String.class, "");
+            String source = capability.normalize(sourcePath);
+            String destination = capability.move(sourcePath, destinationPath);
+            return new FileOutcome<>(true, Map.of(), Map.of("source", source, "destination", destination));
         }, Map.of()));
         operations.put("file_list_dir", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path directory = requireDirectory(ctx.getInputValue(node, "path", String.class, ""));
-            List<String> files;
-            try (Stream<Path> entries = Files.list(directory)) {
-                files = entries.map(path -> path.getFileName().toString()).sorted(String.CASE_INSENSITIVE_ORDER).toList();
-            }
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String directory = capability.normalize(path);
+            List<String> files = capability.list(path);
             return outcome(files, Map.of("files", files), directory);
         }, Map.of("files", List.of())));
         operations.put("file_create_dir", (ctx, node) -> executeAsync(ctx, node, () -> {
-            Path directory = resolveSafePath(ctx.getInputValue(node, "path", String.class, ""));
-            boolean existed = Files.isDirectory(directory);
-            Files.createDirectories(directory);
-            return new FileOutcome<>(true, Map.of("created", !existed), Map.of("path", relativePath(directory), "created", !existed));
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String directory = capability.normalize(path);
+            boolean existed = capability.exists(path);
+            capability.createDirectory(path);
+            return new FileOutcome<>(true, Map.of("created", !existed),
+                Map.of("path", directory, "created", !existed));
         }, Map.of("created", false)));
         operations.put("file_get_size", (ctx, node) -> executeSync(ctx, node, () -> {
-            Path target = requireFile(ctx.getInputValue(node, "path", String.class, ""));
-            long size = Files.size(target);
+            String path = ctx.getInputValue(node, "path", String.class, "");
+            String target = capability.normalize(path);
+            long size = capability.size(path);
             return outcome(size, Map.of("size", size), target);
         }, Map.of("size", 0L)));
     }
@@ -118,14 +113,16 @@ public class FileHandler implements NodeHandler {
         handler.accept(ctx, node);
     }
 
-    private void executeAsync(FlowContext context, FlowNode node, FileOperation<?> operation, Map<String, Object> failureOutputs) {
+    private void executeAsync(FlowContext context, FlowNode node, FileOperation<?> operation,
+                              Map<String, Object> failureOutputs) {
         context.runAsync(() -> {
             Completion completion = perform(operation, failureOutputs);
             context.runSync(() -> complete(context, node, completion));
         });
     }
 
-    private void executeSync(FlowContext context, FlowNode node, FileOperation<?> operation, Map<String, Object> failureOutputs) {
+    private void executeSync(FlowContext context, FlowNode node, FileOperation<?> operation,
+                             Map<String, Object> failureOutputs) {
         complete(context, node, perform(operation, failureOutputs));
     }
 
@@ -134,6 +131,9 @@ public class FileHandler implements NodeHandler {
             FileOutcome<?> outcome = operation.execute();
             FlowOperationResult<?> result = new FlowOperationResult<>(true, outcome.value(), "", "", outcome.details());
             return new Completion(result, outcome.outputs());
+        } catch (ManagedFlowFileCapability.AccessException exception) {
+            FlowOperationResult<?> result = FlowOperationResult.failure(exception.code(), exception.getMessage(), Map.of());
+            return new Completion(result, failureOutputs);
         } catch (FileOperationException exception) {
             FlowOperationResult<?> result = FlowOperationResult.failure(exception.code(), exception.getMessage(), Map.of());
             return new Completion(result, failureOutputs);
@@ -156,69 +156,16 @@ public class FileHandler implements NodeHandler {
         context.triggerOutput(result.success() ? "flow" : "failed");
     }
 
-    private <T> FileOutcome<T> outcome(T value, Map<String, Object> outputs, Path path) {
-        return new FileOutcome<>(value, outputs, Map.of("path", relativePath(path)));
+    private <T> FileOutcome<T> outcome(T value, Map<String, Object> outputs, String path) {
+        return new FileOutcome<>(value, outputs, Map.of("path", path));
     }
 
-    Path resolveSafePath(String path) throws IOException, FileOperationException {
-        if (path == null || path.isBlank()) {
-            throw new FileOperationException("FILE_PATH_REQUIRED", "File path is required");
-        }
-        Path root = dataRoot();
-        Path target;
+    String resolveSafePath(String path) throws IOException, FileOperationException {
         try {
-            target = root.resolve(path).toAbsolutePath().normalize();
-        } catch (RuntimeException exception) {
-            throw new FileOperationException("FILE_PATH_INVALID", "File path is invalid");
+            return capability.normalize(path);
+        } catch (ManagedFlowFileCapability.AccessException exception) {
+            throw new FileOperationException(exception.code(), exception.getMessage(), exception);
         }
-        if (!target.startsWith(root)) {
-            throw new FileOperationException("FILE_PATH_OUTSIDE_DATA", "File path must stay inside the ReSync data folder");
-        }
-        Path existing = target;
-        while (existing != null && !Files.exists(existing)) {
-            existing = existing.getParent();
-        }
-        if (existing == null || !existing.toRealPath().startsWith(root.toRealPath())) {
-            throw new FileOperationException("FILE_PATH_OUTSIDE_DATA", "File path must stay inside the ReSync data folder");
-        }
-        return target;
-    }
-
-    private Path requireFile(String path) throws IOException, FileOperationException {
-        Path target = resolveSafePath(path);
-        if (!Files.exists(target)) {
-            throw new FileOperationException("FILE_NOT_FOUND", "File does not exist");
-        }
-        if (!Files.isRegularFile(target)) {
-            throw new FileOperationException("FILE_NOT_REGULAR", "Path is not a regular file");
-        }
-        return target;
-    }
-
-    private Path requireDirectory(String path) throws IOException, FileOperationException {
-        Path target = resolveSafePath(path);
-        if (!Files.exists(target)) {
-            throw new FileOperationException("DIRECTORY_NOT_FOUND", "Directory does not exist");
-        }
-        if (!Files.isDirectory(target)) {
-            throw new FileOperationException("PATH_NOT_DIRECTORY", "Path is not a directory");
-        }
-        return target;
-    }
-
-    private void createParent(Path path) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-    }
-
-    private Path dataRoot() {
-        return root;
-    }
-
-    private String relativePath(Path path) {
-        return dataRoot().relativize(path).toString().replace('\\', '/');
     }
 
     private String message(Exception exception, String fallback) {
@@ -248,7 +195,12 @@ public class FileHandler implements NodeHandler {
             this.code = code;
         }
 
-        private String code() {
+        private FileOperationException(String code, String message, Throwable cause) {
+            super(message, cause);
+            this.code = code;
+        }
+
+        String code() {
             return code;
         }
     }

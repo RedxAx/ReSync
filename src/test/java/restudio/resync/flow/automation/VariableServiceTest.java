@@ -1,5 +1,6 @@
 package restudio.resync.flow.automation;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -12,8 +13,13 @@ import restudio.resync.flow.FlowContext;
 import restudio.resync.flow.FlowRuntime;
 import restudio.resync.flow.FlowValueCodecRegistry;
 import restudio.resync.flow.TypeAdapterRegistry;
+import restudio.resync.flow.migration.LegacyRuntimeActivationGate;
 import restudio.resync.resources.ReSyncResourceCatalog;
+import restudio.resync.storage.AssetPersistenceGate;
+import restudio.resync.storage.AssetTransactionCoordinator;
+import restudio.resync.storage.CanonicalProjectMetadataFixture;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
@@ -24,14 +30,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VariableServiceTest {
     private ReSyncJsonResourceStorage storage;
+    private AssetPersistenceGate assetsGate;
+    private AssetTransactionCoordinator coordinator;
     private VariableService variables;
     private FlowContext context;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         MockBukkit.mock();
         JavaPlugin plugin = MockBukkit.createMockPlugin();
-        storage = new ReSyncJsonResourceStorage(plugin);
+        Path scope = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        assetsGate = new AssetPersistenceGate(scope);
+        coordinator = new AssetTransactionCoordinator(scope.resolve("assets"), new Gson());
+        CanonicalProjectMetadataFixture.seed(coordinator);
+        storage = new ReSyncJsonResourceStorage(plugin, LegacyRuntimeActivationGate.runtime(scope), assetsGate, coordinator);
         variables = new VariableService(new AutomationDefinitionRegistry(storage), new FlowValueCodecRegistry());
         FlowGraph graph = new FlowGraph();
         graph.setId("variable-test");
@@ -39,8 +51,20 @@ class VariableServiceTest {
     }
 
     @AfterEach
-    void tearDown() {
-        MockBukkit.unmock();
+    void tearDown() throws Exception {
+        try {
+            if (storage != null) {
+                storage.closePersistence();
+            }
+            if (assetsGate != null) {
+                assetsGate.quiesce();
+            }
+            if (coordinator != null) {
+                coordinator.close();
+            }
+        } finally {
+            MockBukkit.unmock();
+        }
     }
 
     @Test

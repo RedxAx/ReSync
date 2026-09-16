@@ -28,4 +28,12 @@ class FlowRuntimeFunctionStartTest {
 
         assertEquals("a", runtime.findFunctionStartNodeId());
     }
+
+    @Test
+    void functionStartRecognizesMaterializedCoreIdentity() {
+        FlowGraph graph = new FlowGraph();
+        graph.getNodes().put("start", new FlowNode("restudio.resync/function_start", 0, 0, Map.of()));
+
+        assertEquals("start", FlowRuntime.findFunctionStartNodeId(graph));
+    }
 }

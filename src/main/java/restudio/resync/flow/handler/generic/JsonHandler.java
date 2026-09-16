@@ -1,32 +1,32 @@
 package restudio.resync.flow.handler.generic;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import restudio.flow.data.FlowNode;
 import restudio.resync.flow.FlowContext;
+import restudio.resync.flow.canonical.CanonicalJson;
+import restudio.resync.flow.canonical.CanonicalLimits;
 import restudio.resync.flow.handler.HandlerRegistry;
 import restudio.resync.flow.handler.NodeHandler;
+import restudio.resync.modules.flow.FlowPacketSender;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 public class JsonHandler implements NodeHandler {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final CanonicalLimits CANONICAL_LIMITS = CanonicalLimits.standard();
     private final Map<String, BiConsumer<FlowContext, FlowNode>> operations = new ConcurrentHashMap<>();
 
     public JsonHandler() {
         operations.put("json_parse", (ctx, node) -> {
             String jsonString = ctx.getInputValue(node, "json_string", String.class, "{}");
+            requireTextLength(jsonString, "JSON input");
             try {
-                JsonElement element = JsonParser.parseString(jsonString);
-                Object result = GSON.fromJson(element, Object.class);
+                Object result = CanonicalJson.parse(jsonString, CANONICAL_LIMITS);
+                requireCanonicalTextLength(result, "JSON output");
                 ctx.setOutput(node, "object", result);
             } catch (RuntimeException exception) {
                 throw new IllegalArgumentException("Invalid JSON input", exception);
@@ -35,28 +35,19 @@ public class JsonHandler implements NodeHandler {
 
         operations.put("json_to_string", (ctx, node) -> {
             Object object = ctx.getInputValue(node, "object", Object.class, null);
-            String jsonString = GSON.toJson(object);
+            String jsonString = canonicalize(object, "JSON output");
             ctx.setOutput(node, "string", jsonString);
         });
 
         operations.put("json_get", (ctx, node) -> {
             Object object = ctx.getInputValue(node, "object", Object.class, null);
             String path = ctx.getInputValue(node, "path", String.class, "");
-            Object value = null;
-            if (object instanceof Map) {
-                Map<?, ?> map = (Map<?, ?>) object;
-                String[] keys = path.split("\\.");
-                Object current = map;
-                for (String key : keys) {
-                    if (current instanceof Map) {
-                        current = ((Map<?, ?>) current).get(key);
-                    } else {
-                        current = null;
-                        break;
-                    }
-                }
-                value = current;
+            String[] keys = validatePath(path);
+            Object canonicalObject = canonicalCopy(object, "JSON object");
+            if (!(canonicalObject instanceof Map<?, ?> map)) {
+                throw new IllegalArgumentException("JSON object must be a JSON object");
             }
+            Object value = valueAt(map, keys);
             ctx.setOutput(node, "value", value);
         });
 
@@ -107,37 +98,22 @@ public class JsonHandler implements NodeHandler {
         operations.put("json_has", (ctx, node) -> {
             Object object = ctx.getInputValue(node, "object", Object.class, null);
             String path = ctx.getInputValue(node, "path", String.class, "");
-            boolean hasKey = false;
-            if (object instanceof Map) {
-                Map<?, ?> map = (Map<?, ?>) object;
-                String[] keys = path.split("\\.");
-                Object current = map;
-                for (int i = 0; i < keys.length; i++) {
-                    if (current instanceof Map) {
-                        if (!((Map<?, ?>) current).containsKey(keys[i])) {
-                            current = null;
-                            break;
-                        }
-                        if (i == keys.length - 1) {
-                            hasKey = true;
-                        } else {
-                            current = ((Map<?, ?>) current).get(keys[i]);
-                        }
-                    } else {
-                        break;
-                    }
-                }
+            String[] keys = validatePath(path);
+            Object canonicalObject = canonicalCopy(object, "JSON object");
+            if (!(canonicalObject instanceof Map<?, ?> map)) {
+                throw new IllegalArgumentException("JSON object must be a JSON object");
             }
-            ctx.setOutput(node, "has", hasKey);
+            ctx.setOutput(node, "has", hasAt(map, keys));
         });
 
         operations.put("json_keys", (ctx, node) -> {
             Object object = ctx.getInputValue(node, "object", Object.class, null);
             List<String> keys = new ArrayList<>();
-            if (object instanceof Map) {
-                keys.addAll(((Map<?, ?>) object).keySet().stream()
-                        .map(k -> k != null ? k.toString() : "null")
-                        .collect(Collectors.toList()));
+            Object canonicalObject = canonicalCopy(object, "JSON object");
+            if (canonicalObject instanceof Map<?, ?> map) {
+                for (Object key : map.keySet()) {
+                    keys.add((String) key);
+                }
             }
             ctx.setOutput(node, "keys", keys);
         });
@@ -145,25 +121,103 @@ public class JsonHandler implements NodeHandler {
         operations.put("json_merge", (ctx, node) -> {
             Object object1 = ctx.getInputValue(node, "object1", Object.class, null);
             Object object2 = ctx.getInputValue(node, "object2", Object.class, null);
-            Map<String, Object> merged = new HashMap<>();
-            if (object1 instanceof Map) {
-                merged.putAll((Map<String, Object>) object1);
+            Object canonicalObject1 = canonicalCopy(object1, "JSON object1");
+            Object canonicalObject2 = canonicalCopy(object2, "JSON object2");
+            Map<String, Object> merged = new LinkedHashMap<>();
+            if (canonicalObject1 instanceof Map<?, ?> map1) {
+                for (Map.Entry<?, ?> entry : map1.entrySet()) {
+                    merged.put((String) entry.getKey(), entry.getValue());
+                }
             }
-            if (object2 instanceof Map) {
-                merged.putAll((Map<String, Object>) object2);
+            if (canonicalObject2 instanceof Map<?, ?> map2) {
+                for (Map.Entry<?, ?> entry : map2.entrySet()) {
+                    merged.put((String) entry.getKey(), entry.getValue());
+                }
             }
-            ctx.setOutput(node, "merged", merged);
+            ctx.setOutput(node, "merged", canonicalCopy(merged, "JSON merge output"));
         });
 
         operations.put("json_create", (ctx, node) -> {
-            Map<String, Object> object = new HashMap<>();
+            Map<String, Object> object = (Map<String, Object>) canonicalCopy(new LinkedHashMap<>(), "JSON object");
             ctx.setOutput(node, "object", object);
         });
 
         operations.put("json_set_array", (ctx, node) -> {
             List<Object> values = ctx.getInputValue(node, "values", List.class, new ArrayList<>());
-            ctx.setOutput(node, "array", values);
+            ctx.setOutput(node, "array", canonicalCopy(values, "JSON array"));
         });
+    }
+
+    private static String canonicalize(Object value, String label) {
+        String canonical = CanonicalJson.canonicalize(value, CANONICAL_LIMITS);
+        requireTextLength(canonical, label);
+        return canonical;
+    }
+
+    private static Object canonicalCopy(Object value, String label) {
+        return CanonicalJson.parse(canonicalize(value, label), CANONICAL_LIMITS);
+    }
+
+    private static void requireCanonicalTextLength(Object value, String label) {
+        canonicalize(value, label);
+    }
+
+    private static void requireTextLength(String value, String label) {
+        if (value == null) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+        if (value.length() > FlowPacketSender.MAX_STRING_LENGTH) {
+            throw new IllegalArgumentException(label + " cannot exceed " + FlowPacketSender.MAX_STRING_LENGTH + " characters");
+        }
+    }
+
+    private static String[] validatePath(String path) {
+        requireTextLength(path, "JSON path");
+        requireTextLength(canonicalize(path, "JSON path"), "JSON path");
+        if (path.isBlank()) {
+            throw new IllegalArgumentException("JSON path cannot be blank");
+        }
+        String[] keys = path.split("\\.", -1);
+        if (keys.length > 64) {
+            throw new IllegalArgumentException("JSON path cannot contain more than 64 segments");
+        }
+        for (String key : keys) {
+            if (key.isEmpty()) {
+                throw new IllegalArgumentException("JSON path segments cannot be empty");
+            }
+        }
+        return keys;
+    }
+
+    private static Object valueAt(Map<?, ?> root, String[] keys) {
+        Object current = root;
+        for (String key : keys) {
+            if (!(current instanceof Map<?, ?> map)) {
+                throw new IllegalArgumentException("JSON path traverses a non-object value");
+            }
+            if (!map.containsKey(key)) {
+                return null;
+            }
+            current = map.get(key);
+        }
+        return current;
+    }
+
+    private static boolean hasAt(Map<?, ?> root, String[] keys) {
+        Object current = root;
+        for (int index = 0; index < keys.length; index++) {
+            if (!(current instanceof Map<?, ?> map)) {
+                throw new IllegalArgumentException("JSON path traverses a non-object value");
+            }
+            if (!map.containsKey(keys[index])) {
+                return false;
+            }
+            if (index == keys.length - 1) {
+                return true;
+            }
+            current = map.get(keys[index]);
+        }
+        return false;
     }
 
     public void registerTo(HandlerRegistry registry) {

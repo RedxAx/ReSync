@@ -1,0 +1,1668 @@
+[
+  {
+    "id": "world.properties",
+    "displayName": "World Properties",
+    "category": "WORLD",
+    "handler": "world",
+    "inputs": [
+      {
+        "name": "target",
+        "description": "Target world",
+        "pinType": "DATA",
+        "dataType": "world"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "has"
+        ],
+        "defaultValue": "get"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "time",
+          "full_time",
+          "weather",
+          "has_storm",
+          "is_thundering",
+          "difficulty",
+          "spawn_location",
+          "seed",
+          "name",
+          "environment",
+          "players",
+          "entities",
+          "loaded_chunks",
+          "sea_level",
+          "min_height",
+          "max_height",
+          "time_relative",
+          "pvp",
+          "auto_save",
+          "keep_spawn",
+          "thundering",
+          "weather_type"
+        ],
+        "defaultValue": "time"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "has",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "has"
+        }
+      },
+      {
+        "name": "time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "time"
+        }
+      },
+      {
+        "name": "full_time",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "full_time"
+        }
+      },
+      {
+        "name": "weather",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "weather"
+        }
+      },
+      {
+        "name": "has_storm",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "has_storm"
+        }
+      },
+      {
+        "name": "is_thundering",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "is_thundering"
+        }
+      },
+      {
+        "name": "difficulty",
+        "dataType": "difficulty",
+        "visibleWhen": {
+          "action": "get",
+          "property": "difficulty"
+        }
+      },
+      {
+        "name": "spawn_location",
+        "dataType": "location",
+        "visibleWhen": {
+          "action": "get",
+          "property": "spawn_location"
+        }
+      },
+      {
+        "name": "seed",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "seed"
+        }
+      },
+      {
+        "name": "name",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "name"
+        }
+      },
+      {
+        "name": "environment",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "environment"
+        }
+      },
+      {
+        "name": "players",
+        "dataType": "list<player>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "players"
+        }
+      },
+      {
+        "name": "entities",
+        "dataType": "list<entity>",
+        "visibleWhen": {
+          "action": "get",
+          "property": "entities"
+        }
+      },
+      {
+        "name": "loaded_chunks",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "loaded_chunks"
+        }
+      },
+      {
+        "name": "sea_level",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "sea_level"
+        }
+      },
+      {
+        "name": "min_height",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "min_height"
+        }
+      },
+      {
+        "name": "max_height",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "max_height"
+        }
+      },
+      {
+        "name": "time_relative",
+        "dataType": "number",
+        "visibleWhen": {
+          "action": "get",
+          "property": "time_relative"
+        }
+      },
+      {
+        "name": "pvp",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "pvp"
+        }
+      },
+      {
+        "name": "auto_save",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "auto_save"
+        }
+      },
+      {
+        "name": "keep_spawn",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "keep_spawn"
+        }
+      },
+      {
+        "name": "thundering",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "get",
+          "property": "thundering"
+        }
+      },
+      {
+        "name": "weather_type",
+        "dataType": "string",
+        "visibleWhen": {
+          "action": "get",
+          "property": "weather_type"
+        }
+      }
+    ],
+    "hidden": true,
+    "kind": "QUERY"
+  },
+  {
+    "id": "world.actions",
+    "displayName": "World Actions",
+    "category": "WORLD",
+    "handler": "world",
+    "inputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "target",
+        "description": "Target world",
+        "pinType": "DATA",
+        "dataType": "world"
+      },
+      {
+        "name": "action",
+        "description": "Action",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "DROPDOWN",
+        "options": [
+          "set",
+          "do",
+          "execute"
+        ],
+        "defaultValue": "set"
+      },
+      {
+        "name": "property",
+        "description": "Property",
+        "pinType": "DATA",
+        "dataType": "string",
+        "widget": "SEARCHABLE_LIST",
+        "options": [
+          "time",
+          "full_time",
+          "weather",
+          "has_storm",
+          "is_thundering",
+          "difficulty",
+          "spawn_location",
+          "seed",
+          "name",
+          "environment",
+          "players",
+          "entities",
+          "loaded_chunks",
+          "sea_level",
+          "min_height",
+          "max_height",
+          "time_relative",
+          "pvp",
+          "auto_save",
+          "keep_spawn",
+          "thundering",
+          "weather_type"
+        ],
+        "defaultValue": "time"
+      },
+      {
+        "name": "value",
+        "description": "Value to set",
+        "pinType": "DATA",
+        "dataType": "any",
+        "visibleWhen": {
+          "action": "set"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "flow",
+        "pinType": "FLOW",
+        "dataType": "execution"
+      },
+      {
+        "name": "success",
+        "dataType": "boolean",
+        "visibleWhen": {
+          "action": "set,do,execute"
+        }
+      }
+    ],
+    "hidden": true,
+    "kind": "FAMILY"
+  },
+  {
+    "id": "world.time",
+    "displayName": "World Time",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "time"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.full_time",
+    "displayName": "World Full Time",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "full_time"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "number",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.weather",
+    "displayName": "World Weather",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "weather"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.has_storm",
+    "displayName": "World Has Storm",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "has_storm"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.is_thundering",
+    "displayName": "World Is Thundering",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "is_thundering"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.difficulty",
+    "displayName": "World Difficulty",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "difficulty"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.spawn_location",
+    "displayName": "World Spawn Location",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "spawn_location"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "location",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "location",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.seed",
+    "displayName": "World Seed",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "seed"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.name",
+    "displayName": "World Name",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "name"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.environment",
+    "displayName": "World Environment",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "environment"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.players",
+    "displayName": "World Players",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "players"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list<any>",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.entities",
+    "displayName": "World Entities",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "entities"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "list<any>",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.loaded_chunks",
+    "displayName": "World Loaded Chunks",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "loaded_chunks"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.sea_level",
+    "displayName": "World Sea Level",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "sea_level"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.min_height",
+    "displayName": "World Min Height",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "min_height"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.max_height",
+    "displayName": "World Max Height",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "max_height"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.time_relative",
+    "displayName": "World Time Relative",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "time_relative"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "number",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.pvp",
+    "displayName": "World Pvp",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "pvp"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.auto_save",
+    "displayName": "World Auto Save",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "auto_save"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.keep_spawn",
+    "displayName": "World Keep Spawn",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "keep_spawn"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get",
+          "set"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Value to set",
+        "visibleWhen": {
+          "action": "set"
+        },
+        "name": "value",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.thundering",
+    "displayName": "Thundering",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "thundering"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "boolean",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  },
+  {
+    "id": "world.weather_type",
+    "displayName": "Weather Type",
+    "category": "WORLD",
+    "handler": "world",
+    "handlerConfig": {
+      "property": "weather_type"
+    },
+    "inputs": [
+      {
+        "dataType": "world",
+        "description": "Target world",
+        "name": "target",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "string",
+        "description": "Action",
+        "widget": "DROPDOWN",
+        "options": [
+          "get"
+        ],
+        "defaultValue": "get",
+        "name": "action",
+        "pinType": "DATA"
+      }
+    ],
+    "outputs": [
+      {
+        "dataType": "string",
+        "description": "Property value",
+        "name": "value",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Operation success",
+        "name": "success",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "boolean",
+        "description": "Has value",
+        "name": "has",
+        "pinType": "DATA"
+      },
+      {
+        "dataType": "execution",
+        "description": "Flow output",
+        "name": "flow",
+        "pinType": "FLOW"
+      }
+    ],
+    "hidden": true,
+    "canonicalId": "world.properties"
+  }
+]

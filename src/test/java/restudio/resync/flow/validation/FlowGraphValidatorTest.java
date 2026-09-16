@@ -8,11 +8,16 @@ import restudio.flow.data.FlowGraph;
 import restudio.flow.data.FlowNode;
 import restudio.flow.data.FlowResourceReference;
 import restudio.flow.data.FlowTypeRef;
+import restudio.resync.api.OptionCatalogCapture;
+import restudio.resync.api.OptionCatalogItem;
 import restudio.resync.api.OptionCatalogProvider;
 import restudio.resync.api.OptionCatalogQuery;
 import restudio.resync.api.OptionCatalogRegistry;
+import restudio.resync.flow.CustomFunctionNodeDefinitions;
 import restudio.resync.flow.TypeAdapterRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
+import restudio.resync.flow.identity.FunctionParameterId;
+import restudio.resync.flow.identity.PinId;
 import restudio.resync.flow.registry.NodeDefinition;
 import restudio.resync.flow.registry.NodeDefinitionRegistry;
 import restudio.resync.modules.flow.FlowResourceAdapter;
@@ -25,6 +30,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -240,7 +247,7 @@ class FlowGraphValidatorTest {
     @Test
     void unresolvedManagedResourceLiteralIsRejected() {
         definitions.register(action("test.resource", FlowDataType.STRING, "server:resync:fixture:quest"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "server:resync:fixture:quest";
@@ -270,7 +277,7 @@ class FlowGraphValidatorTest {
     @Test
     void resyncNamespaceDoesNotImplyManagedResourceSemantics() {
         definitions.register(action("test.time_zone", FlowDataType.STRING, "server:resync:time_zone"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "server:resync:time_zone";
@@ -297,7 +304,7 @@ class FlowGraphValidatorTest {
     @Test
     void literalsFromAnyAuthoritativeCatalogAreValidated() {
         definitions.register(action("test.catalog", FlowDataType.STRING, "extension:fixture_values"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "extension:fixture_values";
@@ -322,9 +329,117 @@ class FlowGraphValidatorTest {
     }
 
     @Test
+    void catalogValidationConsumesOneCoherentCapture() {
+        definitions.register(action("test.captured_catalog", FlowDataType.STRING, "extension:captured_values"));
+        catalogs.register(new OptionCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "extension:captured_values";
+            }
+
+            @Override
+            public CaptureAffinity captureAffinity() {
+                return CaptureAffinity.CALLER;
+            }
+
+            @Override
+            public OptionCatalogCapture capture(OptionCatalogQuery query) {
+                return new OptionCatalogCapture("captured:1", List.of(new OptionCatalogItem("existing")), "available", "");
+            }
+
+            @Override
+            public String revision() {
+                throw new AssertionError("Validation must use the coherent capture");
+            }
+
+            @Override
+            public List<String> values() {
+                throw new AssertionError("Validation must use the coherent capture");
+            }
+
+            @Override
+            public String status(OptionCatalogQuery query) {
+                throw new AssertionError("Validation must use the coherent capture");
+            }
+
+            @Override
+            public String diagnostic(OptionCatalogQuery query) {
+                throw new AssertionError("Validation must use the coherent capture");
+            }
+        });
+        FlowGraph graph = graph(Map.of("target", new FlowNode("test.captured_catalog", 0, 0,
+            Map.of("value", "existing"))), List.of());
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
+    void catalogValidationRejectsProviderReplacementDuringResolution() {
+        NodeDefinition definition = new NodeDefinition.Builder("test.swapped_catalog", "Swapped Catalog", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .input(pin("provider", NodeDefinition.PinDirection.INPUT, FlowDataType.STRING, null, false))
+            .input(pin("value", NodeDefinition.PinDirection.INPUT, FlowDataType.STRING, "extension:swapped_values", false))
+            .build();
+        definitions.register(definition);
+        definitions.register(query("test.provider", FlowDataType.STRING));
+        AtomicBoolean swapped = new AtomicBoolean();
+        catalogs.register(new CallerCatalogProvider() {
+            @Override
+            public String sourceId() {
+                return "extension:swapped_values";
+            }
+
+            @Override
+            public Set<String> contextKeys() {
+                if (swapped.compareAndSet(false, true)) {
+                    catalogs.unregister(sourceId());
+                    catalogs.register(new CallerCatalogProvider() {
+                        @Override
+                        public String sourceId() {
+                            return "extension:swapped_values";
+                        }
+
+                        @Override
+                        public String revision() {
+                            return "replacement";
+                        }
+
+                        @Override
+                        public List<String> values() {
+                            return List.of("replacement");
+                        }
+                    });
+                }
+                return Set.of("provider");
+            }
+
+            @Override
+            public String revision() {
+                return "original";
+            }
+
+            @Override
+            public List<String> values() {
+                return List.of("original");
+            }
+        });
+        FlowGraph graph = graph(Map.of(
+            "source", node("test.provider"),
+            "target", new FlowNode("test.swapped_catalog", 0, 0, Map.of("value", "missing"))
+        ), List.of(new FlowConnection("source", "value", "target", "provider")));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "CATALOG_QUERY_FAILED"));
+    }
+
+    @Test
     void minecraftCatalogValidationAcceptsLegacyEnumCapitalization() {
         definitions.register(action("test.material", FlowDataType.STRING, "server:minecraft:material"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "server:minecraft:material";
@@ -350,7 +465,7 @@ class FlowGraphValidatorTest {
     @Test
     void minecraftCatalogValidationAcceptsLegacyValuesWithoutNamespace() {
         definitions.register(action("test.particle", FlowDataType.STRING, "server:minecraft:particle"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "server:minecraft:particle";
@@ -386,7 +501,7 @@ class FlowGraphValidatorTest {
             .schemaVersion(2)
             .input(input)
             .build());
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "extension:fixture_values";
@@ -430,7 +545,7 @@ class FlowGraphValidatorTest {
             .input(asset)
             .build());
         definitions.register(query("test.provider", FlowDataType.STRING));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "extension:assets";
@@ -521,7 +636,7 @@ class FlowGraphValidatorTest {
             .build();
         definitions.register(definition);
         definitions.register(query("test.provider", FlowDataType.STRING));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "extension:assets";
@@ -569,7 +684,7 @@ class FlowGraphValidatorTest {
     @Test
     void permissionRestrictedCatalogHasADistinctDiagnostic() {
         definitions.register(action("test.restricted", FlowDataType.STRING, "extension:restricted"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "extension:restricted";
@@ -617,7 +732,7 @@ class FlowGraphValidatorTest {
     void connectedResourceInputOverridesStaleMissingLiteral() {
         definitions.register(query("test.string", FlowDataType.STRING));
         definitions.register(action("test.resource", FlowDataType.STRING, "server:resync:test_resource"));
-        catalogs.register(new OptionCatalogProvider() {
+        catalogs.register(new CallerCatalogProvider() {
             @Override
             public String sourceId() {
                 return "server:resync:test_resource";
@@ -752,16 +867,16 @@ class FlowGraphValidatorTest {
 
     @Test
     void unreachableFunctionOutputIsRejected() {
-        definitions.register(new NodeDefinition.Builder("function.start", "Function Start", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("function_start", "Function Start", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .build());
-        definitions.register(new NodeDefinition.Builder("function.function_output", "Function Output", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("function_output", "Function Output", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .input(new NodeDefinition.PinBuilder("flow", NodeDefinition.PinType.FLOW, NodeDefinition.PinDirection.INPUT, FlowDataType.EXECUTION).build())
             .build());
         FlowGraph graph = graph(Map.of(
-            "start", node("function.start"),
-            "output", node("function.function_output")
+            "start", node("function_start"),
+            "output", node("function_output")
         ), List.of());
         graph.setFunction(true);
 
@@ -773,15 +888,15 @@ class FlowGraphValidatorTest {
 
     @Test
     void functionSignaturesAuthoritativelyDefineBoundaryPins() {
-        definitions.register(new NodeDefinition.Builder("function.start", "Function Start", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("function_start", "Function Start", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .build());
-        definitions.register(new NodeDefinition.Builder("function.end", "Function End", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("function_end", "Function End", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .build());
         FlowGraph graph = graph(Map.of(
-            "start", node("function.start"),
-            "end", node("function.end")
+            "start", node("function_start"),
+            "end", node("function_end")
         ), List.of(
             new FlowConnection("start", "flow", "end", "flow"),
             new FlowConnection("start", "amount", "end", "result")
@@ -796,8 +911,99 @@ class FlowGraphValidatorTest {
     }
 
     @Test
+    void functionParameterIdentityAllowsDisplayRenamesAndRejectsDuplicateIds() {
+        FunctionParameterId firstId = FunctionParameterId.of(UUID.fromString("11111111-1111-4111-8111-111111111111"));
+        FunctionParameterId secondId = FunctionParameterId.of(UUID.fromString("22222222-2222-4222-8222-222222222222"));
+        FlowGraph graph = graph(Map.of(), List.of());
+        graph.setFunction(true);
+        graph.setFunctionInputs(List.of(
+            new FlowGraph.FunctionParameter(firstId, "Value", FlowDataType.NUMBER),
+            new FlowGraph.FunctionParameter(secondId, "Value", FlowDataType.NUMBER)));
+
+        assertTrue(validator.validate(graph).valid());
+
+        graph.setFunctionOutputs(List.of(new FlowGraph.FunctionParameter(firstId, "Result", FlowDataType.NUMBER)));
+        FlowGraphValidationResult duplicate = validator.validate(graph);
+
+        assertFalse(duplicate.valid());
+        assertTrue(hasCode(duplicate, "FUNCTION_PARAMETER_ID_DUPLICATE"));
+    }
+
+    @Test
+    void legacyBooleanFunctionWidgetRemainsValid() {
+        FlowGraph graph = graph(Map.of(), List.of());
+        graph.setFunction(true);
+        graph.setFunctionOutputs(List.of(
+            new FlowGraph.FunctionParameter("result", FlowDataType.BOOLEAN, "boolean", "", "false")));
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
+    void modernFunctionParameterRenameKeepsTheIdBasedPin() {
+        FunctionParameterId parameterId = FunctionParameterId.of(UUID.fromString("44444444-4444-4444-8444-444444444444"));
+        FlowGraph graph = new FlowGraph();
+        graph.setId("rename_test");
+        graph.setFunction(true);
+        FlowGraph.FunctionParameter parameter = new FlowGraph.FunctionParameter(parameterId, "Original Amount", FlowDataType.NUMBER);
+        graph.setFunctionInputs(List.of(parameter));
+
+        NodeDefinition original = CustomFunctionNodeDefinitions.buildDefinition(graph);
+        String originalPin = original.getInputs().stream()
+            .filter(pin -> !"flow".equals(pin.getName()))
+            .findFirst()
+            .orElseThrow()
+            .getName();
+
+        parameter.setName("Renamed Amount");
+        NodeDefinition renamed = CustomFunctionNodeDefinitions.buildDefinition(graph);
+        NodeDefinition.PinDefinition renamedPin = renamed.getInputs().stream()
+            .filter(pin -> !"flow".equals(pin.getName()))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(originalPin, renamedPin.getName());
+        assertEquals("Renamed Amount", renamedPin.getDisplayName());
+    }
+
+    @Test
+    void authoredFunctionCallArgumentsResolveByParameterId() {
+        FunctionParameterId parameterId = FunctionParameterId.of(UUID.fromString("33333333-3333-4333-8333-333333333333"));
+        FlowGraph function = new FlowGraph();
+        function.setId("reward");
+        function.setFunction(true);
+        function.setFunctionInputs(List.of(new FlowGraph.FunctionParameter(parameterId, "Reward Amount", FlowDataType.NUMBER)));
+        NodeDefinition signature = CustomFunctionNodeDefinitions.buildDefinition(function);
+        definitions.register(signature);
+        definitions.register(new NodeDefinition.Builder("call_function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
+            .input("arguments", NodeDefinition.PinType.DATA, FlowDataType.MAP)
+            .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
+            .build());
+        String parameterPin = CustomFunctionNodeDefinitions.parameterPinId(
+            function.getFunctionInputs().getFirst(), NodeDefinition.PinDirection.INPUT).value();
+        FlowNode call = new FlowNode("call_function", 0, 0, Map.of(
+            "function", "reward",
+            parameterPin, 3,
+            "__call_parameters", List.of(Map.of(
+                "parameterId", parameterId.canonicalText(),
+                "name", "Renamed Amount",
+                "type", "number"))));
+
+        FlowGraph graph = graph(Map.of("call", call), List.of());
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
+    @Test
     void literalFunctionCallsUseTheSelectedFunctionsTypedPins() {
-        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("call_function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
             .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
@@ -812,7 +1018,7 @@ class FlowGraphValidatorTest {
             .build());
         definitions.register(query("test.number", FlowDataType.NUMBER));
         definitions.register(action("test.boolean", FlowDataType.BOOLEAN, null));
-        FlowNode call = new FlowNode("call.function", 0, 0, Map.of("function", "reward"));
+        FlowNode call = new FlowNode("call_function", 0, 0, Map.of("function", "reward"));
         FlowGraph graph = graph(Map.of(
             "amount", node("test.number"),
             "call", call,
@@ -829,7 +1035,7 @@ class FlowGraphValidatorTest {
 
     @Test
     void wiredFunctionSelectionKeepsTheDynamicMapContract() {
-        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("call_function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
             .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
@@ -844,7 +1050,7 @@ class FlowGraphValidatorTest {
             .build());
         definitions.register(query("test.function", FlowDataType.FUNCTION));
         definitions.register(query("test.number", FlowDataType.NUMBER));
-        FlowNode call = new FlowNode("call.function", 0, 0, Map.of("function", "reward"));
+        FlowNode call = new FlowNode("call_function", 0, 0, Map.of("function", "reward"));
         FlowGraph graph = graph(Map.of(
             "function", node("test.function"),
             "amount", node("test.number"),
@@ -862,7 +1068,7 @@ class FlowGraphValidatorTest {
 
     @Test
     void wiredFunctionSelectionAcceptsADeclaredNamedContract() {
-        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("call_function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
             .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
@@ -871,7 +1077,7 @@ class FlowGraphValidatorTest {
             .build());
         definitions.register(query("test.function", FlowDataType.FUNCTION));
         definitions.register(query("test.number", FlowDataType.NUMBER));
-        FlowNode call = new FlowNode("call.function", 0, 0, Map.of(
+        FlowNode call = new FlowNode("call_function", 0, 0, Map.of(
             "__call_parameters", List.of(Map.of("name", "amount", "type", "number"))
         ));
         FlowGraph graph = graph(Map.of(
@@ -890,7 +1096,7 @@ class FlowGraphValidatorTest {
 
     @Test
     void literalFunctionSelectionRejectsAMismatchedDeclaredContract() {
-        definitions.register(new NodeDefinition.Builder("call.function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
+        definitions.register(new NodeDefinition.Builder("call_function", "Call Function", NodeDefinition.NodeCategory.FUNCTION)
             .handler("TestHandler")
             .input("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
             .input("function", NodeDefinition.PinType.DATA, FlowDataType.FUNCTION)
@@ -903,7 +1109,7 @@ class FlowGraphValidatorTest {
             .input("amount", NodeDefinition.PinType.DATA, FlowDataType.NUMBER)
             .output("flow", NodeDefinition.PinType.FLOW, FlowDataType.EXECUTION)
             .build());
-        FlowNode call = new FlowNode("call.function", 0, 0, Map.of(
+        FlowNode call = new FlowNode("call_function", 0, 0, Map.of(
             "function", "reward",
             "__call_parameters", List.of(Map.of("name", "amount", "type", "string")),
             "amount", "wrong"
@@ -969,6 +1175,28 @@ class FlowGraphValidatorTest {
             .input(repeatable)
             .build());
         FlowNode node = new FlowNode("test.repeatable", 0, 0, Map.of("value", "stale"));
+
+        FlowGraphValidationResult result = validator.validate(graph(Map.of("node", node), List.of()));
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "REPEATABLE_PIN_INACTIVE"));
+    }
+
+    @Test
+    void removedOptionalRepeatableAliasesNormalizeToTheStableInputIdentity() {
+        NodeDefinition.PinDefinition repeatable = new NodeDefinition.PinBuilder(PinId.of("values"), "Values",
+            NodeDefinition.PinType.DATA, NodeDefinition.PinDirection.INPUT, FlowDataType.STRING)
+            .runtimeName("value")
+            .repeatable("values", 0, 3, "Value")
+            .build();
+        definitions.register(new NodeDefinition.Builder("test.repeatable_alias", "Repeatable Alias", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .input(repeatable)
+            .build());
+        FlowNode node = new FlowNode("test.repeatable_alias", 0, 0, Map.of(
+            "__repeatable_count:values", 2,
+            "__removed_optional_inputs", List.of("value_2"),
+            "values_2", "removed"));
 
         FlowGraphValidationResult result = validator.validate(graph(Map.of("node", node), List.of()));
 
@@ -1151,6 +1379,84 @@ class FlowGraphValidatorTest {
         assertFalse(hasCode(result, "SCHEDULE_PATTERN_INVALID"), result.summary());
     }
 
+    @Test
+    void persistedConnectionsResolveStableAndRuntimePinNamesByDirection() {
+        definitions.register(new NodeDefinition.Builder("test.source", "Source", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .output(new NodeDefinition.PinBuilder(PinId.of("output_value"), "Value", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.OUTPUT, FlowDataType.STRING).runtimeName("value").build())
+            .build());
+        definitions.register(new NodeDefinition.Builder("test.target", "Target", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .input(new NodeDefinition.PinBuilder(PinId.of("input_value"), "Value", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING).runtimeName("value").build())
+            .build());
+
+        FlowGraph runtimeNamed = graph(Map.of("source", node("test.source"), "target", node("test.target")),
+            List.of(new FlowConnection("source", "value", "target", "value")));
+        FlowGraph stableNamed = graph(Map.of("source", node("test.source"), "target", node("test.target")),
+            List.of(new FlowConnection("source", "output_value", "target", "input_value")));
+
+        assertTrue(validator.validate(runtimeNamed).valid(), validator.validate(runtimeNamed).summary());
+        assertTrue(validator.validate(stableNamed).valid(), validator.validate(stableNamed).summary());
+    }
+
+    @Test
+    void duplicateRuntimeNamesRemainAmbiguousInsteadOfSelectingAnInput() {
+        definitions.register(query("test.source", FlowDataType.STRING));
+        definitions.register(new NodeDefinition.Builder("test.target", "Target", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .input(new NodeDefinition.PinBuilder(PinId.of("first"), "First", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING).runtimeName("value").build())
+            .input(new NodeDefinition.PinBuilder(PinId.of("second"), "Second", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING).runtimeName("value").build())
+            .build());
+
+        FlowGraph resultGraph = graph(Map.of("source", node("test.source"), "target", node("test.target")),
+            List.of(new FlowConnection("source", "value", "target", "value")));
+
+        FlowGraphValidationResult result = validator.validate(resultGraph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "TARGET_PIN_UNKNOWN"));
+    }
+
+    @Test
+    void duplicateConnectionsUsingStableAndRuntimeNamesShareOneValidationIdentity() {
+        definitions.register(query("test.source", FlowDataType.STRING));
+        definitions.register(new NodeDefinition.Builder("test.target", "Target", NodeDefinition.NodeCategory.DATA)
+            .handler("TestHandler")
+            .input(new NodeDefinition.PinBuilder(PinId.of("input_value"), "Value", NodeDefinition.PinType.DATA,
+                NodeDefinition.PinDirection.INPUT, FlowDataType.STRING).runtimeName("value").build())
+            .build());
+
+        FlowGraph resultGraph = graph(Map.of("first", node("test.source"), "second", node("test.source"), "target", node("test.target")),
+            List.of(new FlowConnection("first", "value", "target", "input_value"),
+                new FlowConnection("second", "value", "target", "value")));
+
+        FlowGraphValidationResult result = validator.validate(resultGraph);
+
+        assertFalse(result.valid());
+        assertTrue(hasCode(result, "CONNECTION_TARGET_DUPLICATE"));
+    }
+
+    @Test
+    void canonicalFunctionBoundaryDefinitionsProvideFunctionTerminalPins() {
+        definitions.register(new NodeDefinition.Builder("function_start", "Function Start", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .build());
+        definitions.register(new NodeDefinition.Builder("function_end", "Function End", NodeDefinition.NodeCategory.FUNCTION)
+            .handler("TestHandler")
+            .build());
+        FlowGraph graph = graph(Map.of("start", node("function_start"), "end", node("function_end")),
+            List.of(new FlowConnection("start", "flow", "end", "flow")));
+        graph.setFunction(true);
+
+        FlowGraphValidationResult result = validator.validate(graph);
+
+        assertTrue(result.valid(), result.summary());
+    }
+
     private NodeDefinition query(String id, FlowDataType outputType) {
         return new NodeDefinition.Builder(id, id, NodeDefinition.NodeCategory.DATA)
             .handler("TestHandler")
@@ -1222,6 +1528,20 @@ class FlowGraphValidatorTest {
 
     private boolean hasCode(FlowGraphValidationResult result, String code) {
         return result.diagnostics().stream().anyMatch(diagnostic -> code.equals(diagnostic.code()));
+    }
+
+    private abstract static class CallerCatalogProvider implements OptionCatalogProvider {
+        @Override
+        public CaptureAffinity captureAffinity() {
+            return CaptureAffinity.CALLER;
+        }
+
+        @Override
+        public OptionCatalogCapture capture(OptionCatalogQuery query) {
+            List<OptionCatalogItem> capturedItems = List.copyOf(items(query));
+            return new OptionCatalogCapture(sourceId() + ":" + capturedItems.hashCode(), capturedItems,
+                status(query), diagnostic(query));
+        }
     }
 
     private static final class FixtureResourceAdapter implements FlowResourceAdapter<String> {

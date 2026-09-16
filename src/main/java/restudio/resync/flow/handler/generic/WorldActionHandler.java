@@ -31,10 +31,9 @@ public class WorldActionHandler implements NodeHandler {
 
     public WorldActionHandler() {
         operations.put("get_location", (ctx, node) -> {
-            Double x = ctx.getInputValue(node, "x", Double.class, 0.0);
-            Double y = ctx.getInputValue(node, "y", Double.class, 0.0);
-            Double z = ctx.getInputValue(node, "z", Double.class, 0.0);
-            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) throw new IllegalArgumentException("Location coordinates must be finite");
+            double x = requireCoordinate(ctx, node, "x");
+            double y = requireCoordinate(ctx, node, "y");
+            double z = requireCoordinate(ctx, node, "z");
             World world = null;
             Player player = ctx.getPlayer();
             if (player != null) {
@@ -47,9 +46,11 @@ public class WorldActionHandler implements NodeHandler {
         });
 
         operations.put("world_get_by_name", (ctx, node) -> {
-            String worldName = ctx.getInputValue(node, "world_name", String.class, "");
+            String worldName = ctx.getInputValue(node, "world_name", String.class, null);
             if (worldName == null || worldName.isBlank()) throw new IllegalArgumentException("World name is required");
-            ctx.setOutput(node, "world", Bukkit.getWorld(worldName));
+            World world = Bukkit.getWorld(worldName);
+            if (world == null) throw new IllegalArgumentException("Unknown world: " + worldName);
+            ctx.setOutput(node, "world", world);
         });
 
         operations.put("world_get_all", (ctx, node) -> {
@@ -817,6 +818,26 @@ public class WorldActionHandler implements NodeHandler {
         World world = context.getInputValue(node, "world", World.class, null);
         if (world == null) throw new IllegalArgumentException("World is required");
         return world;
+    }
+
+    private static double requireCoordinate(FlowContext context, FlowNode node, String inputName) {
+        Object rawValue = context.getInputValue(node, inputName);
+        double value;
+        if (rawValue instanceof Number number) {
+            value = number.doubleValue();
+        } else if (rawValue instanceof String text) {
+            try {
+                value = Double.parseDouble(text.trim());
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("Location coordinate must be a finite number: " + inputName, exception);
+            }
+        } else {
+            throw new IllegalArgumentException("Location coordinate must be a finite number: " + inputName);
+        }
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Location coordinate must be a finite number: " + inputName);
+        }
+        return value;
     }
 
     private static Location requireWorldLocation(FlowContext context, FlowNode node, String inputName, World world) {

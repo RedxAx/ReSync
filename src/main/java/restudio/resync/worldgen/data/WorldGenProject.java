@@ -1,5 +1,7 @@
 package restudio.resync.worldgen.data;
 
+import com.google.gson.JsonObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +19,7 @@ public class WorldGenProject {
     private WorldGenGraph spawnGraph;
     private WorldGenProjectSettings settings;
     private List<WorldGenBiomeProfile> biomeProfiles;
+    private transient JsonObject opaquePayload;
 
     public WorldGenProject() {
         this.id = UUID.randomUUID().toString();
@@ -76,6 +79,14 @@ public class WorldGenProject {
     public void setSettings(WorldGenProjectSettings settings) { this.settings = settings; }
     public List<WorldGenBiomeProfile> getBiomeProfiles() { return biomeProfiles; }
     public void setBiomeProfiles(List<WorldGenBiomeProfile> biomeProfiles) { this.biomeProfiles = biomeProfiles != null ? biomeProfiles : new ArrayList<>(); }
+
+    JsonObject opaquePayload() {
+        return opaquePayload == null ? null : opaquePayload.deepCopy();
+    }
+
+    void setOpaquePayload(JsonObject opaquePayload) {
+        this.opaquePayload = opaquePayload == null ? null : opaquePayload.deepCopy();
+    }
 
     public void setGraph(WorldGenStage stage, WorldGenGraph graph) {
         switch (stage) {

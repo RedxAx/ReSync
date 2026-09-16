@@ -14,11 +14,15 @@ import com.google.gson.stream.JsonWriter;
 import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.Log;
+import restudio.resync.flow.canonical.CanonicalJson;
 import restudio.resync.flow.handler.HandlerRegistry;
+import restudio.resync.flow.identity.ContentHash;
+import restudio.resync.flow.identity.NodeId;
+import restudio.resync.flow.identity.PinId;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -31,6 +35,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,6 +45,33 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 public class NodeDefinitionLoader {
+
+    private static final Set<String> REPLACEMENT_LIFECYCLE_VALUES = Set.of("active", "deprecated", "retiring", "migration-only");
+
+    public enum CatalogSource {
+        REPLACEMENT,
+        COMPATIBILITY
+    }
+
+    public enum SourceOrigin {
+        CLASSPATH,
+        LOCAL
+    }
+
+    public record SourceFile(String sourceName, String sourceUri, String relativePath, SourceOrigin origin, byte[] bytes) {
+        public SourceFile {
+            sourceName = sourceName == null || sourceName.isBlank() ? "source" : sourceName;
+            sourceUri = sourceUri == null || sourceUri.isBlank() ? sourceName : sourceUri;
+            relativePath = relativePath == null ? "" : relativePath;
+            origin = origin == null ? SourceOrigin.CLASSPATH : origin;
+            bytes = bytes == null ? new byte[0] : bytes.clone();
+        }
+
+        @Override
+        public byte[] bytes() {
+            return bytes.clone();
+        }
+    }
 
     private final Gson gson;
     private final List<NodeDefinitionDiagnostic> diagnostics = new ArrayList<>();
@@ -67,6 +99,18 @@ public class NodeDefinitionLoader {
                     return category;
                 }
             })
+            .registerTypeAdapter(PinId.class, new TypeAdapter<PinId>() {
+                @Override
+                public void write(JsonWriter out, PinId value) throws IOException {
+                    out.value(value != null ? value.value() : null);
+                }
+
+                @Override
+                public PinId read(JsonReader in) throws IOException {
+                    String value = in.nextString();
+                    return value == null || value.isBlank() ? null : PinId.of(value);
+                }
+            })
             .registerTypeAdapter(NodeDefinition.NodeKind.class, new EnumAdapter<>(NodeDefinition.NodeKind.class))
             .create();
     }
@@ -79,9 +123,22 @@ public class NodeDefinitionLoader {
         return List.copyOf(diagnostics);
     }
 
+    public void recordFailure(String code, String source, String message) {
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, code, source, -1, "", message);
+    }
+
     public List<NodeDefinition> loadFromClasspath(String resourcePath) {
+        return loadFromClasspath(resourcePath, CatalogSource.COMPATIBILITY);
+    }
+
+    public List<NodeDefinition> loadReplacementFromClasspath(String resourcePath) {
+        return loadFromClasspath(resourcePath, CatalogSource.REPLACEMENT);
+    }
+
+    public List<NodeDefinition> loadFromClasspath(String resourcePath, CatalogSource source) {
         List<NodeDefinition> results = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        CatalogSource selectedSource = source != null ? source : CatalogSource.COMPATIBILITY;
 
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         if (classLoader == null) {
@@ -89,9 +146,9 @@ public class NodeDefinitionLoader {
         }
 
         try {
-            boolean loaded = loadFromCodeSource(resourcePath, results, errors);
+            boolean loaded = loadFromCodeSource(resourcePath, results, errors, selectedSource);
             if (!loaded) {
-                loadFromClassLoaderUrls(classLoader, resourcePath, results, errors);
+                loadFromClassLoaderUrls(classLoader, resourcePath, results, errors, selectedSource);
             }
         } catch (Exception e) {
             Log.warn("[NodeDefinitionLoader] Failed to scan classpath resources: " + e.getMessage());
@@ -107,13 +164,22 @@ public class NodeDefinitionLoader {
     }
 
     public List<NodeDefinition> loadFromClassLoader(ClassLoader classLoader, String resourcePath) {
+        return loadFromClassLoader(classLoader, resourcePath, CatalogSource.COMPATIBILITY);
+    }
+
+    public List<NodeDefinition> loadReplacementFromClassLoader(ClassLoader classLoader, String resourcePath) {
+        return loadFromClassLoader(classLoader, resourcePath, CatalogSource.REPLACEMENT);
+    }
+
+    public List<NodeDefinition> loadFromClassLoader(ClassLoader classLoader, String resourcePath, CatalogSource source) {
         List<NodeDefinition> results = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        CatalogSource selectedSource = source != null ? source : CatalogSource.COMPATIBILITY;
         if (classLoader == null || resourcePath == null || resourcePath.isBlank()) {
             return results;
         }
         try {
-            loadFromClassLoaderUrls(classLoader, resourcePath, results, errors);
+            loadFromClassLoaderUrls(classLoader, resourcePath, results, errors, selectedSource);
         } catch (Exception e) {
             Log.warn("[NodeDefinitionLoader] Failed to scan extension resources: " + e.getMessage());
         }
@@ -125,7 +191,7 @@ public class NodeDefinitionLoader {
         return results;
     }
 
-    private boolean loadFromCodeSource(String resourcePath, List<NodeDefinition> results, List<String> errors) throws IOException, URISyntaxException {
+    private boolean loadFromCodeSource(String resourcePath, List<NodeDefinition> results, List<String> errors, CatalogSource source) throws IOException, URISyntaxException {
         URL location = NodeDefinitionLoader.class.getProtectionDomain().getCodeSource().getLocation();
         if (location == null) {
             return false;
@@ -137,19 +203,19 @@ public class NodeDefinitionLoader {
             if (!Files.exists(root)) {
                 return false;
             }
-            scanPath(root, results, errors);
+            scanPath(root, results, errors, source);
             return true;
         }
 
         if (Files.isRegularFile(codeSourcePath) && codeSourcePath.toString().toLowerCase().endsWith(".jar")) {
-            scanJar(codeSourcePath, resourcePath, results, errors);
+            scanJar(codeSourcePath, resourcePath, results, errors, source);
             return true;
         }
 
         return false;
     }
 
-    private void loadFromClassLoaderUrls(ClassLoader classLoader, String resourcePath, List<NodeDefinition> results, List<String> errors) throws IOException, URISyntaxException {
+    private void loadFromClassLoaderUrls(ClassLoader classLoader, String resourcePath, List<NodeDefinition> results, List<String> errors, CatalogSource source) throws IOException, URISyntaxException {
         Enumeration<URL> urls = classLoader.getResources(resourcePath);
         while (urls.hasMoreElements()) {
             URL url = urls.nextElement();
@@ -162,15 +228,15 @@ public class NodeDefinitionLoader {
                 }
                 String jarUri = ssp.substring(0, bang);
                 if (jarUri.startsWith("file:")) {
-                    scanJar(Paths.get(URI.create(jarUri)), resourcePath, results, errors);
+                    scanJar(Paths.get(URI.create(jarUri)), resourcePath, results, errors, source);
                 }
             } else if ("file".equalsIgnoreCase(uri.getScheme())) {
-                scanPath(Paths.get(uri), results, errors);
+                scanPath(Paths.get(uri), results, errors, source);
             }
         }
     }
 
-    private void scanPath(Path root, List<NodeDefinition> results, List<String> errors) throws IOException {
+    private void scanPath(Path root, List<NodeDefinition> results, List<String> errors, CatalogSource source) throws IOException {
         if (!Files.exists(root)) {
             return;
         }
@@ -178,9 +244,10 @@ public class NodeDefinitionLoader {
             stream.filter(Files::isRegularFile)
                 .filter(p -> p.toString().endsWith(".json"))
                 .filter(p -> !p.getFileName().toString().startsWith("_"))
+                .filter(p -> acceptPath(p.toString(), source))
                 .forEach(p -> {
                     try (InputStream is = Files.newInputStream(p)) {
-                        results.addAll(parse(is, p.toString()));
+                        results.addAll(parse(is, p.toString(), source));
                     } catch (Exception e) {
                         errors.add(p.getFileName() + ": " + e.getMessage());
                     }
@@ -188,7 +255,7 @@ public class NodeDefinitionLoader {
         }
     }
 
-    private void scanJar(Path jarPath, String resourcePath, List<NodeDefinition> results, List<String> errors) throws IOException {
+    private void scanJar(Path jarPath, String resourcePath, List<NodeDefinition> results, List<String> errors, CatalogSource source) throws IOException {
         String normalized = resourcePath.endsWith("/") ? resourcePath : resourcePath + "/";
         try (JarFile jarFile = new JarFile(jarPath.toFile())) {
             Enumeration<JarEntry> entries = jarFile.entries();
@@ -201,12 +268,15 @@ public class NodeDefinitionLoader {
                 if (!name.startsWith(normalized) || !name.endsWith(".json")) {
                     continue;
                 }
+                if (!acceptPath(name, source)) {
+                    continue;
+                }
                 String fileName = name.substring(name.lastIndexOf('/') + 1);
                 if (fileName.startsWith("_")) {
                     continue;
                 }
                 try (InputStream is = jarFile.getInputStream(entry)) {
-                    results.addAll(parse(is, name));
+                    results.addAll(parse(is, name, source));
                 } catch (Exception e) {
                     errors.add(fileName + ": " + e.getMessage());
                 }
@@ -215,7 +285,39 @@ public class NodeDefinitionLoader {
     }
 
     public List<NodeDefinition> loadFromDirectory(Path dir) {
+        return loadFromDirectory(dir, CatalogSource.COMPATIBILITY);
+    }
+
+    public List<NodeDefinition> loadReplacementFromDirectory(Path dir) {
+        return loadFromDirectory(dir, CatalogSource.REPLACEMENT);
+    }
+
+    public List<NodeDefinition> loadReplacementFromSources(List<SourceFile> sources) {
+        return loadFromSources(sources, CatalogSource.REPLACEMENT);
+    }
+
+    public List<NodeDefinition> loadFromSources(List<SourceFile> sources, CatalogSource source) {
         List<NodeDefinition> results = new ArrayList<>();
+        if (sources == null || sources.isEmpty()) {
+            return results;
+        }
+        CatalogSource selectedSource = source != null ? source : CatalogSource.COMPATIBILITY;
+        for (SourceFile sourceFile : sources) {
+            if (sourceFile == null) {
+                continue;
+            }
+            try {
+                results.addAll(parse(new ByteArrayInputStream(sourceFile.bytes()), sourceFile.sourceUri(), selectedSource));
+            } catch (RuntimeException exception) {
+                Log.warn("[NodeDefinitionLoader] Failed to load " + sourceFile.sourceName() + ": " + exception.getMessage());
+            }
+        }
+        return results;
+    }
+
+    public List<NodeDefinition> loadFromDirectory(Path dir, CatalogSource source) {
+        List<NodeDefinition> results = new ArrayList<>();
+        CatalogSource selectedSource = source != null ? source : CatalogSource.COMPATIBILITY;
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
             return results;
         }
@@ -224,9 +326,10 @@ public class NodeDefinitionLoader {
             stream.filter(Files::isRegularFile)
                   .filter(p -> p.toString().endsWith(".json"))
                   .filter(p -> !p.getFileName().toString().startsWith("_"))
+                  .filter(p -> acceptPath(p.toString(), selectedSource))
                   .forEach(p -> {
                       try (InputStream is = Files.newInputStream(p)) {
-                          results.addAll(parse(is, p.toString()));
+                          results.addAll(parse(is, p.toString(), selectedSource));
                       } catch (Exception e) {
                           Log.warn("[NodeDefinitionLoader] Failed to load " + p + ": " + e.getMessage());
                       }
@@ -238,27 +341,61 @@ public class NodeDefinitionLoader {
         return results;
     }
 
+    private boolean acceptPath(String path, CatalogSource source) {
+        if (source != CatalogSource.REPLACEMENT || path == null) {
+            return true;
+        }
+        String normalized = path.replace('\\', '/').toLowerCase(Locale.ROOT);
+        String[] segments = normalized.split("/+", -1);
+        for (int index = 0; index + 1 < segments.length; index++) {
+            if ("nodes".equals(segments[index]) && "migrated".equals(segments[index + 1])) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.WARNING, "CATALOG.LEGACY_ACTIVE", path, -1, "",
+                    "Migration-only node definitions are unavailable to the replacement runtime");
+                return false;
+            }
+        }
+        return true;
+    }
+
     public List<NodeDefinition> parse(InputStream inputStream) {
         return parse(inputStream, "stream");
     }
 
     public List<NodeDefinition> parse(InputStream inputStream, String source) {
+        return parse(inputStream, source, CatalogSource.COMPATIBILITY);
+    }
+
+    public List<NodeDefinition> parseReplacement(InputStream inputStream, String source) {
+        if (!acceptPath(source, CatalogSource.REPLACEMENT)) {
+            return List.of();
+        }
+        return parse(inputStream, source, CatalogSource.REPLACEMENT);
+    }
+
+    public List<NodeDefinition> parse(InputStream inputStream, String source, CatalogSource sourceKind) {
         List<NodeDefinition> results = new ArrayList<>();
-        JsonReader reader = new JsonReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        byte[] sourceBytes;
+        try {
+            sourceBytes = inputStream.readAllBytes();
+        } catch (IOException exception) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
+            return results;
+        }
         JsonElement root;
         try {
-            root = JsonParser.parseReader(reader);
+            root = JsonParser.parseString(new String(sourceBytes, StandardCharsets.UTF_8));
         } catch (RuntimeException exception) {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "FILE_PARSE_FAILED", source, -1, "", exception.getMessage());
             return results;
         }
+        ContentHash sourceHash = sourceHash(root);
 
         if (root.isJsonArray()) {
             for (int index = 0; index < root.getAsJsonArray().size(); index++) {
-                parseElement(root.getAsJsonArray().get(index), source, index, results);
+                parseElement(root.getAsJsonArray().get(index), source, index, sourceKind, sourceHash, results);
             }
         } else if (root.isJsonObject()) {
-            parseElement(root, source, 0, results);
+            parseElement(root, source, 0, sourceKind, sourceHash, results);
         } else {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "INVALID_ROOT", source, -1, "", "Definition file root must be an object or array");
         }
@@ -266,15 +403,300 @@ public class NodeDefinitionLoader {
         return results;
     }
 
-    private void parseElement(JsonElement element, String source, int index, List<NodeDefinition> results) {
+    private void parseElement(JsonElement element, String source, int index, CatalogSource sourceKind, ContentHash sourceHash, List<NodeDefinition> results) {
         String nodeId = extractNodeId(element);
+        if (sourceKind == CatalogSource.REPLACEMENT && !validateReplacementSource(element, source, index, nodeId)) {
+            return;
+        }
         try {
-            NodeDefinition definition = parseSingle(element);
+            NodeDefinition definition = parseSingle(element, sourceKind);
+            if (sourceKind == CatalogSource.REPLACEMENT && definition.getAuthoredMetadata() != null) {
+                AuthoredSourceProvenance provenance = new AuthoredSourceProvenance(source, index, definition.getOwner(), sourceHash.canonicalText());
+                definition = definition.withAuthoredMetadata(definition.getAuthoredMetadata().withSourceProvenance(provenance));
+            }
             results.add(definition);
             origins.put(definition, new DefinitionOrigin(source, index));
         } catch (RuntimeException exception) {
             addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "DEFINITION_PARSE_FAILED", source, index, nodeId, exception.getMessage());
         }
+    }
+
+    private ContentHash sourceHash(JsonElement root) {
+        try {
+            return ContentHash.of(CanonicalJson.genericCanonicalContentHash(CanonicalJson.parse(root.toString())));
+        } catch (RuntimeException exception) {
+            return ContentHash.of(CanonicalJson.genericCanonicalContentHash(root.toString()));
+        }
+    }
+
+    private boolean validateReplacementSource(JsonElement element, String source, int index, String nodeId) {
+        if (element == null || !element.isJsonObject()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+                "Replacement definitions must be authored JSON objects");
+            return false;
+        }
+        JsonObject object = element.getAsJsonObject();
+        boolean valid = true;
+        valid &= requireAuthoredNodeId(object, source, index, nodeId);
+        valid &= requireAuthoredText(object, "displayName", "display name", source, index, nodeId);
+        valid &= requireAuthoredText(object, "domain", "domain", source, index, nodeId);
+        valid &= requireAuthoredText(object, "family", "family", source, index, nodeId);
+        valid &= requireAuthoredLifecycle(object, source, index, nodeId);
+        valid &= requireAuthoredReplacementIdentity(object, source, index, nodeId);
+        valid &= requireAuthoredText(object, "description", "description", source, index, nodeId);
+        valid &= requireAuthoredText(object, "handlerCapability", "handler capability", source, index, nodeId);
+        valid &= requireAuthoredText(object, "selectorIntent", "selector intent", source, index, nodeId);
+        valid &= requireAuthoredText(object, "inspectorIntent", "inspector intent", source, index, nodeId);
+        Set<String> pinIds = new HashSet<>();
+        valid &= validateReplacementPinDescriptions(object, "inputs", "input", source, index, nodeId, pinIds);
+        valid &= validateReplacementPinDescriptions(object, "outputs", "output", source, index, nodeId, pinIds);
+        valid &= validateReplacementPinMigration(object, source, index, nodeId);
+        if (valid) {
+            try {
+                authoredMetadata(object);
+            } catch (RuntimeException exception) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_UNREPRESENTABLE", source, index, nodeId,
+                    exception.getMessage());
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private AuthoredNodeMetadata authoredMetadata(JsonObject object) {
+        return new AuthoredNodeMetadata(
+            object.get("id").getAsString(),
+            object.get("domain").getAsString(),
+            object.get("family").getAsString(),
+            object.get("lifecycle").getAsString(),
+            object.get("description").getAsString(),
+            object.get("handlerCapability").getAsString(),
+            object.get("selectorIntent").getAsString(),
+            object.get("inspectorIntent").getAsString());
+    }
+
+    private boolean requireAuthoredText(JsonObject object, String field, String label, String source, int index, String nodeId) {
+        JsonElement value = object.get(field);
+        if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() && !value.getAsString().isBlank()) {
+            return true;
+        }
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+            "Missing explicit authored " + label + " in '" + field + "'");
+        return false;
+    }
+
+    private boolean requireAuthoredNodeId(JsonObject object, String source, int index, String nodeId) {
+        JsonElement value = object.get("id");
+        if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString() || value.getAsString().isBlank()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+                "Missing explicit authored stable identity in 'id'");
+            return false;
+        }
+        try {
+            String canonical = NodeId.of(value.getAsString()).value();
+            if (canonical.equals(value.getAsString())) {
+                return true;
+            }
+        } catch (RuntimeException ignored) {
+        }
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_UNREPRESENTABLE", source, index, nodeId,
+            "Replacement definitions require a canonical explicit node ID in 'id'");
+        return false;
+    }
+
+    private boolean requireAuthoredLifecycle(JsonObject object, String source, int index, String nodeId) {
+        JsonElement value = object.get("lifecycle");
+        if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+            String lifecycle = value.getAsString().strip().toLowerCase(Locale.ROOT);
+            if (REPLACEMENT_LIFECYCLE_VALUES.contains(lifecycle)) {
+                return true;
+            }
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+                "Unknown authored lifecycle '" + value.getAsString() + "'");
+            return false;
+        }
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+            "Missing explicit authored lifecycle in 'lifecycle'");
+        return false;
+    }
+
+    private boolean requireAuthoredReplacementIdentity(JsonObject object, String source, int index, String nodeId) {
+        JsonElement lifecycleValue = object.get("lifecycle");
+        if (lifecycleValue == null || !lifecycleValue.isJsonPrimitive() || !lifecycleValue.getAsJsonPrimitive().isString()
+            || !"retiring".equals(lifecycleValue.getAsString().strip().toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+        JsonElement replacementValue = object.get("replacementFor");
+        if (replacementValue == null || !replacementValue.isJsonPrimitive()
+            || !replacementValue.getAsJsonPrimitive().isString() || replacementValue.getAsString().isBlank()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+                "Retiring replacement definitions require explicit authored replacement identity in 'replacementFor'");
+            return false;
+        }
+        try {
+            NodeId.of(replacementValue.getAsString().strip());
+            return true;
+        } catch (RuntimeException exception) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_UNREPRESENTABLE", source, index, nodeId,
+                "Authored replacement identity cannot be represented by the Core node identity contract");
+            return false;
+        }
+    }
+
+    private boolean validateReplacementPinDescriptions(JsonObject object, String collection, String authoredDirection,
+                                                       String source, int index, String nodeId, Set<String> pinIds) {
+        JsonElement value = object.get(collection);
+        if (value == null || value.isJsonNull()) {
+            return true;
+        }
+        if (!value.isJsonArray()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_SOURCE_INCOMPLETE", source, index, nodeId,
+                "Replacement '" + collection + "' must be an array so authored pin descriptions can be validated");
+            return false;
+        }
+        boolean valid = true;
+        JsonArray pins = value.getAsJsonArray();
+        for (int pinIndex = 0; pinIndex < pins.size(); pinIndex++) {
+            JsonElement pin = pins.get(pinIndex);
+            if (pin == null || !pin.isJsonObject()) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_DESCRIPTION_MISSING", source, index, nodeId,
+                    "Missing authored description for " + collection + " pin at index " + pinIndex);
+                valid = false;
+                continue;
+            }
+            JsonObject pinObject = pin.getAsJsonObject();
+            valid &= validateReplacementPinId(pinObject, collection, pinIndex, source, index, nodeId, pinIds);
+            valid &= validateReplacementPinDirection(pinObject, collection, authoredDirection, pinIndex, source, index, nodeId);
+            JsonElement displayName = pinObject.get("displayName");
+            if (displayName == null || !displayName.isJsonPrimitive() || !displayName.getAsJsonPrimitive().isString() || displayName.getAsString().isBlank()) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_DISPLAY_NAME_MISSING", source, index, nodeId,
+                    "Missing explicit authored display name for " + collection + " pin at index " + pinIndex);
+                valid = false;
+            }
+            JsonElement description = pinObject.get("description");
+            if (description == null || !description.isJsonPrimitive() || !description.getAsJsonPrimitive().isString() || description.getAsString().isBlank()) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_DESCRIPTION_MISSING", source, index, nodeId,
+                    "Missing explicit authored description for " + collection + " pin at index " + pinIndex);
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private boolean validateReplacementPinId(JsonObject pin, String direction, int pinIndex, String source, int index, String nodeId,
+                                             Set<String> pinIds) {
+        JsonElement id = pin.get("id");
+        if (id == null || !id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString() || id.getAsString().isBlank()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_ID_MISSING", source, index, nodeId,
+                "Missing explicit authored ID for " + direction + " pin at index " + pinIndex);
+            return false;
+        }
+        try {
+            String canonical = PinId.of(id.getAsString()).value();
+            if (canonical.equals(id.getAsString())) {
+                if (!pinIds.add(canonical)) {
+                    addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_ID_DUPLICATE", source, index, nodeId,
+                        "Duplicate authored pin ID '" + canonical + "' in replacement " + direction + " definitions");
+                    return false;
+                }
+                return true;
+            }
+        } catch (RuntimeException ignored) {
+        }
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_ID_INVALID", source, index, nodeId,
+            "Replacement " + direction + " pin at index " + pinIndex + " must use a canonical ID");
+        return false;
+    }
+
+    private boolean validateReplacementPinDirection(JsonObject pin, String collection, String expectedDirection, int pinIndex,
+                                                    String source, int index, String nodeId) {
+        JsonElement value = pin.get("direction");
+        if (value == null || value.isJsonNull()) {
+            return true;
+        }
+        if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+            && expectedDirection.equalsIgnoreCase(value.getAsString().strip())) {
+            return true;
+        }
+        addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_DIRECTION_MISMATCH", source, index, nodeId,
+            "Replacement " + collection + " pin at index " + pinIndex + " declares a different direction");
+        return false;
+    }
+
+    private boolean validateReplacementPinMigration(JsonObject object, String source, int index, String nodeId) {
+        Set<PinKey> currentPins = new HashSet<>();
+        collectCurrentAuthoredPins(object, "inputs", NodeDefinition.PinDirection.INPUT, currentPins);
+        collectCurrentAuthoredPins(object, "outputs", NodeDefinition.PinDirection.OUTPUT, currentPins);
+
+        if (!object.has("migrationMapping")) {
+            return true;
+        }
+
+        JsonElement value = object.get("migrationMapping");
+        if (value == null || !value.isJsonObject()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_MIGRATION_INCOMPLETE", source, index, nodeId,
+                "Changed authored pin IDs require a complete 'migrationMapping'");
+            return false;
+        }
+
+        NodeDefinition.MigrationMapping migration;
+        try {
+            migration = toMigrationMapping(gson.fromJson(value, MigrationMappingJson.class));
+        } catch (RuntimeException exception) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_MIGRATION_INVALID", source, index, nodeId,
+                exception.getMessage());
+            return false;
+        }
+
+        boolean valid = true;
+        if (!migration.complete()) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_MIGRATION_INCOMPLETE", source, index, nodeId,
+                "Changed authored pin IDs require 'migrationMapping.complete' to be true");
+            valid = false;
+        }
+        int targetSchemaVersion = integerValue(object.get("schemaVersion"), 1);
+        if (migration.targetSchemaVersion() != targetSchemaVersion) {
+            addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_MIGRATION_INVALID", source, index, nodeId,
+                "Pin migration target schema version must match the node schema version");
+            valid = false;
+        }
+
+        for (NodeDefinition.PinMigrationMapping mapping : migration.pins()) {
+            PinKey targetKey = new PinKey(mapping.direction(), mapping.targetPinId());
+            if (!currentPins.contains(targetKey)) {
+                addDiagnostic(NodeDefinitionDiagnostic.Severity.ERROR, "CATALOG.REPLACEMENT_PIN_MIGRATION_TARGET_UNKNOWN", source, index, nodeId,
+                    "Pin migration target is not an active pin: " + mapping.targetPinId().value());
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private void collectCurrentAuthoredPins(JsonObject object, String field, NodeDefinition.PinDirection direction,
+                                            Set<PinKey> currentPins) {
+        JsonElement value = object.get(field);
+        if (value == null || !value.isJsonArray()) {
+            return;
+        }
+        for (JsonElement element : value.getAsJsonArray()) {
+            if (element == null || !element.isJsonObject()) {
+                continue;
+            }
+            JsonObject pin = element.getAsJsonObject();
+            String idValue = stringValue(pin.get("id"));
+            if (idValue == null || idValue.isBlank()) {
+                continue;
+            }
+            try {
+                PinId id = PinId.of(idValue);
+                currentPins.add(new PinKey(direction, id));
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
+    private int integerValue(JsonElement value, int fallback) {
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber() ? value.getAsInt() : fallback;
     }
 
     private String extractNodeId(JsonElement element) {
@@ -293,17 +715,18 @@ public class NodeDefinitionLoader {
             return element;
         }
         JsonObject obj = element.getAsJsonObject();
+        Set<String> pinIds = new HashSet<>();
 
         if (obj.has("inputs") && obj.get("inputs").isJsonArray()) {
             JsonArray arr = obj.getAsJsonArray("inputs");
             for (int i = 0; i < arr.size(); i++) {
-                arr.set(i, normalizeLegacyPin(arr.get(i)));
+                arr.set(i, normalizeLegacyPin(arr.get(i), "input", pinIds));
             }
         }
         if (obj.has("outputs") && obj.get("outputs").isJsonArray()) {
             JsonArray arr = obj.getAsJsonArray("outputs");
             for (int i = 0; i < arr.size(); i++) {
-                arr.set(i, normalizeLegacyPin(arr.get(i)));
+                arr.set(i, normalizeLegacyPin(arr.get(i), "output", pinIds));
             }
         }
 
@@ -321,15 +744,28 @@ public class NodeDefinitionLoader {
         return obj;
     }
 
-    private JsonElement normalizeLegacyPin(JsonElement pinEl) {
+    private JsonElement normalizeLegacyPin(JsonElement pinEl, String direction, Set<String> pinIds) {
         if (!pinEl.isJsonObject()) {
             return pinEl;
         }
         JsonObject pin = pinEl.getAsJsonObject();
 
-        if (pin.has("id") && !pin.has("name")) {
-            pin.addProperty("name", pin.get("id").getAsString());
-            pin.remove("id");
+        String legacyName = stringValue(pin.get("name"));
+        String explicitId = stringValue(pin.get("id"));
+        String explicitDisplayName = stringValue(pin.get("displayName"));
+        if (explicitId == null || explicitId.isBlank()) {
+            if (legacyName != null && !legacyName.isBlank()) {
+                explicitId = compatibilityPinId(legacyName, direction, pinIds);
+                pin.addProperty("id", explicitId);
+            }
+        } else {
+            pinIds.add(explicitId);
+        }
+        if (explicitDisplayName == null || explicitDisplayName.isBlank()) {
+            String displayName = legacyName != null && !legacyName.isBlank() ? legacyName : explicitId;
+            if (displayName != null && !displayName.isBlank()) {
+                pin.addProperty("displayName", displayName);
+            }
         }
 
         if (pin.has("type") && pin.get("type").isJsonPrimitive()) {
@@ -356,8 +792,44 @@ public class NodeDefinitionLoader {
         return pin;
     }
 
-    private NodeDefinition parseSingle(JsonElement element) {
-        element = applyCompatibilityTransforms(element);
+    private String compatibilityPinId(String legacyName, String direction, Set<String> pinIds) {
+        String base = canonicalLegacyPinId(legacyName);
+        if (pinIds.add(base)) {
+            return base;
+        }
+        String directional = direction + "_" + base;
+        if (pinIds.add(directional)) {
+            return directional;
+        }
+        int suffix = 2;
+        while (!pinIds.add(directional + "_" + suffix)) {
+            suffix++;
+        }
+        return directional + "_" + suffix;
+    }
+
+    private String canonicalLegacyPinId(String legacyName) {
+        String candidate = legacyName.strip();
+        try {
+            return PinId.of(candidate).value();
+        } catch (RuntimeException ignored) {
+            String normalized = candidate.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+            if (normalized.isBlank() || !Character.isLetter(normalized.charAt(0))) {
+                normalized = "pin_" + normalized;
+            }
+            return PinId.of(normalized).value();
+        }
+    }
+
+    private String stringValue(JsonElement value) {
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : null;
+    }
+
+    private NodeDefinition parseSingle(JsonElement element, CatalogSource sourceKind) {
+        if (sourceKind != CatalogSource.REPLACEMENT) {
+            element = applyCompatibilityTransforms(element);
+        }
         NodeJson dto = gson.fromJson(element, NodeJson.class);
         if (dto == null || dto.id == null || dto.id.isBlank()) {
             throw new JsonParseException("Node ID is required");
@@ -400,8 +872,12 @@ public class NodeDefinitionLoader {
         }
         if (dto.description != null && !dto.description.isBlank()) {
             builder.description(dto.description);
-        } else {
+        } else if (sourceKind != CatalogSource.REPLACEMENT) {
             builder.description(defaultDescription(dto, displayName));
+        }
+        if (sourceKind == CatalogSource.REPLACEMENT) {
+            builder.authoredMetadata(new AuthoredNodeMetadata(dto.id, dto.domain, dto.family, dto.lifecycle, dto.description,
+                dto.handlerCapability, dto.selectorIntent, dto.inspectorIntent));
         }
         if (dto.handler != null && !dto.handler.isBlank()) {
             builder.handler(dto.handler);
@@ -427,6 +903,9 @@ public class NodeDefinitionLoader {
             }
             builder.outputMappings(mappings);
         }
+        if (dto.migrationMapping != null) {
+            builder.migrationMapping(toMigrationMapping(dto.migrationMapping));
+        }
         builder.tags(dto.tags != null && !dto.tags.isEmpty() ? dto.tags : defaultTags(dto, category));
         builder.examples(dto.examples != null && !dto.examples.isEmpty() ? dto.examples : defaultExamples(dto, displayName));
         if (dto.family != null && !dto.family.isBlank()) {
@@ -436,7 +915,9 @@ public class NodeDefinitionLoader {
             builder.recommended(dto.recommended);
         }
         if (dto.replacementFor != null && !dto.replacementFor.isBlank()) {
-            builder.replacementFor(dto.replacementFor);
+            String replacementFor = sourceKind == CatalogSource.REPLACEMENT
+                ? NodeId.of(dto.replacementFor.strip()).value() : dto.replacementFor;
+            builder.replacementFor(replacementFor);
         }
         if (dto.authorizationPolicy != null && !dto.authorizationPolicy.isBlank()) {
             builder.authorizationPolicy(dto.authorizationPolicy);
@@ -482,6 +963,33 @@ public class NodeDefinitionLoader {
         }
 
         return builder.build();
+    }
+
+    private NodeDefinition.MigrationMapping toMigrationMapping(MigrationMappingJson migration) {
+        if (migration == null || migration.sourceSchemaVersion == null || migration.targetSchemaVersion == null
+            || migration.complete == null || migration.pins == null) {
+            throw new JsonParseException("Pin migration mapping requires sourceSchemaVersion, targetSchemaVersion, complete, and pins");
+        }
+        List<NodeDefinition.PinMigrationMapping> pins = new ArrayList<>();
+        for (MigrationPinJson pin : migration.pins) {
+            if (pin == null) {
+                throw new JsonParseException("Pin migration mapping cannot contain null pins");
+            }
+            String source = pin.source != null ? pin.source : pin.sourcePinId;
+            String target = pin.target != null ? pin.target : pin.targetPinId;
+            if (source == null || target == null || source.isBlank() || target.isBlank()) {
+                throw new JsonParseException("Pin migration mapping requires source and target pin IDs");
+            }
+            NodeDefinition.LegacyPinId sourcePinId = NodeDefinition.LegacyPinId.of(source);
+            PinId targetPinId = PinId.of(target);
+            if (!targetPinId.value().equals(target)) {
+                throw new JsonParseException("Pin migration mapping IDs must be canonical");
+            }
+            pins.add(new NodeDefinition.PinMigrationMapping(sourcePinId, targetPinId, pin.direction,
+                migration.sourceSchemaVersion, migration.targetSchemaVersion));
+        }
+        return new NodeDefinition.MigrationMapping(migration.sourceSchemaVersion, migration.targetSchemaVersion,
+            migration.complete, pins);
     }
 
     private String defaultHiddenReason(NodeJson dto) {
@@ -634,24 +1142,32 @@ public class NodeDefinitionLoader {
             return List.of("Connect the " + name + " Flow output to the actions that should run.");
         }
         List<String> dataInputs = dto.inputs != null ? dto.inputs.stream()
-            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pin.name != null && !pin.name.isBlank())
-            .map(pin -> pin.name.replace('_', ' '))
+            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pinDisplayName(pin) != null)
+            .map(pin -> pinDisplayName(pin).replace('_', ' '))
             .limit(3)
             .toList() : List.of();
         boolean action = dto.inputs != null && dto.inputs.stream().anyMatch(pin -> pin != null && pin.pinType == NodeDefinition.PinType.FLOW);
         boolean failure = dto.outputs != null && dto.outputs.stream()
-            .anyMatch(pin -> pin != null && "failed".equalsIgnoreCase(pin.name));
+            .anyMatch(pin -> pin != null && "failed".equalsIgnoreCase(pinDisplayName(pin)));
         String supplied = dataInputs.isEmpty() ? "its inputs" : String.join(", ", dataInputs);
         if (action) {
             return List.of("Connect Flow, provide " + supplied + ", then handle " + (failure ? "Flow or Failed." : "its continuation."));
         }
         List<String> dataOutputs = dto.outputs != null ? dto.outputs.stream()
-            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pin.name != null && !pin.name.isBlank())
-            .map(pin -> pin.name.replace('_', ' '))
+            .filter(pin -> pin != null && pin.pinType != NodeDefinition.PinType.FLOW && pinDisplayName(pin) != null)
+            .map(pin -> pinDisplayName(pin).replace('_', ' '))
             .limit(2)
             .toList() : List.of();
         String produced = dataOutputs.isEmpty() ? "its result" : String.join(" and ", dataOutputs);
         return List.of("Provide " + supplied + " and connect " + produced + " to a compatible input.");
+    }
+
+    private String pinDisplayName(PinJson pin) {
+        if (pin == null) {
+            return null;
+        }
+        String value = pin.displayName != null && !pin.displayName.isBlank() ? pin.displayName : pin.name;
+        return value != null && !value.isBlank() ? value : pin.id;
     }
 
     private boolean isDestructive(NodeJson dto) {
@@ -718,8 +1234,20 @@ public class NodeDefinitionLoader {
             ? new NodeDefinition.RepeatablePin(pin.repeatable.groupId, pin.repeatable.minItems, pin.repeatable.maxItems, pin.repeatable.itemLabel)
             : null;
 
+        PinId pinId;
+        try {
+            pinId = PinId.of(pin.id);
+        } catch (RuntimeException exception) {
+            Log.warn("[NodeDefinitionLoader] Invalid pin ID: " + pin.id);
+            return null;
+        }
+        String displayName = pin.displayName != null && !pin.displayName.isBlank() ? pin.displayName : pinId.value();
+        String runtimeName = pin.name != null ? pin.name : pinId.value();
+
         return new NodeDefinition.PinDefinition(
-            pin.name,
+            pinId,
+            displayName,
+            runtimeName,
             pinType,
             direction,
             dataType,
@@ -758,7 +1286,7 @@ public class NodeDefinitionLoader {
             case "trade_profile" -> "trade_profile_id";
             case "npc_definition" -> "npc_id";
             case "loot_table" -> "loot_table_id";
-            case "worldgen" -> "worldgen_id";
+            case "worldgen" -> "worldgen_project";
             default -> fallback;
         };
     }
@@ -811,9 +1339,14 @@ public class NodeDefinitionLoader {
             validator = new NodeDefinitionValidator(handlerRegistry);
         }
         Set<String> displayNames = new HashSet<>();
+        Set<AdmissionIdentity> acceptedIdentities = new HashSet<>();
+        List<NodeDefinition> accepted = new ArrayList<>();
+        boolean identityConflict = false;
         for (NodeDefinition def : definitions) {
-            if (registry.getAllDefinitions().containsKey(def.getId())) {
+            AdmissionIdentity identity = new AdmissionIdentity(def.getOwner(), def.getId());
+            if (registry.get(def.getOwner(), def.getId()) != null || acceptedIdentities.contains(identity)) {
                 reject(def, "DUPLICATE_NODE_ID", "Duplicate node ID: " + def.getId());
+                identityConflict = true;
                 continue;
             }
             String displayKey = def.getCategory() + ":" + def.getDisplayName().toLowerCase();
@@ -834,7 +1367,11 @@ public class NodeDefinitionLoader {
                     }
                 }
             }
-            registry.register(pluginId, def);
+            accepted.add(def);
+            acceptedIdentities.add(identity);
+        }
+        if (!identityConflict && !accepted.isEmpty()) {
+            registry.registerAll(pluginId, accepted);
         }
     }
 
@@ -866,11 +1403,25 @@ public class NodeDefinitionLoader {
     private record DefinitionOrigin(String source, int index) {
     }
 
+    private record AdmissionIdentity(String owner, String nodeId) {
+    }
+
+    private record PinKey(NodeDefinition.PinDirection direction, NodeDefinition.LegacyPinId pinId) {
+        private PinKey(NodeDefinition.PinDirection direction, PinId pinId) {
+            this(direction, NodeDefinition.LegacyPinId.of(pinId.value()));
+        }
+    }
+
     private static class NodeJson {
         String id;
         String displayName;
         NodeDefinition.NodeCategory category;
         String description;
+        String domain;
+        String lifecycle;
+        String handlerCapability;
+        String selectorIntent;
+        String inspectorIntent;
         Integer color;
         Integer priority;
         Boolean hidden;
@@ -888,6 +1439,7 @@ public class NodeDefinitionLoader {
         String eventType;
         List<String> aliases;
         List<PinMappingJson> outputMappings;
+        MigrationMappingJson migrationMapping;
         List<PinJson> inputs;
         List<PinJson> outputs;
         List<String> tags;
@@ -914,7 +1466,24 @@ public class NodeDefinitionLoader {
         String target;
     }
 
+    private static class MigrationMappingJson {
+        Integer sourceSchemaVersion;
+        Integer targetSchemaVersion;
+        Boolean complete;
+        List<MigrationPinJson> pins;
+    }
+
+    private static class MigrationPinJson {
+        String source;
+        String target;
+        String sourcePinId;
+        String targetPinId;
+        NodeDefinition.PinDirection direction;
+    }
+
     private static class PinJson {
+        String id;
+        String displayName;
         String name;
         NodeDefinition.PinType pinType;
         String dataType;

@@ -24,6 +24,7 @@ import restudio.resync.diagnostics.BoundedDiagnosticDeduplicator;
 import restudio.resync.flow.FlowExecutor;
 import restudio.resync.flow.FlowStorage;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ public class CustomContentService {
     private final CustomContentStorage contentStorage;
     private final FlowStorage flowStorage;
     private final FlowExecutor executor;
+    private volatile CustomContentExecution compiledExecution;
     private final Map<String, CustomContentProvider> providers = new ConcurrentHashMap<>();
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private final Map<String, Integer> tickActivations = new ConcurrentHashMap<>();
@@ -56,7 +58,8 @@ public class CustomContentService {
         this.contentStorage = contentStorage;
         this.flowStorage = flowStorage;
         this.executor = executor;
-        this.vanillaProvider = new VanillaContentProvider(contentStorage.getPlugin(), attributeSchemaService);
+        Path activeRoot = contentStorage.getAssetsPath().getParent();
+        this.vanillaProvider = new VanillaContentProvider(contentStorage.getPlugin(), attributeSchemaService, activeRoot);
         this.itemReconciler = new CustomContentItemReconciler(contentStorage, this);
         registerProvider(vanillaProvider);
         if (Bukkit.getPluginManager().getPlugin("Nexo") != null) {
@@ -135,10 +138,40 @@ public class CustomContentService {
     }
 
     public List<OptionCatalogItem> recipeItemCatalog() {
+        return recipeItemCatalog(contentStorage.getAll());
+    }
+
+    public List<OptionCatalogItem> recipeItemCatalogForProjection() {
+        return recipeItemCatalog(contentStorage.readOptionCatalogProjection());
+    }
+
+    public List<OptionCatalogItem> providerRecipeItemCatalog() {
         ensureNexoProvider();
+        CustomContentProvider nexo = providers.get("nexo");
+        if (!(nexo instanceof NexoContentProvider nexoProvider) || !nexoProvider.isAvailable()) {
+            return List.of();
+        }
+        Set<String> providerIds = new LinkedHashSet<>();
+        providerIds.addAll(nexoProvider.itemIds());
+        providerIds.addAll(nexoProvider.armorIds());
+        providerIds.addAll(nexoProvider.blockIds());
+        providerIds.addAll(nexoProvider.furnitureIds());
+        List<OptionCatalogItem> items = new ArrayList<>();
+        for (String externalId : providerIds) {
+            if (externalId == null || externalId.isBlank()) {
+                continue;
+            }
+            ItemStack previewStack = nexoProvider.createExternalItem(externalId, 1);
+            items.add(new OptionCatalogItem("provider:nexo:" + externalId, externalId, "", "", "Providers",
+                ItemStackPreviewMetadata.fromStack(previewStack)));
+        }
+        return List.copyOf(items);
+    }
+
+    private List<OptionCatalogItem> recipeItemCatalog(List<CustomContentDefinition> definitions) {
         List<OptionCatalogItem> items = new ArrayList<>();
         Set<String> values = new LinkedHashSet<>();
-        for (CustomContentDefinition definition : contentStorage.getAll()) {
+        for (CustomContentDefinition definition : definitions) {
             if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
                 continue;
             }
@@ -155,23 +188,9 @@ public class CustomContentService {
                 : definition.getId();
             items.add(new OptionCatalogItem(value, label, contentType, "", "ReSync", ItemStackPreviewMetadata.fromDefinition(this, definition)));
         }
-        CustomContentProvider nexo = providers.get("nexo");
-        if (nexo instanceof NexoContentProvider nexoProvider && nexoProvider.isAvailable()) {
-            Set<String> providerIds = new LinkedHashSet<>();
-            providerIds.addAll(nexoProvider.itemIds());
-            providerIds.addAll(nexoProvider.armorIds());
-            providerIds.addAll(nexoProvider.blockIds());
-            providerIds.addAll(nexoProvider.furnitureIds());
-            for (String externalId : providerIds) {
-                if (externalId == null || externalId.isBlank()) {
-                    continue;
-                }
-                String value = "provider:nexo:" + externalId;
-                if (!values.add(value)) {
-                    continue;
-                }
-                ItemStack previewStack = nexoProvider.createExternalItem(externalId, 1);
-                items.add(new OptionCatalogItem(value, externalId, "", "", "Providers", ItemStackPreviewMetadata.fromStack(previewStack)));
+        for (OptionCatalogItem item : providerRecipeItemCatalog()) {
+            if (values.add(item.value())) {
+                items.add(item);
             }
         }
         for (Material material : Material.values()) {
@@ -180,7 +199,7 @@ public class CustomContentService {
             }
             String value = material.name().toLowerCase(Locale.ROOT);
             if (values.add(value)) {
-                items.add(new OptionCatalogItem(value, formatMaterialLabel(value), "", "", "Minecraft", Map.of()));
+                items.add(new OptionCatalogItem(value, formatMaterialLabel(value), "", "", "Vanilla", Map.of()));
             }
         }
         items.sort(Comparator.comparingInt((OptionCatalogItem item) -> recipeItemGroupRank(item.group()))
@@ -246,6 +265,10 @@ public class CustomContentService {
 
     public ItemStack createItem(String contentId, int amount) {
         CustomContentDefinition definition = contentStorage.get(contentId);
+        return createItemFromDefinition(definition, amount);
+    }
+
+    ItemStack createItemFromDefinition(CustomContentDefinition definition, int amount) {
         if (definition == null || !definition.isEnabled()) {
             return null;
         }
@@ -425,6 +448,10 @@ public class CustomContentService {
         tickActivations.clear();
     }
 
+    public void setCompiledExecution(CustomContentExecution execution) {
+        compiledExecution = execution;
+    }
+
     public void dispatch(String contentId, String trigger, Player player, Event event, Map<String, Object> eventVars) {
         CustomContentDefinition definition = contentStorage.get(contentId);
         if (definition == null || !definition.isEnabled() || trigger == null) {
@@ -442,7 +469,10 @@ public class CustomContentService {
             }
             FlowGraph graph = graphFor(definition, binding.getFlowId());
             if (graph == null) {
-                reportDispatchFailure(contentId, trigger, "FLOW_TARGET_UNRESOLVED: Ability " + binding.getId() + " targets missing flow: " + binding.getFlowId(), null);
+                String message = embeddedTarget(definition, binding.getFlowId())
+                    ? "CONTENT_EXECUTION_UNAVAILABLE: Custom content " + contentId + " has no admitted Core execution for ability " + binding.getId()
+                    : "FLOW_TARGET_UNRESOLVED: Ability " + binding.getId() + " targets missing flow: " + binding.getFlowId();
+                reportDispatchFailure(contentId, trigger, message, null);
                 continue;
             }
             Map<String, Object> vars = new HashMap<>();
@@ -459,9 +489,10 @@ public class CustomContentService {
                 vars.put("event.cancelled", true);
             }
             String customContentStart = findCustomContentStartNode(graph);
-            CompletableFuture<Void> execution = customContentStart != null
-                ? executor.execute(graph, customContentStart, player, event, vars)
-                : executor.execute(graph, player, event, vars);
+            CustomContentExecution runtime = compiledExecution;
+            CompletableFuture<Void> execution = runtime == null
+                ? CompletableFuture.failedFuture(new IllegalStateException("Custom content compiled execution is unavailable"))
+                : runtime.execute(graph, customContentStart != null ? customContentStart : executor.findStartNode(graph), player, event, vars);
             execution.whenComplete((ignored, failure) -> {
                 if (failure == null) {
                     return;
@@ -500,7 +531,7 @@ public class CustomContentService {
             return storedDefinition;
         }
         if (sourceGraph == null) {
-            sourceGraph = flowStorage.getGraph(flowId);
+            sourceGraph = flowStorage.getGraph("flow", flowId);
         }
         if (sourceGraph == null) {
             compiledDefinitions.remove(contentId);
@@ -522,13 +553,16 @@ public class CustomContentService {
     }
 
     private FlowGraph graphFor(CustomContentDefinition definition, String flowId) {
-        if (definition != null && definition.getGraph() != null) {
-            FlowGraph graph = definition.getGraph();
-            if (flowId == null || flowId.isBlank() || flowId.equals(graph.getId())) {
-                return graph;
-            }
+        if (embeddedTarget(definition, flowId)) {
+            CustomContentExecution runtime = compiledExecution;
+            return runtime == null ? null : runtime.graph(definition.getId());
         }
-        return flowStorage.getGraph(flowId);
+        return flowStorage.getGraph("flow", flowId);
+    }
+
+    private static boolean embeddedTarget(CustomContentDefinition definition, String flowId) {
+        return definition != null && definition.getGraph() != null
+            && (flowId == null || flowId.isBlank() || flowId.equals(definition.getGraph().getId()));
     }
 
     private boolean passes(CustomContentDefinition definition, CustomAbilityBinding binding, Player player, Event event, Map<String, Object> vars) {
@@ -667,6 +701,9 @@ public class CustomContentService {
         }
         for (Map.Entry<String, FlowNode> entry : graph.getNodes().entrySet()) {
             String type = entry.getValue() != null ? entry.getValue().getType() : null;
+            if (type != null && type.startsWith("restudio.resync/")) {
+                type = type.substring("restudio.resync/".length());
+            }
             if (CustomContentGraphAdapter.typeFromNode(type) != null) {
                 return entry.getKey();
             }

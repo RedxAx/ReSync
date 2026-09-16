@@ -3,6 +3,7 @@ package restudio.resync.server;
 import java.util.List;
 
 public class ReSyncConfig {
+    private transient ConfigurationPersistenceParticipant persistenceParticipant;
     private boolean enabled;
     private int port;
     private String apiKey;
@@ -210,6 +211,14 @@ public class ReSyncConfig {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public ConfigurationPersistenceParticipant getPersistenceParticipant() {
+        return persistenceParticipant;
+    }
+
+    public void setPersistenceParticipant(ConfigurationPersistenceParticipant persistenceParticipant) {
+        this.persistenceParticipant = persistenceParticipant;
     }
 
     public void setEnabled(boolean enabled) {

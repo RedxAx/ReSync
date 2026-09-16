@@ -2,6 +2,10 @@ package restudio.resync.permissions;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.context.ImmutableContextSet;
@@ -31,6 +35,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
+import restudio.resync.migration.MigrationPaths;
 import restudio.resync.permissions.LuckPermsManagementContract.Action;
 import restudio.resync.permissions.LuckPermsManagementContract.AppliedEntity;
 import restudio.resync.permissions.LuckPermsManagementContract.AuditEntry;
@@ -65,7 +70,9 @@ import restudio.resync.storage.StorageSafety;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -86,7 +93,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -98,7 +107,8 @@ public final class LuckPermsManagementService implements AutoCloseable {
     private static final int COMPLETED_SAVE_LIMIT = 256;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final JavaPlugin plugin;
-    private final Path operationJournal;
+    private final LuckPermsBackendPersistenceCapability backendPersistence;
+    private volatile Path operationJournal;
     private final AtomicLong revision = new AtomicLong(1);
     private final Map<String, Long> entityRevisions = new ConcurrentHashMap<>();
     private final Deque<AuditEntry> audit = new ArrayDeque<>();
@@ -109,6 +119,7 @@ public final class LuckPermsManagementService implements AutoCloseable {
     private final Object saveLock = new Object();
     private CompletableFuture<Void> saveTail = CompletableFuture.completedFuture(null);
     private volatile long lastChangedAt = System.currentTimeMillis();
+    private PersistenceState persistenceState = PersistenceState.OPEN;
 
     private record PermissionSource(SubjectRef source, List<String> path, String explanation) {
     }
@@ -143,10 +154,29 @@ public final class LuckPermsManagementService implements AutoCloseable {
     }
 
     public LuckPermsManagementService(JavaPlugin plugin) {
-        this.plugin = plugin;
-        operationJournal = plugin.getDataFolder().toPath().resolve("runtime").resolve("luckperms-operations.json");
-        loadCompleted();
+        this(plugin, LuckPermsBackendPersistenceCapability.unavailable(), pluginDataRoot(plugin));
+    }
+
+    public LuckPermsManagementService(JavaPlugin plugin, LuckPermsBackendPersistenceCapability backendPersistence) {
+        this(plugin, backendPersistence, pluginDataRoot(plugin));
+    }
+
+    public LuckPermsManagementService(JavaPlugin plugin, LuckPermsBackendPersistenceCapability backendPersistence,
+                                      Path activeRoot) {
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.backendPersistence = backendPersistence == null ? LuckPermsBackendPersistenceCapability.unavailable() : backendPersistence;
+        operationJournal = operationJournal(activeRoot);
+        try {
+            loadCompleted(operationJournal);
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalStateException("LuckPerms operation journal could not be loaded: " + operationJournal, exception);
+        }
         subscribeEvents();
+    }
+
+    public LuckPermsManagementService(JavaPlugin plugin, LuckPermsBackendPersistenceCapability.Adapter backendAdapter) {
+        this(plugin, backendAdapter == null ? LuckPermsBackendPersistenceCapability.unavailable()
+            : new LuckPermsBackendPersistenceCapability(backendAdapter), pluginDataRoot(plugin));
     }
 
     public void addListener(Consumer<Invalidation> listener) {
@@ -375,10 +405,214 @@ public final class LuckPermsManagementService implements AutoCloseable {
 
     private CompletableFuture<Response> save(Request request, String actor) {
         synchronized (saveLock) {
+            if (persistenceState != PersistenceState.OPEN) {
+                return CompletableFuture.completedFuture(error(request,
+                    "Permission persistence is " + persistenceState.name().toLowerCase(Locale.ROOT) + "; save rejected"));
+            }
             CompletableFuture<Response> result = saveTail.handle((ignored, failure) -> null)
-                .thenCompose(ignored -> performSave(request, actor));
+                .thenCompose(ignored -> admittedSave(request, actor));
             saveTail = result.handle((ignored, failure) -> null);
             return result;
+        }
+    }
+
+    private CompletableFuture<Response> admittedSave(Request request, String actor) {
+        try {
+            return backendPersistence.trackMutation("luckperms-save", () -> performSave(request, actor));
+        } catch (RuntimeException exception) {
+            return CompletableFuture.completedFuture(error(request,
+                "Permission Backend Mutation Rejected: " + message(exception)));
+        }
+    }
+
+    public LuckPermsBackendPersistenceCapability backendPersistence() {
+        return backendPersistence;
+    }
+
+    public Optional<Path> backendPersistenceRoot() {
+        return backendPersistence.activeRoot();
+    }
+
+    public LuckPermsBackendPersistenceCapability.Readiness backendPersistenceReadiness() {
+        return backendPersistence.readiness();
+    }
+
+    public LuckPermsBackendPersistenceCapability.Health backendPersistenceHealth() {
+        return backendPersistence.health();
+    }
+
+    public void flushBackendPersistence() throws IOException {
+        backendPersistence.flush();
+    }
+
+    public void quiesceBackendPersistence() throws IOException {
+        backendPersistence.quiesce();
+    }
+
+    public void quiesceBackendPersistence(Duration timeout) throws IOException {
+        backendPersistence.quiesce(timeout);
+    }
+
+    public void drainBackendPersistence() throws IOException {
+        backendPersistence.drain();
+    }
+
+    public void resumeBackendPersistence() throws IOException {
+        backendPersistence.resume();
+    }
+
+    public LuckPermsBackendPersistenceCapability.SnapshotManifest backupBackendPersistence(Path snapshotRoot) throws IOException {
+        return backendPersistence.backup(snapshotRoot);
+    }
+
+    public void restoreBackendPersistence(Path snapshotRoot) throws IOException {
+        backendPersistence.restore(snapshotRoot);
+    }
+
+    public void restoreBackendPersistence(LuckPermsBackendPersistenceCapability.SnapshotManifest manifest) throws IOException {
+        backendPersistence.restore(manifest);
+    }
+
+    public void rebindBackendPersistence(Path activeRoot) throws IOException {
+        backendPersistence.rebind(activeRoot);
+    }
+
+    public void rebindBackendPersistence(LuckPermsBackendPersistenceCapability.SnapshotManifest manifest, Path activeRoot) throws IOException {
+        backendPersistence.rebind(manifest, activeRoot);
+    }
+
+    public void healthCheckBackendPersistence() throws IOException {
+        backendPersistence.healthCheck();
+    }
+
+    public void closeBackendPersistence() throws IOException {
+        IOException failure = null;
+        if (backendPersistence.state() == LuckPermsBackendPersistenceCapability.State.OPEN) {
+            try {
+                backendPersistence.quiesce();
+            } catch (IOException exception) {
+                failure = exception;
+            }
+        }
+        if (backendPersistence.activeAdmissionCount() > 0) {
+            IOException active = new IOException("LuckPerms backend persistence still has active admissions");
+            if (failure != null) {
+                failure.addSuppressed(active);
+            } else {
+                failure = active;
+            }
+        } else if (backendPersistence.state() != LuckPermsBackendPersistenceCapability.State.CLOSED) {
+            try {
+                backendPersistence.close();
+            } catch (IOException exception) {
+                if (failure != null) {
+                    failure.addSuppressed(exception);
+                } else {
+                    failure = exception;
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    public Path persistenceRoot() {
+        return operationJournal;
+    }
+
+    public void flushPersistence() throws IOException {
+        synchronized (saveLock) {
+            writeJournal(journalSnapshot(), operationJournal);
+        }
+    }
+
+    public void quiescePersistence() throws IOException {
+        CompletableFuture<Void> pending;
+        synchronized (saveLock) {
+            if (persistenceState == PersistenceState.QUIESCED) {
+                return;
+            }
+            if (persistenceState != PersistenceState.OPEN) {
+                throw new IOException("LuckPerms operation persistence is already quiescing");
+            }
+            persistenceState = PersistenceState.QUIESCING;
+            pending = saveTail;
+        }
+        try {
+            pending.join();
+            synchronized (saveLock) {
+                writeJournal(journalSnapshot(), operationJournal);
+                persistenceState = PersistenceState.QUIESCED;
+            }
+        } catch (RuntimeException | IOException failure) {
+            synchronized (saveLock) {
+                persistenceState = PersistenceState.OPEN;
+            }
+            if (failure instanceof IOException exception) {
+                throw exception;
+            }
+            throw new IOException("LuckPerms operation persistence could not quiesce", failure);
+        }
+    }
+
+    public void resumePersistence() throws IOException {
+        synchronized (saveLock) {
+            if (persistenceState == PersistenceState.OPEN) {
+                return;
+            }
+            if (persistenceState != PersistenceState.QUIESCED) {
+                throw new IOException("LuckPerms operation persistence is not quiesced");
+            }
+            healthCheckPersistenceLocked();
+            persistenceState = PersistenceState.OPEN;
+        }
+    }
+
+    public void rebindPersistence(Path activeFile) throws IOException {
+        synchronized (saveLock) {
+            if (persistenceState != PersistenceState.QUIESCED) {
+                throw new IOException("LuckPerms operation persistence must be quiesced before rebind");
+            }
+            Path candidate = requirePersistenceFile(activeFile);
+            List<SaveResult> staged = loadCompletedStrict(candidate);
+            if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
+                writeJournal(staged, candidate);
+                staged = loadCompletedStrict(candidate);
+            }
+            Map<String, SaveResult> previousCompleted = new LinkedHashMap<>(completedSaves);
+            List<String> previousOrder = List.copyOf(completedSaveOrder);
+            Path previousJournal = operationJournal;
+            try {
+                operationJournal = candidate;
+                replaceCompleted(staged);
+                healthCheckPersistenceLocked();
+            } catch (IOException | RuntimeException failure) {
+                operationJournal = previousJournal;
+                completedSaves.clear();
+                completedSaves.putAll(previousCompleted);
+                completedSaveOrder.clear();
+                completedSaveOrder.addAll(previousOrder);
+                throw failure;
+            }
+        }
+    }
+
+    public void healthCheckPersistence() throws IOException {
+        synchronized (saveLock) {
+            healthCheckPersistenceLocked();
+        }
+    }
+
+    public boolean isPersistenceQuiesced() {
+        synchronized (saveLock) {
+            return persistenceState == PersistenceState.QUIESCED;
+        }
+    }
+
+    boolean hasCompletedOperation(String operationId) {
+        synchronized (saveLock) {
+            return operationId != null && completedSaves.containsKey(operationId);
         }
     }
 
@@ -411,9 +645,14 @@ public final class LuckPermsManagementService implements AutoCloseable {
         for (EntityDelete delete : changes.deletes()) {
             mutations.add(() -> deleteMutation(delete));
         }
+        AtomicReference<Invalidation> recordedInvalidation = new AtomicReference<>();
+        AtomicReference<List<AppliedEntity>> recordedEntities = new AtomicReference<>(List.of());
         return runCompensating(mutations, applied -> {
             Invalidation invalidation = recordChange(applied, actor);
-            SaveResult result = new SaveResult(changes.operationId(), true, invalidation.revision(), List.of(), committedEntities(applied, invalidation.revision()));
+            List<AppliedEntity> entities = committedEntities(applied, invalidation.revision());
+            recordedInvalidation.set(invalidation);
+            recordedEntities.set(entities);
+            SaveResult result = new SaveResult(changes.operationId(), true, invalidation.revision(), List.of(), entities);
             rememberCompleted(result);
             notifyInvalidation(invalidation);
             return CompletableFuture.completedFuture(result);
@@ -424,6 +663,9 @@ public final class LuckPermsManagementService implements AutoCloseable {
             Throwable failure = unwrap(exception);
             boolean rollbackFailed = failure instanceof CompensationFailure compensation && compensation.rollbackFailed();
             List<AppliedEntity> applied = failure instanceof CompensationFailure compensation ? compensation.applied() : List.of();
+            if (!rollbackFailed) {
+                rollbackRecordedChange(recordedInvalidation.get(), recordedEntities.get());
+            }
             String detail = rollbackFailed ? message(failure) + ". Recovery Was Incomplete" : message(failure);
             SaveResult result = new SaveResult(changes.operationId(), false, revision.get(), List.of(), applied);
             if (rollbackFailed) {
@@ -437,6 +679,21 @@ public final class LuckPermsManagementService implements AutoCloseable {
             return response(request, rollbackFailed ? "Permissions Need Recovery" : "Permissions Were Not Saved",
                 null, null, null, null, null, null, result);
         });
+    }
+
+    private void rollbackRecordedChange(Invalidation invalidation, List<AppliedEntity> entities) {
+        if (invalidation == null) {
+            return;
+        }
+        long recordedRevision = invalidation.revision();
+        for (AppliedEntity entity : entities == null ? List.<AppliedEntity>of() : entities) {
+            if (entity == null || entity.type() == null || entity.id() == null) {
+                continue;
+            }
+            String key = entity.type() + ":" + entity.id().toLowerCase(Locale.ROOT);
+            entityRevisions.remove(key, recordedRevision);
+        }
+        revision.compareAndSet(recordedRevision, recordedRevision - 1L);
     }
 
     static List<AppliedEntity> committedEntities(List<AppliedEntity> applied, long revision) {
@@ -977,50 +1234,230 @@ public final class LuckPermsManagementService implements AutoCloseable {
         return List.copyOf(audit);
     }
 
-    private synchronized void rememberCompleted(SaveResult result) {
-        if (result.operationId().isBlank() || completedSaves.containsKey(result.operationId())) {
-            return;
-        }
-        List<SaveResult> saved = Stream.concat(
-                completedSaveOrder.stream().map(completedSaves::get).filter(Objects::nonNull),
-                Stream.of(result)
-            )
-            .skip(Math.max(0, completedSaveOrder.size() + 1L - COMPLETED_SAVE_LIMIT))
-            .toList();
-        saveCompleted(saved);
-        completedSaves.put(result.operationId(), result);
-        completedSaveOrder.addLast(result.operationId());
-        while (completedSaveOrder.size() > COMPLETED_SAVE_LIMIT) {
-            completedSaves.remove(completedSaveOrder.removeFirst());
+    private void rememberCompleted(SaveResult result) {
+        synchronized (saveLock) {
+            if (result.operationId().isBlank() || completedSaves.containsKey(result.operationId())) {
+                return;
+            }
+            List<SaveResult> saved = new ArrayList<>(journalSnapshot());
+            saved.add(result);
+            if (saved.size() > COMPLETED_SAVE_LIMIT) {
+                saved = new ArrayList<>(saved.subList(saved.size() - COMPLETED_SAVE_LIMIT, saved.size()));
+            }
+            saveCompleted(saved);
+            replaceCompleted(saved);
         }
     }
 
-    private void loadCompleted() {
-        if (Files.notExists(operationJournal)) {
-            return;
+    private void loadCompleted(Path journal) throws IOException {
+        replaceCompleted(loadCompletedStrict(journal));
+    }
+
+    private List<SaveResult> loadCompletedStrict(Path journal) throws IOException {
+        Path normalized = requirePersistenceFile(journal);
+        if (!Files.exists(normalized, LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        if (!Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS)
+            || Files.isSymbolicLink(normalized)) {
+            throw new IOException("LuckPerms operation journal must be a regular non-symbolic-link file: " + normalized);
+        }
+        JsonElement parsed;
+        try {
+            parsed = JsonParser.parseString(StorageSafety.readUtf8(normalized));
+        } catch (RuntimeException exception) {
+            throw new IOException("LuckPerms operation journal contains invalid JSON: " + normalized, exception);
+        }
+        if (!parsed.isJsonArray()) {
+            throw new IOException("LuckPerms operation journal root must be an array: " + normalized);
+        }
+        validateJournalShape(parsed.getAsJsonArray(), normalized);
+        List<SaveResult> saved;
+        try {
+            saved = GSON.fromJson(parsed, new TypeToken<List<SaveResult>>() {}.getType());
+        } catch (RuntimeException exception) {
+            throw new IOException("LuckPerms operation journal contains an invalid save result: " + normalized, exception);
+        }
+        Set<String> ids = new HashSet<>();
+        for (SaveResult result : saved) {
+            if (result == null || result.operationId().isBlank() || !ids.add(result.operationId())) {
+                throw new IOException("LuckPerms operation journal contains a missing or duplicate operation ID: " + normalized);
+            }
+            validateSaveResult(result, normalized);
+        }
+        List<SaveResult> bounded = saved.size() <= COMPLETED_SAVE_LIMIT
+            ? saved : saved.subList(saved.size() - COMPLETED_SAVE_LIMIT, saved.size());
+        return List.copyOf(bounded);
+    }
+
+    private void validateJournalShape(JsonArray entries, Path journal) throws IOException {
+        for (JsonElement entry : entries) {
+            if (entry == null || !entry.isJsonObject()) {
+                throw new IOException("LuckPerms operation journal contains a non-object save result: " + journal);
+            }
+            JsonObject result = entry.getAsJsonObject();
+            requireText(result, "operationId", false, journal);
+            requireBoolean(result, "applied", journal);
+            requireNumber(result, "revision", journal);
+            JsonArray conflicts = requireArray(result, "conflicts", journal);
+            JsonArray entities = requireArray(result, "entities", journal);
+            for (JsonElement conflict : conflicts) {
+                if (conflict == null || !conflict.isJsonObject()) {
+                    throw new IOException("LuckPerms operation journal contains an invalid conflict: " + journal);
+                }
+                JsonObject value = conflict.getAsJsonObject();
+                requireEntityType(value, journal);
+                requireText(value, "id", false, journal);
+                requireNumber(value, "expectedRevision", journal);
+                requireNumber(value, "actualRevision", journal);
+                requireText(value, "message", true, journal);
+            }
+            for (JsonElement entity : entities) {
+                if (entity == null || !entity.isJsonObject()) {
+                    throw new IOException("LuckPerms operation journal contains an invalid entity: " + journal);
+                }
+                JsonObject value = entity.getAsJsonObject();
+                requireEntityType(value, journal);
+                requireText(value, "id", false, journal);
+                requireNumber(value, "revision", journal);
+                requireBoolean(value, "success", journal);
+                requireText(value, "message", true, journal);
+            }
+        }
+    }
+
+    private String requireText(JsonObject object, String key, boolean allowBlank, Path journal) throws IOException {
+        if (!object.has(key) || !object.get(key).isJsonPrimitive() || !object.getAsJsonPrimitive(key).isString()) {
+            throw new IOException("LuckPerms operation journal field is missing or invalid: " + key + ": " + journal);
+        }
+        String value = object.get(key).getAsString();
+        if (!allowBlank && value.isBlank()) {
+            throw new IOException("LuckPerms operation journal field is blank: " + key + ": " + journal);
+        }
+        return value;
+    }
+
+    private void requireEntityType(JsonObject object, Path journal) throws IOException {
+        String type = requireText(object, "type", false, journal);
+        try {
+            EntityType.valueOf(type);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("LuckPerms operation journal entity type is invalid: " + journal, exception);
+        }
+    }
+
+    private void requireNumber(JsonObject object, String key, Path journal) throws IOException {
+        if (!object.has(key) || !object.get(key).isJsonPrimitive() || !object.getAsJsonPrimitive(key).isNumber()) {
+            throw new IOException("LuckPerms operation journal field is missing or invalid: " + key + ": " + journal);
         }
         try {
-            List<SaveResult> saved = GSON.fromJson(StorageSafety.readUtf8(operationJournal), new TypeToken<List<SaveResult>>() {}.getType());
-            if (saved == null) {
-                return;
+            if (!Double.isFinite(object.get(key).getAsDouble())) {
+                throw new IOException("LuckPerms operation journal field is not finite: " + key + ": " + journal);
             }
-            saved.stream().filter(Objects::nonNull).skip(Math.max(0, saved.size() - COMPLETED_SAVE_LIMIT)).forEach(result -> {
-                if (!result.operationId().isBlank()) {
-                    completedSaves.put(result.operationId(), result);
-                    completedSaveOrder.addLast(result.operationId());
-                }
-            });
-        } catch (IOException | RuntimeException exception) {
-            plugin.getLogger().warning("LuckPerms operation journal could not be loaded: " + message(exception));
+        } catch (RuntimeException exception) {
+            throw new IOException("LuckPerms operation journal field is invalid: " + key + ": " + journal, exception);
         }
+    }
+
+    private void requireBoolean(JsonObject object, String key, Path journal) throws IOException {
+        if (!object.has(key) || !object.get(key).isJsonPrimitive() || !object.getAsJsonPrimitive(key).isBoolean()) {
+            throw new IOException("LuckPerms operation journal field is missing or invalid: " + key + ": " + journal);
+        }
+    }
+
+    private JsonArray requireArray(JsonObject object, String key, Path journal) throws IOException {
+        if (!object.has(key) || !object.get(key).isJsonArray()) {
+            throw new IOException("LuckPerms operation journal field is missing or invalid: " + key + ": " + journal);
+        }
+        return object.getAsJsonArray(key);
+    }
+
+    private void validateSaveResult(SaveResult result, Path journal) throws IOException {
+        if (result.revision() < 0L || result.conflicts() == null || result.entities() == null) {
+            throw new IOException("LuckPerms operation journal contains an invalid save result: " + journal);
+        }
+        for (Conflict conflict : result.conflicts()) {
+            if (conflict == null || conflict.id() == null || conflict.id().isBlank()
+                || conflict.expectedRevision() < 0L || conflict.actualRevision() < 0L) {
+                throw new IOException("LuckPerms operation journal contains an invalid conflict: " + journal);
+            }
+        }
+        for (AppliedEntity entity : result.entities()) {
+            if (entity == null || entity.id() == null || entity.id().isBlank() || entity.revision() < 0L) {
+                throw new IOException("LuckPerms operation journal contains an invalid entity: " + journal);
+            }
+        }
+    }
+
+    private void replaceCompleted(List<SaveResult> saved) {
+        completedSaves.clear();
+        completedSaveOrder.clear();
+        for (SaveResult result : saved) {
+            completedSaves.put(result.operationId(), result);
+            completedSaveOrder.addLast(result.operationId());
+        }
+    }
+
+    private List<SaveResult> journalSnapshot() {
+        return completedSaveOrder.stream().map(completedSaves::get).filter(Objects::nonNull).toList();
     }
 
     private void saveCompleted(List<SaveResult> saved) {
         try {
-            StorageSafety.writeUtf8Atomic(operationJournal, GSON.toJson(saved));
+            writeJournal(saved, operationJournal);
         } catch (IOException exception) {
             throw new IllegalStateException("LuckPerms operation journal could not be saved", exception);
         }
+    }
+
+    private void writeJournal(List<SaveResult> saved, Path target) throws IOException {
+        Path normalized = requirePersistenceFile(target);
+        StorageSafety.writeUtf8Atomic(normalized, GSON.toJson(saved));
+        List<SaveResult> verified = loadCompletedStrict(normalized);
+        if (!GSON.toJson(saved).equals(GSON.toJson(verified))) {
+            throw new IOException("LuckPerms operation journal write verification failed: " + normalized);
+        }
+    }
+
+    private void healthCheckPersistenceLocked() throws IOException {
+        if (!Files.isRegularFile(operationJournal, LinkOption.NOFOLLOW_LINKS)
+            || Files.isSymbolicLink(operationJournal)) {
+            throw new IOException("LuckPerms operation journal is missing: " + operationJournal);
+        }
+        List<SaveResult> persisted = loadCompletedStrict(operationJournal);
+        if (!GSON.toJson(journalSnapshot()).equals(GSON.toJson(persisted))) {
+            throw new IOException("LuckPerms operation journal is out of sync: " + operationJournal);
+        }
+    }
+
+    private Path requirePersistenceFile(Path file) throws IOException {
+        if (file == null) {
+            throw new IOException("LuckPerms operation journal is required");
+        }
+        Path normalized = file.toAbsolutePath().normalize();
+        Path parent = normalized.getParent();
+        if (parent == null || !"runtime".equals(parent.getFileName().toString())
+            || !"luckperms-operations.json".equals(normalized.getFileName().toString())) {
+            throw new IOException("LuckPerms operation journal must be runtime/luckperms-operations.json");
+        }
+        Files.createDirectories(parent);
+        if (Files.isSymbolicLink(parent)) {
+            throw new IOException("LuckPerms operation journal directory cannot be symbolic");
+        }
+        if (Files.exists(normalized, LinkOption.NOFOLLOW_LINKS)
+            && (!Files.isRegularFile(normalized, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(normalized))) {
+            throw new IOException("LuckPerms operation journal must be a regular non-symbolic-link file: " + normalized);
+        }
+        return normalized;
+    }
+
+    private static Path operationJournal(Path activeRoot) {
+        Path root = MigrationPaths.requirePath(activeRoot, "activeRoot");
+        return MigrationPaths.resolveInside(root, "runtime/luckperms-operations.json");
+    }
+
+    private static Path pluginDataRoot(JavaPlugin plugin) {
+        return Objects.requireNonNull(plugin, "plugin").getDataFolder().toPath();
     }
 
     private String pluginVersion() {
@@ -1037,7 +1474,7 @@ public final class LuckPermsManagementService implements AutoCloseable {
 
     private static Throwable unwrap(Throwable throwable) {
         Throwable cause = throwable;
-        while ((cause instanceof CompletionException || cause instanceof java.util.concurrent.ExecutionException) && cause.getCause() != null) {
+        while ((cause instanceof CompletionException || cause instanceof ExecutionException) && cause.getCause() != null) {
             cause = cause.getCause();
         }
         return cause;
@@ -1056,8 +1493,25 @@ public final class LuckPermsManagementService implements AutoCloseable {
         return registration == null ? null : registration.getProvider();
     }
 
+    private enum PersistenceState {
+        OPEN,
+        QUIESCING,
+        QUIESCED
+    }
+
     @Override
     public void close() {
+        closeForModuleShutdown();
+        try {
+            if (backendPersistence.state() != LuckPermsBackendPersistenceCapability.State.CLOSED) {
+                closeBackendPersistence();
+            }
+        } catch (IOException | RuntimeException exception) {
+            plugin.getLogger().warning("LuckPerms backend persistence could not close cleanly: " + message(exception));
+        }
+    }
+
+    public void closeForModuleShutdown() {
         for (EventSubscription<?> subscription : subscriptions) {
             subscription.close();
         }

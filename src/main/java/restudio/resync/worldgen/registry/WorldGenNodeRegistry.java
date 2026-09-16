@@ -1,5 +1,7 @@
 package restudio.resync.worldgen.registry;
 
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
+
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,6 +20,14 @@ public class WorldGenNodeRegistry {
     }
 
     public WorldGenNodeDefinition getDefinition(String nodeId) {
+        return getDefinitionByLocalId(WorldGenNodeIdentity.localId(nodeId));
+    }
+
+    public WorldGenNodeDefinition getDefinition(String nodeId, boolean legacyCompatibility) {
+        return getDefinitionByLocalId(WorldGenNodeIdentity.localId(nodeId, legacyCompatibility));
+    }
+
+    public WorldGenNodeDefinition getDefinitionByLocalId(String nodeId) {
         return definitions.get(nodeId);
     }
 

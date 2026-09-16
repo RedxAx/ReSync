@@ -1,0 +1,2721 @@
+[
+  {
+    "id": "menu_create",
+    "displayName": "Create Menu",
+    "description": "Create a persisted inventory menu with a title and one to six rows.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.create"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "create"
+    ],
+    "examples": [
+      "Connect Flow, provide a new menu ID, title, and row count, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_create"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts menu creation when this execution route is reached."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu ID",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "description": "Sets the stable ID used to save and open the new menu."
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "Menu",
+        "description": "Sets the title shown at the top of the menu."
+      },
+      {
+        "id": "rows",
+        "displayName": "Rows",
+        "name": "rows",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 1,
+        "constraints": {
+          "min": 1,
+          "max": 6
+        },
+        "description": "Sets the menu height from one through six rows."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the menu is saved and ready."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "input",
+          "source": "rows",
+          "target": "rows"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_item",
+    "displayName": "Set Item",
+    "description": "Replace one menu slot with an item and an optional click flow.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.item"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "slot"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, configure the item, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts the slot update."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu whose slot should change."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the zero-based slot to replace."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Selects the material displayed in the slot."
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Sets the item display name."
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "list<string>",
+        "widget": "MULTILINE",
+        "description": "Sets the item lore as lines or comma-separated text."
+      },
+      {
+        "id": "flow_to_execute",
+        "displayName": "Click Flow",
+        "name": "flow_to_execute",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "optional": true,
+        "description": "Selects the flow to run when the item is clicked."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the item is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "input",
+          "source": "flow_to_execute",
+          "target": "flow_to_execute"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_add_item",
+    "displayName": "Add Item",
+    "description": "Place an item in the first empty slot of a menu.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.add.item"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "append"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, configure the item, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_add_item"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts the append operation."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu that receives the item."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Selects the material displayed in the first empty slot."
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Sets the item display name."
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "list<string>",
+        "widget": "MULTILINE",
+        "description": "Sets the item lore as lines or comma-separated text."
+      },
+      {
+        "id": "flow_to_execute",
+        "displayName": "Click Flow",
+        "name": "flow_to_execute",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "optional": true,
+        "description": "Selects the flow to run when the item is clicked."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the item is added."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "input",
+          "source": "flow_to_execute",
+          "target": "flow_to_execute"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_clear",
+    "displayName": "Clear Menu",
+    "description": "Remove every item from a persisted menu.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.clear"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "clear"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, then continue through Flow after its slots are cleared."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_clear"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts clearing the menu."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu whose items should be removed."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after all menu items are cleared."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_open",
+    "displayName": "Open Menu",
+    "description": "Open a persisted menu for a player.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.open"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "open",
+      "player"
+    ],
+    "examples": [
+      "Connect Flow, provide a Player and Menu, then continue through Flow after the menu opens."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_open"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts opening the menu."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "player",
+        "optional": true,
+        "description": "Selects the player who should see the menu; uses the current Flow player when omitted."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to open."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the menu opens."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_update",
+    "displayName": "Update Menu",
+    "description": "Refresh an open menu for a player from its persisted definition.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.update"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "refresh",
+      "player"
+    ],
+    "examples": [
+      "Connect Flow, provide a Player and Menu, then continue through Flow after the open view is refreshed."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_update"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts refreshing the menu."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "player",
+        "optional": true,
+        "description": "Selects the player whose open menu should refresh; uses the current Flow player when omitted."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to refresh."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the menu is refreshed."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_close",
+    "displayName": "Close Menu",
+    "description": "Close the currently open menu for a player.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.close"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "close",
+      "player"
+    ],
+    "examples": [
+      "Connect Flow and provide the Player whose active menu should close."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_close"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts closing the active menu."
+      },
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "player",
+        "optional": true,
+        "description": "Selects the player whose active menu should close; uses the current Flow player when omitted."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the player's active menu closes."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_click_sound",
+    "displayName": "Set Click Sound",
+    "description": "Set the sound played when a menu item is clicked.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.click.sound"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "sound"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Minecraft sound, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_click_sound"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts updating the click sound."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "sound",
+        "displayName": "Sound",
+        "name": "sound",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "sound",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:sound",
+        "defaultValue": "UI_BUTTON_CLICK",
+        "description": "Selects the sound played for item clicks."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the click sound is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "sound",
+          "target": "sound"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_title",
+    "displayName": "Set Title",
+    "description": "Change the title shown by a persisted menu.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.title"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "title"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, set its title, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_title"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the menu title."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "title",
+        "displayName": "Title",
+        "name": "title",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "Menu",
+        "description": "Sets the new menu title."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the title is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_click_action",
+    "displayName": "Set Click Action",
+    "description": "Assign a Flow to run when a menu slot is clicked.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.click.action"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "click",
+      "flow"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, Slot, and Click Flow, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_click_action"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the slot action."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot whose click action should change."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Click Flow",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Selects the flow to run on click."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the click action is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_item_with_action",
+    "displayName": "Set Item With Action",
+    "description": "Replace a menu slot with an item and a click action in one operation.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.item.with.action"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "click"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, Slot, item values, and Flow, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_item_with_action"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts replacing the slot item."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot to replace."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Selects the material displayed in the slot."
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Sets the item display name."
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "list<string>",
+        "widget": "MULTILINE",
+        "description": "Sets the item lore as lines or comma-separated text."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Click Flow",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "description": "Selects the flow to run when the item is clicked."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the item and click action are saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_enchant",
+    "displayName": "Set Enchant",
+    "description": "Toggle the enchanted visual effect on an item in a menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.enchant"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "visual"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, choose whether the item glows, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_enchant"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the item visual."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot whose item should change."
+      },
+      {
+        "id": "enchanted",
+        "displayName": "Enchanted",
+        "name": "enchanted",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "boolean",
+        "defaultValue": false,
+        "description": "Controls whether the item displays the enchanted glow."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the item visual is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "enchanted",
+          "target": "enchanted"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_flags",
+    "displayName": "Set Flags",
+    "description": "Replace the item flags applied to a menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.flags"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "flags"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, provide item flags, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_flags"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the item flags."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot whose item flags should change."
+      },
+      {
+        "id": "flags_list",
+        "displayName": "Flags",
+        "name": "flags_list",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "list<string>",
+        "widget": "MULTILINE",
+        "description": "Provides item flag names as a list, lines, or comma-separated text."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the item flags are saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "flags_list",
+          "target": "flags_list"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_custom_model",
+    "displayName": "Set Custom Model",
+    "description": "Set the custom model data value on an item in a menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.custom.model"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "model"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, enter non-negative model data, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_custom_model"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the custom model data."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot whose item should change."
+      },
+      {
+        "id": "model_data",
+        "displayName": "Custom Model Data",
+        "name": "model_data",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Sets the non-negative custom model data value."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the custom model data is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "model_data",
+          "target": "model_data"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_head_texture",
+    "displayName": "Set Head Texture",
+    "description": "Use a player name or UUID as the head texture for an item in a menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.head.texture"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "head"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, provide a player name or UUID, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_head_texture"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the head texture."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot whose item should become a player head."
+      },
+      {
+        "id": "player_name_or_uuid",
+        "displayName": "Player Name Or UUID",
+        "name": "player_name_or_uuid",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "description": "Provides the player name or UUID used for the head texture."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the head texture is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "input",
+          "source": "player_name_or_uuid",
+          "target": "player_name_or_uuid"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_fill_pattern",
+    "displayName": "Fill Pattern",
+    "description": "Fill an inclusive range of menu slots with the same item visual.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.fill.pattern"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "pattern"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and slot range, configure the item, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_fill_pattern"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts filling the slot range."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "start_slot",
+        "displayName": "Start Slot",
+        "name": "start_slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Sets the first slot in the inclusive range."
+      },
+      {
+        "id": "end_slot",
+        "displayName": "End Slot",
+        "name": "end_slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Sets the last slot in the inclusive range."
+      },
+      {
+        "id": "material",
+        "displayName": "Material",
+        "name": "material",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "material",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:minecraft:material",
+        "defaultValue": "STONE",
+        "description": "Selects the material placed in every slot."
+      },
+      {
+        "id": "name",
+        "displayName": "Name",
+        "name": "name",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "string",
+        "defaultValue": "",
+        "description": "Sets the item display name."
+      },
+      {
+        "id": "lore",
+        "displayName": "Lore",
+        "name": "lore",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "list<string>",
+        "widget": "MULTILINE",
+        "description": "Sets the item lore as lines or comma-separated text."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after every slot in the range is filled."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "start_slot",
+          "target": "start_slot"
+        },
+        {
+          "direction": "input",
+          "source": "end_slot",
+          "target": "end_slot"
+        },
+        {
+          "direction": "input",
+          "source": "material",
+          "target": "material"
+        },
+        {
+          "direction": "input",
+          "source": "name",
+          "target": "name"
+        },
+        {
+          "direction": "input",
+          "source": "lore",
+          "target": "lore"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_clear_slot",
+    "displayName": "Clear Slot",
+    "description": "Remove the item from one menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.clear.slot"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "slot",
+      "clear"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Slot, then continue through Flow after that slot is emptied."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_clear_slot"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts clearing the slot."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot to empty."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the slot is emptied."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_get_item",
+    "displayName": "Get Item",
+    "description": "Read the item currently stored in one menu slot.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": [
+      "menu.get.item"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "query"
+    ],
+    "examples": [
+      "Select a Menu and Slot, then connect Item to an item-compatible input."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_item"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "slot",
+          "target": "slot"
+        },
+        {
+          "direction": "output",
+          "source": "item",
+          "target": "item"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to inspect."
+      },
+      {
+        "id": "slot",
+        "displayName": "Slot",
+        "name": "slot",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 0,
+        "constraints": {
+          "min": 0,
+          "max": 53
+        },
+        "description": "Selects the slot to inspect."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "item",
+        "displayName": "Item",
+        "name": "item",
+        "pinType": "DATA",
+        "direction": "output",
+        "dataType": "item",
+        "optional": true,
+        "description": "Returns the item in the selected slot, or an empty result when the slot has no item."
+      }
+    ]
+  },
+  {
+    "id": "menu_get_all_items",
+    "displayName": "Get All Items",
+    "description": "Read every non-empty item from a menu in slot order.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": [
+      "menu.get.all.items"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "item",
+      "query"
+    ],
+    "examples": [
+      "Select a Menu and connect Items to a list-compatible input."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_all_items"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "output",
+          "source": "items_list",
+          "target": "items"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to inspect."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "items",
+        "displayName": "Items",
+        "name": "items_list",
+        "pinType": "DATA",
+        "direction": "output",
+        "dataType": "list<item>",
+        "description": "Returns the non-empty menu items ordered by their first slot."
+      }
+    ]
+  },
+  {
+    "id": "menu_duplicate",
+    "displayName": "Duplicate",
+    "description": "Copy a persisted menu under a new stable ID.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.duplicate"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "copy"
+    ],
+    "examples": [
+      "Connect Flow, select the source Menu, enter a new ID, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_duplicate"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts the menu copy."
+      },
+      {
+        "id": "source_menu_id",
+        "displayName": "Source Menu",
+        "name": "source_menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to copy."
+      },
+      {
+        "id": "new_menu_id",
+        "displayName": "New Menu ID",
+        "name": "new_menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "description": "Sets the stable ID for the copied menu."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the copied menu is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "source_menu_id",
+          "target": "source_menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "new_menu_id",
+          "target": "new_menu_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_close_action",
+    "displayName": "Set Close Action",
+    "description": "Assign a Flow to run when a menu closes.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.close.action"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "close",
+      "flow"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Close Flow, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_close_action"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the close action."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Close Flow",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "optional": true,
+        "description": "Selects the flow to run when the menu closes."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the close action is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_open_action",
+    "displayName": "Set Open Action",
+    "description": "Assign a Flow to run when a menu opens.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.open.action"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "open",
+      "flow"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu and Open Flow, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_open_action"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the open action."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Open Flow",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "optional": true,
+        "description": "Selects the flow to run when the menu opens."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the open action is saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_set_update_interval",
+    "displayName": "Set Update Interval",
+    "description": "Configure periodic updates and the Flow run for an open menu.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "typed-reference",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "ACTION",
+    "legacyIds": [
+      "menu.set.update.interval"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "update",
+      "schedule"
+    ],
+    "examples": [
+      "Connect Flow, select a Menu, set the interval and update Flow, then continue through Flow."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_set_update_interval"
+    },
+    "inputs": [
+      {
+        "id": "flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "input",
+        "dataType": "execution",
+        "description": "Starts changing the periodic update settings."
+      },
+      {
+        "id": "menu_id",
+        "displayName": "Menu",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "gui_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:gui",
+        "description": "Selects the menu to update."
+      },
+      {
+        "id": "interval_ticks",
+        "displayName": "Interval Ticks",
+        "name": "interval_ticks",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "integer",
+        "defaultValue": 20,
+        "constraints": {
+          "min": 0
+        },
+        "description": "Sets the delay between updates in server ticks; zero disables periodic updates."
+      },
+      {
+        "id": "flow_id",
+        "displayName": "Update Flow",
+        "name": "flow_id",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "flow_id",
+        "widget": "SEARCHABLE_LIST",
+        "optionsSource": "server:resync:flow",
+        "optional": true,
+        "description": "Selects the flow run for each periodic update."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "output_flow",
+        "displayName": "Flow",
+        "name": "flow",
+        "pinType": "FLOW",
+        "direction": "output",
+        "dataType": "execution",
+        "description": "Continues after the update settings are saved."
+      }
+    ],
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "flow",
+          "target": "flow"
+        },
+        {
+          "direction": "input",
+          "source": "menu_id",
+          "target": "menu_id"
+        },
+        {
+          "direction": "input",
+          "source": "interval_ticks",
+          "target": "interval_ticks"
+        },
+        {
+          "direction": "input",
+          "source": "flow_id",
+          "target": "flow_id"
+        },
+        {
+          "direction": "output",
+          "source": "flow",
+          "target": "output_flow"
+        }
+      ]
+    }
+  },
+  {
+    "id": "menu_get_open_menu_id",
+    "displayName": "Get Open Menu ID",
+    "description": "Return the ID of the menu currently open for a player.",
+    "domain": "inventory",
+    "family": "menu",
+    "lifecycle": "active",
+    "handlerCapability": "flow.menu",
+    "selectorIntent": "none",
+    "inspectorIntent": "generic",
+    "owner": "restudio.resync",
+    "category": "MENU",
+    "schemaVersion": 2,
+    "kind": "QUERY",
+    "legacyIds": [
+      "menu.get.open.menu.id"
+    ],
+    "tags": [
+      "menu",
+      "inventory",
+      "query",
+      "player"
+    ],
+    "examples": [
+      "Provide a Player and connect Menu ID to a compatible input."
+    ],
+    "handler": "MenuHandler",
+    "handlerConfig": {
+      "operation": "menu_get_open_menu_id"
+    },
+    "migrationMapping": {
+      "sourceSchemaVersion": 1,
+      "targetSchemaVersion": 2,
+      "complete": true,
+      "pins": [
+        {
+          "direction": "input",
+          "source": "player",
+          "target": "player"
+        },
+        {
+          "direction": "output",
+          "source": "menu_id",
+          "target": "menu_id"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "id": "player",
+        "displayName": "Player",
+        "name": "player",
+        "pinType": "DATA",
+        "direction": "input",
+        "dataType": "player",
+        "optional": true,
+        "description": "Selects the player whose active menu should be read; uses the current Flow player when omitted."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "menu_id",
+        "displayName": "Menu ID",
+        "name": "menu_id",
+        "pinType": "DATA",
+        "direction": "output",
+        "dataType": "gui_id",
+        "optional": true,
+        "description": "Returns the active menu ID, or an empty value when no menu is open."
+      }
+    ]
+  }
+]

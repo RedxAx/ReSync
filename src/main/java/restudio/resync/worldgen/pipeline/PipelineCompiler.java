@@ -2,11 +2,13 @@ package restudio.resync.worldgen.pipeline;
 
 import restudio.flow.data.FlowDataType;
 import restudio.resync.worldgen.contract.WorldGenGenerationMode;
+import restudio.resync.worldgen.contract.WorldGenNodeIdentity;
 import restudio.resync.worldgen.contract.WorldGenTargetVersion;
 import restudio.resync.worldgen.data.WorldGenConnection;
 import restudio.resync.worldgen.data.WorldGenGraph;
 import restudio.resync.worldgen.data.WorldGenNode;
 import restudio.resync.worldgen.data.WorldGenProject;
+import restudio.resync.worldgen.data.WorldGenSerializer;
 import restudio.resync.worldgen.data.WorldGenStage;
 import restudio.resync.worldgen.evaluator.FractalEvaluator;
 import restudio.resync.worldgen.evaluator.NoiseEvaluator;
@@ -25,13 +27,18 @@ import java.util.Set;
 
 public class PipelineCompiler {
     public static WorldGenCompileDiagnostics diagnoseProject(WorldGenProject project) {
+        return diagnoseProject(project, false);
+    }
+
+    public static WorldGenCompileDiagnostics diagnoseProject(WorldGenProject project, boolean legacyCompatibility) {
         long started = System.nanoTime();
         WorldGenCompileDiagnostics diagnostics = new WorldGenCompileDiagnostics();
         try {
+            validateProjectNodeIdentities(project, legacyCompatibility);
             if (isVanilla(project)) {
-                VanillaWorldGenValidator.validate(project);
+                VanillaWorldGenValidator.validate(project, legacyCompatibility);
             } else {
-                compileProject(project);
+                compileProject(project, legacyCompatibility);
             }
             diagnostics.setSuccess(true);
             if (!isVanilla(project)) {
@@ -78,8 +85,13 @@ public class PipelineCompiler {
     }
 
     public static TerrainPipeline compileProject(WorldGenProject project) {
+        return compileProject(project, false);
+    }
+
+    public static TerrainPipeline compileProject(WorldGenProject project, boolean legacyCompatibility) {
         if (project == null) throw new CompilationException("Project Missing");
         if (isVanilla(project)) throw new CompilationException("Vanilla Projects Compile Through The Datapack Pipeline");
+        validateProjectNodeIdentities(project, legacyCompatibility);
         if (project.getSettings() != null) {
             String targetVersion = project.getSettings().getTargetVersion();
             if (targetVersion != null && !targetVersion.isBlank() && !WorldGenTargetVersion.AUTOMATIC.equalsIgnoreCase(targetVersion.trim())) {
@@ -91,24 +103,24 @@ public class PipelineCompiler {
             WorldGenNodeDefinitions.registerDefaults(registry);
         }
         project.rebuildIndices();
-        PipelineValidator.validateTerrainStage(project.getTerrainGraph());
-        PipelineValidator.validateStage(project.getBiomeGraph(), WorldGenStage.BIOME, Set.of("output_biome"), true);
-        PipelineValidator.validateStage(project.getSurfaceGraph(), WorldGenStage.SURFACE, Set.of("output_block"), true);
-        PipelineValidator.validateStage(project.getCaveGraph(), WorldGenStage.CAVE, Set.of(), true);
-        PipelineValidator.validateStage(project.getFeatureGraph(), WorldGenStage.FEATURE, Set.of(), true);
-        PipelineValidator.validateStage(project.getStructureGraph(), WorldGenStage.STRUCTURE, Set.of(), true);
-        PipelineValidator.validateStage(project.getSpawnGraph(), WorldGenStage.SPAWN, Set.of(), true);
+        PipelineValidator.validateTerrainStage(project.getTerrainGraph(), legacyCompatibility);
+        PipelineValidator.validateStage(project.getBiomeGraph(), WorldGenStage.BIOME, Set.of("output_biome"), true, legacyCompatibility);
+        PipelineValidator.validateStage(project.getSurfaceGraph(), WorldGenStage.SURFACE, Set.of("output_block"), true, legacyCompatibility);
+        PipelineValidator.validateStage(project.getCaveGraph(), WorldGenStage.CAVE, Set.of(), true, legacyCompatibility);
+        PipelineValidator.validateStage(project.getFeatureGraph(), WorldGenStage.FEATURE, Set.of(), true, legacyCompatibility);
+        PipelineValidator.validateStage(project.getStructureGraph(), WorldGenStage.STRUCTURE, Set.of(), true, legacyCompatibility);
+        PipelineValidator.validateStage(project.getSpawnGraph(), WorldGenStage.SPAWN, Set.of(), true, legacyCompatibility);
         CompiledGraphs compiled = new CompiledGraphs();
-        compileInto(compiled, "terrain", project.getTerrainGraph());
-        compileInto(compiled, "biome", project.getBiomeGraph());
-        compileInto(compiled, "surface", project.getSurfaceGraph());
-        compileInto(compiled, "cave", project.getCaveGraph());
-        compileInto(compiled, "feature", project.getFeatureGraph());
-        compileInto(compiled, "structure", project.getStructureGraph());
-        compileInto(compiled, "spawn", project.getSpawnGraph());
+        compileInto(compiled, "terrain", project.getTerrainGraph(), legacyCompatibility);
+        compileInto(compiled, "biome", project.getBiomeGraph(), legacyCompatibility);
+        compileInto(compiled, "surface", project.getSurfaceGraph(), legacyCompatibility);
+        compileInto(compiled, "cave", project.getCaveGraph(), legacyCompatibility);
+        compileInto(compiled, "feature", project.getFeatureGraph(), legacyCompatibility);
+        compileInto(compiled, "structure", project.getStructureGraph(), legacyCompatibility);
+        compileInto(compiled, "spawn", project.getSpawnGraph(), legacyCompatibility);
         if (compiled.heightOutput == null && compiled.densityOutput == null) throw new CompilationException("Terrain Output Missing");
         var settings = project.getSettings();
-        BiomePolicyCompiler.Result biomePolicy = BiomePolicyCompiler.compile(project);
+        BiomePolicyCompiler.Result biomePolicy = BiomePolicyCompiler.compile(project, legacyCompatibility);
         return new TerrainPipeline(compiled.nodes, compiled.upstreams, compiled.outputNodes, compiled.heightOutput, compiled.densityOutput,
             compiled.continentalnessOutput, compiled.erosionOutput, compiled.weirdnessOutput, compiled.depthOutput,
             compiled.temperatureOutput, compiled.humidityOutput, compiled.biomeOutput, compiled.blockOutput, compiled.caveOutput, compiled.featureOutput, compiled.structureOutput, compiled.spawnOutput,
@@ -126,17 +138,38 @@ public class PipelineCompiler {
     }
 
     public static TerrainPipeline compile(WorldGenGraph graph) {
+        return compile(graph, false);
+    }
+
+    public static WorldGenProject normalizeForRuntime(WorldGenProject project, boolean legacyCompatibility) {
+        if (project == null) {
+            throw new CompilationException("Project Missing");
+        }
+        validateProjectNodeIdentities(project, legacyCompatibility);
+        WorldGenProject normalized = WorldGenSerializer.deserializeProject(WorldGenSerializer.serializeProject(project));
+        normalizeGraphForRuntime(normalized.getTerrainGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getBiomeGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getSurfaceGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getCaveGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getFeatureGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getStructureGraph(), legacyCompatibility);
+        normalizeGraphForRuntime(normalized.getSpawnGraph(), legacyCompatibility);
+        return normalized;
+    }
+
+    public static TerrainPipeline compile(WorldGenGraph graph, boolean legacyCompatibility) {
         if (graph == null) throw new CompilationException("Graph Missing");
+        validateGraphNodeIdentities(graph, legacyCompatibility);
         WorldGenNodeRegistry registry = WorldGenNodeRegistry.getInstance();
         if (!registry.hasDefinitions()) {
             WorldGenNodeDefinitions.registerDefaults(registry);
         }
         graph.rebuildIndices();
         PipelineValidator.validateDag(graph);
-        PipelineValidator.validateTypes(graph, registry);
+        PipelineValidator.validateTypes(graph, registry, legacyCompatibility);
         Map<String, PipelineNode> nodes = new HashMap<>();
         for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
-            nodes.put(entry.getKey(), createNode(entry.getValue()));
+            nodes.put(entry.getKey(), createNode(entry.getValue(), legacyCompatibility));
         }
         Map<String, Map<String, PipelineNode>> upstreams = new HashMap<>();
         for (WorldGenConnection connection : graph.getConnections()) {
@@ -158,15 +191,16 @@ public class PipelineCompiler {
             if (!nodesWithOutgoing.contains(entry.getKey())) {
                 outputNodes.add(pipelineNode);
             }
-            if ("output_height".equals(entry.getValue().getType())) heightOutput = pipelineNode;
-            if ("output_biome".equals(entry.getValue().getType())) biomeOutput = pipelineNode;
-            if ("output_block".equals(entry.getValue().getType())) blockOutput = pipelineNode;
+            String type = WorldGenNodeIdentity.localId(entry.getValue().getType(), legacyCompatibility);
+            if ("output_height".equals(type)) heightOutput = pipelineNode;
+            if ("output_biome".equals(type)) biomeOutput = pipelineNode;
+            if ("output_block".equals(type)) blockOutput = pipelineNode;
         }
         if (heightOutput == null) throw new CompilationException("Output Height Missing");
         return new TerrainPipeline(nodes, upstreams, outputNodes, heightOutput, biomeOutput, blockOutput);
     }
 
-    private static void compileInto(CompiledGraphs compiled, String prefix, WorldGenGraph graph) {
+    private static void compileInto(CompiledGraphs compiled, String prefix, WorldGenGraph graph, boolean legacyCompatibility) {
         if (graph == null || graph.getNodes().isEmpty()) {
             return;
         }
@@ -174,9 +208,9 @@ public class PipelineCompiler {
         for (Map.Entry<String, WorldGenNode> entry : graph.getNodes().entrySet()) {
             String id = prefix + ":" + entry.getKey();
             ids.put(entry.getKey(), id);
-            PipelineNode node = createNode(entry.getValue());
+            PipelineNode node = createNode(entry.getValue(), legacyCompatibility);
             compiled.nodes.put(id, node);
-            String type = entry.getValue().getType();
+            String type = WorldGenNodeIdentity.localId(entry.getValue().getType(), legacyCompatibility);
             if ("output_height".equals(type)) compiled.heightOutput = node;
             if ("output_density".equals(type)) compiled.densityOutput = node;
             if ("output_continentalness".equals(type)) compiled.continentalnessOutput = node;
@@ -213,8 +247,9 @@ public class PipelineCompiler {
     public static void invalidate(String graphId) {
     }
 
-    private static PipelineNode createNode(WorldGenNode node) {
-        return switch (node.getType()) {
+    private static PipelineNode createNode(WorldGenNode node, boolean legacyCompatibility) {
+        String type = WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility);
+        return switch (type) {
             case "simplex" -> (ctx, upstreams) -> NoiseEvaluator.evaluateSimplex(ctx.x(), ctx.y(), ctx.z(), seed(node, upstreams, ctx), inputFloat(node, upstreams, "frequency", 0.01f));
             case "perlin" -> (ctx, upstreams) -> NoiseEvaluator.evaluatePerlin(ctx.x(), ctx.y(), ctx.z(), seed(node, upstreams, ctx), inputFloat(node, upstreams, "frequency", 0.01f));
             case "value" -> (ctx, upstreams) -> NoiseEvaluator.evaluateValue(ctx.x(), ctx.y(), ctx.z(), seed(node, upstreams, ctx), inputFloat(node, upstreams, "frequency", 0.01f));
@@ -317,8 +352,49 @@ public class PipelineCompiler {
             case "output_features" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");
             case "output_structures" -> (ctx, upstreams) -> input(node, upstreams, "placements", "");
             case "output_spawns" -> (ctx, upstreams) -> input(node, upstreams, "table", "");
-            default -> throw new CompilationException("Unsupported Node " + node.getType());
+            default -> throw new CompilationException("Unsupported Node " + type);
         };
+    }
+
+    private static void validateProjectNodeIdentities(WorldGenProject project, boolean legacyCompatibility) {
+        if (project == null) {
+            return;
+        }
+        validateGraphNodeIdentities(project.getTerrainGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getBiomeGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getSurfaceGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getCaveGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getFeatureGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getStructureGraph(), legacyCompatibility);
+        validateGraphNodeIdentities(project.getSpawnGraph(), legacyCompatibility);
+    }
+
+    private static void normalizeGraphForRuntime(WorldGenGraph graph, boolean legacyCompatibility) {
+        if (graph == null || graph.getNodes() == null) {
+            return;
+        }
+        for (WorldGenNode node : graph.getNodes().values()) {
+            if (node != null) {
+                node.setType(WorldGenNodeIdentity.localId(node.getType(), legacyCompatibility));
+            }
+        }
+        graph.rebuildIndices();
+    }
+
+    private static void validateGraphNodeIdentities(WorldGenGraph graph, boolean legacyCompatibility) {
+        if (graph == null || graph.getNodes() == null) {
+            return;
+        }
+        for (WorldGenNode node : graph.getNodes().values()) {
+            if (node == null) {
+                throw new CompilationException("WorldGen Node Missing");
+            }
+            try {
+                WorldGenNodeIdentity.canonical(node.getType(), legacyCompatibility);
+            } catch (RuntimeException exception) {
+                throw new CompilationException(exception.getMessage());
+            }
+        }
     }
 
     private static Object input(WorldGenNode node, Map<String, PipelineNode> upstreams, String pin, Object fallback) {

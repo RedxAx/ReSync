@@ -4,13 +4,15 @@ import restudio.flow.data.FlowDataType;
 import restudio.flow.data.FlowTypeRef;
 import restudio.resync.api.OptionCatalogRegistry;
 import restudio.resync.flow.handler.HandlerRegistry;
+import restudio.resync.flow.identity.PinId;
 import restudio.resync.resources.ReSyncResourceCatalog;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class NodeDefinitionValidator {
     private static final Set<String> RESERVED_VISIBLE_WHEN_KEYS = Set.of("__flow_branches");
@@ -24,6 +26,9 @@ public class NodeDefinitionValidator {
         public boolean hasWarnings() {
             return !warnings.isEmpty();
         }
+    }
+
+    private record RepeatableAlias(NodeDefinition.PinDefinition pin, String base, String identityKind, int maxItems) {
     }
 
     private final HandlerRegistry handlerRegistry;
@@ -127,27 +132,16 @@ public class NodeDefinitionValidator {
 
         validateAvailability(def, errors);
 
-        Set<String> inputNames = new HashSet<>();
-        if (def.getInputs() != null) {
-            for (NodeDefinition.PinDefinition pin : def.getInputs()) {
-                validatePin(pin, NodeDefinition.PinDirection.INPUT, errors, warnings);
-                if (pin.getName() != null && !inputNames.add(pin.getName())) {
-                    errors.add("Duplicate input pin name: " + pin.getName());
-                }
-            }
-        }
+        Map<String, String> inputIdentities = new LinkedHashMap<>();
+        Map<String, String> outputIdentities = new LinkedHashMap<>();
+        validatePins(def.getInputs(), NodeDefinition.PinDirection.INPUT, inputIdentities, errors, warnings);
+        validatePins(def.getOutputs(), NodeDefinition.PinDirection.OUTPUT, outputIdentities, errors, warnings);
 
-        Set<String> outputNames = new HashSet<>();
-        if (def.getOutputs() != null) {
-            for (NodeDefinition.PinDefinition pin : def.getOutputs()) {
-                validatePin(pin, NodeDefinition.PinDirection.OUTPUT, errors, warnings);
-                if (pin.getName() != null && !outputNames.add(pin.getName())) {
-                    errors.add("Duplicate output pin name: " + pin.getName());
-                }
-            }
-        }
-
-        validateVisibleWhen(def, inputNames, errors);
+        Set<String> inputIds = def.getInputs() == null ? Set.of() : def.getInputs().stream()
+            .filter(pin -> pin != null && pin.getId() != null)
+            .map(pin -> pin.getId().value())
+            .collect(Collectors.toSet());
+        validateVisibleWhen(def, inputIds, errors);
         validateKindContract(def, errors, warnings);
 
         return new ValidationResult(errors.isEmpty(), errors, warnings);
@@ -190,18 +184,98 @@ public class NodeDefinitionValidator {
         }
     }
 
-    private void validateVisibleWhen(NodeDefinition def, Set<String> inputNames, List<String> errors) {
-        validateVisibleWhen(def.getInputs(), inputNames, errors);
-        validateVisibleWhen(def.getOutputs(), inputNames, errors);
+    private void validatePins(List<NodeDefinition.PinDefinition> pins, NodeDefinition.PinDirection direction,
+                              Map<String, String> identities,
+                              List<String> errors, List<String> warnings) {
+        if (pins == null) {
+            return;
+        }
+        List<RepeatableAlias> repeatableAliases = collectRepeatableAliases(pins);
+        for (NodeDefinition.PinDefinition pin : pins) {
+            validatePin(pin, direction, errors, warnings);
+            if (pin == null || pin.getId() == null) {
+                continue;
+            }
+            String id = pin.getId().value();
+            registerPinIdentity(id, "stable ID", direction, pin, repeatableAliases, identities, errors);
+            String runtimeName = pin.getRuntimeName();
+            if (runtimeName != null && !runtimeName.equals(id)) {
+                registerPinIdentity(runtimeName, "runtime name", direction, pin, repeatableAliases, identities, errors);
+            }
+        }
     }
 
-    private void validateVisibleWhen(List<NodeDefinition.PinDefinition> pins, Set<String> inputNames, List<String> errors) {
+    private List<RepeatableAlias> collectRepeatableAliases(List<NodeDefinition.PinDefinition> pins) {
+        List<RepeatableAlias> aliases = new ArrayList<>();
+        for (NodeDefinition.PinDefinition pin : pins) {
+            if (pin == null || pin.getId() == null || pin.getRepeatable() == null) {
+                continue;
+            }
+            NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
+            aliases.add(new RepeatableAlias(pin, pin.getId().value(), "stable ID", repeatable.getMaxItems()));
+            String runtimeName = pin.getRuntimeName();
+            if (runtimeName != null && !runtimeName.equals(pin.getId().value())) {
+                aliases.add(new RepeatableAlias(pin, runtimeName, "runtime name", repeatable.getMaxItems()));
+            }
+        }
+        return aliases;
+    }
+
+    private void registerPinIdentity(String token, String identityKind, NodeDefinition.PinDirection direction,
+                                     NodeDefinition.PinDefinition pin, List<RepeatableAlias> repeatableAliases,
+                                     Map<String, String> identities, List<String> errors) {
+        String previousKind = identities.putIfAbsent(token, identityKind);
+        String directionName = direction.name().toLowerCase();
+        if (previousKind != null && previousKind.equals(identityKind)) {
+            if ("stable ID".equals(identityKind)) {
+                errors.add("Duplicate pin ID: " + token);
+            } else {
+                errors.add("Duplicate " + directionName + " pin runtime name: " + token);
+            }
+        }
+        if (previousKind != null && !previousKind.equals(identityKind)) {
+            errors.add("Pin identity collision in " + directionName + " pins: " + token
+                + " is used as both " + previousKind + " and " + identityKind);
+        }
+        for (RepeatableAlias alias : repeatableAliases) {
+            if (alias.pin() == pin) {
+                continue;
+            }
+            int index = repeatableAliasIndex(token, alias);
+            if (index >= 1) {
+                errors.add("Pin identity collision in " + directionName + " pins: " + token
+                    + " is declared as " + identityKind + " but is a repeatable " + alias.identityKind()
+                    + " expansion of " + alias.base() + " at index " + index);
+                break;
+            }
+        }
+    }
+
+    private int repeatableAliasIndex(String token, RepeatableAlias alias) {
+        String prefix = alias.base() + "_";
+        if (!token.startsWith(prefix)) {
+            return -1;
+        }
+        String suffix = token.substring(prefix.length());
+        if (suffix.isEmpty() || suffix.length() > 9 || !suffix.chars().allMatch(Character::isDigit)) {
+            return -1;
+        }
+        int index = Integer.parseInt(suffix);
+        return index >= 1 && index <= alias.maxItems() ? index : -1;
+    }
+
+    private void validateVisibleWhen(NodeDefinition def, Set<String> pinIds, List<String> errors) {
+        validateVisibleWhen(def.getInputs(), pinIds, errors);
+        validateVisibleWhen(def.getOutputs(), pinIds, errors);
+    }
+
+    private void validateVisibleWhen(List<NodeDefinition.PinDefinition> pins, Set<String> pinIds, List<String> errors) {
         if (pins == null) {
             return;
         }
         for (NodeDefinition.PinDefinition pin : pins) {
             for (Map.Entry<String, String> condition : pin.getVisibleWhen().entrySet()) {
-                if (!inputNames.contains(condition.getKey()) && !RESERVED_VISIBLE_WHEN_KEYS.contains(condition.getKey())) {
+                if (!pinIds.contains(condition.getKey()) && !RESERVED_VISIBLE_WHEN_KEYS.contains(condition.getKey())) {
                     errors.add("Pin " + pin.getName() + " visibleWhen references unknown input: " + condition.getKey());
                 }
                 if (condition.getValue() == null || condition.getValue().isBlank()) {
@@ -263,8 +337,12 @@ public class NodeDefinitionValidator {
         }
         return def.getInputs().stream().anyMatch(pin ->
             pin.getType() == NodeDefinition.PinType.DATA
-                && ("mode".equalsIgnoreCase(pin.getName()) || "action".equalsIgnoreCase(pin.getName()))
+                && (matchesPinSemantic(pin, "mode") || matchesPinSemantic(pin, "action"))
         );
+    }
+
+    private boolean matchesPinSemantic(NodeDefinition.PinDefinition pin, String semantic) {
+        return pin != null && (semantic.equalsIgnoreCase(pin.getName()) || semantic.equalsIgnoreCase(pin.getRuntimeName()));
     }
 
     private void validatePin(NodeDefinition.PinDefinition pin, NodeDefinition.PinDirection expectedDirection, List<String> errors, List<String> warnings) {
@@ -273,41 +351,53 @@ public class NodeDefinitionValidator {
             return;
         }
 
-        if (pin.getName() == null || pin.getName().isBlank()) {
-            errors.add("Pin name is required for " + expectedDirection.name().toLowerCase());
+        if (pin.getId() == null) {
+            errors.add("Pin ID is required for " + expectedDirection.name().toLowerCase());
+        } else {
+            try {
+                if (!pin.getId().equals(PinId.of(pin.getId().value()))) {
+                    errors.add("Pin ID is not canonical: " + pin.getId().value());
+                }
+            } catch (RuntimeException exception) {
+                errors.add("Pin ID is invalid: " + pin.getId().value());
+            }
+        }
+
+        if (pin.getDisplayName() == null || pin.getDisplayName().isBlank()) {
+            errors.add("Pin display name is required for " + pin.getId());
         }
 
         if (pin.getDirection() != expectedDirection) {
-            errors.add("Pin " + pin.getName() + " has mismatched direction");
+            errors.add("Pin " + pin.getId() + " has mismatched direction");
         }
 
         if (pin.getType() == null) {
-            errors.add("Pin type is required for " + pin.getName());
+            errors.add("Pin type is required for " + pin.getId());
         }
 
         FlowDataType dataType = pin.getDataType();
         if (dataType == null) {
-            errors.add("Data type is required for pin " + pin.getName());
+            errors.add("Data type is required for pin " + pin.getId());
         } else if (!dataType.isResolved()) {
-            errors.add("Unresolved data type for pin " + pin.getName() + ": " + dataType.getId() + " owned by " + dataType.getOwner());
+            errors.add("Unresolved data type for pin " + pin.getId() + ": " + dataType.getId() + " owned by " + dataType.getOwner());
         } else if (dataType == FlowDataType.ANY && strict) {
             if (pin.getType() == NodeDefinition.PinType.DATA) {
-                warnings.add("Pin " + pin.getName() + " uses generic ANY data type");
+                warnings.add("Pin " + pin.getId() + " uses generic ANY data type");
             }
         }
         validateTypeRef(pin, errors, warnings);
         NodeDefinition.RepeatablePin repeatable = pin.getRepeatable();
         if (repeatable != null) {
             if (repeatable.getGroupId() == null || repeatable.getGroupId().isBlank()) {
-                errors.add("Repeatable pin " + pin.getName() + " requires a groupId");
+                errors.add("Repeatable pin " + pin.getId() + " requires a groupId");
             }
             if (repeatable.getMaxItems() < 1 || repeatable.getMinItems() > repeatable.getMaxItems()) {
-                errors.add("Repeatable pin " + pin.getName() + " has invalid item bounds");
+                errors.add("Repeatable pin " + pin.getId() + " has invalid item bounds");
             }
         }
 
         if (pin.getOptionsSource() != null && !pin.getOptionsSource().isBlank() && (optionCatalogRegistry == null || !optionCatalogRegistry.contains(pin.getOptionsSource()))) {
-            errors.add("Unknown optionsSource for pin " + pin.getName() + ": " + pin.getOptionsSource());
+            errors.add("Unknown optionsSource for pin " + pin.getId() + ": " + pin.getOptionsSource());
         }
     }
 

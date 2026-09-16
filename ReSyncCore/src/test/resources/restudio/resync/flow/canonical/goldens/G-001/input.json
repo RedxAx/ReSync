@@ -1,0 +1,20 @@
+{
+  "canonicalProbe": {"😀":1e+2,"":-0.00,"text":"<>&"},
+  "ownerId": "example.reference",
+  "kind": "contribution",
+  "version": "1.0.0",
+  "contractRange": {"maximum":{"minor":0,"generation":1},"minimum":{"generation":1,"minor":0}},
+  "dependencies": [],
+  "definitions": [],
+  "types": [],
+  "conversions": [],
+  "categories": [],
+  "optionSources": [],
+  "validators": [],
+  "editors": [],
+  "previews": [],
+  "capabilities": [],
+  "runtimeRequirements": [],
+  "migrations": [],
+  "provenance": {"sourceVersion":"1.0.0","sourceUri":"extension:example.reference","sourceKind":"extension","sourceHash":"1111111111111111111111111111111111111111111111111111111111111111","buildId":"reference-1"}
+}

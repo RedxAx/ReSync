@@ -14,39 +14,110 @@ import java.util.stream.Collectors;
 
 public final class RuntimeDataRegistry {
     private final Map<String, Map<String, RuntimeDataAdapter<?>>> adapters = new ConcurrentHashMap<>();
+    private volatile ExtensionRegistryActivation activation;
+
+    public void bindActivation(ExtensionRegistryActivation activation) {
+        this.activation = activation;
+    }
 
     public boolean register(RuntimeDataAdapter<?> adapter) {
         if (adapter == null || normalize(adapter.id()).isBlank() || normalize(adapter.domain()).isBlank()) {
             return false;
         }
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            return current.update(RuntimeDataRegistry.class, target -> target.registerLocal(adapter));
+        }
+        return registerLocal(adapter);
+    }
+
+    private boolean registerLocal(RuntimeDataAdapter<?> adapter) {
         return adapters.computeIfAbsent(normalize(adapter.domain()), ignored -> new ConcurrentHashMap<>())
             .putIfAbsent(normalize(adapter.id()), adapter) == null;
     }
 
     public void unregister(String adapterId) {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(RuntimeDataRegistry.class, target -> {
+                target.unregisterLocal(adapterId);
+                return null;
+            });
+            return;
+        }
+        unregisterLocal(adapterId);
+    }
+
+    private void unregisterLocal(String adapterId) {
         String normalized = normalize(adapterId);
         adapters.values().forEach(domainAdapters -> domainAdapters.remove(normalized));
         adapters.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     public RuntimeDataAdapter<?> adapter(String adapterId) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.adapter(adapterId);
+        }
         String normalized = normalize(adapterId);
         return adapters.values().stream().map(domain -> domain.get(normalized)).filter(value -> value != null).findFirst().orElse(null);
     }
 
     public List<RuntimeDataAdapter<?>> adapters(String domain) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.adapters(domain);
+        }
         return adapters.getOrDefault(normalize(domain), Map.of()).values().stream()
             .filter(RuntimeDataAdapter::available)
             .sorted(Comparator.comparing(RuntimeDataAdapter::id, String.CASE_INSENSITIVE_ORDER))
             .toList();
     }
 
+    public RuntimeDataRegistry copy() {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            return current.snapshot().runtimeData();
+        }
+        RuntimeDataRegistry copy = new RuntimeDataRegistry();
+        adapters.forEach((domain, values) -> copy.adapters.put(domain, new ConcurrentHashMap<>(values)));
+        return copy;
+    }
+
+    public synchronized void replaceFrom(RuntimeDataRegistry staged) {
+        ExtensionRegistryActivation current = activation;
+        if (current != null) {
+            current.update(RuntimeDataRegistry.class, target -> {
+                target.replaceFromLocal(staged);
+                return null;
+            });
+            return;
+        }
+        replaceFromLocal(staged);
+    }
+
+    private synchronized void replaceFromLocal(RuntimeDataRegistry staged) {
+        if (staged == null) {
+            throw new IllegalArgumentException("A staged runtime data registry is required");
+        }
+        adapters.clear();
+        staged.adapters.forEach((domain, values) -> adapters.put(domain, new ConcurrentHashMap<>(values)));
+    }
+
     public List<String> domains() {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.domains();
+        }
         return adapters.entrySet().stream().filter(entry -> entry.getValue().values().stream().anyMatch(RuntimeDataAdapter::available))
             .map(Map.Entry::getKey).sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
     public List<RuntimeDataRecord> query(String domain, RuntimeDataQuery query) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.query(domain, query);
+        }
         RuntimeDataQuery effective = query != null ? query : RuntimeDataQuery.all();
         List<RuntimeDataRecord> values = new ArrayList<>();
         for (RuntimeDataAdapter<?> adapter : adapters(domain)) {
@@ -71,11 +142,19 @@ public final class RuntimeDataRegistry {
     }
 
     public Optional<RuntimeDataRecord> random(String domain, RuntimeDataQuery query) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.random(domain, query);
+        }
         List<RuntimeDataRecord> records = query(domain, query);
         return records.isEmpty() ? Optional.empty() : Optional.of(records.get(ThreadLocalRandom.current().nextInt(records.size())));
     }
 
     public Object resolve(RuntimeDataRecord record, int amount) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.resolve(record, amount);
+        }
         RuntimeDataAdapter<?> adapter = record != null ? adapter(record.adapterId()) : null;
         if (adapter == null || !normalize(adapter.domain()).equals(normalize(record.domain()))
             || !adapter.capabilities().contains(RuntimeDataCapability.RESOLVE)) {
@@ -85,6 +164,10 @@ public final class RuntimeDataRegistry {
     }
 
     public List<Object> resolveAll(List<RuntimeDataRecord> records, int amount) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.resolveAll(records, amount);
+        }
         if (records == null || records.isEmpty()) {
             return List.of();
         }
@@ -92,6 +175,10 @@ public final class RuntimeDataRegistry {
     }
 
     public RuntimeDataRecord describe(String domain, Object value) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.describe(domain, value);
+        }
         if (value == null) {
             return null;
         }
@@ -105,6 +192,10 @@ public final class RuntimeDataRegistry {
     }
 
     public List<RuntimeDataCategory> categories(String domain, RuntimeDataQuery query) {
+        RuntimeDataRegistry activeRegistry = activeRegistry();
+        if (activeRegistry != this) {
+            return activeRegistry.categories(domain, query);
+        }
         RuntimeDataQuery effective = query != null ? query.withoutCategoryFilter() : RuntimeDataQuery.all();
         Map<String, List<RuntimeDataRecord>> grouped = query(domain, effective).stream()
             .flatMap(record -> record.categories().stream().map(category -> Map.entry(category, record)))
@@ -138,5 +229,10 @@ public final class RuntimeDataRegistry {
 
     private static String normalize(String value) {
         return value != null ? value.trim().toLowerCase(Locale.ROOT) : "";
+    }
+
+    private RuntimeDataRegistry activeRegistry() {
+        ExtensionRegistryActivation current = activation;
+        return current != null ? current.snapshot().runtimeData() : this;
     }
 }
